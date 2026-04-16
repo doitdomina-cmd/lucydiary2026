@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Writer's Perfect Routine 2026</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -28,19 +28,27 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
 
+    <!-- Mobile Drag and Drop Polyfill -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/mobile-drag-drop@2.3.0-rc.2/default.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/mobile-drag-drop@2.3.0-rc.2/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mobile-drag-drop@2.3.0-rc.2/scroll-behaviour.min.js"></script>
+
     <style>
-        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         body { -webkit-font-smoothing: antialiased; }
-        .hidden { display: none; }
+        .hidden { display: none !important; }
         .dragging { opacity: 0.5; }
         .drag-over { border: 2px dashed #94a3b8 !important; background-color: rgba(255, 255, 255, 0.8) !important; }
         .drag-over-calendar { background-color: rgba(241, 245, 249, 0.8) !important; border: 2px dashed #94a3b8 !important; }
         .edit-input { width: 100%; border: none; background: transparent; border-bottom: 1px solid #94a3b8; outline: none; padding: 2px 0; }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* 모바일 드래그 앤 드롭 폴리필용 설정 */
+        .dnd-poly-drag-image { opacity: 0.8 !important; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); border-radius: 8px; z-index: 9999; }
     </style>
 </head>
 <body id="body" class="bg-slate-50 transition-colors duration-500">
@@ -55,15 +63,16 @@
                 bg-pink-100 text-pink-800 border-pink-200 peer-checked:border-pink-500 bg-pink-500">
     </div>
 
-    <div id="app" class="max-w-[1600px] mx-auto p-4 md:p-6 min-h-screen flex flex-col">
+    <div id="app" class="max-w-[1600px] mx-auto p-3 md:p-6 min-h-screen flex flex-col">
         <header class="mb-6 flex flex-col md:flex-row items-center justify-between gap-4">
-            <div>
-                <h1 id="app-title" class="text-3xl font-bold flex items-center gap-2 transition-colors">
-                    <i data-lucide="calendar" class="w-8 h-8"></i>
+            <div class="w-full md:w-auto text-center md:text-left">
+                <h1 id="app-title" class="text-2xl md:text-3xl font-bold flex items-center justify-center md:justify-start gap-2 transition-colors">
+                    <i data-lucide="calendar" class="w-7 h-7 md:w-8 md:h-8"></i>
                     Lucy's Diary
                 </h1>
             </div>
-            <nav id="nav-tabs" class="flex bg-white p-1.5 rounded-2xl shadow-sm border overflow-x-auto transition-colors"></nav>
+            <!-- 모바일 네비게이션 가로 스크롤 허용 -->
+            <nav id="nav-tabs" class="flex w-full md:w-auto bg-white p-1.5 rounded-2xl shadow-sm border overflow-x-auto scrollbar-hide transition-colors snap-x"></nav>
         </header>
 
         <!-- 데이터 로딩 상태 표시 -->
@@ -76,14 +85,21 @@
         
         <div id="modal-container"></div>
 
-        <footer id="footer" class="mt-12 pb-8 text-center text-xs transition-colors hidden">
+        <footer id="footer" class="mt-10 pb-6 text-center text-xs transition-colors hidden">
             <p>Managing Writer is Invincible - Data Synchronized via Cloud</p>
         </footer>
     </div>
 
     <script>
+        // 모바일 터치 드래그 앤 드롭 지원 초기화 (0.3초 꾹 누르면 드래그 시작)
+        window.addEventListener('touchmove', function() {}, {passive: false});
+        MobileDragDrop.polyfill({
+            holdToDrag: 300,
+            dragImageTranslateOverride: MobileDragDrop.scrollBehaviourDragImageTranslateOverride
+        });
+
         // ============================================================================
-        // [중요] 작가님의 파이어베이스 프로젝트 설정값으로 반드시 교체하십시오.
+        // 파이어베이스 프로젝트 설정값
         // ============================================================================
         const firebaseConfig = {
             apiKey: "AIzaSyCYWsMUSAaxnnTNoNjxw8YfZThv9-5mHak",
@@ -101,7 +117,6 @@
         try {
             firebase.initializeApp(firebaseConfig);
             db = firebase.firestore();
-            // 단일 사용자용 데이터베이스 문서 경로 (users 컬렉션의 myRoutineData 문서)
             docRef = db.collection("users").doc("myRoutineData");
         } catch (error) {
             console.error("Firebase 초기화 실패:", error);
@@ -178,10 +193,10 @@
         let lastNotifiedTime = "";
         let focusTargetId = null;
 
-        // Custom Toast UI (대체 alert)
+        // Custom Toast UI
         function showToast(msg, isError = false) {
             const toast = document.createElement('div');
-            toast.className = `fixed bottom-6 right-6 px-6 py-3 rounded-xl shadow-2xl z-[100] font-bold text-sm transition-all duration-300 transform translate-y-0 opacity-100 ${isError ? 'bg-red-600 text-white' : 'bg-slate-800 text-white'}`;
+            toast.className = `fixed bottom-6 right-6 left-6 md:left-auto px-6 py-3 rounded-xl shadow-2xl z-[100] font-bold text-sm text-center md:text-left transition-all duration-300 transform translate-y-0 opacity-100 ${isError ? 'bg-red-600 text-white' : 'bg-slate-800 text-white'}`;
             toast.textContent = msg;
             document.body.appendChild(toast);
             setTimeout(() => { 
@@ -192,8 +207,8 @@
 
         // --- Firebase Data Fetching ---
         function loadData() {
-            if (!docRef || firebaseConfig.apiKey.includes("여기에")) {
-                showToast("Firebase가 아직 연결되지 않았습니다. config 값을 세팅하세요.", true);
+            if (!docRef) {
+                showToast("Firebase 설정 오류입니다.", true);
                 hideLoading();
                 render(); 
                 return;
@@ -228,7 +243,6 @@
                         render();
                     }
                 } else {
-                    // 최초 접속
                     saveData();
                 }
             }).catch((error) => {
@@ -239,12 +253,11 @@
             });
         }
 
-        // --- Firebase Data Saving ---
         function saveData() {
             const { editing, ...dataToSave } = state;
             dataToSave.themeId = state.theme.id;
             
-            if (docRef && !firebaseConfig.apiKey.includes("여기에")) {
+            if (docRef) {
                 docRef.set(dataToSave).then(() => {
                     hideLoading();
                     requestAnimationFrame(render);
@@ -343,11 +356,11 @@
             if (t.customBg) body.className = `${t.customBg} text-${t.secondary}-900 font-sans transition-colors duration-500`;
             else body.className = `bg-${t.bg}-50 text-${t.secondary}-900 font-sans transition-colors duration-500`;
             const title = document.getElementById('app-title');
-            title.className = `text-3xl font-bold flex items-center gap-2 text-${t.primary}-900 transition-colors`;
+            title.className = `text-2xl md:text-3xl font-bold flex items-center justify-center md:justify-start gap-2 text-${t.primary}-900 transition-colors`;
             const titleIcon = title.querySelector('i');
-            if(titleIcon) titleIcon.className = `w-8 h-8 text-${t.primary}-600`;
-            document.getElementById('nav-tabs').className = `flex bg-white p-1.5 rounded-2xl shadow-sm border border-${t.secondary}-100 overflow-x-auto transition-colors`;
-            document.getElementById('footer').className = `mt-12 pb-8 text-center text-${t.secondary}-400 text-xs transition-colors hidden md:block`;
+            if(titleIcon) titleIcon.className = `w-7 h-7 md:w-8 md:h-8 text-${t.primary}-600`;
+            document.getElementById('nav-tabs').className = `flex w-full md:w-auto bg-white p-1.5 rounded-2xl shadow-sm border overflow-x-auto scrollbar-hide transition-colors snap-x`;
+            document.getElementById('footer').className = `mt-10 pb-6 text-center text-${t.secondary}-400 text-xs transition-colors block`;
         }
 
         function renderHeader() {
@@ -364,7 +377,8 @@
                 const activeClass = `bg-${state.theme.primary}-500 text-white shadow-md`;
                 const inactiveClass = `text-${state.theme.secondary}-500 hover:bg-${state.theme.bg || 'white'}-50`; 
                 const iconColor = tab.id === 'health' && !isActive ? `text-${state.theme.accent}-500` : '';
-                return `<button onclick="setState('activeTab', '${tab.id}')" class="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${isActive ? activeClass : inactiveClass}"><i data-lucide="${tab.icon}" class="w-4 h-4 ${iconColor}"></i> ${tab.label}</button>`;
+                // 탭이 화면 밖으로 넘어갈 때 스와이프 가능하도록 flex-shrink-0 및 snap 적용
+                return `<button onclick="setState('activeTab', '${tab.id}')" class="snap-start flex-shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${isActive ? activeClass : inactiveClass}"><i data-lucide="${tab.icon}" class="w-4 h-4 ${iconColor}"></i> ${tab.label}</button>`;
             }).join('');
         }
 
@@ -391,80 +405,84 @@
             }
 
             container.innerHTML = `
-                <div class="bg-white rounded-3xl shadow-sm border border-${t.secondary}-100 p-6">
-                    <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-2xl font-bold flex items-center gap-3 text-${t.primary}-900">
-                            <i data-lucide="calendar-days" class="w-7 h-7 text-${t.primary}-600"></i> ${year}.${String(month + 1).padStart(2, '0')}
+                <div class="bg-white rounded-3xl shadow-sm border border-${t.secondary}-100 p-4 md:p-6 overflow-hidden">
+                    <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                        <h2 class="text-xl md:text-2xl font-bold flex items-center gap-2 text-${t.primary}-900">
+                            <i data-lucide="calendar-days" class="w-6 h-6 md:w-7 md:h-7 text-${t.primary}-600"></i> ${year}.${String(month + 1).padStart(2, '0')}
                         </h2>
-                        <div class="flex items-center gap-4">
-                            <div class="flex gap-1 bg-${t.bg || 'slate'}-100 p-1.5 rounded-xl">
+                        <div class="flex w-full md:w-auto items-center justify-between md:justify-end gap-3">
+                            <div class="flex gap-1 bg-${t.bg || 'slate'}-100 p-1 rounded-xl">
                                 <button onclick="changeCalendarMonth(-1)" class="p-2 hover:bg-white rounded-lg transition-all"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
-                                <button onclick="setCalendarToToday()" class="px-4 py-1 text-sm font-bold text-${t.secondary}-700 hover:bg-white rounded-lg transition-all">오늘</button>
+                                <button onclick="setCalendarToToday()" class="px-3 py-1 text-sm font-bold text-${t.secondary}-700 hover:bg-white rounded-lg transition-all">오늘</button>
                                 <button onclick="changeCalendarMonth(1)" class="p-2 hover:bg-white rounded-lg transition-all"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
                             </div>
-                            <button onclick="openEventModal()" class="bg-${t.primary}-500 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-md hover:bg-${t.primary}-600 transition-all flex items-center gap-2">
-                                <i data-lucide="plus" class="w-4 h-4"></i> 새 일정 만들기
+                            <button onclick="openEventModal()" class="bg-${t.primary}-500 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-md hover:bg-${t.primary}-600 transition-all flex items-center gap-2 flex-shrink-0">
+                                <i data-lucide="plus" class="w-4 h-4"></i> 추가
                             </button>
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-7 gap-px bg-${t.secondary}-200 border-t border-l border-r border-${t.secondary}-200 rounded-t-xl overflow-hidden">
-                        ${['일', '월', '화', '수', '목', '금', '토'].map((day, i) => `
-                            <div class="bg-${t.bg || 'slate'}-50 text-center py-3 text-xs font-bold ${i===0?'text-red-500':i===6?'text-blue-500':`text-${t.secondary}-500`}">${day}</div>
-                        `).join('')}
-                    </div>
+                    <div class="overflow-x-auto">
+                        <div class="min-w-[600px] md:min-w-full">
+                            <div class="grid grid-cols-7 gap-px bg-${t.secondary}-200 border-t border-l border-r border-${t.secondary}-200 rounded-t-xl overflow-hidden">
+                                ${['일', '월', '화', '수', '목', '금', '토'].map((day, i) => `
+                                    <div class="bg-${t.bg || 'slate'}-50 text-center py-2 md:py-3 text-xs font-bold ${i===0?'text-red-500':i===6?'text-blue-500':`text-${t.secondary}-500`}">${day}</div>
+                                `).join('')}
+                            </div>
 
-                    <div class="grid grid-cols-7 gap-px bg-${t.secondary}-200 border border-${t.secondary}-200 rounded-b-xl overflow-hidden">
-                        ${days.map((dayObj) => {
-                            const d = dayObj.date;
-                            const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                            const isToday = ymd === getTodayStr();
-                            const isCurrent = dayObj.isCurrentMonth;
+                            <div class="grid grid-cols-7 gap-px bg-${t.secondary}-200 border border-${t.secondary}-200 rounded-b-xl overflow-hidden">
+                                ${days.map((dayObj) => {
+                                    const d = dayObj.date;
+                                    const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                                    const isToday = ymd === getTodayStr();
+                                    const isCurrent = dayObj.isCurrentMonth;
 
-                            const dayEvents = state.calendarEvents.filter(ev => {
-                                const start = ev.start;
-                                const end = ev.end || ev.start;
-                                return ymd >= start && ymd <= end;
-                            }).sort((a,b) => a.start.localeCompare(b.start));
+                                    const dayEvents = state.calendarEvents.filter(ev => {
+                                        const start = ev.start;
+                                        const end = ev.end || ev.start;
+                                        return ymd >= start && ymd <= end;
+                                    }).sort((a,b) => a.start.localeCompare(b.start));
 
-                            return `
-                                <div class="bg-white min-h-[140px] p-1.5 flex flex-col hover:bg-slate-50/50 transition-colors cursor-pointer relative group" 
-                                     onclick="openEventModal(null, '${ymd}')"
-                                     ondragover="calendarAllowDrop(event)"
-                                     ondragenter="calendarDragEnter(event)"
-                                     ondragleave="calendarDragLeave(event)"
-                                     ondrop="calendarDrop(event, '${ymd}')">
-                                    <div class="text-right mb-1 pr-1">
-                                        <span class="text-xs font-bold ${isToday ? `bg-${t.primary}-500 text-white w-6 h-6 inline-flex items-center justify-center rounded-full shadow-sm` : (isCurrent ? (d.getDay()===0?'text-red-500':d.getDay()===6?'text-blue-500':`text-${t.secondary}-700`) : `text-${t.secondary}-300`)}">
-                                            ${d.getDate()}
-                                        </span>
-                                    </div>
-                                    <div class="flex-1 overflow-y-auto space-y-1.5 scrollbar-hide pb-2">
-                                        ${dayEvents.map(ev => {
-                                            const isStart = ymd === ev.start;
-                                            const isEnd = ymd === (ev.end || ev.start);
-                                            
-                                            let roundedClass = '';
-                                            let marginClass = 'mx-1';
-                                            if(isStart && isEnd) { roundedClass = 'rounded-md'; }
-                                            else if(isStart) { roundedClass = 'rounded-l-md rounded-r-none border-r-0'; marginClass = 'ml-1 mr-[-6px]'; }
-                                            else if(isEnd) { roundedClass = 'rounded-r-md rounded-l-none border-l-0'; marginClass = 'mr-1 ml-[-6px]'; }
-                                            else { roundedClass = 'rounded-none border-l-0 border-r-0'; marginClass = 'mx-[-6px]'; }
+                                    return `
+                                        <div class="bg-white min-h-[90px] md:min-h-[140px] p-1 md:p-1.5 flex flex-col hover:bg-slate-50/50 transition-colors cursor-pointer relative group" 
+                                             onclick="openEventModal(null, '${ymd}')"
+                                             ondragover="calendarAllowDrop(event)"
+                                             ondragenter="calendarDragEnter(event)"
+                                             ondragleave="calendarDragLeave(event)"
+                                             ondrop="calendarDrop(event, '${ymd}')">
+                                            <div class="text-right mb-1 pr-1">
+                                                <span class="text-[10px] md:text-xs font-bold ${isToday ? `bg-${t.primary}-500 text-white w-5 h-5 md:w-6 md:h-6 inline-flex items-center justify-center rounded-full shadow-sm` : (isCurrent ? (d.getDay()===0?'text-red-500':d.getDay()===6?'text-blue-500':`text-${t.secondary}-700`) : `text-${t.secondary}-300`)}">
+                                                    ${d.getDate()}
+                                                </span>
+                                            </div>
+                                            <div class="flex-1 overflow-y-auto space-y-1.5 scrollbar-hide pb-2">
+                                                ${dayEvents.map(ev => {
+                                                    const isStart = ymd === ev.start;
+                                                    const isEnd = ymd === (ev.end || ev.start);
+                                                    
+                                                    let roundedClass = '';
+                                                    let marginClass = 'mx-1';
+                                                    if(isStart && isEnd) { roundedClass = 'rounded-md'; }
+                                                    else if(isStart) { roundedClass = 'rounded-l-md rounded-r-none border-r-0'; marginClass = 'ml-1 mr-[-6px]'; }
+                                                    else if(isEnd) { roundedClass = 'rounded-r-md rounded-l-none border-l-0'; marginClass = 'mr-1 ml-[-6px]'; }
+                                                    else { roundedClass = 'rounded-none border-l-0 border-r-0'; marginClass = 'mx-[-6px]'; }
 
-                                            return `
-                                                <div draggable="true" 
-                                                     ondragstart="calendarDragStart(event, '${ev.id}')"
-                                                     onclick="event.stopPropagation(); openEventModal('${ev.id}')" 
-                                                     class="text-[11px] px-2 py-1 truncate bg-${ev.color}-100 text-${ev.color}-800 ${roundedClass} ${marginClass} border border-${ev.color}-200 relative z-10 hover:opacity-80 transition-opacity flex items-center gap-1 cursor-move shadow-sm">
-                                                    ${isStart ? `<span class="font-bold flex items-center gap-1 w-full overflow-hidden"><span class="w-4 h-4 shrink-0 inline-flex items-center justify-center">${getIconHtml(ev.icon)}</span><span class="truncate">${ev.title}</span></span>` : '&nbsp;'}
-                                                </div>
-                                            `;
-                                        }).join('')}
-                                    </div>
-                                    <div class="absolute inset-0 border-2 border-transparent group-hover:border-${t.primary}-200 pointer-events-none transition-colors"></div>
-                                </div>
-                            `;
-                        }).join('')}
+                                                    return `
+                                                        <div draggable="true" 
+                                                             ondragstart="calendarDragStart(event, '${ev.id}')"
+                                                             onclick="event.stopPropagation(); openEventModal('${ev.id}')" 
+                                                             class="text-[10px] md:text-[11px] px-1 md:px-2 py-0.5 md:py-1 truncate bg-${ev.color}-100 text-${ev.color}-800 ${roundedClass} ${marginClass} border border-${ev.color}-200 relative z-10 hover:opacity-80 transition-opacity flex items-center gap-1 cursor-move shadow-sm">
+                                                            ${isStart ? `<span class="font-bold flex items-center gap-1 w-full overflow-hidden"><span class="w-3 h-3 md:w-4 md:h-4 shrink-0 inline-flex items-center justify-center">${getIconHtml(ev.icon)}</span><span class="truncate">${ev.title}</span></span>` : '&nbsp;'}
+                                                        </div>
+                                                    `;
+                                                }).join('')}
+                                            </div>
+                                            <div class="absolute inset-0 border-2 border-transparent group-hover:border-${t.primary}-200 pointer-events-none transition-colors"></div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
                     </div>
                 </div>
             `;
@@ -583,24 +601,24 @@
             const t = state.theme;
 
             const modalHTML = `
-                <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onclick="closeEventModal()">
-                    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all" onclick="event.stopPropagation()">
-                        <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                            <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2"><i data-lucide="${eventId ? 'edit' : 'calendar-plus'}" class="w-5 h-5 text-${t.primary}-500"></i> ${eventId ? '일정 수정' : '새 일정 등록'}</h3>
-                            <button onclick="closeEventModal()" class="text-slate-400 hover:text-slate-600 bg-white p-1 rounded-lg"><i data-lucide="x" class="w-5 h-5"></i></button>
+                <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onclick="closeEventModal()">
+                    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all flex flex-col max-h-[90vh]" onclick="event.stopPropagation()">
+                        <div class="p-4 md:p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 flex-shrink-0">
+                            <h3 class="text-lg md:text-xl font-bold text-slate-800 flex items-center gap-2"><i data-lucide="${eventId ? 'edit' : 'calendar-plus'}" class="w-5 h-5 text-${t.primary}-500"></i> ${eventId ? '일정 수정' : '새 일정 등록'}</h3>
+                            <button onclick="closeEventModal()" class="text-slate-400 hover:text-slate-600 bg-white p-1.5 rounded-lg"><i data-lucide="x" class="w-5 h-5"></i></button>
                         </div>
-                        <div class="p-6 space-y-5">
-                            <div class="flex gap-3 relative">
-                                <div class="relative">
-                                    <button type="button" onclick="toggleIconPicker()" id="icon-display-btn" class="w-14 h-full min-h-[46px] p-2 border border-slate-200 rounded-xl flex items-center justify-center bg-slate-50 text-2xl shadow-sm hover:bg-slate-100 transition-colors cursor-pointer" title="아이콘 선택">
+                        <div class="p-4 md:p-6 space-y-4 md:space-y-5 overflow-y-auto flex-1">
+                            <div class="flex gap-2 md:gap-3 relative">
+                                <div class="relative flex-shrink-0">
+                                    <button type="button" onclick="toggleIconPicker()" id="icon-display-btn" class="w-12 h-12 md:w-14 md:h-[46px] p-2 border border-slate-200 rounded-xl flex items-center justify-center bg-slate-50 text-xl md:text-2xl shadow-sm hover:bg-slate-100 transition-colors cursor-pointer" title="아이콘 선택">
                                         ${getIconHtml(ev.icon)}
                                     </button>
                                     <input type="hidden" id="ev-icon" value="${ev.icon}">
                                     
-                                    <div id="icon-picker" class="hidden absolute top-full left-0 mt-2 p-3 bg-white border border-slate-200 rounded-2xl shadow-xl w-[280px] z-50">
+                                    <div id="icon-picker" class="hidden absolute top-full left-0 mt-2 p-3 bg-white border border-slate-200 rounded-2xl shadow-xl w-[260px] md:w-[280px] z-50">
                                         <div class="grid grid-cols-5 gap-1.5 mb-3">
                                             ${iconsList.map(icon => `
-                                                <button type="button" onclick="selectIcon('${icon}')" class="text-2xl hover:bg-slate-100 p-2 rounded-xl transition-colors flex items-center justify-center aspect-square">${icon}</button>
+                                                <button type="button" onclick="selectIcon('${icon}')" class="text-xl md:text-2xl hover:bg-slate-100 p-2 rounded-xl transition-colors flex items-center justify-center aspect-square">${icon}</button>
                                             `).join('')}
                                         </div>
                                         <div class="border-t border-slate-100 pt-3">
@@ -611,41 +629,41 @@
                                         </div>
                                     </div>
                                 </div>
-                                <input type="text" id="ev-title" value="${ev.title}" placeholder="프로젝트/일정 제목" class="flex-1 border border-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-${t.primary}-200 focus:outline-none bg-slate-50 font-bold text-slate-800 shadow-sm text-sm">
+                                <input type="text" id="ev-title" value="${ev.title}" placeholder="프로젝트/일정 제목" class="flex-1 border border-slate-200 rounded-xl px-3 md:px-4 py-2 md:py-3 focus:ring-2 focus:ring-${t.primary}-200 focus:outline-none bg-slate-50 font-bold text-slate-800 shadow-sm text-sm">
                             </div>
-                            <div class="grid grid-cols-2 gap-4">
+                            <div class="grid grid-cols-2 gap-3 md:gap-4">
                                 <div>
-                                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">시작일</label>
-                                    <input type="date" id="ev-start" value="${ev.start}" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-${t.primary}-200 focus:outline-none text-sm text-slate-700 shadow-sm font-medium">
+                                    <label class="block text-[10px] md:text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">시작일</label>
+                                    <input type="date" id="ev-start" value="${ev.start}" class="w-full border border-slate-200 rounded-xl px-3 md:px-4 py-2 md:py-2.5 focus:ring-2 focus:ring-${t.primary}-200 focus:outline-none text-xs md:text-sm text-slate-700 shadow-sm font-medium">
                                 </div>
                                 <div>
-                                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">종료일 (선택)</label>
-                                    <input type="date" id="ev-end" value="${ev.end}" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-${t.primary}-200 focus:outline-none text-sm text-slate-700 shadow-sm font-medium">
+                                    <label class="block text-[10px] md:text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">종료일 (선택)</label>
+                                    <input type="date" id="ev-end" value="${ev.end}" class="w-full border border-slate-200 rounded-xl px-3 md:px-4 py-2 md:py-2.5 focus:ring-2 focus:ring-${t.primary}-200 focus:outline-none text-xs md:text-sm text-slate-700 shadow-sm font-medium">
                                 </div>
                             </div>
                             <div>
-                                <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">테마 색상 (필명/장르별 분류 권장)</label>
-                                <div class="flex gap-2 flex-wrap bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                <label class="block text-[10px] md:text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">테마 색상 (필명/장르별 분류 권장)</label>
+                                <div class="flex gap-2 flex-wrap bg-slate-50 p-2 md:p-3 rounded-xl border border-slate-100">
                                     ${colors.map(c => `
                                         <label class="cursor-pointer relative">
                                             <input type="radio" name="ev-color" value="${c}" class="peer sr-only" ${ev.color === c ? 'checked' : ''}>
-                                            <div class="w-8 h-8 rounded-full bg-${c}-100 border-2 border-transparent peer-checked:border-${c}-500 transition-all flex items-center justify-center hover:scale-110">
-                                                <div class="w-4 h-4 rounded-full bg-${c}-500"></div>
+                                            <div class="w-6 h-6 md:w-8 md:h-8 rounded-full bg-${c}-100 border-2 border-transparent peer-checked:border-${c}-500 transition-all flex items-center justify-center hover:scale-110">
+                                                <div class="w-3 h-3 md:w-4 md:h-4 rounded-full bg-${c}-500"></div>
                                             </div>
                                         </label>
                                     `).join('')}
                                 </div>
                             </div>
                             <div>
-                                <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">세부 내용 및 메모</label>
-                                <textarea id="ev-desc" rows="3" placeholder="예: 공미 110,000자 달성 목표" class="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-${t.primary}-200 focus:outline-none text-sm text-slate-700 resize-none shadow-sm">${ev.desc || ''}</textarea>
+                                <label class="block text-[10px] md:text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">세부 내용 및 메모</label>
+                                <textarea id="ev-desc" rows="3" placeholder="예: 공미 110,000자 달성 목표" class="w-full border border-slate-200 rounded-xl px-3 md:px-4 py-2 md:py-3 focus:ring-2 focus:ring-${t.primary}-200 focus:outline-none text-sm text-slate-700 resize-none shadow-sm">${ev.desc || ''}</textarea>
                             </div>
                         </div>
-                        <div class="p-5 bg-slate-50 flex justify-between items-center border-t border-slate-100">
-                            ${eventId ? `<button onclick="deleteEvent('${eventId}')" class="text-red-500 hover:bg-red-50 px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-1"><i data-lucide="trash-2" class="w-4 h-4"></i> 삭제</button>` : `<div></div>`}
+                        <div class="p-4 md:p-5 bg-slate-50 flex justify-between items-center border-t border-slate-100 flex-shrink-0">
+                            ${eventId ? `<button onclick="deleteEvent('${eventId}')" class="text-red-500 hover:bg-red-50 px-3 md:px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-1"><i data-lucide="trash-2" class="w-4 h-4"></i> 삭제</button>` : `<div></div>`}
                             <div class="flex gap-2">
-                                <button onclick="closeEventModal()" class="px-5 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-200 transition-colors">취소</button>
-                                <button onclick="saveEvent('${eventId || ''}')" class="bg-${t.primary}-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-${t.primary}-700 shadow-md transition-colors flex items-center gap-2"><i data-lucide="save" class="w-4 h-4"></i> 저장하기</button>
+                                <button onclick="closeEventModal()" class="px-4 md:px-5 py-2 md:py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-200 transition-colors">취소</button>
+                                <button onclick="saveEvent('${eventId || ''}')" class="bg-${t.primary}-600 text-white px-5 md:px-6 py-2 md:py-2.5 rounded-xl text-sm font-bold hover:bg-${t.primary}-700 shadow-md transition-colors flex items-center gap-2"><i data-lucide="save" class="w-4 h-4"></i> 저장하기</button>
                             </div>
                         </div>
                     </div>
@@ -723,27 +741,27 @@
             const isPerfect = progressPercent === 100 && totalRoutine > 0;
 
             container.innerHTML = `
-                <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
                     <section class="lg:col-span-4 bg-white rounded-3xl shadow-sm border border-${t.secondary}-100 overflow-hidden h-fit">
-                        <div class="bg-${t.primary}-500 p-5 text-white flex justify-between items-center">
-                            <h2 class="text-lg font-bold flex items-center gap-2"><i data-lucide="clock" class="w-5 h-5"></i> 데일리 루틴</h2>
-                            <span class="text-sm opacity-90 font-medium">${shiftedDate.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric'})}</span>
+                        <div class="bg-${t.primary}-500 p-4 md:p-5 text-white flex justify-between items-center">
+                            <h2 class="text-base md:text-lg font-bold flex items-center gap-2"><i data-lucide="clock" class="w-5 h-5"></i> 데일리 루틴</h2>
+                            <span class="text-xs md:text-sm opacity-90 font-medium">${shiftedDate.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric'})}</span>
                         </div>
-                        <div class="p-4 relative">
-                            <div class="absolute left-[29px] top-6 bottom-6 w-0.5 bg-${t.primary}-100 z-0"></div>
+                        <div class="p-3 md:p-4 relative">
+                            <div class="absolute left-[25px] md:left-[29px] top-6 bottom-6 w-0.5 bg-${t.primary}-100 z-0"></div>
                             <div class="space-y-3 relative z-10"> 
                                 ${state.routine.map(item => `
-                                    <div class="flex gap-4 items-start group cursor-pointer" onclick="toggleRoutine('${item.id}')">
+                                    <div class="flex gap-3 md:gap-4 items-start group cursor-pointer" onclick="toggleRoutine('${item.id}')">
                                         <div class="flex flex-col items-center mt-1">
                                             <div class="w-2.5 h-2.5 rounded-full ${item.completed ? `bg-${t.success}-500 ring-4 ring-${t.success}-100` : `bg-${t.primary}-500 ring-4 ring-white`} shadow-sm transition-all"></div>
                                         </div>
                                         <div class="flex-1 -mt-1 p-2 rounded-xl transition-all ${item.completed ? `bg-${t.secondary}-50 opacity-60 border border-${t.secondary}-100` : `hover:bg-${t.bg || 'slate'}-50`}">
                                             <div class="flex items-center gap-2 mb-1">
-                                                <span class="text-sm font-black ${item.completed ? `text-${t.secondary}-400 bg-${t.secondary}-100` : `text-${t.primary}-700 bg-${t.primary}-50`} px-2 py-0.5 rounded-md">${item.time}</span>
+                                                <span class="text-xs md:text-sm font-black ${item.completed ? `text-${t.secondary}-400 bg-${t.secondary}-100` : `text-${t.primary}-700 bg-${t.primary}-50`} px-2 py-0.5 rounded-md">${item.time}</span>
                                                 ${item.completed ? `<i data-lucide="check" class="w-3 h-3 text-${t.success}-500"></i>` : ''}
                                             </div>
-                                            <h3 class="text-base font-bold ${item.completed ? `text-${t.secondary}-400 line-through` : `text-${t.secondary}-800`} mb-0.5">${item.task}</h3>
-                                            <p class="text-sm ${item.completed ? `text-${t.secondary}-300` : `text-${t.secondary}-500`} leading-relaxed">${item.detail}</p>
+                                            <h3 class="text-sm md:text-base font-bold ${item.completed ? `text-${t.secondary}-400 line-through` : `text-${t.secondary}-800`} mb-0.5">${item.task}</h3>
+                                            <p class="text-xs md:text-sm ${item.completed ? `text-${t.secondary}-300` : `text-${t.secondary}-500`} leading-relaxed">${item.detail}</p>
                                         </div>
                                     </div>
                                 `).join('')}
@@ -752,11 +770,11 @@
                     </section>
 
                     <div class="lg:col-span-8 space-y-6">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div class="bg-white p-6 rounded-3xl shadow-sm border border-${t.primary}-100 flex flex-col h-full">
-                                <h2 class="text-base font-bold text-${t.primary}-900 mb-4 flex items-center gap-2"><i data-lucide="star" class="w-5 h-5 text-amber-400 fill-amber-400"></i> ${monthNames[monthIdx]} 목표</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                            <div class="bg-white p-5 md:p-6 rounded-3xl shadow-sm border border-${t.primary}-100 flex flex-col h-full">
+                                <h2 class="text-base font-bold text-${t.primary}-900 mb-3 md:mb-4 flex items-center gap-2"><i data-lucide="star" class="w-5 h-5 text-amber-400 fill-amber-400"></i> ${monthNames[monthIdx]} 목표</h2>
                                 <div class="flex-1 space-y-2 overflow-y-auto max-h-[150px]">
-                                    ${currentMonthGoals.length === 0 ? `<p class="text-sm text-${t.secondary}-400 italic">이번 달 목표를 '장기 계획' 탭에서 설정하세요.</p>` : 
+                                    ${currentMonthGoals.length === 0 ? `<p class="text-xs md:text-sm text-${t.secondary}-400 italic">이번 달 목표를 '장기 계획' 탭에서 설정하세요.</p>` : 
                                     currentMonthGoals.map(g => {
                                         const isEditing = state.editing && state.editing.type === 'monthly' && String(state.editing.id) === String(g.id);
                                         return `<div class="flex items-start gap-2 justify-between group/item p-1 hover:bg-slate-50 rounded-lg">
@@ -765,8 +783,8 @@
                                                     <i data-lucide="${g.completed ? 'check-square' : 'square'}" class="w-4 h-4 ${g.completed ? `text-${t.success}-500` : `text-${t.secondary}-300`}"></i>
                                                 </div>
                                                 ${isEditing 
-                                                    ? `<input type="text" value="${g.text}" class="edit-input font-medium text-sm text-${t.secondary}-700" id="edit-input-${g.id}" onblur="finishEdit(this.value)" onkeydown="if(event.key==='Enter') this.blur()">`
-                                                    : `<span class="text-sm py-1 px-1 rounded hover:bg-white cursor-text flex-1 ${g.completed ? `line-through text-${t.secondary}-300` : `text-${t.secondary}-700`}" onclick="startEdit('monthly', '${g.id}', '${monthIdx}')">${g.text}</span>`
+                                                    ? `<input type="text" value="${g.text}" class="edit-input font-medium text-xs md:text-sm text-${t.secondary}-700" id="edit-input-${g.id}" onblur="finishEdit(this.value)" onkeydown="if(event.key==='Enter') this.blur()">`
+                                                    : `<span class="text-xs md:text-sm py-1 px-1 rounded hover:bg-white cursor-text flex-1 ${g.completed ? `line-through text-${t.secondary}-300` : `text-${t.secondary}-700`}" onclick="startEdit('monthly', '${g.id}', '${monthIdx}')">${g.text}</span>`
                                                 }
                                             </div>
                                             <button onclick="event.stopPropagation(); deleteMonthlyGoal('${monthIdx}', '${g.id}')" class="opacity-0 group-hover/item:opacity-100 text-${t.secondary}-300 hover:text-${t.accent}-500 transition-opacity p-1"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
@@ -774,10 +792,10 @@
                                     }).join('')}
                                 </div>
                             </div>
-                            <div class="bg-${t.primary}-50 p-6 rounded-3xl shadow-sm border border-${t.primary}-100 flex flex-col h-full">
-                                <h2 class="text-base font-bold text-${t.primary}-900 mb-4 flex items-center gap-2"><i data-lucide="target" class="w-5 h-5 text-${t.primary}-600"></i> 이번 주 목표 (${weekIdx + 1}주차)</h2>
+                            <div class="bg-${t.primary}-50 p-5 md:p-6 rounded-3xl shadow-sm border border-${t.primary}-100 flex flex-col h-full">
+                                <h2 class="text-base font-bold text-${t.primary}-900 mb-3 md:mb-4 flex items-center gap-2"><i data-lucide="target" class="w-5 h-5 text-${t.primary}-600"></i> 이번 주 목표 (${weekIdx + 1}주차)</h2>
                                 <div class="flex-1 space-y-2 overflow-y-auto max-h-[150px]">
-                                    ${currentWeekGoals.length === 0 ? `<p class="text-sm text-${t.primary}-300 italic">이번 주 목표를 '장기 계획' 탭에서 설정하세요.</p>` : 
+                                    ${currentWeekGoals.length === 0 ? `<p class="text-xs md:text-sm text-${t.primary}-300 italic">이번 주 목표를 '장기 계획' 탭에서 설정하세요.</p>` : 
                                     currentWeekGoals.map(g => {
                                         const isEditing = state.editing && state.editing.type === 'weekly' && String(state.editing.id) === String(g.id);
                                         return `<div class="flex items-start gap-2 justify-between group/item p-1 hover:bg-white/50 rounded-lg">
@@ -786,8 +804,8 @@
                                                     <i data-lucide="${g.completed ? 'check-circle-2' : 'circle'}" class="w-4 h-4 ${g.completed ? `text-${t.success}-500` : `text-${t.primary}-300`}"></i>
                                                 </div>
                                                 ${isEditing
-                                                    ? `<input type="text" value="${g.text}" class="edit-input font-medium text-sm text-${t.primary}-800 bg-transparent" id="edit-input-${g.id}" onblur="finishEdit(this.value)" onkeydown="if(event.key==='Enter') this.blur()">`
-                                                    : `<span class="text-sm py-1 px-1 rounded hover:bg-white/60 cursor-text flex-1 ${g.completed ? `line-through text-${t.primary}-300` : `text-${t.primary}-800`}" onclick="startEdit('weekly', '${g.id}', '${monthIdx}', '${weekKey}')">${g.text}</span>`
+                                                    ? `<input type="text" value="${g.text}" class="edit-input font-medium text-xs md:text-sm text-${t.primary}-800 bg-transparent" id="edit-input-${g.id}" onblur="finishEdit(this.value)" onkeydown="if(event.key==='Enter') this.blur()">`
+                                                    : `<span class="text-xs md:text-sm py-1 px-1 rounded hover:bg-white/60 cursor-text flex-1 ${g.completed ? `line-through text-${t.primary}-300` : `text-${t.primary}-800`}" onclick="startEdit('weekly', '${g.id}', '${monthIdx}', '${weekKey}')">${g.text}</span>`
                                                 }
                                             </div>
                                             <button onclick="event.stopPropagation(); deleteWeeklyTodo('${monthIdx}', '${weekKey}', '${g.id}')" class="opacity-0 group-hover/item:opacity-100 text-${t.primary}-400 hover:text-${t.accent}-500 transition-opacity p-1"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
@@ -797,37 +815,37 @@
                             </div>
                         </div>
 
-                        <section class="bg-white p-4 rounded-3xl shadow-sm border border-${t.secondary}-100">
+                        <section class="bg-white p-4 md:p-5 rounded-3xl shadow-sm border border-${t.secondary}-100">
                             <div class="flex justify-between items-end mb-4">
-                                <div><h2 class="text-lg font-bold text-${t.secondary}-800 flex items-center gap-2"><i data-lucide="trophy" class="w-6 h-6 text-amber-400 fill-amber-400"></i> 오늘의 성취도</h2><p class="text-xs text-${t.secondary}-400 mt-1">냉정하게 매일매일 목표를 체크하십시오.</p></div>
-                                <div class="text-right"><span class="text-2xl font-black text-${t.primary}-600">${progressPercent}%</span><span class="text-xs text-${t.secondary}-400 font-medium">(${completedRoutine}/${totalRoutine})</span></div>
+                                <div><h2 class="text-base md:text-lg font-bold text-${t.secondary}-800 flex items-center gap-2"><i data-lucide="trophy" class="w-5 h-5 md:w-6 md:h-6 text-amber-400 fill-amber-400"></i> 오늘의 성취도</h2><p class="text-[10px] md:text-xs text-${t.secondary}-400 mt-1">냉정하게 매일매일 목표를 체크하십시오.</p></div>
+                                <div class="text-right"><span class="text-xl md:text-2xl font-black text-${t.primary}-600">${progressPercent}%</span><span class="text-[10px] md:text-xs text-${t.secondary}-400 font-medium">(${completedRoutine}/${totalRoutine})</span></div>
                             </div>
-                            <div class="flex gap-1 h-3 mb-2">${Array.from({length: totalRoutine}).map((_, i) => `<div class="flex-1 rounded-full transition-all duration-500 ${i < completedRoutine ? `bg-${t.primary}-500` : `bg-${t.bg || 'slate'}-200`}"></div>`).join('')}</div>
-                            ${isPerfect ? `<div class="mt-3 bg-${t.primary}-50 text-${t.primary}-700 px-4 py-3 rounded-xl text-sm font-bold text-center border border-${t.primary}-100 flex items-center justify-center gap-2"><span>🎯</span> 완벽합니다. 이런 하루가 쌓여 베스트셀러가 됩니다. <span>🎯</span></div>` : ''}
+                            <div class="flex gap-1 h-2 md:h-3 mb-2">${Array.from({length: totalRoutine}).map((_, i) => `<div class="flex-1 rounded-full transition-all duration-500 ${i < completedRoutine ? `bg-${t.primary}-500` : `bg-${t.bg || 'slate'}-200`}"></div>`).join('')}</div>
+                            ${isPerfect ? `<div class="mt-3 bg-${t.primary}-50 text-${t.primary}-700 px-3 py-2 md:px-4 md:py-3 rounded-xl text-xs md:text-sm font-bold text-center border border-${t.primary}-100 flex items-center justify-center gap-2"><span>🎯</span> 완벽합니다. 이런 하루가 쌓여 베스트셀러가 됩니다. <span>🎯</span></div>` : ''}
                         </section>
 
-                        <div class="flex flex-col md:flex-row gap-6">
-                            <section class="w-full md:w-[60%] bg-white p-6 rounded-3xl shadow-sm border border-${t.secondary}-100 flex flex-col">
-                                <div class="flex justify-between items-center mb-6">
-                                    <h2 class="text-lg font-bold text-${t.secondary}-800 flex items-center gap-2"><i data-lucide="check-circle-2" class="text-${t.success}-500 w-6 h-6"></i> 데일리 투두</h2>
-                                    ${state.dayFinished ? `<button onclick="toggleDayFinish()" class="text-xs px-3 py-1.5 bg-${t.secondary}-100 text-${t.secondary}-600 rounded-lg hover:bg-${t.secondary}-200 transition-colors font-bold">다시 열기</button>` : `<button onclick="toggleDayFinish()" class="text-xs px-3 py-1.5 bg-${t.secondary}-800 text-white rounded-lg hover:bg-${t.secondary}-700 transition-colors font-bold flex items-center gap-1"><i data-lucide="moon" class="w-3 h-3"></i> 오늘 끝!</button>`}
+                        <div class="flex flex-col md:flex-row gap-4 md:gap-6">
+                            <section class="w-full md:w-[60%] bg-white p-5 md:p-6 rounded-3xl shadow-sm border border-${t.secondary}-100 flex flex-col">
+                                <div class="flex justify-between items-center mb-4 md:mb-6">
+                                    <h2 class="text-base md:text-lg font-bold text-${t.secondary}-800 flex items-center gap-2"><i data-lucide="check-circle-2" class="text-${t.success}-500 w-5 h-5 md:w-6 md:h-6"></i> 데일리 투두</h2>
+                                    ${state.dayFinished ? `<button onclick="toggleDayFinish()" class="text-[10px] md:text-xs px-2 py-1 md:px-3 md:py-1.5 bg-${t.secondary}-100 text-${t.secondary}-600 rounded-lg hover:bg-${t.secondary}-200 transition-colors font-bold">다시 열기</button>` : `<button onclick="toggleDayFinish()" class="text-[10px] md:text-xs px-2 py-1 md:px-3 md:py-1.5 bg-${t.secondary}-800 text-white rounded-lg hover:bg-${t.secondary}-700 transition-colors font-bold flex items-center gap-1"><i data-lucide="moon" class="w-3 h-3"></i> 오늘 끝!</button>`}
                                 </div>
-                                ${state.dayFinished ? `<div class="py-12 text-center bg-${t.bg || 'slate'}-50 rounded-2xl border border-dashed border-${t.secondary}-200"><div class="mb-3 flex justify-center"><div class="p-3 bg-${t.primary}-100 rounded-full"><i data-lucide="moon" class="w-8 h-8 text-${t.primary}-600"></i></div></div><h3 class="text-lg font-bold text-${t.secondary}-700 mb-1">오늘 하루도 고생하셨습니다 🌙</h3><p class="text-sm text-${t.secondary}-400">편안한 밤 보내세요! 투두는 내일로 이월됩니다.</p></div>` : `
+                                ${state.dayFinished ? `<div class="py-8 md:py-12 text-center bg-${t.bg || 'slate'}-50 rounded-2xl border border-dashed border-${t.secondary}-200"><div class="mb-3 flex justify-center"><div class="p-3 bg-${t.primary}-100 rounded-full"><i data-lucide="moon" class="w-6 h-6 md:w-8 md:h-8 text-${t.primary}-600"></i></div></div><h3 class="text-base md:text-lg font-bold text-${t.secondary}-700 mb-1">오늘 하루도 고생하셨습니다 🌙</h3><p class="text-xs md:text-sm text-${t.secondary}-400">편안한 밤 보내세요! 투두는 내일로 이월됩니다.</p></div>` : `
                                     <form onsubmit="addDailyTodo(event)" class="flex gap-2 mb-4">
-                                        <input type="text" id="daily-todo-input" placeholder="오늘 꼭 해야 할 일..." class="flex-1 bg-${t.bg || 'slate'}-50 border border-${t.secondary}-100 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-${t.primary}-100">
-                                        <button type="submit" class="bg-${t.secondary}-900 text-white px-4 py-2.5 rounded-xl flex items-center justify-center hover:bg-${t.secondary}-800 shadow-sm shadow-${t.secondary}-200"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                                        <input type="text" id="daily-todo-input" placeholder="오늘 꼭 해야 할 일..." class="flex-1 bg-${t.bg || 'slate'}-50 border border-${t.secondary}-100 rounded-xl px-3 py-2 md:px-4 md:py-2.5 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-${t.primary}-100">
+                                        <button type="submit" class="bg-${t.secondary}-900 text-white px-3 py-2 md:px-4 md:py-2.5 rounded-xl flex items-center justify-center hover:bg-${t.secondary}-800 shadow-sm shadow-${t.secondary}-200"><i data-lucide="plus" class="w-4 h-4"></i></button>
                                     </form>
-                                    <div class="relative grid grid-cols-1 md:grid-cols-2 gap-3">
-                                        ${activeTodos.length === 0 ? `<div class="col-span-1 md:col-span-2 text-center py-6"><p class="text-sm text-${t.secondary}-400">오늘의 할 일을 추가하고 힘차게 시작해보세요!</p></div>` : activeTodos.map(item => {
+                                    <div class="relative grid grid-cols-1 gap-2 md:gap-3">
+                                        ${activeTodos.length === 0 ? `<div class="text-center py-6"><p class="text-xs md:text-sm text-${t.secondary}-400">오늘의 할 일을 추가하고 힘차게 시작해보세요!</p></div>` : activeTodos.map(item => {
                                             const isEditing = state.editing && state.editing.type === 'daily' && String(state.editing.id) === String(item.id);
-                                            return `<div class="flex items-center justify-between p-2.5 rounded-xl border transition-all ${item.completed ? `bg-${t.bg || 'slate'}-50 opacity-60 border-${t.secondary}-100` : `bg-white border-${t.secondary}-100 shadow-sm`}">
+                                            return `<div class="flex items-center justify-between p-2 md:p-2.5 rounded-xl border transition-all ${item.completed ? `bg-${t.bg || 'slate'}-50 opacity-60 border-${t.secondary}-100` : `bg-white border-${t.secondary}-100 shadow-sm`}">
                                                 <div class="flex items-center gap-2 flex-1">
                                                     <div class="cursor-pointer p-1 rounded-full hover:bg-slate-100" onclick="toggleDailyTodo('${item.id}')">
                                                         <i data-lucide="${item.completed ? 'check-circle-2' : 'circle'}" class="w-4 h-4 ${item.completed ? `text-${t.success}-500` : `text-${t.secondary}-300`}"></i>
                                                     </div>
                                                     ${isEditing
-                                                        ? `<input type="text" value="${item.text}" class="edit-input font-medium text-sm text-${t.secondary}-700" id="edit-input-${item.id}" onblur="finishEdit(this.value)" onkeydown="if(event.key==='Enter') this.blur()">`
-                                                        : `<span class="text-sm py-0.5 px-1 rounded hover:bg-slate-50 cursor-text flex-1 ${item.completed ? `line-through text-${t.secondary}-400` : `text-${t.secondary}-700 font-medium`}" onclick="startEdit('daily', '${item.id}')">${item.text}</span>`
+                                                        ? `<input type="text" value="${item.text}" class="edit-input font-medium text-xs md:text-sm text-${t.secondary}-700" id="edit-input-${item.id}" onblur="finishEdit(this.value)" onkeydown="if(event.key==='Enter') this.blur()">`
+                                                        : `<span class="text-xs md:text-sm py-0.5 px-1 rounded hover:bg-slate-50 cursor-text flex-1 ${item.completed ? `line-through text-${t.secondary}-400` : `text-${t.secondary}-700 font-medium`}" onclick="startEdit('daily', '${item.id}')">${item.text}</span>`
                                                     }
                                                 </div>
                                                 <button onclick="deleteDailyTodo('${item.id}')" class="text-${t.secondary}-300 hover:text-${t.accent}-500 p-1"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
@@ -836,28 +854,28 @@
                                     </div>`}
                             </section>
 
-                            <section class="w-full md:w-[40%] bg-${t.primary}-50 p-6 rounded-3xl shadow-sm border border-${t.primary}-100 flex flex-col">
-                                <div class="flex justify-between items-center mb-6">
-                                    <h2 class="text-lg font-bold text-${t.primary}-900 flex items-center gap-2"><i data-lucide="sun" class="text-${t.primary}-500 w-6 h-6"></i> 내일 미리보기</h2>
+                            <section class="w-full md:w-[40%] bg-${t.primary}-50 p-5 md:p-6 rounded-3xl shadow-sm border border-${t.primary}-100 flex flex-col">
+                                <div class="flex justify-between items-center mb-4 md:mb-6">
+                                    <h2 class="text-base md:text-lg font-bold text-${t.primary}-900 flex items-center gap-2"><i data-lucide="sun" class="text-${t.primary}-500 w-5 h-5 md:w-6 md:h-6"></i> 내일 미리보기</h2>
                                 </div>
                                 
                                 <form onsubmit="addTomorrowTodo(event)" class="flex gap-2 mb-4">
-                                    <input type="text" id="tomorrow-todo-input" placeholder="내일 할 일..." class="flex-1 bg-white border border-${t.primary}-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-${t.primary}-300">
-                                    <button type="submit" class="bg-${t.primary}-500 text-white px-4 py-2.5 flex items-center justify-center rounded-xl hover:bg-${t.primary}-600 shadow-sm shadow-${t.primary}-200"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                                    <input type="text" id="tomorrow-todo-input" placeholder="내일 할 일..." class="flex-1 bg-white border border-${t.primary}-200 rounded-xl px-3 py-2 md:px-4 md:py-2.5 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-${t.primary}-300">
+                                    <button type="submit" class="bg-${t.primary}-500 text-white px-3 py-2 md:px-4 md:py-2.5 flex items-center justify-center rounded-xl hover:bg-${t.primary}-600 shadow-sm shadow-${t.primary}-200"><i data-lucide="plus" class="w-4 h-4"></i></button>
                                 </form>
 
-                                <div class="relative grid grid-cols-1 gap-y-2.5">
-                                    ${tomorrowTodos.length === 0 ? `<div class="text-center py-6"><p class="text-sm text-${t.primary}-400">내일의 계획을 미리 세워보세요!</p></div>` :
+                                <div class="relative grid grid-cols-1 gap-y-2 md:gap-y-2.5">
+                                    ${tomorrowTodos.length === 0 ? `<div class="text-center py-6"><p class="text-xs md:text-sm text-${t.primary}-400">내일의 계획을 미리 세워보세요!</p></div>` :
                                     tomorrowTodos.map(item => {
                                         const isEditing = state.editing && state.editing.type === 'daily' && String(state.editing.id) === String(item.id);
-                                        return `<div class="flex items-center justify-between p-2.5 rounded-xl bg-white border border-${t.primary}-100 shadow-sm">
+                                        return `<div class="flex items-center justify-between p-2 md:p-2.5 rounded-xl bg-white border border-${t.primary}-100 shadow-sm">
                                             <div class="flex items-center gap-2 flex-1">
                                                 <div class="cursor-pointer p-1 rounded-full hover:bg-slate-100" onclick="toggleDailyTodo('${item.id}')">
                                                     <i data-lucide="${item.completed ? 'check-circle-2' : 'circle'}" class="w-4 h-4 ${item.completed ? `text-${t.success}-500` : `text-${t.primary}-300`}"></i>
                                                 </div>
                                                 ${isEditing
-                                                    ? `<input type="text" value="${item.text}" class="edit-input font-medium text-sm text-${t.primary}-800" id="edit-input-${item.id}" onblur="finishEdit(this.value)" onkeydown="if(event.key==='Enter') this.blur()">`
-                                                    : `<span class="text-sm py-0.5 px-1 rounded hover:bg-slate-50 cursor-text flex-1 ${item.completed ? `line-through text-${t.primary}-300` : `text-${t.primary}-800 font-medium`}" onclick="startEdit('daily', '${item.id}')">${item.text}</span>`
+                                                    ? `<input type="text" value="${item.text}" class="edit-input font-medium text-xs md:text-sm text-${t.primary}-800" id="edit-input-${item.id}" onblur="finishEdit(this.value)" onkeydown="if(event.key==='Enter') this.blur()">`
+                                                    : `<span class="text-xs md:text-sm py-0.5 px-1 rounded hover:bg-slate-50 cursor-text flex-1 ${item.completed ? `line-through text-${t.primary}-300` : `text-${t.primary}-800 font-medium`}" onclick="startEdit('daily', '${item.id}')">${item.text}</span>`
                                                 }
                                             </div>
                                             <button onclick="deleteDailyTodo('${item.id}')" class="text-${t.primary}-300 hover:text-${t.accent}-500 p-1"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
@@ -867,10 +885,10 @@
                             </section>
                         </div>
 
-                        <section class="bg-${t.bg || 'slate'}-100 p-6 rounded-3xl border border-${t.secondary}-200 opacity-80">
-                            <h2 class="text-sm font-bold text-${t.secondary}-600 flex items-center gap-2 mb-4"><i data-lucide="history" class="w-4 h-4 text-${t.secondary}-400"></i> 어제 완료한 일</h2>
+                        <section class="bg-${t.bg || 'slate'}-100 p-5 md:p-6 rounded-3xl border border-${t.secondary}-200 opacity-80">
+                            <h2 class="text-xs md:text-sm font-bold text-${t.secondary}-600 flex items-center gap-2 mb-3 md:mb-4"><i data-lucide="history" class="w-4 h-4 text-${t.secondary}-400"></i> 어제 완료한 일</h2>
                             <div class="space-y-2">
-                                ${yesterdayTodos.length === 0 ? `<p class="text-sm text-${t.secondary}-400 pl-1">어제 기록된 완료 항목이 없습니다.</p>` : yesterdayTodos.map(item => `<div class="flex items-center gap-3 p-3 rounded-xl bg-white/50 border border-${t.secondary}-200"><i data-lucide="check-circle-2" class="w-4 h-4 text-${t.secondary}-400"></i><span class="text-sm text-${t.secondary}-500 line-through">${item.text}</span></div>`).join('')}
+                                ${yesterdayTodos.length === 0 ? `<p class="text-xs md:text-sm text-${t.secondary}-400 pl-1">어제 기록된 완료 항목이 없습니다.</p>` : yesterdayTodos.map(item => `<div class="flex items-center gap-2 md:gap-3 p-2 md:p-3 rounded-xl bg-white/50 border border-${t.secondary}-200"><i data-lucide="check-circle-2" class="w-4 h-4 text-${t.secondary}-400"></i><span class="text-xs md:text-sm text-${t.secondary}-500 line-through">${item.text}</span></div>`).join('')}
                             </div>
                         </section>
                     </div>
@@ -883,10 +901,17 @@
             const weeks = getWeeksForMonth(state.currentYear, state.selectedMonth);
             
             container.innerHTML = `
-                <div class="space-y-8">
-                    <p class="text-center text-xs text-${t.secondary}-400 mb-2"><i data-lucide="mouse-pointer-2" class="w-3 h-3 inline mr-1"></i>목표나 할 일을 드래그하여 다른 월/주차로 이동할 수 있습니다.</p>
-                    <section class="bg-white p-8 rounded-3xl shadow-sm border border-${t.secondary}-100">
-                        <div class="flex justify-between items-center mb-6"><h2 class="text-2xl font-bold text-${t.primary}-900 flex items-center gap-2"><i data-lucide="star" class="w-7 h-7 text-amber-400 fill-amber-400"></i> ${state.currentYear}년 연간 목표</h2><div class="flex gap-2 bg-${t.bg || 'slate'}-100 p-1.5 rounded-xl"><button onclick="setState('currentYear', ${state.currentYear - 1})" class="p-2 hover:bg-white rounded-lg transition-all"><i data-lucide="chevron-left" class="w-5 h-5"></i></button><span class="px-4 py-2 text-base font-bold">${state.currentYear}년</span><button onclick="setState('currentYear', ${state.currentYear + 1})" class="p-2 hover:bg-white rounded-lg transition-all"><i data-lucide="chevron-right" class="w-5 h-5"></i></button></div></div>
+                <div class="space-y-6 md:space-y-8">
+                    <p class="text-center text-[10px] md:text-xs text-${t.secondary}-400 mb-2"><i data-lucide="mouse-pointer-2" class="w-3 h-3 inline mr-1"></i>목표/할 일을 드래그하여 이동할 수 있습니다. (모바일: 0.3초간 길게 누르기)</p>
+                    <section class="bg-white p-5 md:p-8 rounded-3xl shadow-sm border border-${t.secondary}-100">
+                        <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                            <h2 class="text-xl md:text-2xl font-bold text-${t.primary}-900 flex items-center gap-2"><i data-lucide="star" class="w-6 h-6 md:w-7 md:h-7 text-amber-400 fill-amber-400"></i> ${state.currentYear}년 연간 목표</h2>
+                            <div class="flex gap-2 bg-${t.bg || 'slate'}-100 p-1.5 rounded-xl w-full md:w-auto justify-between md:justify-start">
+                                <button onclick="setState('currentYear', ${state.currentYear - 1})" class="p-2 hover:bg-white rounded-lg transition-all"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
+                                <span class="px-4 py-2 text-sm md:text-base font-bold">${state.currentYear}년</span>
+                                <button onclick="setState('currentYear', ${state.currentYear + 1})" class="p-2 hover:bg-white rounded-lg transition-all"><i data-lucide="chevron-right" class="w-5 h-5"></i></button>
+                            </div>
+                        </div>
                         <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
                             ${monthNames.map((name, idx) => {
                                 const mGoals = (state.monthlyGoals[state.currentYear] && state.monthlyGoals[state.currentYear][idx]) || [];
@@ -897,9 +922,9 @@
                                     ondragenter="this.classList.add('drag-over')" 
                                     ondragleave="this.classList.remove('drag-over')"
                                     onclick="setState('selectedMonth', ${idx})" 
-                                    class="p-5 rounded-2xl border-2 transition-all cursor-pointer group flex flex-col min-h-[350px] ${isSelected ? `border-${t.primary}-500 bg-${t.primary}-50 shadow-md transform scale-[1.02]` : `border-${t.bg || 'slate'}-50 bg-${t.bg || 'slate'}-50 hover:border-${t.primary}-200`}">
-                                    <div class="flex justify-between items-center mb-4"><span class="text-lg font-black ${isSelected ? `text-${t.primary}-600` : `text-${t.secondary}-400`}">${name}</span></div>
-                                    <div class="flex-1 space-y-2 mb-3 overflow-y-auto max-h-64">
+                                    class="p-4 md:p-5 rounded-2xl border-2 transition-all cursor-pointer group flex flex-col min-h-[250px] md:min-h-[350px] ${isSelected ? `border-${t.primary}-500 bg-${t.primary}-50 shadow-md transform scale-[1.02] md:scale-[1.02]` : `border-${t.bg || 'slate'}-50 bg-${t.bg || 'slate'}-50 hover:border-${t.primary}-200`}">
+                                    <div class="flex justify-between items-center mb-4"><span class="text-base md:text-lg font-black ${isSelected ? `text-${t.primary}-600` : `text-${t.secondary}-400`}">${name}</span></div>
+                                    <div class="flex-1 space-y-2 mb-3 overflow-y-auto max-h-48 md:max-h-64">
                                         ${mGoals.map(g => {
                                             const isEditing = state.editing && state.editing.type === 'monthly' && String(state.editing.id) === String(g.id);
                                             return `<div 
@@ -911,8 +936,8 @@
                                                         <i data-lucide="${g.completed ? 'check-square' : 'square'}" class="w-4 h-4 ${g.completed ? `text-${t.success}-500` : `text-${t.secondary}-300`}"></i>
                                                     </div>
                                                     ${isEditing
-                                                        ? `<input type="text" value="${g.text}" class="edit-input font-medium text-sm text-${t.secondary}-700" id="edit-input-${g.id}" onblur="finishEdit(this.value)" onkeydown="if(event.key==='Enter') this.blur()" onclick="event.stopPropagation()">`
-                                                        : `<span class="text-sm leading-snug flex-1 py-1 px-1 rounded hover:bg-slate-100 cursor-text ${g.completed ? `line-through text-${t.secondary}-300` : `text-${t.secondary}-700 font-medium`}" onclick="event.stopPropagation(); startEdit('monthly', '${g.id}', '${idx}')">${g.text}</span>`
+                                                        ? `<input type="text" value="${g.text}" class="edit-input font-medium text-xs md:text-sm text-${t.secondary}-700" id="edit-input-${g.id}" onblur="finishEdit(this.value)" onkeydown="if(event.key==='Enter') this.blur()" onclick="event.stopPropagation()">`
+                                                        : `<span class="text-xs md:text-sm leading-snug flex-1 py-1 px-1 rounded hover:bg-slate-100 cursor-text ${g.completed ? `line-through text-${t.secondary}-300` : `text-${t.secondary}-700 font-medium`}" onclick="event.stopPropagation(); startEdit('monthly', '${g.id}', '${idx}')">${g.text}</span>`
                                                     }
                                                 </div>
                                                 <button onclick="event.stopPropagation(); deleteMonthlyGoal('${idx}', '${g.id}')" class="opacity-0 group-hover/item:opacity-100 text-${t.secondary}-300 hover:text-${t.accent}-500 transition-opacity p-1"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
@@ -920,15 +945,15 @@
                                         }).join('')}
                                     </div>
                                     <form onsubmit="handleAddMonthlyGoal(event, ${idx})" onclick="event.stopPropagation()">
-                                        <input type="text" id="monthly-goal-input-${idx}" class="w-full bg-white/50 border border-${t.secondary}-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:bg-white">
+                                        <input type="text" id="monthly-goal-input-${idx}" class="w-full bg-white/50 border border-${t.secondary}-200 rounded-xl px-3 py-2 text-xs md:text-sm focus:outline-none focus:bg-white">
                                     </form>
                                 </div>`;
                             }).join('')}
                         </div>
                     </section>
-                    <section class="bg-${t.primary}-50 p-8 rounded-3xl shadow-sm border border-${t.primary}-100">
-                        <div class="mb-8"><h2 class="text-2xl font-bold flex items-center gap-3 text-${t.primary}-900"><i data-lucide="calendar" class="w-7 h-7 text-${t.primary}-600"></i> 주간 계획 (${monthNames[state.selectedMonth]})</h2></div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+                    <section class="bg-${t.primary}-50 p-5 md:p-8 rounded-3xl shadow-sm border border-${t.primary}-100">
+                        <div class="mb-6 md:mb-8"><h2 class="text-xl md:text-2xl font-bold flex items-center gap-2 md:gap-3 text-${t.primary}-900"><i data-lucide="calendar" class="w-6 h-6 md:w-7 md:h-7 text-${t.primary}-600"></i> 주간 계획 (${monthNames[state.selectedMonth]})</h2></div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 md:gap-6">
                             ${weeks.map((week, wIdx) => {
                                 const weekKey = `week-${wIdx}`;
                                 const weekTasks = (state.weeklyPlanning[state.currentYear] && state.weeklyPlanning[state.currentYear][state.selectedMonth] && state.weeklyPlanning[state.currentYear][state.selectedMonth][weekKey]) || [];
@@ -937,22 +962,22 @@
                                     ondrop="dropItem(event, 'weekly', '${weekKey}')"
                                     ondragenter="this.classList.add('drag-over')" 
                                     ondragleave="this.classList.remove('drag-over')"
-                                    class="bg-white rounded-2xl p-6 border border-${t.primary}-100 shadow-sm flex flex-col min-h-[400px]">
-                                    <div class="mb-5 pb-3 border-b border-${t.bg || 'slate'}-50"><h3 class="text-xl font-black text-${t.primary}-900 mb-1">${wIdx + 1}주차</h3><p class="text-xs text-${t.secondary}-400 font-bold tracking-wide">${week.label}</p></div>
-                                    <div class="flex-1 space-y-3 mb-4 overflow-y-auto max-h-[250px] pr-1">
+                                    class="bg-white rounded-2xl p-5 md:p-6 border border-${t.primary}-100 shadow-sm flex flex-col min-h-[250px] md:min-h-[400px]">
+                                    <div class="mb-4 md:mb-5 pb-2 md:pb-3 border-b border-${t.bg || 'slate'}-50"><h3 class="text-lg md:text-xl font-black text-${t.primary}-900 mb-1">${wIdx + 1}주차</h3><p class="text-[10px] md:text-xs text-${t.secondary}-400 font-bold tracking-wide">${week.label}</p></div>
+                                    <div class="flex-1 space-y-2 md:space-y-3 mb-4 overflow-y-auto max-h-[200px] md:max-h-[250px] pr-1">
                                         ${weekTasks.map(item => {
                                             const isEditing = state.editing && state.editing.type === 'weekly' && String(state.editing.id) === String(item.id);
                                             return `<div 
                                                 draggable="${!isEditing}"
                                                 ondragstart="drag(event, 'weekly', '${weekKey}', '${item.id}')"
-                                                class="flex items-center justify-between p-3 rounded-xl bg-${t.bg || 'slate'}-50 border border-${t.secondary}-100 group hover:bg-${t.primary}-50/30 transition-colors ${!isEditing ? 'cursor-move' : ''}">
-                                                <div class="flex items-center gap-3 flex-1">
+                                                class="flex items-center justify-between p-2 md:p-3 rounded-xl bg-${t.bg || 'slate'}-50 border border-${t.secondary}-100 group hover:bg-${t.primary}-50/30 transition-colors ${!isEditing ? 'cursor-move' : ''}">
+                                                <div class="flex items-center gap-2 md:gap-3 flex-1">
                                                     <div class="cursor-pointer p-1 rounded-full hover:bg-slate-200" onclick="toggleWeeklyTodo('${state.selectedMonth}', '${weekKey}', '${item.id}')">
                                                         <i data-lucide="${item.completed ? 'check-circle-2' : 'circle'}" class="w-4 h-4 ${item.completed ? `text-${t.success}-500` : `text-${t.secondary}-300`}"></i>
                                                     </div>
                                                     ${isEditing
-                                                        ? `<input type="text" value="${item.text}" class="edit-input font-medium text-sm text-${t.secondary}-700 bg-transparent" id="edit-input-${item.id}" onblur="finishEdit(this.value)" onkeydown="if(event.key==='Enter') this.blur()">`
-                                                        : `<span class="text-sm py-1 px-1 rounded hover:bg-slate-100 cursor-text flex-1 ${item.completed ? `line-through text-${t.secondary}-400` : `text-${t.secondary}-700 font-medium`}" onclick="startEdit('weekly', '${item.id}', '${state.selectedMonth}', '${weekKey}')">${item.text}</span>`
+                                                        ? `<input type="text" value="${item.text}" class="edit-input font-medium text-xs md:text-sm text-${t.secondary}-700 bg-transparent" id="edit-input-${item.id}" onblur="finishEdit(this.value)" onkeydown="if(event.key==='Enter') this.blur()">`
+                                                        : `<span class="text-xs md:text-sm py-1 px-1 rounded hover:bg-slate-100 cursor-text flex-1 ${item.completed ? `line-through text-${t.secondary}-400` : `text-${t.secondary}-700 font-medium`}" onclick="startEdit('weekly', '${item.id}', '${state.selectedMonth}', '${weekKey}')">${item.text}</span>`
                                                     }
                                                 </div>
                                                 <button onclick="event.stopPropagation(); deleteWeeklyTodo('${state.selectedMonth}', '${weekKey}', '${item.id}')" class="text-${t.secondary}-300 group-hover:text-${t.accent}-500 transition-colors p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
@@ -960,7 +985,7 @@
                                         }).join('')}
                                     </div>
                                     <form onsubmit="handleAddWeeklyTodo(event, '${weekKey}')" class="mt-auto">
-                                        <input type="text" id="weekly-todo-input-${weekKey}" class="w-full bg-white border border-${t.secondary}-200 rounded-xl px-4 py-3 text-sm text-${t.secondary}-700 focus:outline-none focus:ring-2 focus:ring-${t.primary}-100">
+                                        <input type="text" id="weekly-todo-input-${weekKey}" class="w-full bg-white border border-${t.secondary}-200 rounded-xl px-3 py-2 md:px-4 md:py-3 text-xs md:text-sm text-${t.secondary}-700 focus:outline-none focus:ring-2 focus:ring-${t.primary}-100">
                                     </form>
                                 </div>`;
                             }).join('')}
@@ -972,45 +997,79 @@
         function renderHealth(container) {
             const t = state.theme;
             container.innerHTML = `
-                <div class="grid grid-cols-1 md:grid-cols-12 gap-8">
-                    <div class="md:col-span-5 space-y-8">
-                        <section class="bg-white p-8 rounded-3xl border border-${t.accent}-100 shadow-sm">
-                            <h2 class="text-xl font-bold text-${t.accent}-900 mb-6 flex items-center gap-2"><i data-lucide="trending-down" class="w-6 h-6 text-${t.accent}-500"></i> 체중 목표</h2>
-                            <div class="space-y-6">
-                                <div><label class="text-xs font-bold text-${t.secondary}-400 uppercase tracking-widest mb-2 block">현재 체중</label><div class="flex items-end gap-3"><input type="number" step="0.1" value="${state.currentWeight}" onchange="updateWeight(this.value)" class="bg-${t.bg || 'slate'}-50 border-2 border-${t.accent}-100 rounded-2xl px-5 py-3 text-4xl font-black text-${t.secondary}-800 w-40 focus:outline-none focus:border-${t.accent}-400 transition-colors"><span class="text-${t.secondary}-400 font-bold mb-4 text-lg">kg</span></div></div>
-                                <div class="flex items-center justify-between p-4 bg-${t.accent}-50 rounded-2xl">
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8">
+                    <div class="md:col-span-5 space-y-6 md:space-y-8">
+                        <section class="bg-white p-5 md:p-8 rounded-3xl border border-${t.accent}-100 shadow-sm">
+                            <h2 class="text-lg md:text-xl font-bold text-${t.accent}-900 mb-4 md:mb-6 flex items-center gap-2"><i data-lucide="trending-down" class="w-5 h-5 md:w-6 md:h-6 text-${t.accent}-500"></i> 체중 목표</h2>
+                            <div class="space-y-4 md:space-y-6">
+                                <div>
+                                    <label class="text-[10px] md:text-xs font-bold text-${t.secondary}-400 uppercase tracking-widest mb-1 md:mb-2 block">현재 체중</label>
+                                    <div class="flex items-end gap-2 md:gap-3">
+                                        <input type="number" step="0.1" value="${state.currentWeight}" onchange="updateWeight(this.value)" class="bg-${t.bg || 'slate'}-50 border-2 border-${t.accent}-100 rounded-xl md:rounded-2xl px-3 py-2 md:px-5 md:py-3 text-2xl md:text-4xl font-black text-${t.secondary}-800 w-24 md:w-40 focus:outline-none focus:border-${t.accent}-400 transition-colors">
+                                        <span class="text-${t.secondary}-400 font-bold mb-2 md:mb-4 text-base md:text-lg">kg</span>
+                                    </div>
+                                </div>
+                                <div class="flex flex-row items-center justify-between p-3 md:p-4 bg-${t.accent}-50 rounded-xl md:rounded-2xl">
                                     <div>
-                                        <label class="text-[10px] font-bold text-${t.accent}-400 uppercase tracking-widest block mb-1">목표 체중</label>
+                                        <label class="text-[9px] md:text-[10px] font-bold text-${t.accent}-400 uppercase tracking-widest block mb-1">목표 체중</label>
                                         <div class="flex items-end gap-1">
-                                            <input type="number" step="0.1" value="${state.weightGoal}" onchange="updateWeightGoal(this.value)" class="bg-transparent border-b-2 border-${t.accent}-300 px-1 text-2xl font-black text-${t.accent}-600 w-20 focus:outline-none focus:border-${t.accent}-500 transition-colors text-center">
-                                            <span class="text-${t.accent}-600 font-bold mb-1 text-sm">kg</span>
+                                            <input type="number" step="0.1" value="${state.weightGoal}" onchange="updateWeightGoal(this.value)" class="bg-transparent border-b-2 border-${t.accent}-300 px-1 text-xl md:text-2xl font-black text-${t.accent}-600 w-16 md:w-20 focus:outline-none focus:border-${t.accent}-500 transition-colors text-center">
+                                            <span class="text-${t.accent}-600 font-bold mb-1 text-xs md:text-sm">kg</span>
                                         </div>
                                     </div>
                                     <div class="text-right">
-                                        <span class="text-xs font-bold text-${t.accent}-400 block mb-1">감량 필요</span>
-                                        <span class="text-xl font-bold text-${t.accent}-600">${(state.currentWeight - state.weightGoal).toFixed(1)}kg</span>
+                                        <span class="text-[10px] md:text-xs font-bold text-${t.accent}-400 block mb-1">감량 필요</span>
+                                        <span class="text-lg md:text-xl font-bold text-${t.accent}-600">${(state.currentWeight - state.weightGoal).toFixed(1)}kg</span>
                                     </div>
                                 </div>
                             </div>
                         </section>
-                        <section class="bg-${t.success}-50 p-8 rounded-3xl border border-${t.success}-100 shadow-sm">
-                            <div class="flex justify-between items-center mb-6"><h2 class="text-xl font-bold text-${t.success}-900 flex items-center gap-2"><i data-lucide="activity" class="w-6 h-6 text-${t.success}-600"></i> Daily Health Check</h2><span class="text-xs text-${t.success}-600 font-bold bg-${t.success}-100 px-2 py-1 rounded-lg">수정 가능</span></div>
-                            <div class="space-y-3 mb-6">
+                        <section class="bg-${t.success}-50 p-5 md:p-8 rounded-3xl border border-${t.success}-100 shadow-sm">
+                            <div class="flex justify-between items-center mb-4 md:mb-6">
+                                <h2 class="text-lg md:text-xl font-bold text-${t.success}-900 flex items-center gap-2"><i data-lucide="activity" class="w-5 h-5 md:w-6 md:h-6 text-${t.success}-600"></i> Daily Health Check</h2>
+                                <span class="text-[10px] md:text-xs text-${t.success}-600 font-bold bg-${t.success}-100 px-2 py-1 rounded-lg">수정 가능</span>
+                            </div>
+                            <div class="space-y-2 md:space-y-3 mb-4 md:mb-6">
                                 ${state.healthChecklist.map(item => `
-                                    <div class="flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all group relative ${item.completed ? `bg-${t.success}-500 text-white shadow-md transform scale-[1.02]` : `bg-white text-${t.success}-900 hover:bg-${t.success}-100/50`}" onclick="toggleHealthCheck('${item.id}')">
-                                        <div class="p-1 rounded-full flex-shrink-0 ${item.completed ? 'bg-white/20' : `bg-${t.success}-100`}"><i data-lucide="${getIconName(item.icon)}" class="w-4 h-4"></i></div>
-                                        <span class="font-bold text-sm flex-1">${item.text}</span>
-                                        <button onclick="event.stopPropagation(); deleteHealthCheck('${item.id}')" class="absolute right-2 opacity-0 group-hover:opacity-100 p-2 rounded-lg transition-all text-white/80"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                                        ${item.completed ? '<i data-lucide="check-circle-2" class="w-5 h-5 flex-shrink-0"></i>' : ''}
+                                    <div class="flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-xl md:rounded-2xl cursor-pointer transition-all group relative ${item.completed ? `bg-${t.success}-500 text-white shadow-md transform scale-[1.02]` : `bg-white text-${t.success}-900 hover:bg-${t.success}-100/50`}" onclick="toggleHealthCheck('${item.id}')">
+                                        <div class="p-1 rounded-full flex-shrink-0 ${item.completed ? 'bg-white/20' : `bg-${t.success}-100`}"><i data-lucide="${getIconName(item.icon)}" class="w-3 h-3 md:w-4 md:h-4"></i></div>
+                                        <span class="font-bold text-xs md:text-sm flex-1">${item.text}</span>
+                                        <button onclick="event.stopPropagation(); deleteHealthCheck('${item.id}')" class="absolute right-2 opacity-0 group-hover:opacity-100 p-2 rounded-lg transition-all text-white/80"><i data-lucide="trash-2" class="w-3 h-3 md:w-4 md:h-4"></i></button>
+                                        ${item.completed ? '<i data-lucide="check-circle-2" class="w-4 h-4 md:w-5 md:h-5 flex-shrink-0"></i>' : ''}
                                     </div>
                                 `).join('')}
                             </div>
-                            <form onsubmit="addHealthCheck(event)" class="flex gap-2"><input type="text" id="health-input" placeholder="새로운 습관 추가..." class="flex-1 bg-white border border-${t.success}-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-${t.success}-300"><button type="submit" class="bg-${t.success}-600 text-white p-3 rounded-xl hover:bg-${t.success}-700 shadow-lg shadow-${t.success}-200"><i data-lucide="plus" class="w-5 h-5"></i></button></form>
+                            <form onsubmit="addHealthCheck(event)" class="flex gap-2">
+                                <input type="text" id="health-input" placeholder="새로운 습관 추가..." class="flex-1 bg-white border border-${t.success}-200 rounded-xl px-3 py-2 md:px-4 md:py-3 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-${t.success}-300">
+                                <button type="submit" class="bg-${t.success}-600 text-white p-2 md:p-3 rounded-xl hover:bg-${t.success}-700 shadow-lg shadow-${t.success}-200"><i data-lucide="plus" class="w-4 h-4 md:w-5 md:h-5"></i></button>
+                            </form>
                         </section>
                     </div>
                     <div class="md:col-span-7 space-y-6">
-                        <section class="bg-white p-8 rounded-3xl shadow-sm border border-${t.secondary}-100"><h2 class="text-xl font-bold text-${t.secondary}-800 mb-6 flex items-center gap-2"><i data-lucide="flag" class="w-6 h-6 text-${t.primary}-500"></i> 다이어트 로드맵</h2><div class="mb-8"><h3 class="text-sm font-bold text-${t.secondary}-400 uppercase tracking-widest mb-4">월간 핵심 목표</h3><div class="grid grid-cols-1 gap-4">${dietPlan.monthly.map(plan => `<div class="flex gap-4 p-4 rounded-2xl bg-${t.bg || 'slate'}-50 border border-${t.secondary}-100 items-center"><div class="bg-white px-3 py-1 rounded-lg border border-${t.secondary}-200 text-sm font-black text-${t.primary}-600 whitespace-nowrap">${plan.month}</div><div><p class="font-bold text-${t.secondary}-800 text-sm">${plan.goal}</p><p class="text-xs text-${t.secondary}-500 mt-1">${plan.task}</p></div></div>`).join('')}</div></div><div><h3 class="text-sm font-bold text-${t.secondary}-400 uppercase tracking-widest mb-4">주간 실천 가이드</h3><div class="grid grid-cols-1 sm:grid-cols-2 gap-4">${dietPlan.weekly.map((tip, i) => `<div class="flex items-center gap-3 p-4 bg-${t.primary}-50/50 rounded-2xl border border-${t.primary}-50"><div class="w-6 h-6 rounded-full bg-${t.primary}-100 text-${t.primary}-600 flex items-center justify-center text-xs font-bold shrink-0">${i + 1}</div><span class="text-sm text-${t.primary}-900 font-medium leading-tight">${tip}</span></div>`).join('')}</div></div></section>
-                        <section class="bg-gradient-to-br from-${t.accent}-500 to-orange-500 p-8 rounded-3xl text-white shadow-lg shadow-${t.accent}-100"><div class="flex gap-5 items-center"><div class="bg-white/20 p-4 rounded-full backdrop-blur-md"><i data-lucide="target" class="w-8 h-8 text-white"></i></div><div><h3 class="text-lg font-bold mb-1">목표 체중 ${state.weightGoal}kg 달성!</h3><p class="text-sm text-white/90 leading-relaxed font-medium">지금의 절제력이 새로운 작가님을 만듭니다.<br>매일 체크리스트를 채우고, ${(state.currentWeight - state.weightGoal).toFixed(1)}kg 감량의 주인공이 되세요.</p></div></div></section>
+                        <section class="bg-white p-5 md:p-8 rounded-3xl shadow-sm border border-${t.secondary}-100">
+                            <h2 class="text-lg md:text-xl font-bold text-${t.secondary}-800 mb-4 md:mb-6 flex items-center gap-2"><i data-lucide="flag" class="w-5 h-5 md:w-6 md:h-6 text-${t.primary}-500"></i> 다이어트 로드맵</h2>
+                            <div class="mb-6 md:mb-8">
+                                <h3 class="text-xs md:text-sm font-bold text-${t.secondary}-400 uppercase tracking-widest mb-3 md:mb-4">월간 핵심 목표</h3>
+                                <div class="grid grid-cols-1 gap-3 md:gap-4">
+                                    ${dietPlan.monthly.map(plan => `<div class="flex flex-col sm:flex-row gap-2 sm:gap-4 p-3 md:p-4 rounded-2xl bg-${t.bg || 'slate'}-50 border border-${t.secondary}-100 sm:items-center"><div class="bg-white px-3 py-1 rounded-lg border border-${t.secondary}-200 text-xs md:text-sm font-black text-${t.primary}-600 whitespace-nowrap text-center sm:text-left">${plan.month}</div><div><p class="font-bold text-${t.secondary}-800 text-xs md:text-sm">${plan.goal}</p><p class="text-[10px] md:text-xs text-${t.secondary}-500 mt-1">${plan.task}</p></div></div>`).join('')}
+                                </div>
+                            </div>
+                            <div>
+                                <h3 class="text-xs md:text-sm font-bold text-${t.secondary}-400 uppercase tracking-widest mb-3 md:mb-4">주간 실천 가이드</h3>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+                                    ${dietPlan.weekly.map((tip, i) => `<div class="flex items-center gap-2 md:gap-3 p-3 md:p-4 bg-${t.primary}-50/50 rounded-2xl border border-${t.primary}-50"><div class="w-5 h-5 md:w-6 md:h-6 rounded-full bg-${t.primary}-100 text-${t.primary}-600 flex items-center justify-center text-[10px] md:text-xs font-bold shrink-0">${i + 1}</div><span class="text-xs md:text-sm text-${t.primary}-900 font-medium leading-tight">${tip}</span></div>`).join('')}
+                                </div>
+                            </div>
+                        </section>
+                        <section class="bg-gradient-to-br from-${t.accent}-500 to-orange-500 p-5 md:p-8 rounded-3xl text-white shadow-lg shadow-${t.accent}-100">
+                            <div class="flex flex-col sm:flex-row gap-4 md:gap-5 items-center sm:items-start text-center sm:text-left">
+                                <div class="bg-white/20 p-3 md:p-4 rounded-full backdrop-blur-md"><i data-lucide="target" class="w-6 h-6 md:w-8 md:h-8 text-white"></i></div>
+                                <div>
+                                    <h3 class="text-base md:text-lg font-bold mb-1">목표 체중 ${state.weightGoal}kg 달성!</h3>
+                                    <p class="text-xs md:text-sm text-white/90 leading-relaxed font-medium">지금의 절제력이 새로운 작가님을 만듭니다.<br>매일 체크리스트를 채우고, ${(state.currentWeight - state.weightGoal).toFixed(1)}kg 감량의 주인공이 되세요.</p>
+                                </div>
+                            </div>
+                        </section>
                     </div>
                 </div>`;
         }
@@ -1018,24 +1077,55 @@
         function renderSettings(container) {
             const t = state.theme;
             container.innerHTML = `
-                <section class="bg-white p-8 rounded-3xl shadow-sm border border-${t.secondary}-100">
-                    <div class="mb-10 border-b border-slate-100 pb-10"><h2 class="text-xl font-bold text-${t.secondary}-800 flex items-center gap-2 mb-6"><i data-lucide="palette" class="w-6 h-6"></i> 테마 설정</h2><div class="grid grid-cols-2 md:grid-cols-5 gap-4">${themes.map(theme => `<button onclick="setTheme('${theme.id}')" class="relative p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-3 ${state.theme.id === theme.id ? `border-${t.primary}-500 bg-${t.primary}-50` : 'border-slate-100 hover:border-slate-200'}"><div class="flex gap-1"><div class="w-4 h-4 rounded-full bg-${theme.primary}-500"></div><div class="w-4 h-4 rounded-full bg-${theme.accent}-500"></div></div><span class="text-sm font-bold ${state.theme.id === theme.id ? `text-${t.primary}-700` : 'text-slate-500'}">${theme.name}</span>${state.theme.id === theme.id ? `<div class="absolute top-2 right-2 w-2 h-2 rounded-full bg-${t.primary}-500"></div>` : ''}</button>`).join('')}</div></div>
-                    <div class="flex justify-between items-center mb-8 border-b pb-4"><h2 class="text-xl font-bold text-${t.secondary}-800 flex items-center gap-2"><i data-lucide="settings" class="w-6 h-6"></i> 루틴 설정</h2><button onclick="saveData()" class="bg-${t.primary}-500 text-white px-6 py-2 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-${t.primary}-100"><i data-lucide="save" class="w-4 h-4"></i> 저장하기</button></div>
-                    <div class="space-y-4 max-w-4xl">${state.routine.map((item, index) => `<div class="grid grid-cols-12 gap-4 items-center bg-${t.bg || 'slate'}-50 p-4 rounded-2xl border border-${t.secondary}-100"><div class="col-span-2"><input type="text" value="${item.time}" onchange="updateRoutine('${index}', 'time', this.value)" class="w-full bg-white border border-${t.secondary}-200 rounded-lg px-2 py-1 text-sm font-bold text-${t.primary}-600" /></div><div class="col-span-4"><input type="text" value="${item.task}" onchange="updateRoutine('${index}', 'task', this.value)" class="w-full bg-white border border-${t.secondary}-200 rounded-lg px-3 py-1 text-sm font-bold text-${t.secondary}-800" /></div><div class="col-span-5"><input type="text" value="${item.detail}" onchange="updateRoutine('${index}', 'detail', this.value)" class="w-full bg-white border border-${t.secondary}-200 rounded-lg px-3 py-1 text-sm text-${t.secondary}-500" /></div><div class="col-span-1 flex justify-end"><button onclick="deleteRoutine('${index}')" class="text-${t.secondary}-300 hover:text-${t.accent}-500"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div></div>`).join('')}<button onclick="addRoutine()" class="w-full py-4 border-2 border-dashed border-${t.secondary}-200 rounded-2xl text-${t.secondary}-400 font-medium flex items-center justify-center gap-2"><i data-lucide="plus" class="w-4 h-4"></i> 루틴 추가</button></div>
-                    <div class="mt-12 pt-8 border-t border-${t.secondary}-100">
-                        <h2 class="text-xl font-bold text-${t.secondary}-800 flex items-center gap-2 mb-6">
-                            <i data-lucide="database" class="w-6 h-6"></i> 데이터 관리
+                <section class="bg-white p-4 md:p-8 rounded-3xl shadow-sm border border-${t.secondary}-100">
+                    <div class="mb-8 md:mb-10 border-b border-slate-100 pb-6 md:pb-10">
+                        <h2 class="text-lg md:text-xl font-bold text-${t.secondary}-800 flex items-center gap-2 mb-4 md:mb-6"><i data-lucide="palette" class="w-5 h-5 md:w-6 md:h-6"></i> 테마 설정</h2>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 md:gap-4">
+                            ${themes.map(theme => `<button onclick="setTheme('${theme.id}')" class="relative p-3 md:p-4 rounded-xl md:rounded-2xl border-2 transition-all flex flex-col items-center gap-2 md:gap-3 ${state.theme.id === theme.id ? `border-${t.primary}-500 bg-${t.primary}-50` : 'border-slate-100 hover:border-slate-200'}"><div class="flex gap-1"><div class="w-3 h-3 md:w-4 md:h-4 rounded-full bg-${theme.primary}-500"></div><div class="w-3 h-3 md:w-4 md:h-4 rounded-full bg-${theme.accent}-500"></div></div><span class="text-xs md:text-sm font-bold ${state.theme.id === theme.id ? `text-${t.primary}-700` : 'text-slate-500'}">${theme.name}</span>${state.theme.id === theme.id ? `<div class="absolute top-1.5 md:top-2 right-1.5 md:right-2 w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-${t.primary}-500"></div>` : ''}</button>`).join('')}
+                        </div>
+                    </div>
+                    
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 md:mb-8 border-b pb-4 gap-4">
+                        <h2 class="text-lg md:text-xl font-bold text-${t.secondary}-800 flex items-center gap-2"><i data-lucide="settings" class="w-5 h-5 md:w-6 md:h-6"></i> 루틴 설정</h2>
+                        <button onclick="saveData()" class="w-full md:w-auto bg-${t.primary}-500 text-white px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-${t.primary}-100"><i data-lucide="save" class="w-4 h-4"></i> 저장하기</button>
+                    </div>
+                    
+                    <div class="space-y-3 md:space-y-4 max-w-4xl">
+                        ${state.routine.map((item, index) => `
+                        <div class="flex flex-col md:grid md:grid-cols-12 gap-2 md:gap-4 items-start md:items-center bg-${t.bg || 'slate'}-50 p-3 md:p-4 rounded-xl md:rounded-2xl border border-${t.secondary}-100">
+                            <div class="w-full md:col-span-2">
+                                <label class="md:hidden text-[10px] font-bold text-slate-400 mb-1 block">시간</label>
+                                <input type="text" value="${item.time}" onchange="updateRoutine('${index}', 'time', this.value)" class="w-full bg-white border border-${t.secondary}-200 rounded-lg px-2 py-1.5 md:py-1 text-xs md:text-sm font-bold text-${t.primary}-600" />
+                            </div>
+                            <div class="w-full md:col-span-4">
+                                <label class="md:hidden text-[10px] font-bold text-slate-400 mb-1 block mt-1">할 일</label>
+                                <input type="text" value="${item.task}" onchange="updateRoutine('${index}', 'task', this.value)" class="w-full bg-white border border-${t.secondary}-200 rounded-lg px-3 py-1.5 md:py-1 text-xs md:text-sm font-bold text-${t.secondary}-800" />
+                            </div>
+                            <div class="w-full md:col-span-5">
+                                <label class="md:hidden text-[10px] font-bold text-slate-400 mb-1 block mt-1">세부 내용</label>
+                                <input type="text" value="${item.detail}" onchange="updateRoutine('${index}', 'detail', this.value)" class="w-full bg-white border border-${t.secondary}-200 rounded-lg px-3 py-1.5 md:py-1 text-xs md:text-sm text-${t.secondary}-500" />
+                            </div>
+                            <div class="w-full md:col-span-1 flex justify-end md:justify-center mt-1 md:mt-0">
+                                <button onclick="deleteRoutine('${index}')" class="text-red-400 hover:text-red-600 bg-red-50 md:bg-transparent px-3 py-1 md:px-0 md:py-0 rounded-lg md:rounded-none text-xs md:text-sm flex items-center gap-1"><i data-lucide="trash-2" class="w-4 h-4 md:w-4 md:h-4"></i><span class="md:hidden">삭제</span></button>
+                            </div>
+                        </div>`).join('')}
+                        <button onclick="addRoutine()" class="w-full py-3 md:py-4 border-2 border-dashed border-${t.secondary}-200 rounded-xl md:rounded-2xl text-${t.secondary}-400 font-medium flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors"><i data-lucide="plus" class="w-4 h-4"></i> 루틴 추가</button>
+                    </div>
+
+                    <div class="mt-10 md:mt-12 pt-6 md:pt-8 border-t border-${t.secondary}-100">
+                        <h2 class="text-lg md:text-xl font-bold text-${t.secondary}-800 flex items-center gap-2 mb-4 md:mb-6">
+                            <i data-lucide="database" class="w-5 h-5 md:w-6 md:h-6"></i> 데이터 관리
                         </h2>
-                        <div class="flex flex-wrap gap-4">
-                            <button onclick="exportData()" class="flex items-center gap-2 px-5 py-3 bg-${t.bg || 'slate'}-100 text-${t.secondary}-700 rounded-xl font-bold hover:bg-${t.bg || 'slate'}-200 transition-colors border border-${t.secondary}-200">
-                                <i data-lucide="download" class="w-4 h-4"></i> 내보내기 (백업)
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+                            <button onclick="exportData()" class="flex items-center justify-center gap-2 px-4 md:px-5 py-2.5 md:py-3 bg-${t.bg || 'slate'}-100 text-${t.secondary}-700 rounded-xl font-bold hover:bg-${t.bg || 'slate'}-200 transition-colors border border-${t.secondary}-200 text-sm">
+                                <i data-lucide="download" class="w-4 h-4"></i> 백업 다운로드
                             </button>
-                            <label class="flex items-center gap-2 px-5 py-3 bg-${t.bg || 'slate'}-100 text-${t.secondary}-700 rounded-xl font-bold hover:bg-${t.bg || 'slate'}-200 transition-colors border border-${t.secondary}-200 cursor-pointer">
-                                <i data-lucide="upload" class="w-4 h-4"></i> 불러오기 (복원)
+                            <label class="flex items-center justify-center gap-2 px-4 md:px-5 py-2.5 md:py-3 bg-${t.bg || 'slate'}-100 text-${t.secondary}-700 rounded-xl font-bold hover:bg-${t.bg || 'slate'}-200 transition-colors border border-${t.secondary}-200 cursor-pointer text-sm">
+                                <i data-lucide="upload" class="w-4 h-4"></i> 데이터 복원
                                 <input type="file" id="import-file" style="display:none" onchange="importData(this)" accept=".json">
                             </label>
-                            <button onclick="requestNotificationPermission()" class="flex items-center gap-2 px-5 py-3 bg-indigo-50 text-indigo-600 rounded-xl font-bold hover:bg-indigo-100 transition-colors border border-indigo-200">
-                                <i data-lucide="bell" class="w-4 h-4"></i> 알림 권한 켜기
+                            <button onclick="requestNotificationPermission()" class="flex items-center justify-center gap-2 px-4 md:px-5 py-2.5 md:py-3 bg-indigo-50 text-indigo-600 rounded-xl font-bold hover:bg-indigo-100 transition-colors border border-indigo-200 text-sm">
+                                <i data-lucide="bell" class="w-4 h-4"></i> 모바일 알림 켜기
                             </button>
                         </div>
                     </div>

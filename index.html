@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Writer's Perfect Routine 2026</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'classic-lucy': { 50: '#F0F6F7', 100: '#DDEBEC', 200: '#C0DADD', 300: '#9EC5CA', 400: '#85B3BA', 500: '#7EACB5', 600: '#629099', 700: '#52767D', 800: '#466167', 900: '#3D5156' },
+                        'warm-latte': { 50: '#FFF8F3', 100: '#FFEFD6', 200: '#FFDCA8', 300: '#FFC575', 400: '#FDBA74', 500: '#FAAC68', 600: '#E88B3E', 700: '#C16B32', 800: '#99542F', 900: '#7C4629' },
+                        'dirty-mint': { 50: '#F5F9FB', 100: '#EBF4F7', 200: '#D6E8EE', 300: '#B9D8E2', 400: '#B0D3DF', 500: '#A3CCDA', 600: '#82AEC0', 700: '#6890A3', 800: '#587889', 900: '#4B6371' },
+                        'dirty-rose': { 50: '#FDF2F4', 100: '#FBE6EB', 200: '#F5D0D8', 300: '#EBB4C0', 400: '#E49BA6', 500: '#E49BA6', 600: '#D07B8A', 700: '#B55A6C', 800: '#964253', 900: '#7A3140' },
+                        'dirty-blue': { 50: '#F0F4F8', 100: '#D9E2EC', 200: '#BCCCDC', 300: '#9FB3C8', 400: '#829AB1', 500: '#627D98', 600: '#486581', 900: '#102A43' }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Firebase SDK 연동 (호환성 버전) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+
+    <style>
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        body { -webkit-font-smoothing: antialiased; }
+        .hidden { display: none; }
+        .dragging { opacity: 0.5; }
+        .drag-over { border: 2px dashed #94a3b8 !important; background-color: rgba(255, 255, 255, 0.8) !important; }
+        .drag-over-calendar { background-color: rgba(241, 245, 249, 0.8) !important; border: 2px dashed #94a3b8 !important; }
+        .edit-input { width: 100%; border: none; background: transparent; border-bottom: 1px solid #94a3b8; outline: none; padding: 2px 0; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body id="body" class="bg-slate-50 transition-colors duration-500">
+    <div class="hidden bg-slate-100 text-slate-800 border-slate-200 peer-checked:border-slate-500 bg-slate-500
+                bg-red-100 text-red-800 border-red-200 peer-checked:border-red-500 bg-red-500
+                bg-orange-100 text-orange-800 border-orange-200 peer-checked:border-orange-500 bg-orange-500
+                bg-amber-100 text-amber-800 border-amber-200 peer-checked:border-amber-500 bg-amber-500
+                bg-green-100 text-green-800 border-green-200 peer-checked:border-green-500 bg-green-500
+                bg-blue-100 text-blue-800 border-blue-200 peer-checked:border-blue-500 bg-blue-500
+                bg-indigo-100 text-indigo-800 border-indigo-200 peer-checked:border-indigo-500 bg-indigo-500
+                bg-purple-100 text-purple-800 border-purple-200 peer-checked:border-purple-500 bg-purple-500
+                bg-pink-100 text-pink-800 border-pink-200 peer-checked:border-pink-500 bg-pink-500">
+    </div>
+
+    <div id="app" class="max-w-[1600px] mx-auto p-4 md:p-6 min-h-screen flex flex-col">
+        <header class="mb-6 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div>
+                <h1 id="app-title" class="text-3xl font-bold flex items-center gap-2 transition-colors">
+                    <i data-lucide="calendar" class="w-8 h-8"></i>
+                    Lucy's Diary
+                </h1>
+            </div>
+            <nav id="nav-tabs" class="flex bg-white p-1.5 rounded-2xl shadow-sm border overflow-x-auto transition-colors"></nav>
+        </header>
+
+        <!-- 데이터 로딩 상태 표시 -->
+        <div id="loading-spinner" class="flex-1 flex flex-col items-center justify-center space-y-4">
+            <div class="w-10 h-10 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
+            <p class="text-slate-500 font-bold text-sm">클라우드 데이터 동기화 중...</p>
+        </div>
+
+        <main id="main-content" class="flex-1 hidden"></main>
+        
+        <div id="modal-container"></div>
+
+        <footer id="footer" class="mt-12 pb-8 text-center text-xs transition-colors hidden">
+            <p>Managing Writer is Invincible - Data Synchronized via Cloud</p>
+        </footer>
+    </div>
+
+    <script>
+        // ============================================================================
+        // [중요] 작가님의 파이어베이스 프로젝트 설정값으로 반드시 교체하십시오.
+        // ============================================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyCYWsMUSAaxnnTNoNjxw8YfZThv9-5mHak",
+            authDomain: "writer-routine.firebaseapp.com",
+            projectId: "writer-routine",
+            storageBucket: "writer-routine.firebasestorage.app",
+            messagingSenderId: "595233935430",
+            appId: "1:595233935430:web:b76b9c2e56008e1101ba47"
+        };
+
+        // Firebase 초기화 및 Firestore 객체 생성
+        let db = null;
+        let docRef = null;
+        
+        try {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+            // 단일 사용자용 데이터베이스 문서 경로 (users 컬렉션의 myRoutineData 문서)
+            docRef = db.collection("users").doc("myRoutineData");
+        } catch (error) {
+            console.error("Firebase 초기화 실패:", error);
+        }
+
+        const themes = [
+            { id: 'classic', name: 'Classic Lucy', primary: 'classic-lucy', secondary: 'slate', accent: 'classic-lucy', success: 'classic-lucy', bg: 'slate' },
+            { id: 'warm', name: 'Warm Latte', primary: 'warm-latte', secondary: 'stone', accent: 'warm-latte', success: 'warm-latte', bg: 'stone' },
+            { id: 'mint', name: 'Dirty Mint', primary: 'dirty-mint', secondary: 'stone', accent: 'dirty-mint', success: 'dirty-mint', customBg: 'bg-gradient-to-br from-[#F5F9FB] via-[#EBF4F7] to-[#D6E8EE]' },
+            { id: 'pink', name: 'Dirty Rose', primary: 'dirty-rose', secondary: 'stone', accent: 'dirty-rose', success: 'dirty-rose', customBg: 'bg-gradient-to-br from-[#FDF2F4] via-[#FBE6EB] to-[#E49BA6]/20' },
+            { id: 'sky', name: 'Dirty Blue', primary: 'dirty-blue', secondary: 'slate', accent: 'dirty-blue', success: 'dirty-blue', customBg: 'bg-gradient-to-br from-slate-100 via-[#D9E2EC] to-slate-200' }
+        ];
+
+        const defaultRoutine = [
+            { id: '1', time: '06:30', task: '기상 및 뇌 깨우기', detail: '전날의 숙면을 바탕으로 맑은 정신으로 기상.', completed: false },
+            { id: '2', time: '06:30', task: '✍️ 오전 집중 집필 (Golden Time)', detail: '목표: 8,000자 달성(2빡). 외부 연락 차단, 오롯이 몰두.', completed: false },
+            { id: '3', time: '11:00', task: '점심 식사 및 실내 걷기', detail: '오전 집필 성취감 느끼며 식사. 식후 집안 걷기 1시간.', completed: false },
+            { id: '4', time: '12:00', task: '오후 힐링 및 외출', detail: '커피 타임, 가벼운 외출. 도파민을 건강하게 채우기.', completed: false },
+            { id: '5', time: '14:30', task: '헬스장 운동 (1시간)', detail: '가벼운 웨이트/유산소. 집필로 굳은 근육 이완, 체력 비축.', completed: false },
+            { id: '6', time: '15:30', task: '💻 오후 작업 및 마무리', detail: '오전 원고 퇴고, 다음 화 구상. 뇌 부하 최소화.', completed: false },
+            { id: '7', time: '18:00', task: '저녁 식사', detail: '쉐이크 등 가벼운 식단. 체중 관리 및 수면 퀄리티 확보.', completed: false },
+            { id: '8', time: '19:00', task: '완전한 휴식 및 멘탈 케어', detail: '남편분과의 대화, 요가, 독서 등 정서적 안정화.', completed: false },
+            { id: '9', time: '22:00', task: '📵 스마트폰 격리 및 스트레칭', detail: '[중요] 폰은 거실 충전기에! 하루 피로 푸는 스트레칭.', completed: false },
+            { id: '10', time: '22:30', task: '취침 준비 및 수면 돌입', detail: '밤 11시, 다음 날의 승리를 위한 완벽한 취침.', completed: false },
+        ];
+
+        const defaultHealthChecks = [
+            { id: '1', text: '물 2L 마시기 (순수 물)', completed: false, icon: 'water' },
+            { id: '2', text: '오전 8,000자 집필 완료', completed: false, icon: 'meal' },
+            { id: '3', text: '액상과당/밀가루 금지', completed: false, icon: 'food' },
+            { id: '4', text: '오후 헬스 1시간 완료', completed: false, icon: 'gym' },
+            { id: '5', text: '11시 이전 취침 완료 (숙면)', completed: false, icon: 'sleep' },
+            { id: '6', text: '10시 스마트폰 거실 격리', completed: false, icon: 'aroma_day' },
+            { id: '7', text: '저녁 쉐이크 가볍게 먹기', completed: false, icon: 'aroma_night' },
+        ];
+
+        const dietPlan = {
+            monthly: [
+                { month: "5월", goal: "체중 감량 궤도 진입 (70kg 진입)", task: "1일 2식(저녁 쉐이크) 정착, 헬스장 주 4회 (목표: -2kg)" },
+                { month: "6월", goal: "가속화 및 체지방 컷팅 (68kg 진입)", task: "밀가루/액상과당 완벽 차단, 유산소 강도 증가 (목표: -2kg)" },
+                { month: "7월", goal: "정체기 돌파 및 눈바디 개선 (66kg 진입)", task: "근력 운동 중량 인상, 공복 유산소 병행 (목표: -2kg)" },
+                { month: "8월", goal: "최종 목표 달성 및 유지어터 준비 (64kg 달성)", task: "수분 섭취 극대화, 염분 조절, 식단 80% 유지 (목표: -2kg)" },
+            ],
+            weekly: [
+                "1주차: 스마트폰 거실 격리 및 11시 수면 루틴 완벽 적응",
+                "2주차: 오후 2시 30분 헬스장 출석 습관화 (핑계 금지)",
+                "3주차: 저녁 식사 쉐이크로 대체 후 야식 욕구 통제",
+                "4주차: 오전 8천 자 집필 달성으로 심리적 보상 얻기 (음식 보상 금지)"
+            ]
+        };
+
+        const monthNames = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
+
+        let state = {
+            activeTab: 'today',
+            currentYear: 2026,
+            selectedMonth: new Date().getMonth(),
+            theme: themes[0],
+            routine: JSON.parse(JSON.stringify(defaultRoutine)),
+            lastRoutineDate: new Date().toDateString(),
+            dayFinished: false,
+            todos: { daily: [] },
+            monthlyGoals: {},
+            weeklyPlanning: {},
+            currentWeight: 72.0,  
+            weightGoal: 64.0,     
+            healthChecklist: JSON.parse(JSON.stringify(defaultHealthChecks)),
+            editing: null,
+            calendarEvents: [],
+            calendarYear: new Date().getFullYear(),
+            calendarMonth: new Date().getMonth()
+        };
+        
+        let lastNotifiedTime = "";
+        let focusTargetId = null;
+
+        // Custom Toast UI (대체 alert)
+        function showToast(msg, isError = false) {
+            const toast = document.createElement('div');
+            toast.className = `fixed bottom-6 right-6 px-6 py-3 rounded-xl shadow-2xl z-[100] font-bold text-sm transition-all duration-300 transform translate-y-0 opacity-100 ${isError ? 'bg-red-600 text-white' : 'bg-slate-800 text-white'}`;
+            toast.textContent = msg;
+            document.body.appendChild(toast);
+            setTimeout(() => { 
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300); 
+            }, 3000);
+        }
+
+        // --- Firebase Data Fetching ---
+        function loadData() {
+            if (!docRef || firebaseConfig.apiKey.includes("여기에")) {
+                showToast("Firebase가 아직 연결되지 않았습니다. config 값을 세팅하세요.", true);
+                hideLoading();
+                render(); 
+                return;
+            }
+
+            docRef.get().then((doc) => {
+                if (doc.exists) {
+                    const parsed = doc.data();
+                    state = { ...state, ...parsed, editing: null }; 
+                    
+                    if(!state.calendarEvents) state.calendarEvents = [];
+                    if(state.calendarYear === undefined) state.calendarYear = new Date().getFullYear();
+                    if(state.calendarMonth === undefined) state.calendarMonth = new Date().getMonth();
+
+                    if(state.todos.daily) state.todos.daily = state.todos.daily.map(t => ({...t, id: String(t.id)}));
+                    if(state.healthChecklist) state.healthChecklist = state.healthChecklist.map(t => ({...t, id: String(t.id)}));
+                    
+                    const savedTheme = themes.find(t => t.id === parsed.themeId);
+                    if (savedTheme) state.theme = savedTheme;
+                    
+                    const now = new Date();
+                    now.setHours(now.getHours() - 2);
+                    const todayDate = now.toDateString();
+                    
+                    if (state.lastRoutineDate !== todayDate) {
+                        state.routine = state.routine.map(item => ({ ...item, completed: false }));
+                        state.dayFinished = false;
+                        state.lastRoutineDate = todayDate;
+                        saveData(); 
+                    } else {
+                        hideLoading();
+                        render();
+                    }
+                } else {
+                    // 최초 접속
+                    saveData();
+                }
+            }).catch((error) => {
+                console.error("데이터 로드 실패:", error);
+                showToast("데이터를 불러오는데 실패했습니다.", true);
+                hideLoading();
+                render();
+            });
+        }
+
+        // --- Firebase Data Saving ---
+        function saveData() {
+            const { editing, ...dataToSave } = state;
+            dataToSave.themeId = state.theme.id;
+            
+            if (docRef && !firebaseConfig.apiKey.includes("여기에")) {
+                docRef.set(dataToSave).then(() => {
+                    hideLoading();
+                    requestAnimationFrame(render);
+                }).catch((error) => {
+                    console.error("데이터 저장 실패:", error);
+                    showToast("저장 실패. 네트워크 상태를 확인하세요.", true);
+                });
+            } else {
+                hideLoading();
+                requestAnimationFrame(render);
+            }
+        }
+
+        function hideLoading() {
+            document.getElementById('loading-spinner').classList.add('hidden');
+            document.getElementById('main-content').classList.remove('hidden');
+            document.getElementById('footer').classList.remove('hidden');
+        }
+
+        function getTodayStr() { 
+            const d = new Date(); 
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+        function getTomorrowStr() { 
+            const d = new Date(); d.setDate(d.getDate() + 1); 
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+        function getYesterdayStr() { 
+            const d = new Date(); d.setDate(d.getDate() - 1); 
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+        
+        function getWeeksForMonth(year, month) {
+            const weeks = [];
+            const firstDayOfMonth = new Date(year, month, 1);
+            const dayOfWeek = firstDayOfMonth.getDay();
+            const offsetToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+            let currentMonday = new Date(firstDayOfMonth);
+            currentMonday.setDate(firstDayOfMonth.getDate() - offsetToMonday);
+            const checkThursday = new Date(currentMonday);
+            checkThursday.setDate(currentMonday.getDate() + 3);
+            if (checkThursday.getMonth() !== month) currentMonday.setDate(currentMonday.getDate() + 7);
+            while (true) {
+                const currentThursday = new Date(currentMonday);
+                currentThursday.setDate(currentMonday.getDate() + 3);
+                if (currentThursday.getMonth() !== month) break; 
+                const weekEnd = new Date(currentMonday);
+                weekEnd.setDate(currentMonday.getDate() + 6);
+                weeks.push({ start: new Date(currentMonday), end: new Date(weekEnd), label: `${currentMonday.getMonth() + 1}/${currentMonday.getDate()} - ${weekEnd.getMonth() + 1}/${weekEnd.getDate()}` });
+                currentMonday.setDate(currentMonday.getDate() + 7);
+            }
+            return weeks;
+        }
+        
+        function getIconName(type) {
+            switch(type) {
+                case 'water': return 'droplets';
+                case 'meal': return 'pen-tool'; 
+                case 'food': return 'utensils';
+                case 'gym': return 'dumbbell';
+                case 'sleep': return 'moon';
+                case 'aroma_day': return 'smartphone-off';
+                case 'aroma_night': return 'coffee';
+                default: return 'flower-2';
+            }
+        }
+
+        function render() {
+            applyTheme();
+            renderHeader();
+            const main = document.getElementById('main-content');
+            main.innerHTML = '';
+            
+            if (state.activeTab === 'today') renderToday(main);
+            else if (state.activeTab === 'calendar') renderCalendar(main); 
+            else if (state.activeTab === 'planning') renderPlanning(main);
+            else if (state.activeTab === 'health') renderHealth(main);
+            else if (state.activeTab === 'settings') renderSettings(main);
+            
+            if (window.lucide) window.lucide.createIcons();
+
+            if (focusTargetId && !state.editing) { 
+                const el = document.getElementById(focusTargetId);
+                if (el) {
+                    el.focus();
+                    const len = el.value.length;
+                    el.setSelectionRange(len, len);
+                }
+                focusTargetId = null;
+            }
+        }
+
+        function applyTheme() {
+            const t = state.theme;
+            const body = document.getElementById('body');
+            if (t.customBg) body.className = `${t.customBg} text-${t.secondary}-900 font-sans transition-colors duration-500`;
+            else body.className = `bg-${t.bg}-50 text-${t.secondary}-900 font-sans transition-colors duration-500`;
+            const title = document.getElementById('app-title');
+            title.className = `text-3xl font-bold flex items-center gap-2 text-${t.primary}-900 transition-colors`;
+            const titleIcon = title.querySelector('i');
+            if(titleIcon) titleIcon.className = `w-8 h-8 text-${t.primary}-600`;
+            document.getElementById('nav-tabs').className = `flex bg-white p-1.5 rounded-2xl shadow-sm border border-${t.secondary}-100 overflow-x-auto transition-colors`;
+            document.getElementById('footer').className = `mt-12 pb-8 text-center text-${t.secondary}-400 text-xs transition-colors hidden md:block`;
+        }
+
+        function renderHeader() {
+            const nav = document.getElementById('nav-tabs');
+            const tabs = [
+                { id: 'today', label: '오늘', icon: 'clock' },
+                { id: 'calendar', label: '월간 일정', icon: 'calendar-days' }, 
+                { id: 'planning', label: '장기 계획', icon: 'layout' },
+                { id: 'health', label: '건강 관리', icon: 'heart' },
+                { id: 'settings', label: '설정', icon: 'settings' }
+            ];
+            nav.innerHTML = tabs.map(tab => {
+                const isActive = state.activeTab === tab.id;
+                const activeClass = `bg-${state.theme.primary}-500 text-white shadow-md`;
+                const inactiveClass = `text-${state.theme.secondary}-500 hover:bg-${state.theme.bg || 'white'}-50`; 
+                const iconColor = tab.id === 'health' && !isActive ? `text-${state.theme.accent}-500` : '';
+                return `<button onclick="setState('activeTab', '${tab.id}')" class="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${isActive ? activeClass : inactiveClass}"><i data-lucide="${tab.icon}" class="w-4 h-4 ${iconColor}"></i> ${tab.label}</button>`;
+            }).join('');
+        }
+
+        // --- Calendar Functions ---
+        function renderCalendar(container) {
+            const t = state.theme;
+            const year = state.calendarYear;
+            const month = state.calendarMonth;
+
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const prevMonthDays = new Date(year, month, 0).getDate();
+            
+            const days = [];
+            for(let i = firstDay - 1; i >= 0; i--) {
+                days.push({ date: new Date(year, month - 1, prevMonthDays - i), isCurrentMonth: false });
+            }
+            for(let i = 1; i <= daysInMonth; i++) {
+                days.push({ date: new Date(year, month, i), isCurrentMonth: true });
+            }
+            const remainingDays = 42 - days.length; 
+            for(let i = 1; i <= remainingDays; i++) {
+                days.push({ date: new Date(year, month + 1, i), isCurrentMonth: false });
+            }
+
+            container.innerHTML = `
+                <div class="bg-white rounded-3xl shadow-sm border border-${t.secondary}-100 p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold flex items-center gap-3 text-${t.primary}-900">
+                            <i data-lucide="calendar-days" class="w-7 h-7 text-${t.primary}-600"></i> ${year}.${String(month + 1).padStart(2, '0')}
+                        </h2>
+                        <div class="flex items-center gap-4">
+                            <div class="flex gap-1 bg-${t.bg || 'slate'}-100 p-1.5 rounded-xl">
+                                <button onclick="changeCalendarMonth(-1)" class="p-2 hover:bg-white rounded-lg transition-all"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
+                                <button onclick="setCalendarToToday()" class="px-4 py-1 text-sm font-bold text-${t.secondary}-700 hover:bg-white rounded-lg transition-all">오늘</button>
+                                <button onclick="changeCalendarMonth(1)" class="p-2 hover:bg-white rounded-lg transition-all"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
+                            </div>
+                            <button onclick="openEventModal()" class="bg-${t.primary}-500 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-md hover:bg-${t.primary}-600 transition-all flex items-center gap-2">
+                                <i data-lucide="plus" class="w-4 h-4"></i> 새 일정 만들기
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-7 gap-px bg-${t.secondary}-200 border-t border-l border-r border-${t.secondary}-200 rounded-t-xl overflow-hidden">
+                        ${['일', '월', '화', '수', '목', '금', '토'].map((day, i) => `
+                            <div class="bg-${t.bg || 'slate'}-50 text-center py-3 text-xs font-bold ${i===0?'text-red-500':i===6?'text-blue-500':`text-${t.secondary}-500`}">${day}</div>
+                        `).join('')}
+                    </div>
+
+                    <div class="grid grid-cols-7 gap-px bg-${t.secondary}-200 border border-${t.secondary}-200 rounded-b-xl overflow-hidden">
+                        ${days.map((dayObj) => {
+                            const d = dayObj.date;
+                            const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                            const isToday = ymd === getTodayStr();
+                            const isCurrent = dayObj.isCurrentMonth;
+
+                            const dayEvents = state.calendarEvents.filter(ev => {
+                                const start = ev.start;
+                                const end = ev.end || ev.start;
+                                return ymd >= start && ymd <= end;
+                            }).sort((a,b) => a.start.localeCompare(b.start));
+
+                            return `
+                                <div class="bg-white min-h-[140px] p-1.5 flex flex-col hover:bg-slate-50/50 transition-colors cursor-pointer relative group" 
+                                     onclick="openEventModal(null, '${ymd}')"
+                                     ondragover="calendarAllowDrop(event)"
+                                     ondragenter="calendarDragEnter(event)"
+                                     ondragleave="calendarDragLeave(event)"
+                                     ondrop="calendarDrop(event, '${ymd}')">
+                                    <div class="text-right mb-1 pr-1">
+                                        <span class="text-xs font-bold ${isToday ? `bg-${t.primary}-500 text-white w-6 h-6 inline-flex items-center justify-center rounded-full shadow-sm` : (isCurrent ? (d.getDay()===0?'text-red-500':d.getDay()===6?'text-blue-500':`text-${t.secondary}-700`) : `text-${t.secondary}-300`)}">
+                                            ${d.getDate()}
+                                        </span>
+                                    </div>
+                                    <div class="flex-1 overflow-y-auto space-y-1.5 scrollbar-hide pb-2">
+                                        ${dayEvents.map(ev => {
+                                            const isStart = ymd === ev.start;
+                                            const isEnd = ymd === (ev.end || ev.start);
+                                            
+                                            let roundedClass = '';
+                                            let marginClass = 'mx-1';
+                                            if(isStart && isEnd) { roundedClass = 'rounded-md'; }
+                                            else if(isStart) { roundedClass = 'rounded-l-md rounded-r-none border-r-0'; marginClass = 'ml-1 mr-[-6px]'; }
+                                            else if(isEnd) { roundedClass = 'rounded-r-md rounded-l-none border-l-0'; marginClass = 'mr-1 ml-[-6px]'; }
+                                            else { roundedClass = 'rounded-none border-l-0 border-r-0'; marginClass = 'mx-[-6px]'; }
+
+                                            return `
+                                                <div draggable="true" 
+                                                     ondragstart="calendarDragStart(event, '${ev.id}')"
+                                                     onclick="event.stopPropagation(); openEventModal('${ev.id}')" 
+                                                     class="text-[11px] px-2 py-1 truncate bg-${ev.color}-100 text-${ev.color}-800 ${roundedClass} ${marginClass} border border-${ev.color}-200 relative z-10 hover:opacity-80 transition-opacity flex items-center gap-1 cursor-move shadow-sm">
+                                                    ${isStart ? `<span class="font-bold flex items-center gap-1 w-full overflow-hidden"><span class="w-4 h-4 shrink-0 inline-flex items-center justify-center">${getIconHtml(ev.icon)}</span><span class="truncate">${ev.title}</span></span>` : '&nbsp;'}
+                                                </div>
+                                            `;
+                                        }).join('')}
+                                    </div>
+                                    <div class="absolute inset-0 border-2 border-transparent group-hover:border-${t.primary}-200 pointer-events-none transition-colors"></div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function changeCalendarMonth(delta) {
+            state.calendarMonth += delta;
+            if (state.calendarMonth < 0) { state.calendarMonth = 11; state.calendarYear--; } 
+            else if (state.calendarMonth > 11) { state.calendarMonth = 0; state.calendarYear++; }
+            saveData();
+        }
+
+        function setCalendarToToday() {
+            const now = new Date();
+            state.calendarYear = now.getFullYear();
+            state.calendarMonth = now.getMonth();
+            saveData();
+        }
+
+        function calendarAllowDrop(ev) { ev.preventDefault(); }
+        function calendarDragEnter(ev) { ev.preventDefault(); ev.currentTarget.classList.add('drag-over-calendar'); }
+        function calendarDragLeave(ev) { ev.currentTarget.classList.remove('drag-over-calendar'); }
+        function calendarDragStart(ev, id) { 
+            ev.dataTransfer.setData("text/plain", id); 
+            setTimeout(() => ev.target.classList.add('opacity-50'), 0);
+        }
+        function calendarDrop(ev, targetDateStr) {
+            ev.preventDefault();
+            ev.currentTarget.classList.remove('drag-over-calendar');
+            const eventId = ev.dataTransfer.getData("text/plain");
+            if (!eventId) return;
+
+            const eventIndex = state.calendarEvents.findIndex(e => e.id === eventId);
+            if (eventIndex === -1) return;
+
+            const targetEvent = state.calendarEvents[eventIndex];
+            const oldStart = new Date(targetEvent.start);
+            const oldEnd = new Date(targetEvent.end || targetEvent.start);
+            
+            const duration = oldEnd.getTime() - oldStart.getTime();
+
+            const newStart = new Date(targetDateStr);
+            const newEnd = new Date(newStart.getTime() + duration);
+
+            const formatDate = (d) => {
+                return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            };
+
+            state.calendarEvents[eventIndex].start = formatDate(newStart);
+            state.calendarEvents[eventIndex].end = formatDate(newEnd);
+
+            saveData(); 
+        }
+
+        function getIconHtml(iconData) {
+            if (!iconData) return '📝';
+            if (iconData.startsWith('data:image')) {
+                return `<img src="${iconData}" class="w-full h-full object-cover rounded shadow-sm" alt="icon" />`;
+            }
+            return iconData;
+        }
+
+        function toggleIconPicker() {
+            const picker = document.getElementById('icon-picker');
+            picker.classList.toggle('hidden');
+        }
+
+        function selectIcon(icon) {
+            document.getElementById('ev-icon').value = icon;
+            document.getElementById('icon-display-btn').innerHTML = getIconHtml(icon);
+            toggleIconPicker();
+        }
+
+        function handleIconUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const MAX_SIZE = 64; 
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; }
+                    } else {
+                        if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; }
+                    }
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    const dataUrl = canvas.toDataURL('image/png');
+                    
+                    document.getElementById('ev-icon').value = dataUrl;
+                    document.getElementById('icon-display-btn').innerHTML = getIconHtml(dataUrl);
+                    toggleIconPicker();
+                }
+                img.src = e.target.result;
+            }
+            reader.readAsDataURL(file);
+        }
+
+        function openEventModal(eventId = null, targetDate = null) {
+            let ev = { id: '', title: '', start: targetDate || getTodayStr(), end: targetDate || getTodayStr(), color: 'slate', desc: '', icon: '📝' };
+            if (eventId) {
+                ev = state.calendarEvents.find(e => e.id === eventId) || ev;
+            }
+
+            const colors = ['slate', 'red', 'orange', 'amber', 'green', 'blue', 'indigo', 'purple', 'pink'];
+            const iconsList = ['📝', '💻', '✍️', '📚', '💡', '🚀', '⏳', '⏰', '📅', '📌', '🏆', '⭐', '🔥', '💰', '💌', '🎉', '🏃‍♀️', '☕', '💊', '🌙'];
+            const t = state.theme;
+
+            const modalHTML = `
+                <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onclick="closeEventModal()">
+                    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all" onclick="event.stopPropagation()">
+                        <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2"><i data-lucide="${eventId ? 'edit' : 'calendar-plus'}" class="w-5 h-5 text-${t.primary}-500"></i> ${eventId ? '일정 수정' : '새 일정 등록'}</h3>
+                            <button onclick="closeEventModal()" class="text-slate-400 hover:text-slate-600 bg-white p-1 rounded-lg"><i data-lucide="x" class="w-5 h-5"></i></button>
+                        </div>
+                        <div class="p-6 space-y-5">
+                            <div class="flex gap-3 relative">
+                                <div class="relative">
+                                    <button type="button" onclick="toggleIconPicker()" id="icon-display-btn" class="w-14 h-full min-h-[46px] p-2 border border-slate-200 rounded-xl flex items-center justify-center bg-slate-50 text-2xl shadow-sm hover:bg-slate-100 transition-colors cursor-pointer" title="아이콘 선택">
+                                        ${getIconHtml(ev.icon)}
+                                    </button>
+                                    <input type="hidden" id="ev-icon" value="${ev.icon}">
+                                    
+                                    <div id="icon-picker" class="hidden absolute top-full left-0 mt-2 p-3 bg-white border border-slate-200 rounded-2xl shadow-xl w-[280px] z-50">
+                                        <div class="grid grid-cols-5 gap-1.5 mb-3">
+                                            ${iconsList.map(icon => `
+                                                <button type="button" onclick="selectIcon('${icon}')" class="text-2xl hover:bg-slate-100 p-2 rounded-xl transition-colors flex items-center justify-center aspect-square">${icon}</button>
+                                            `).join('')}
+                                        </div>
+                                        <div class="border-t border-slate-100 pt-3">
+                                            <label class="flex items-center justify-center gap-2 w-full py-2 bg-slate-50 hover:bg-slate-100 text-sm font-bold text-slate-600 rounded-lg cursor-pointer transition-colors border border-slate-200">
+                                                <i data-lucide="upload" class="w-4 h-4"></i> 내 이미지 업로드
+                                                <input type="file" accept="image/*" class="hidden" onchange="handleIconUpload(event)">
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <input type="text" id="ev-title" value="${ev.title}" placeholder="프로젝트/일정 제목" class="flex-1 border border-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-${t.primary}-200 focus:outline-none bg-slate-50 font-bold text-slate-800 shadow-sm text-sm">
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">시작일</label>
+                                    <input type="date" id="ev-start" value="${ev.start}" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-${t.primary}-200 focus:outline-none text-sm text-slate-700 shadow-sm font-medium">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">종료일 (선택)</label>
+                                    <input type="date" id="ev-end" value="${ev.end}" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-${t.primary}-200 focus:outline-none text-sm text-slate-700 shadow-sm font-medium">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">테마 색상 (필명/장르별 분류 권장)</label>
+                                <div class="flex gap-2 flex-wrap bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                    ${colors.map(c => `
+                                        <label class="cursor-pointer relative">
+                                            <input type="radio" name="ev-color" value="${c}" class="peer sr-only" ${ev.color === c ? 'checked' : ''}>
+                                            <div class="w-8 h-8 rounded-full bg-${c}-100 border-2 border-transparent peer-checked:border-${c}-500 transition-all flex items-center justify-center hover:scale-110">
+                                                <div class="w-4 h-4 rounded-full bg-${c}-500"></div>
+                                            </div>
+                                        </label>
+                                    `).join('')}
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">세부 내용 및 메모</label>
+                                <textarea id="ev-desc" rows="3" placeholder="예: 공미 110,000자 달성 목표" class="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-${t.primary}-200 focus:outline-none text-sm text-slate-700 resize-none shadow-sm">${ev.desc || ''}</textarea>
+                            </div>
+                        </div>
+                        <div class="p-5 bg-slate-50 flex justify-between items-center border-t border-slate-100">
+                            ${eventId ? `<button onclick="deleteEvent('${eventId}')" class="text-red-500 hover:bg-red-50 px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-1"><i data-lucide="trash-2" class="w-4 h-4"></i> 삭제</button>` : `<div></div>`}
+                            <div class="flex gap-2">
+                                <button onclick="closeEventModal()" class="px-5 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-200 transition-colors">취소</button>
+                                <button onclick="saveEvent('${eventId || ''}')" class="bg-${t.primary}-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-${t.primary}-700 shadow-md transition-colors flex items-center gap-2"><i data-lucide="save" class="w-4 h-4"></i> 저장하기</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('modal-container').innerHTML = modalHTML;
+            if (window.lucide) window.lucide.createIcons();
+        }
+
+        function closeEventModal() {
+            document.getElementById('modal-container').innerHTML = '';
+        }
+
+        function saveEvent(id) {
+            const title = document.getElementById('ev-title').value.trim();
+            const start = document.getElementById('ev-start').value;
+            let end = document.getElementById('ev-end').value;
+            const desc = document.getElementById('ev-desc').value.trim();
+            const icon = document.getElementById('ev-icon').value.trim() || '📝';
+            const color = document.querySelector('input[name="ev-color"]:checked').value;
+
+            if (!title || !start) {
+                showToast('일정 제목과 시작일은 필수입니다.', true);
+                return;
+            }
+            
+            if (end && start > end) {
+                end = start; 
+            }
+
+            const eventObj = {
+                id: id || Date.now().toString(),
+                title, start, end, desc, icon, color
+            };
+
+            if (id) {
+                state.calendarEvents = state.calendarEvents.map(e => e.id === id ? eventObj : e);
+            } else {
+                state.calendarEvents.push(eventObj);
+            }
+
+            closeEventModal();
+            saveData();
+        }
+
+        function deleteEvent(id) {
+            if (confirm('해당 일정을 삭제하시겠습니까? (삭제된 일정은 복구할 수 없습니다)')) {
+                state.calendarEvents = state.calendarEvents.filter(e => e.id !== id);
+                closeEventModal();
+                saveData();
+            }
+        }
+
+        // --- 기타 기존 Functions ---
+        function renderToday(container) {
+            const t = state.theme;
+            const shiftedDate = new Date(); 
+            const todayStr = getTodayStr();
+            const tomorrowStr = getTomorrowStr();
+            const activeTodos = state.todos.daily.filter(todo => {
+                const tDate = todo.date || todayStr;
+                return tDate === todayStr || (!todo.completed && tDate < todayStr);
+            }).sort((a, b) => (a.completed === b.completed ? 0 : a.completed ? 1 : -1));
+            const tomorrowTodos = state.todos.daily.filter(todo => todo.date === tomorrowStr);
+            const yesterdayTodos = state.todos.daily.filter(todo => todo.completed && todo.date === getYesterdayStr());
+            const monthIdx = shiftedDate.getMonth();
+            const currentMonthGoals = (state.monthlyGoals[state.currentYear] && state.monthlyGoals[state.currentYear][monthIdx]) || [];
+            const weeks = getWeeksForMonth(shiftedDate.getFullYear(), monthIdx);
+            const weekIdx = weeks.findIndex(w => shiftedDate >= w.start && shiftedDate <= w.end);
+            const weekKey = `week-${weekIdx !== -1 ? weekIdx : 0}`;
+            const currentWeekGoals = (state.weeklyPlanning[state.currentYear] && state.weeklyPlanning[state.currentYear][monthIdx] && state.weeklyPlanning[state.currentYear][monthIdx][weekKey]) || [];
+            const totalRoutine = state.routine.length;
+            const completedRoutine = state.routine.filter(r => r.completed).length;
+            const progressPercent = totalRoutine === 0 ? 0 : Math.round((completedRoutine / totalRoutine) * 100);
+            const isPerfect = progressPercent === 100 && totalRoutine > 0;
+
+            container.innerHTML = `
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                    <section class="lg:col-span-4 bg-white rounded-3xl shadow-sm border border-${t.secondary}-100 overflow-hidden h-fit">
+                        <div class="bg-${t.primary}-500 p-5 text-white flex justify-between items-center">
+                            <h2 class="text-lg font-bold flex items-center gap-2"><i data-lucide="clock" class="w-5 h-5"></i> 데일리 루틴</h2>
+                            <span class="text-sm opacity-90 font-medium">${shiftedDate.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric'})}</span>
+                        </div>
+                        <div class="p-4 relative">
+                            <div class="absolute left-[29px] top-6 bottom-6 w-0.5 bg-${t.primary}-100 z-0"></div>
+                            <div class="space-y-3 relative z-10"> 
+                                ${state.routine.map(item => `
+                                    <div class="flex gap-4 items-start group cursor-pointer" onclick="toggleRoutine('${item.id}')">
+                                        <div class="flex flex-col items-center mt-1">
+                                            <div class="w-2.5 h-2.5 rounded-full ${item.completed ? `bg-${t.success}-500 ring-4 ring-${t.success}-100` : `bg-${t.primary}-500 ring-4 ring-white`} shadow-sm transition-all"></div>
+                                        </div>
+                                        <div class="flex-1 -mt-1 p-2 rounded-xl transition-all ${item.completed ? `bg-${t.secondary}-50 opacity-60 border border-${t.secondary}-100` : `hover:bg-${t.bg || 'slate'}-50`}">
+                                            <div class="flex items-center gap-2 mb-1">
+                                                <span class="text-sm font-black ${item.completed ? `text-${t.secondary}-400 bg-${t.secondary}-100` : `text-${t.primary}-700 bg-${t.primary}-50`} px-2 py-0.5 rounded-md">${item.time}</span>
+                                                ${item.completed ? `<i data-lucide="check" class="w-3 h-3 text-${t.success}-500"></i>` : ''}
+                                            </div>
+                                            <h3 class="text-base font-bold ${item.completed ? `text-${t.secondary}-400 line-through` : `text-${t.secondary}-800`} mb-0.5">${item.task}</h3>
+                                            <p class="text-sm ${item.completed ? `text-${t.secondary}-300` : `text-${t.secondary}-500`} leading-relaxed">${item.detail}</p>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </section>
+
+                    <div class="lg:col-span-8 space-y-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="bg-white p-6 rounded-3xl shadow-sm border border-${t.primary}-100 flex flex-col h-full">
+                                <h2 class="text-base font-bold text-${t.primary}-900 mb-4 flex items-center gap-2"><i data-lucide="star" class="w-5 h-5 text-amber-400 fill-amber-400"></i> ${monthNames[monthIdx]} 목표</h2>
+                                <div class="flex-1 space-y-2 overflow-y-auto max-h-[150px]">
+                                    ${currentMonthGoals.length === 0 ? `<p class="text-sm text-${t.secondary}-400 italic">이번 달 목표를 '장기 계획' 탭에서 설정하세요.</p>` : 
+                                    currentMonthGoals.map(g => {
+                                        const isEditing = state.editing && state.editing.type === 'monthly' && String(state.editing.id) === String(g.id);
+                                        return `<div class="flex items-start gap-2 justify-between group/item p-1 hover:bg-slate-50 rounded-lg">
+                                            <div class="flex items-start gap-2 flex-1">
+                                                <div class="mt-0.5 cursor-pointer p-1 rounded-md hover:bg-slate-200" onclick="toggleMonthlyGoal('${monthIdx}', '${g.id}')">
+                                                    <i data-lucide="${g.completed ? 'check-square' : 'square'}" class="w-4 h-4 ${g.completed ? `text-${t.success}-500` : `text-${t.secondary}-300`}"></i>
+                                                </div>
+                                                ${isEditing 
+                                                    ? `<input type="text" value="${g.text}" class="edit-input font-medium text-sm text-${t.secondary}-700" id="edit-input-${g.id}" onblur="finishEdit(this.value)" onkeydown="if(event.key==='Enter') this.blur()">`
+                                                    : `<span class="text-sm py-1 px-1 rounded hover:bg-white cursor-text flex-1 ${g.completed ? `line-through text-${t.secondary}-300` : `text-${t.secondary}-700`}" onclick="startEdit('monthly', '${g.id}', '${monthIdx}')">${g.text}</span>`
+                                                }
+                                            </div>
+                                            <button onclick="event.stopPropagation(); deleteMonthlyGoal('${monthIdx}', '${g.id}')" class="opacity-0 group-hover/item:opacity-100 text-${t.secondary}-300 hover:text-${t.accent}-500 transition-opacity p-1"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                                        </div>`
+                                    }).join('')}
+                                </div>
+                            </div>
+                            <div class="bg-${t.primary}-50 p-6 rounded-3xl shadow-sm border border-${t.primary}-100 flex flex-col h-full">
+                                <h2 class="text-base font-bold text-${t.primary}-900 mb-4 flex items-center gap-2"><i data-lucide="target" class="w-5 h-5 text-${t.primary}-600"></i> 이번 주 목표 (${weekIdx + 1}주차)</h2>
+                                <div class="flex-1 space-y-2 overflow-y-auto max-h-[150px]">
+                                    ${currentWeekGoals.length === 0 ? `<p class="text-sm text-${t.primary}-300 italic">이번 주 목표를 '장기 계획' 탭에서 설정하세요.</p>` : 
+                                    currentWeekGoals.map(g => {
+                                        const isEditing = state.editing && state.editing.type === 'weekly' && String(state.editing.id) === String(g.id);
+                                        return `<div class="flex items-start gap-2 justify-between group/item p-1 hover:bg-white/50 rounded-lg">
+                                            <div class="flex items-start gap-2 flex-1">
+                                                <div class="mt-0.5 cursor-pointer p-1 rounded-md hover:bg-white" onclick="toggleWeeklyTodo('${monthIdx}', '${weekKey}', '${g.id}')">
+                                                    <i data-lucide="${g.completed ? 'check-circle-2' : 'circle'}" class="w-4 h-4 ${g.completed ? `text-${t.success}-500` : `text-${t.primary}-300`}"></i>
+                                                </div>
+                                                ${isEditing
+                                                    ? `<input type="text" value="${g.text}" class="edit-input font-medium text-sm text-${t.primary}-800 bg-transparent" id="edit-input-${g.id}" onblur="finishEdit(this.value)" onkeydown="if(event.key==='Enter') this.blur()">`
+                                                    : `<span class="text-sm py-1 px-1 rounded hover:bg-white/60 cursor-text flex-1 ${g.completed ? `line-through text-${t.primary}-300` : `text-${t.primary}-800`}" onclick="startEdit('weekly', '${g.id}', '${monthIdx}', '${weekKey}')">${g.text}</span>`
+                                                }
+                                            </div>
+                                            <button onclick="event.stopPropagation(); deleteWeeklyTodo('${monthIdx}', '${weekKey}', '${g.id}')" class="opacity-0 group-hover/item:opacity-100 text-${t.primary}-400 hover:text-${t.accent}-500 transition-opacity p-1"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                                        </div>`
+                                    }).join('')}
+                                </div>
+                            </div>
+                        </div>
+
+                        <section class="bg-white p-4 rounded-3xl shadow-sm border border-${t.secondary}-100">
+                            <div class="flex justify-between items-end mb-4">
+                                <div><h2 class="text-lg font-bold text-${t.secondary}-800 flex items-center gap-2"><i data-lucide="trophy" class="w-6 h-6 text-amber-400 fill-amber-400"></i> 오늘의 성취도</h2><p class="text-xs text-${t.secondary}-400 mt-1">냉정하게 매일매일 목표를 체크하십시오.</p></div>
+                                <div class="text-right"><span class="text-2xl font-black text-${t.primary}-600">${progressPercent}%</span><span class="text-xs text-${t.secondary}-400 font-medium">(${completedRoutine}/${totalRoutine})</span></div>
+                            </div>
+                            <div class="flex gap-1 h-3 mb-2">${Array.from({length: totalRoutine}).map((_, i) => `<div class="flex-1 rounded-full transition-all duration-500 ${i < completedRoutine ? `bg-${t.primary}-500` : `bg-${t.bg || 'slate'}-200`}"></div>`).join('')}</div>
+                            ${isPerfect ? `<div class="mt-3 bg-${t.primary}-50 text-${t.primary}-700 px-4 py-3 rounded-xl text-sm font-bold text-center border border-${t.primary}-100 flex items-center justify-center gap-2"><span>🎯</span> 완벽합니다. 이런 하루가 쌓여 베스트셀러가 됩니다. <span>🎯</span></div>` : ''}
+                        </section>
+
+                        <div class="flex flex-col md:flex-row gap-6">
+                            <section class="w-full md:w-[60%] bg-white p-6 rounded-3xl shadow-sm border border-${t.secondary}-100 flex flex-col">
+                                <div class="flex justify-between items-center mb-6">
+                                    <h2 class="text-lg font-bold text-${t.secondary}-800 flex items-center gap-2"><i data-lucide="check-circle-2" class="text-${t.success}-500 w-6 h-6"></i> 데일리 투두</h2>
+                                    ${state.dayFinished ? `<button onclick="toggleDayFinish()" class="text-xs px-3 py-1.5 bg-${t.secondary}-100 text-${t.secondary}-600 rounded-lg hover:bg-${t.secondary}-200 transition-colors font-bold">다시 열기</button>` : `<button onclick="toggleDayFinish()" class="text-xs px-3 py-1.5 bg-${t.secondary}-800 text-white rounded-lg hover:bg-${t.secondary}-700 transition-colors font-bold flex items-center gap-1"><i data-lucide="moon" class="w-3 h-3"></i> 오늘 끝!</button>`}
+                                </div>
+                                ${state.dayFinished ? `<div class="py-12 text-center bg-${t.bg || 'slate'}-50 rounded-2xl border border-dashed border-${t.secondary}-200"><div class="mb-3 flex justify-center"><div class="p-3 bg-${t.primary}-100 rounded-full"><i data-lucide="moon" class="w-8 h-8 text-${t.primary}-600"></i></div></div><h3 class="text-lg font-bold text-${t.secondary}-700 mb-1">오늘 하루도 고생하셨습니다 🌙</h3><p class="text-sm text-${t.secondary}-400">편안한 밤 보내세요! 투두는 내일로 이월됩니다.</p></div>` : `
+                                    <form onsubmit="addDailyTodo(event)" class="flex gap-2 mb-4">
+                                        <input type="text" id="daily-todo-input" placeholder="오늘 꼭 해야 할 일..." class="flex-1 bg-${t.bg || 'slate'}-50 border border-${t.secondary}-100 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-${t.primary}-100">
+                                        <button type="submit" class="bg-${t.secondary}-900 text-white px-4 py-2.5 rounded-xl flex items-center justify-center hover:bg-${t.secondary}-800 shadow-sm shadow-${t.secondary}-200"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                                    </form>
+                                    <div class="relative grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        ${activeTodos.length === 0 ? `<div class="col-span-1 md:col-span-2 text-center py-6"><p class="text-sm text-${t.secondary}-400">오늘의 할 일을 추가하고 힘차게 시작해보세요!</p></div>` : activeTodos.map(item => {
+                                            const isEditing = state.editing && state.editing.type === 'daily' && String(state.editing.id) === String(item.id);
+                                            return `<div class="flex items-center justify-between p-2.5 rounded-xl border transition-all ${item.completed ? `bg-${t.bg || 'slate'}-50 opacity-60 border-${t.secondary}-100` : `bg-white border-${t.secondary}-100 shadow-sm`}">
+                                                <div class="flex items-center gap-2 flex-1">
+                                                    <div class="cursor-pointer p-1 rounded-full hover:bg-slate-100" onclick="toggleDailyTodo('${item.id}')">
+                                                        <i data-lucide="${item.completed ? 'check-circle-2' : 'circle'}" class="w-4 h-4 ${item.completed ? `text-${t.success}-500` : `text-${t.secondary}-300`}"></i>
+                                                    </div>
+                                                    ${isEditing
+                                                        ? `<input type="text" value="${item.text}" class="edit-input font-medium text-sm text-${t.secondary}-700" id="edit-input-${item.id}" onblur="finishEdit(this.value)" onkeydown="if(event.key==='Enter') this.blur()">`
+                                                        : `<span class="text-sm py-0.5 px-1 rounded hover:bg-slate-50 cursor-text flex-1 ${item.completed ? `line-through text-${t.secondary}-400` : `text-${t.secondary}-700 font-medium`}" onclick="startEdit('daily', '${item.id}')">${item.text}</span>`
+                                                    }
+                                                </div>
+                                                <button onclick="deleteDailyTodo('${item.id}')" class="text-${t.secondary}-300 hover:text-${t.accent}-500 p-1"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                                            </div>`
+                                        }).join('')}
+                                    </div>`}
+                            </section>
+
+                            <section class="w-full md:w-[40%] bg-${t.primary}-50 p-6 rounded-3xl shadow-sm border border-${t.primary}-100 flex flex-col">
+                                <div class="flex justify-between items-center mb-6">
+                                    <h2 class="text-lg font-bold text-${t.primary}-900 flex items-center gap-2"><i data-lucide="sun" class="text-${t.primary}-500 w-6 h-6"></i> 내일 미리보기</h2>
+                                </div>
+                                
+                                <form onsubmit="addTomorrowTodo(event)" class="flex gap-2 mb-4">
+                                    <input type="text" id="tomorrow-todo-input" placeholder="내일 할 일..." class="flex-1 bg-white border border-${t.primary}-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-${t.primary}-300">
+                                    <button type="submit" class="bg-${t.primary}-500 text-white px-4 py-2.5 flex items-center justify-center rounded-xl hover:bg-${t.primary}-600 shadow-sm shadow-${t.primary}-200"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                                </form>
+
+                                <div class="relative grid grid-cols-1 gap-y-2.5">
+                                    ${tomorrowTodos.length === 0 ? `<div class="text-center py-6"><p class="text-sm text-${t.primary}-400">내일의 계획을 미리 세워보세요!</p></div>` :
+                                    tomorrowTodos.map(item => {
+                                        const isEditing = state.editing && state.editing.type === 'daily' && String(state.editing.id) === String(item.id);
+                                        return `<div class="flex items-center justify-between p-2.5 rounded-xl bg-white border border-${t.primary}-100 shadow-sm">
+                                            <div class="flex items-center gap-2 flex-1">
+                                                <div class="cursor-pointer p-1 rounded-full hover:bg-slate-100" onclick="toggleDailyTodo('${item.id}')">
+                                                    <i data-lucide="${item.completed ? 'check-circle-2' : 'circle'}" class="w-4 h-4 ${item.completed ? `text-${t.success}-500` : `text-${t.primary}-300`}"></i>
+                                                </div>
+                                                ${isEditing
+                                                    ? `<input type="text" value="${item.text}" class="edit-input font-medium text-sm text-${t.primary}-800" id="edit-input-${item.id}" onblur="finishEdit(this.value)" onkeydown="if(event.key==='Enter') this.blur()">`
+                                                    : `<span class="text-sm py-0.5 px-1 rounded hover:bg-slate-50 cursor-text flex-1 ${item.completed ? `line-through text-${t.primary}-300` : `text-${t.primary}-800 font-medium`}" onclick="startEdit('daily', '${item.id}')">${item.text}</span>`
+                                                }
+                                            </div>
+                                            <button onclick="deleteDailyTodo('${item.id}')" class="text-${t.primary}-300 hover:text-${t.accent}-500 p-1"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                                        </div>`
+                                    }).join('')}
+                                </div>
+                            </section>
+                        </div>
+
+                        <section class="bg-${t.bg || 'slate'}-100 p-6 rounded-3xl border border-${t.secondary}-200 opacity-80">
+                            <h2 class="text-sm font-bold text-${t.secondary}-600 flex items-center gap-2 mb-4"><i data-lucide="history" class="w-4 h-4 text-${t.secondary}-400"></i> 어제 완료한 일</h2>
+                            <div class="space-y-2">
+                                ${yesterdayTodos.length === 0 ? `<p class="text-sm text-${t.secondary}-400 pl-1">어제 기록된 완료 항목이 없습니다.</p>` : yesterdayTodos.map(item => `<div class="flex items-center gap-3 p-3 rounded-xl bg-white/50 border border-${t.secondary}-200"><i data-lucide="check-circle-2" class="w-4 h-4 text-${t.secondary}-400"></i><span class="text-sm text-${t.secondary}-500 line-through">${item.text}</span></div>`).join('')}
+                            </div>
+                        </section>
+                    </div>
+                </div>`;
+        }
+
+        function renderPlanning(container) {
+            const t = state.theme;
+            const currentMonthGoals = (state.monthlyGoals[state.currentYear] && state.monthlyGoals[state.currentYear][state.selectedMonth]) || [];
+            const weeks = getWeeksForMonth(state.currentYear, state.selectedMonth);
+            
+            container.innerHTML = `
+                <div class="space-y-8">
+                    <p class="text-center text-xs text-${t.secondary}-400 mb-2"><i data-lucide="mouse-pointer-2" class="w-3 h-3 inline mr-1"></i>목표나 할 일을 드래그하여 다른 월/주차로 이동할 수 있습니다.</p>
+                    <section class="bg-white p-8 rounded-3xl shadow-sm border border-${t.secondary}-100">
+                        <div class="flex justify-between items-center mb-6"><h2 class="text-2xl font-bold text-${t.primary}-900 flex items-center gap-2"><i data-lucide="star" class="w-7 h-7 text-amber-400 fill-amber-400"></i> ${state.currentYear}년 연간 목표</h2><div class="flex gap-2 bg-${t.bg || 'slate'}-100 p-1.5 rounded-xl"><button onclick="setState('currentYear', ${state.currentYear - 1})" class="p-2 hover:bg-white rounded-lg transition-all"><i data-lucide="chevron-left" class="w-5 h-5"></i></button><span class="px-4 py-2 text-base font-bold">${state.currentYear}년</span><button onclick="setState('currentYear', ${state.currentYear + 1})" class="p-2 hover:bg-white rounded-lg transition-all"><i data-lucide="chevron-right" class="w-5 h-5"></i></button></div></div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+                            ${monthNames.map((name, idx) => {
+                                const mGoals = (state.monthlyGoals[state.currentYear] && state.monthlyGoals[state.currentYear][idx]) || [];
+                                const isSelected = state.selectedMonth === idx;
+                                return `<div 
+                                    ondragover="allowDrop(event)" 
+                                    ondrop="dropItem(event, 'monthly', '${idx}')"
+                                    ondragenter="this.classList.add('drag-over')" 
+                                    ondragleave="this.classList.remove('drag-over')"
+                                    onclick="setState('selectedMonth', ${idx})" 
+                                    class="p-5 rounded-2xl border-2 transition-all cursor-pointer group flex flex-col min-h-[350px] ${isSelected ? `border-${t.primary}-500 bg-${t.primary}-50 shadow-md transform scale-[1.02]` : `border-${t.bg || 'slate'}-50 bg-${t.bg || 'slate'}-50 hover:border-${t.primary}-200`}">
+                                    <div class="flex justify-between items-center mb-4"><span class="text-lg font-black ${isSelected ? `text-${t.primary}-600` : `text-${t.secondary}-400`}">${name}</span></div>
+                                    <div class="flex-1 space-y-2 mb-3 overflow-y-auto max-h-64">
+                                        ${mGoals.map(g => {
+                                            const isEditing = state.editing && state.editing.type === 'monthly' && String(state.editing.id) === String(g.id);
+                                            return `<div 
+                                                draggable="${!isEditing}" 
+                                                ondragstart="drag(event, 'monthly', '${idx}', '${g.id}')"
+                                                class="flex items-start gap-2 group/item justify-between bg-white/50 p-2 rounded-lg border border-${t.secondary}-100 hover:bg-white transition-colors ${!isEditing ? 'cursor-move' : ''}">
+                                                <div class="flex items-start gap-2 flex-1">
+                                                    <div class="mt-0.5 cursor-pointer p-1 rounded-md hover:bg-slate-200" onclick="event.stopPropagation(); toggleMonthlyGoal('${idx}', '${g.id}')">
+                                                        <i data-lucide="${g.completed ? 'check-square' : 'square'}" class="w-4 h-4 ${g.completed ? `text-${t.success}-500` : `text-${t.secondary}-300`}"></i>
+                                                    </div>
+                                                    ${isEditing
+                                                        ? `<input type="text" value="${g.text}" class="edit-input font-medium text-sm text-${t.secondary}-700" id="edit-input-${g.id}" onblur="finishEdit(this.value)" onkeydown="if(event.key==='Enter') this.blur()" onclick="event.stopPropagation()">`
+                                                        : `<span class="text-sm leading-snug flex-1 py-1 px-1 rounded hover:bg-slate-100 cursor-text ${g.completed ? `line-through text-${t.secondary}-300` : `text-${t.secondary}-700 font-medium`}" onclick="event.stopPropagation(); startEdit('monthly', '${g.id}', '${idx}')">${g.text}</span>`
+                                                    }
+                                                </div>
+                                                <button onclick="event.stopPropagation(); deleteMonthlyGoal('${idx}', '${g.id}')" class="opacity-0 group-hover/item:opacity-100 text-${t.secondary}-300 hover:text-${t.accent}-500 transition-opacity p-1"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                                            </div>`
+                                        }).join('')}
+                                    </div>
+                                    <form onsubmit="handleAddMonthlyGoal(event, ${idx})" onclick="event.stopPropagation()">
+                                        <input type="text" id="monthly-goal-input-${idx}" class="w-full bg-white/50 border border-${t.secondary}-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:bg-white">
+                                    </form>
+                                </div>`;
+                            }).join('')}
+                        </div>
+                    </section>
+                    <section class="bg-${t.primary}-50 p-8 rounded-3xl shadow-sm border border-${t.primary}-100">
+                        <div class="mb-8"><h2 class="text-2xl font-bold flex items-center gap-3 text-${t.primary}-900"><i data-lucide="calendar" class="w-7 h-7 text-${t.primary}-600"></i> 주간 계획 (${monthNames[state.selectedMonth]})</h2></div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+                            ${weeks.map((week, wIdx) => {
+                                const weekKey = `week-${wIdx}`;
+                                const weekTasks = (state.weeklyPlanning[state.currentYear] && state.weeklyPlanning[state.currentYear][state.selectedMonth] && state.weeklyPlanning[state.currentYear][state.selectedMonth][weekKey]) || [];
+                                return `<div 
+                                    ondragover="allowDrop(event)"
+                                    ondrop="dropItem(event, 'weekly', '${weekKey}')"
+                                    ondragenter="this.classList.add('drag-over')" 
+                                    ondragleave="this.classList.remove('drag-over')"
+                                    class="bg-white rounded-2xl p-6 border border-${t.primary}-100 shadow-sm flex flex-col min-h-[400px]">
+                                    <div class="mb-5 pb-3 border-b border-${t.bg || 'slate'}-50"><h3 class="text-xl font-black text-${t.primary}-900 mb-1">${wIdx + 1}주차</h3><p class="text-xs text-${t.secondary}-400 font-bold tracking-wide">${week.label}</p></div>
+                                    <div class="flex-1 space-y-3 mb-4 overflow-y-auto max-h-[250px] pr-1">
+                                        ${weekTasks.map(item => {
+                                            const isEditing = state.editing && state.editing.type === 'weekly' && String(state.editing.id) === String(item.id);
+                                            return `<div 
+                                                draggable="${!isEditing}"
+                                                ondragstart="drag(event, 'weekly', '${weekKey}', '${item.id}')"
+                                                class="flex items-center justify-between p-3 rounded-xl bg-${t.bg || 'slate'}-50 border border-${t.secondary}-100 group hover:bg-${t.primary}-50/30 transition-colors ${!isEditing ? 'cursor-move' : ''}">
+                                                <div class="flex items-center gap-3 flex-1">
+                                                    <div class="cursor-pointer p-1 rounded-full hover:bg-slate-200" onclick="toggleWeeklyTodo('${state.selectedMonth}', '${weekKey}', '${item.id}')">
+                                                        <i data-lucide="${item.completed ? 'check-circle-2' : 'circle'}" class="w-4 h-4 ${item.completed ? `text-${t.success}-500` : `text-${t.secondary}-300`}"></i>
+                                                    </div>
+                                                    ${isEditing
+                                                        ? `<input type="text" value="${item.text}" class="edit-input font-medium text-sm text-${t.secondary}-700 bg-transparent" id="edit-input-${item.id}" onblur="finishEdit(this.value)" onkeydown="if(event.key==='Enter') this.blur()">`
+                                                        : `<span class="text-sm py-1 px-1 rounded hover:bg-slate-100 cursor-text flex-1 ${item.completed ? `line-through text-${t.secondary}-400` : `text-${t.secondary}-700 font-medium`}" onclick="startEdit('weekly', '${item.id}', '${state.selectedMonth}', '${weekKey}')">${item.text}</span>`
+                                                    }
+                                                </div>
+                                                <button onclick="event.stopPropagation(); deleteWeeklyTodo('${state.selectedMonth}', '${weekKey}', '${item.id}')" class="text-${t.secondary}-300 group-hover:text-${t.accent}-500 transition-colors p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                            </div>`
+                                        }).join('')}
+                                    </div>
+                                    <form onsubmit="handleAddWeeklyTodo(event, '${weekKey}')" class="mt-auto">
+                                        <input type="text" id="weekly-todo-input-${weekKey}" class="w-full bg-white border border-${t.secondary}-200 rounded-xl px-4 py-3 text-sm text-${t.secondary}-700 focus:outline-none focus:ring-2 focus:ring-${t.primary}-100">
+                                    </form>
+                                </div>`;
+                            }).join('')}
+                        </div>
+                    </section>
+                </div>`;
+        }
+
+        function renderHealth(container) {
+            const t = state.theme;
+            container.innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-8">
+                    <div class="md:col-span-5 space-y-8">
+                        <section class="bg-white p-8 rounded-3xl border border-${t.accent}-100 shadow-sm">
+                            <h2 class="text-xl font-bold text-${t.accent}-900 mb-6 flex items-center gap-2"><i data-lucide="trending-down" class="w-6 h-6 text-${t.accent}-500"></i> 체중 목표</h2>
+                            <div class="space-y-6">
+                                <div><label class="text-xs font-bold text-${t.secondary}-400 uppercase tracking-widest mb-2 block">현재 체중</label><div class="flex items-end gap-3"><input type="number" step="0.1" value="${state.currentWeight}" onchange="updateWeight(this.value)" class="bg-${t.bg || 'slate'}-50 border-2 border-${t.accent}-100 rounded-2xl px-5 py-3 text-4xl font-black text-${t.secondary}-800 w-40 focus:outline-none focus:border-${t.accent}-400 transition-colors"><span class="text-${t.secondary}-400 font-bold mb-4 text-lg">kg</span></div></div>
+                                <div class="flex items-center justify-between p-4 bg-${t.accent}-50 rounded-2xl">
+                                    <div>
+                                        <label class="text-[10px] font-bold text-${t.accent}-400 uppercase tracking-widest block mb-1">목표 체중</label>
+                                        <div class="flex items-end gap-1">
+                                            <input type="number" step="0.1" value="${state.weightGoal}" onchange="updateWeightGoal(this.value)" class="bg-transparent border-b-2 border-${t.accent}-300 px-1 text-2xl font-black text-${t.accent}-600 w-20 focus:outline-none focus:border-${t.accent}-500 transition-colors text-center">
+                                            <span class="text-${t.accent}-600 font-bold mb-1 text-sm">kg</span>
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <span class="text-xs font-bold text-${t.accent}-400 block mb-1">감량 필요</span>
+                                        <span class="text-xl font-bold text-${t.accent}-600">${(state.currentWeight - state.weightGoal).toFixed(1)}kg</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                        <section class="bg-${t.success}-50 p-8 rounded-3xl border border-${t.success}-100 shadow-sm">
+                            <div class="flex justify-between items-center mb-6"><h2 class="text-xl font-bold text-${t.success}-900 flex items-center gap-2"><i data-lucide="activity" class="w-6 h-6 text-${t.success}-600"></i> Daily Health Check</h2><span class="text-xs text-${t.success}-600 font-bold bg-${t.success}-100 px-2 py-1 rounded-lg">수정 가능</span></div>
+                            <div class="space-y-3 mb-6">
+                                ${state.healthChecklist.map(item => `
+                                    <div class="flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all group relative ${item.completed ? `bg-${t.success}-500 text-white shadow-md transform scale-[1.02]` : `bg-white text-${t.success}-900 hover:bg-${t.success}-100/50`}" onclick="toggleHealthCheck('${item.id}')">
+                                        <div class="p-1 rounded-full flex-shrink-0 ${item.completed ? 'bg-white/20' : `bg-${t.success}-100`}"><i data-lucide="${getIconName(item.icon)}" class="w-4 h-4"></i></div>
+                                        <span class="font-bold text-sm flex-1">${item.text}</span>
+                                        <button onclick="event.stopPropagation(); deleteHealthCheck('${item.id}')" class="absolute right-2 opacity-0 group-hover:opacity-100 p-2 rounded-lg transition-all text-white/80"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                        ${item.completed ? '<i data-lucide="check-circle-2" class="w-5 h-5 flex-shrink-0"></i>' : ''}
+                                    </div>
+                                `).join('')}
+                            </div>
+                            <form onsubmit="addHealthCheck(event)" class="flex gap-2"><input type="text" id="health-input" placeholder="새로운 습관 추가..." class="flex-1 bg-white border border-${t.success}-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-${t.success}-300"><button type="submit" class="bg-${t.success}-600 text-white p-3 rounded-xl hover:bg-${t.success}-700 shadow-lg shadow-${t.success}-200"><i data-lucide="plus" class="w-5 h-5"></i></button></form>
+                        </section>
+                    </div>
+                    <div class="md:col-span-7 space-y-6">
+                        <section class="bg-white p-8 rounded-3xl shadow-sm border border-${t.secondary}-100"><h2 class="text-xl font-bold text-${t.secondary}-800 mb-6 flex items-center gap-2"><i data-lucide="flag" class="w-6 h-6 text-${t.primary}-500"></i> 다이어트 로드맵</h2><div class="mb-8"><h3 class="text-sm font-bold text-${t.secondary}-400 uppercase tracking-widest mb-4">월간 핵심 목표</h3><div class="grid grid-cols-1 gap-4">${dietPlan.monthly.map(plan => `<div class="flex gap-4 p-4 rounded-2xl bg-${t.bg || 'slate'}-50 border border-${t.secondary}-100 items-center"><div class="bg-white px-3 py-1 rounded-lg border border-${t.secondary}-200 text-sm font-black text-${t.primary}-600 whitespace-nowrap">${plan.month}</div><div><p class="font-bold text-${t.secondary}-800 text-sm">${plan.goal}</p><p class="text-xs text-${t.secondary}-500 mt-1">${plan.task}</p></div></div>`).join('')}</div></div><div><h3 class="text-sm font-bold text-${t.secondary}-400 uppercase tracking-widest mb-4">주간 실천 가이드</h3><div class="grid grid-cols-1 sm:grid-cols-2 gap-4">${dietPlan.weekly.map((tip, i) => `<div class="flex items-center gap-3 p-4 bg-${t.primary}-50/50 rounded-2xl border border-${t.primary}-50"><div class="w-6 h-6 rounded-full bg-${t.primary}-100 text-${t.primary}-600 flex items-center justify-center text-xs font-bold shrink-0">${i + 1}</div><span class="text-sm text-${t.primary}-900 font-medium leading-tight">${tip}</span></div>`).join('')}</div></div></section>
+                        <section class="bg-gradient-to-br from-${t.accent}-500 to-orange-500 p-8 rounded-3xl text-white shadow-lg shadow-${t.accent}-100"><div class="flex gap-5 items-center"><div class="bg-white/20 p-4 rounded-full backdrop-blur-md"><i data-lucide="target" class="w-8 h-8 text-white"></i></div><div><h3 class="text-lg font-bold mb-1">목표 체중 ${state.weightGoal}kg 달성!</h3><p class="text-sm text-white/90 leading-relaxed font-medium">지금의 절제력이 새로운 작가님을 만듭니다.<br>매일 체크리스트를 채우고, ${(state.currentWeight - state.weightGoal).toFixed(1)}kg 감량의 주인공이 되세요.</p></div></div></section>
+                    </div>
+                </div>`;
+        }
+
+        function renderSettings(container) {
+            const t = state.theme;
+            container.innerHTML = `
+                <section class="bg-white p-8 rounded-3xl shadow-sm border border-${t.secondary}-100">
+                    <div class="mb-10 border-b border-slate-100 pb-10"><h2 class="text-xl font-bold text-${t.secondary}-800 flex items-center gap-2 mb-6"><i data-lucide="palette" class="w-6 h-6"></i> 테마 설정</h2><div class="grid grid-cols-2 md:grid-cols-5 gap-4">${themes.map(theme => `<button onclick="setTheme('${theme.id}')" class="relative p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-3 ${state.theme.id === theme.id ? `border-${t.primary}-500 bg-${t.primary}-50` : 'border-slate-100 hover:border-slate-200'}"><div class="flex gap-1"><div class="w-4 h-4 rounded-full bg-${theme.primary}-500"></div><div class="w-4 h-4 rounded-full bg-${theme.accent}-500"></div></div><span class="text-sm font-bold ${state.theme.id === theme.id ? `text-${t.primary}-700` : 'text-slate-500'}">${theme.name}</span>${state.theme.id === theme.id ? `<div class="absolute top-2 right-2 w-2 h-2 rounded-full bg-${t.primary}-500"></div>` : ''}</button>`).join('')}</div></div>
+                    <div class="flex justify-between items-center mb-8 border-b pb-4"><h2 class="text-xl font-bold text-${t.secondary}-800 flex items-center gap-2"><i data-lucide="settings" class="w-6 h-6"></i> 루틴 설정</h2><button onclick="saveData()" class="bg-${t.primary}-500 text-white px-6 py-2 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-${t.primary}-100"><i data-lucide="save" class="w-4 h-4"></i> 저장하기</button></div>
+                    <div class="space-y-4 max-w-4xl">${state.routine.map((item, index) => `<div class="grid grid-cols-12 gap-4 items-center bg-${t.bg || 'slate'}-50 p-4 rounded-2xl border border-${t.secondary}-100"><div class="col-span-2"><input type="text" value="${item.time}" onchange="updateRoutine('${index}', 'time', this.value)" class="w-full bg-white border border-${t.secondary}-200 rounded-lg px-2 py-1 text-sm font-bold text-${t.primary}-600" /></div><div class="col-span-4"><input type="text" value="${item.task}" onchange="updateRoutine('${index}', 'task', this.value)" class="w-full bg-white border border-${t.secondary}-200 rounded-lg px-3 py-1 text-sm font-bold text-${t.secondary}-800" /></div><div class="col-span-5"><input type="text" value="${item.detail}" onchange="updateRoutine('${index}', 'detail', this.value)" class="w-full bg-white border border-${t.secondary}-200 rounded-lg px-3 py-1 text-sm text-${t.secondary}-500" /></div><div class="col-span-1 flex justify-end"><button onclick="deleteRoutine('${index}')" class="text-${t.secondary}-300 hover:text-${t.accent}-500"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div></div>`).join('')}<button onclick="addRoutine()" class="w-full py-4 border-2 border-dashed border-${t.secondary}-200 rounded-2xl text-${t.secondary}-400 font-medium flex items-center justify-center gap-2"><i data-lucide="plus" class="w-4 h-4"></i> 루틴 추가</button></div>
+                    <div class="mt-12 pt-8 border-t border-${t.secondary}-100">
+                        <h2 class="text-xl font-bold text-${t.secondary}-800 flex items-center gap-2 mb-6">
+                            <i data-lucide="database" class="w-6 h-6"></i> 데이터 관리
+                        </h2>
+                        <div class="flex flex-wrap gap-4">
+                            <button onclick="exportData()" class="flex items-center gap-2 px-5 py-3 bg-${t.bg || 'slate'}-100 text-${t.secondary}-700 rounded-xl font-bold hover:bg-${t.bg || 'slate'}-200 transition-colors border border-${t.secondary}-200">
+                                <i data-lucide="download" class="w-4 h-4"></i> 내보내기 (백업)
+                            </button>
+                            <label class="flex items-center gap-2 px-5 py-3 bg-${t.bg || 'slate'}-100 text-${t.secondary}-700 rounded-xl font-bold hover:bg-${t.bg || 'slate'}-200 transition-colors border border-${t.secondary}-200 cursor-pointer">
+                                <i data-lucide="upload" class="w-4 h-4"></i> 불러오기 (복원)
+                                <input type="file" id="import-file" style="display:none" onchange="importData(this)" accept=".json">
+                            </label>
+                            <button onclick="requestNotificationPermission()" class="flex items-center gap-2 px-5 py-3 bg-indigo-50 text-indigo-600 rounded-xl font-bold hover:bg-indigo-100 transition-colors border border-indigo-200">
+                                <i data-lucide="bell" class="w-4 h-4"></i> 알림 권한 켜기
+                            </button>
+                        </div>
+                    </div>
+                </section>`;
+        }
+
+        // --- Functions ---
+        function startEdit(type, id, param1, param2) {
+            state.editing = { type, id, param1, param2 };
+            render();
+            requestAnimationFrame(() => {
+                const input = document.getElementById(`edit-input-${id}`);
+                if(input) { input.focus(); input.select(); }
+            });
+        }
+        function finishEdit(value) {
+            if (!state.editing) return;
+            const { type, id, param1, param2 } = state.editing;
+            const val = value.trim();
+            if (val) {
+                if (type === 'daily') {
+                     state.todos.daily = state.todos.daily.map(t => String(t.id) === String(id) ? { ...t, text: val } : t);
+                } else if (type === 'monthly') {
+                     const yearKey = String(state.currentYear);
+                     if(state.monthlyGoals[yearKey] && state.monthlyGoals[yearKey][param1]) {
+                         state.monthlyGoals[yearKey][param1] = state.monthlyGoals[yearKey][param1].map(g => String(g.id) === String(id) ? { ...g, text: val } : g);
+                     }
+                } else if (type === 'weekly') {
+                     const yearKey = String(state.currentYear);
+                     if(state.weeklyPlanning[yearKey] && state.weeklyPlanning[yearKey][param1] && state.weeklyPlanning[yearKey][param1][param2]) {
+                         state.weeklyPlanning[yearKey][param1][param2] = state.weeklyPlanning[yearKey][param1][param2].map(g => String(g.id) === String(id) ? { ...g, text: val } : g);
+                     }
+                }
+            }
+            state.editing = null; saveData();
+        }
+        function setState(key, value) { state[key] = value; saveData(); }
+        function setTheme(themeId) { const theme = themes.find(t => t.id === themeId); if (theme) { state.theme = theme; saveData(); } }
+        function toggleDailyTodo(id) { state.todos.daily = state.todos.daily.map(t => String(t.id) === String(id) ? { ...t, completed: !t.completed } : t); saveData(); }
+        function deleteDailyTodo(id) { state.todos.daily = state.todos.daily.filter(t => String(t.id) !== String(id)); saveData(); }
+        function addDailyTodo(e) { e.preventDefault(); const input = document.getElementById('daily-todo-input'); const text = input.value.trim(); if (!text) return; state.todos.daily.push({ id: Date.now().toString(), text, completed: false, date: getTodayStr() }); focusTargetId = 'daily-todo-input'; saveData(); }
+        function addTomorrowTodo(e) { e.preventDefault(); const input = document.getElementById('tomorrow-todo-input'); const text = input.value.trim(); if (!text) return; state.todos.daily.push({ id: Date.now().toString(), text, completed: false, date: getTomorrowStr() }); focusTargetId = 'tomorrow-todo-input'; saveData(); }
+        function toggleMonthlyGoal(monthIdx, id) { const yearKey = String(state.currentYear); if(!state.monthlyGoals[yearKey]) state.monthlyGoals[yearKey] = {}; if(!state.monthlyGoals[yearKey][monthIdx]) return; state.monthlyGoals[yearKey][monthIdx] = state.monthlyGoals[yearKey][monthIdx].map(g => String(g.id) === String(id) ? { ...g, completed: !g.completed } : g); saveData(); }
+        function deleteMonthlyGoal(monthIdx, id) { const yearKey = String(state.currentYear); if(!state.monthlyGoals[yearKey] || !state.monthlyGoals[yearKey][monthIdx]) return; state.monthlyGoals[yearKey][monthIdx] = state.monthlyGoals[yearKey][monthIdx].filter(g => String(g.id) !== String(id)); saveData(); }
+        function handleAddMonthlyGoal(e, monthIdx) { e.preventDefault(); const input = document.getElementById(`monthly-goal-input-${monthIdx}`); const text = input.value.trim(); if (!text) return; const yearKey = String(state.currentYear); if(!state.monthlyGoals[yearKey]) state.monthlyGoals[yearKey] = {}; if(!state.monthlyGoals[yearKey][monthIdx]) state.monthlyGoals[yearKey][monthIdx] = []; state.monthlyGoals[yearKey][monthIdx].push({ id: Date.now().toString(), text, completed: false }); focusTargetId = `monthly-goal-input-${monthIdx}`; saveData(); }
+        function toggleWeeklyTodo(monthIdx, weekKey, id) { const yearKey = String(state.currentYear); if(!state.weeklyPlanning[yearKey]) return; if(!state.weeklyPlanning[yearKey][monthIdx]) return; if(!state.weeklyPlanning[yearKey][monthIdx][weekKey]) return; state.weeklyPlanning[yearKey][monthIdx][weekKey] = state.weeklyPlanning[yearKey][monthIdx][weekKey].map(g => String(g.id) === String(id) ? { ...g, completed: !g.completed } : g); saveData(); }
+        function handleAddWeeklyTodo(e, weekKey) { e.preventDefault(); const input = document.getElementById(`weekly-todo-input-${weekKey}`); const text = input.value.trim(); if(!text) return; const yearKey = String(state.currentYear); const monthIdx = state.selectedMonth; if(!state.weeklyPlanning[yearKey]) state.weeklyPlanning[yearKey] = {}; if(!state.weeklyPlanning[yearKey][monthIdx]) state.weeklyPlanning[yearKey][monthIdx] = {}; if(!state.weeklyPlanning[yearKey][monthIdx][weekKey]) state.weeklyPlanning[yearKey][monthIdx][weekKey] = []; state.weeklyPlanning[yearKey][monthIdx][weekKey].push({ id: Date.now().toString(), text, completed: false }); focusTargetId = `weekly-todo-input-${weekKey}`; saveData(); }
+        function deleteWeeklyTodo(monthIdx, weekKey, id) { const yearKey = String(state.currentYear); if(!state.weeklyPlanning[yearKey]) return; if(!state.weeklyPlanning[yearKey][monthIdx]) return; state.weeklyPlanning[yearKey][monthIdx][weekKey] = state.weeklyPlanning[yearKey][monthIdx][weekKey].filter(g => String(g.id) !== String(id)); saveData(); }
+        function toggleHealthCheck(id) { state.healthChecklist = state.healthChecklist.map(i => String(i.id) === String(id) ? { ...i, completed: !i.completed } : i); saveData(); }
+        function deleteHealthCheck(id) { state.healthChecklist = state.healthChecklist.filter(i => String(i.id) !== String(id)); saveData(); }
+        function addHealthCheck(e) { e.preventDefault(); const input = document.getElementById('health-input'); const text = input.value.trim(); if(!text) return; state.healthChecklist.push({ id: Date.now().toString(), text, completed: false, icon: 'plus' }); focusTargetId = 'health-input'; saveData(); }
+        function updateRoutine(index, field, value) { state.routine[index][field] = value; saveData(); }
+        function deleteRoutine(index) { state.routine = state.routine.filter((_, i) => i != index); saveData(); }
+        function addRoutine() { state.routine.push({ id: Date.now().toString(), time: '00:00', task: '', detail: '' }); saveData(); }
+        function updateWeight(val) { state.currentWeight = Number(val); saveData(); }
+        function updateWeightGoal(val) { state.weightGoal = Number(val); saveData(); }
+        function toggleRoutine(id) { state.routine = state.routine.map(item => String(item.id) === String(id) ? { ...item, completed: !item.completed } : item ); saveData(); }
+        function toggleDayFinish() { state.dayFinished = !state.dayFinished; saveData(); }
+
+        // --- Drag and Drop ---
+        function allowDrop(ev) { ev.preventDefault(); }
+        function drag(ev, type, sourceKey, id) { ev.dataTransfer.setData("text/plain", JSON.stringify({ type: type, sourceKey: sourceKey, id: id })); ev.target.classList.add('dragging'); }
+        function dropItem(ev, targetType, targetKey) { ev.preventDefault(); ev.currentTarget.classList.remove('drag-over'); const dataStr = ev.dataTransfer.getData("text/plain"); if (!dataStr) return; const data = JSON.parse(dataStr); const sourceItem = findAndRemoveItem(data.type, data.sourceKey, data.id); if (sourceItem) { addItemToTarget(sourceItem, targetType, targetKey); saveData(); } }
+        function findAndRemoveItem(type, sourceKey, id) { const yearKey = String(state.currentYear); let item = null; if (type === 'monthly') { if (state.monthlyGoals[yearKey] && state.monthlyGoals[yearKey][sourceKey]) { const idx = state.monthlyGoals[yearKey][sourceKey].findIndex(g => String(g.id) === String(id)); if (idx > -1) { item = state.monthlyGoals[yearKey][sourceKey][idx]; state.monthlyGoals[yearKey][sourceKey].splice(idx, 1); } } } else if (type === 'weekly') { const monthIdx = state.selectedMonth; if (state.weeklyPlanning[yearKey] && state.weeklyPlanning[yearKey][monthIdx] && state.weeklyPlanning[yearKey][monthIdx][sourceKey]) { const idx = state.weeklyPlanning[yearKey][monthIdx][sourceKey].findIndex(g => String(g.id) === String(id)); if (idx > -1) { item = state.weeklyPlanning[yearKey][monthIdx][sourceKey][idx]; state.weeklyPlanning[yearKey][monthIdx][sourceKey].splice(idx, 1); } } } return item; }
+        function addItemToTarget(item, targetType, targetKey) { const yearKey = String(state.currentYear); if (targetType === 'monthly') { if (!state.monthlyGoals[yearKey]) state.monthlyGoals[yearKey] = {}; if (!state.monthlyGoals[yearKey][targetKey]) state.monthlyGoals[yearKey][targetKey] = []; state.monthlyGoals[yearKey][targetKey].push(item); } else if (targetType === 'weekly') { const monthIdx = state.selectedMonth; if (!state.weeklyPlanning[yearKey]) state.weeklyPlanning[yearKey] = {}; if (!state.weeklyPlanning[yearKey][monthIdx]) state.weeklyPlanning[yearKey][monthIdx] = {}; if (!state.weeklyPlanning[yearKey][monthIdx][targetKey]) state.weeklyPlanning[yearKey][monthIdx][targetKey] = []; state.weeklyPlanning[yearKey][monthIdx][targetKey].push(item); } }
+
+        // --- Data Management (Export/Import) ---
+        function exportData() { 
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state)); 
+            const downloadAnchorNode = document.createElement('a'); 
+            downloadAnchorNode.setAttribute("href", dataStr); 
+            downloadAnchorNode.setAttribute("download", "writer_diary_backup_" + new Date().toISOString().slice(0, 10) + ".json"); 
+            document.body.appendChild(downloadAnchorNode); 
+            downloadAnchorNode.click(); 
+            downloadAnchorNode.remove(); 
+            showToast("백업 데이터 다운로드를 시작합니다.");
+        }
+        function importData(input) { 
+            const file = input.files[0]; 
+            if (!file) return; 
+            const reader = new FileReader(); 
+            reader.onload = function(e) { 
+                try { 
+                    const content = e.target.result; 
+                    const parsedData = JSON.parse(content); 
+                    if (!parsedData.currentYear || !parsedData.routine) { 
+                        showToast("올바르지 않은 데이터 파일입니다.", true); 
+                        return; 
+                    } 
+                    if (parsedData.themeId) { 
+                        const theme = themes.find(t => t.id === parsedData.themeId); 
+                        if(theme) parsedData.theme = theme; 
+                    } else { 
+                        parsedData.theme = themes[0]; 
+                    } 
+                    state = parsedData;
+                    saveData();
+                    showToast("데이터 복원이 완료되었습니다."); 
+                } catch (err) { 
+                    console.error(err); 
+                    showToast("파일을 읽는 중 오류가 발생했습니다.", true); 
+                } 
+            }; 
+            reader.readAsText(file); 
+        }
+        
+        // --- Notifications ---
+        function requestNotificationPermission() { 
+            if (!("Notification" in window)) { 
+                showToast("이 브라우저는 알림을 지원하지 않습니다.", true); 
+                return; 
+            } 
+            Notification.requestPermission().then(permission => { 
+                if (permission === "granted") { 
+                    showToast("알림 권한이 허용되었습니다! 루틴 시간에 맞춰 알려드릴게요."); 
+                    new Notification("Writer Diary", { body: "알림 테스트: 성공적으로 설정되었습니다!" }); 
+                } else { 
+                    showToast("알림 권한이 거부되었습니다.", true); 
+                } 
+            }); 
+        }
+        function checkRoutineTime() { 
+            if (Notification.permission !== "granted") return; 
+            const now = new Date(); 
+            const currentTime = now.toTimeString().slice(0, 5); 
+            if (lastNotifiedTime === currentTime) return; 
+            const matchingRoutines = state.routine.filter(r => r.time === currentTime); 
+            matchingRoutines.forEach(routine => { 
+                new Notification(`작업 알림: ${routine.time}`, { body: `${routine.task}\n${routine.detail}`, icon: 'https://cdn-icons-png.flaticon.com/512/2693/2693507.png' }); 
+                lastNotifiedTime = currentTime; 
+            }); 
+        }
+
+        // --- Init ---
+        // 비동기로 데이터를 불러오고 완료 시 render() 호출
+        loadData(); 
+        setInterval(checkRoutineTime, 30000);
+    </script>
+</body>
+</html>

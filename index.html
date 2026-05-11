@@ -669,14 +669,20 @@ function go(p, pid){
   const n=document.getElementById('nav-'+p);
   if(n) n.classList.add('on');
   const tbTitle=document.getElementById('tb-title');
-  if(pid){
-    const proj=S.projects.find(x=>x.id===pid)||{name:'프로젝트'};
-    const area=(S.lifeAreas||[]).find(a=>a.id===proj.lifeAreaId);
-    const colorDot='<span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:'+(proj.color||'#999')+';margin-right:6px;vertical-align:middle;flex-shrink:0"></span>';
-    const areaBadge=area?'<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:99px;font-size:0.78em;font-weight:500;background:'+area.color+'18;color:'+area.color+';margin-left:8px;vertical-align:middle">'+area.emoji+' '+area.name+'</span>':'';
-    tbTitle.innerHTML=colorDot+proj.name+areaBadge;
+  const topbar=document.querySelector('.topbar');
+  if(p==='ledger'){
+    if(topbar)topbar.style.display='none';
   } else {
-    tbTitle.textContent=titles[p];
+    if(topbar)topbar.style.display='';
+    if(pid){
+      const proj=S.projects.find(x=>x.id===pid)||{name:'프로젝트'};
+      const area=(S.lifeAreas||[]).find(a=>a.id===proj.lifeAreaId);
+      const colorDot='<span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:'+(proj.color||'#999')+';margin-right:6px;vertical-align:middle;flex-shrink:0"></span>';
+      const areaBadge=area?'<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:99px;font-size:0.78em;font-weight:500;background:'+area.color+'18;color:'+area.color+';margin-left:8px;vertical-align:middle">'+area.emoji+' '+area.name+'</span>':'';
+      tbTitle.innerHTML=colorDot+proj.name+areaBadge;
+    } else {
+      tbTitle.textContent=titles[p];
+    }
   }
   render(); closeSB();
 }
@@ -2677,8 +2683,23 @@ function renderLedgerDashboard(){
     monthBars+='</div>';
   }
 
-  // 최근 거래
+  // 카테고리별 수입
+  const incCatMap={}, expCatMapDetail={};
   const recent=[...(LD.transactions||[])].filter(tx=>tx.date.slice(0,7)===ym).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,8);
+  (LD.transactions||[]).forEach(function(tx){
+    if(tx.date.slice(0,7)!==ym)return;
+    if(tx.type==='income'){
+      if(!incCatMap[tx.majorCategory])incCatMap[tx.majorCategory]={total:0,subs:{}};
+      incCatMap[tx.majorCategory].total+=tx.amount;
+      const sub=tx.minorCategory||'기타';
+      incCatMap[tx.majorCategory].subs[sub]=(incCatMap[tx.majorCategory].subs[sub]||0)+tx.amount;
+    } else if(tx.type==='expense'){
+      if(!expCatMapDetail[tx.majorCategory])expCatMapDetail[tx.majorCategory]={total:0,subs:{}};
+      expCatMapDetail[tx.majorCategory].total+=tx.amount;
+      const sub=tx.minorCategory||'기타';
+      expCatMapDetail[tx.majorCategory].subs[sub]=(expCatMapDetail[tx.majorCategory].subs[sub]||0)+tx.amount;
+    }
+  });
 
   let html='';
   // 헤더
@@ -2691,50 +2712,74 @@ function renderLedgerDashboard(){
   html+='<button class="btn bp bsm" onclick="openLedgerTxForm(\'\')">+ 내역 추가</button>';
   html+='</div>';
 
-  // 요약 카드
-  html+='<div class="g3" style="margin-bottom:16px">';
-  html+='<div class="stat"><div class="sl">이번 달 수입</div><div class="sv" style="color:var(--green);font-size:1.3em">'+fmtMoney(curInc)+'</div></div>';
-  html+='<div class="stat"><div class="sl">이번 달 지출</div><div class="sv" style="font-size:1.3em">'+fmtMoney(curExp)+'</div>';
-  if(prevExp>0)html+='<div class="ss" style="color:'+(diff>0?'var(--red)':'var(--green)')+'">전월 대비 '+(diff>0?'+':'')+fmtMoney(Math.abs(diff))+'</div>';
-  html+='</div>';
-  html+='<div class="stat"><div class="sl">이번 달 순수지</div><div class="sv" style="font-size:1.3em;color:'+(curInc-curExp>=0?'var(--green)':'var(--red)')+'">'+fmtMoney(curInc-curExp)+'</div></div>';
+  // 요약 카드 (수입/지출 카테고리 상세 포함)
+  html+='<div class="g2" style="margin-bottom:16px">';
+
+  // 수입 카드
+  html+='<div class="card" style="margin-bottom:0">';
+  html+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px">';
+  html+='<div style="font-size:0.82em;color:var(--t3)">이번 달 수입</div>';
+  html+='<div style="font-size:1.5em;font-weight:600;color:var(--green)">'+fmtMoney(curInc)+'</div></div>';
+  if(Object.keys(incCatMap).length>0){
+    Object.entries(incCatMap).sort((a,b)=>b[1].total-a[1].total).forEach(function([major,data]){
+      html+='<div style="margin-bottom:8px">';
+      html+='<div style="display:flex;justify-content:space-between;font-size:0.88em;font-weight:500;margin-bottom:3px">';
+      html+='<span>'+major+'</span><span style="color:var(--green)">'+fmtMoney(data.total)+'</span></div>';
+      Object.entries(data.subs).forEach(function([sub,amt]){
+        html+='<div style="display:flex;justify-content:space-between;font-size:0.78em;color:var(--t3);padding-left:10px">';
+        html+='<span>'+sub+'</span><span>'+fmtMoney(amt)+'</span></div>';
+      });
+      html+='</div>';
+    });
+  }
   html+='</div>';
 
-  // 예산 진행
+  // 지출 카드
+  html+='<div class="card" style="margin-bottom:0">';
+  html+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px">';
+  html+='<div style="font-size:0.82em;color:var(--t3)">이번 달 지출</div>';
+  html+='<div style="font-size:1.5em;font-weight:600;color:var(--red)">'+fmtMoney(curExp)+'</div></div>';
+  if(Object.keys(expCatMapDetail).length>0){
+    Object.entries(expCatMapDetail).sort((a,b)=>b[1].total-a[1].total).forEach(function([major,data]){
+      html+='<div style="margin-bottom:8px">';
+      html+='<div style="display:flex;justify-content:space-between;font-size:0.88em;font-weight:500;margin-bottom:3px">';
+      html+='<span>'+major+'</span><span style="color:var(--red)">'+fmtMoney(data.total)+'</span></div>';
+      Object.entries(data.subs).forEach(function([sub,amt]){
+        html+='<div style="display:flex;justify-content:space-between;font-size:0.78em;color:var(--t3);padding-left:10px">';
+        html+='<span>'+sub+'</span><span>'+fmtMoney(amt)+'</span></div>';
+      });
+      html+='</div>';
+    });
+  }
+  html+='</div></div>';
+
+  // 순수지
+  html+='<div class="stat" style="margin-bottom:16px"><div class="sl">이번 달 순수지</div><div class="sv" style="font-size:1.3em;color:'+(curInc-curExp>=0?'var(--green)':'var(--red)')+'">'+fmtMoney(curInc-curExp)+'</div></div>';
+
+  // 예산 진행 (소분류 포함)
   if(totalBudget>0){
     html+='<div class="card" style="margin-bottom:16px">';
     html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
     html+='<div class="ct">🎯 월 예산 진행률</div>';
     html+='<div style="font-size:0.88em;color:var(--t2)">'+fmtMoney(totalSpent)+' / '+fmtMoney(totalBudget)+'</div></div>';
     html+='<div class="pw" style="height:10px;margin-bottom:6px"><div class="pb" style="width:'+totalPct+'%;background:'+(totalPct>=100?'var(--red)':'var(--accent)')+'"></div></div>';
-    html+='<div style="font-size:0.78em;color:var(--t3);text-align:right">'+totalPct+'% 사용</div>';
-    // 카테고리별
+    html+='<div style="font-size:0.78em;color:var(--t3);text-align:right;margin-bottom:10px">'+totalPct+'% 사용</div>';
     budgetedCats.forEach(function(cat){
       const b=LD.budgets[cat]||0; if(!b)return;
       const sp=catMap[cat]||0;
       const pct=Math.min(100,Math.round(sp/b*100));
       const over=sp>b;
-      html+='<div style="margin-top:10px">';
-      html+='<div style="display:flex;justify-content:space-between;font-size:0.82em;margin-bottom:3px">';
-      html+='<span style="color:var(--t2)">'+cat+'</span>';
-      html+='<span style="color:'+(over?'var(--red)':'var(--text)')+'">'+fmtMoney(sp)+' <span style="color:var(--t3)">/ '+fmtMoney(b)+'</span></span></div>';
-      html+='<div class="pw" style="height:5px"><div class="pb" style="width:'+pct+'%;background:'+(over?'var(--red)':'var(--green)')+'"></div></div>';
-      html+='</div>';
-    });
-    html+='</div>';
-  }
-
-  // 카테고리 파이
-  if(cats.length>0){
-    const COLORS_L=['#C17C3C','#4A7C6F','#7C4A6F','#3C6BC1','#C14A3C','#6B7C3C','#3C7C7C'];
-    html+='<div class="card" style="margin-bottom:16px"><div class="ct" style="margin-bottom:14px">📊 카테고리별 지출</div>';
-    cats.forEach(function(c,i){
-      const pct=curExp===0?0:Math.round(c[1]/curExp*100);
-      html+='<div style="margin-bottom:8px">';
-      html+='<div style="display:flex;justify-content:space-between;font-size:0.85em;margin-bottom:3px">';
-      html+='<span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:'+COLORS_L[i%COLORS_L.length]+';display:inline-block"></span>'+c[0]+'</span>';
-      html+='<span style="color:var(--t2)">'+fmtMoney(c[1])+' <span style="color:var(--t3);font-size:0.85em">'+pct+'%</span></span></div>';
-      html+='<div class="pw" style="height:4px"><div class="pb" style="width:'+pct+'%;background:'+COLORS_L[i%COLORS_L.length]+'"></div></div>';
+      html+='<div style="margin-top:12px">';
+      html+='<div style="display:flex;justify-content:space-between;font-size:0.88em;font-weight:500;margin-bottom:4px">';
+      html+='<span>'+cat+'</span>';
+      html+='<span style="color:'+(over?'var(--red)':'var(--text)')+'">'+fmtMoney(sp)+' <span style="color:var(--t3);font-weight:400">/ '+fmtMoney(b)+'</span></span></div>';
+      html+='<div class="pw" style="height:5px;margin-bottom:4px"><div class="pb" style="width:'+pct+'%;background:'+(over?'var(--red)':'var(--green)')+'"></div></div>';
+      // 소분류
+      const subData=expCatMapDetail[cat]?expCatMapDetail[cat].subs:{};
+      Object.entries(subData).forEach(function([sub,amt]){
+        html+='<div style="display:flex;justify-content:space-between;font-size:0.78em;color:var(--t3);padding-left:10px;margin-top:2px">';
+        html+='<span>'+sub+'</span><span>'+fmtMoney(amt)+'</span></div>';
+      });
       html+='</div>';
     });
     html+='</div>';
@@ -2817,12 +2862,23 @@ function renderLedgerCalendar(){
     dayMap[tx.date].txs.push(tx);
   });
 
+  // 이번 달 총 수입/지출 계산
+  const ym=ledgerYear+'-'+String(ledgerMonth+1).padStart(2,'0');
+  let calInc=0,calExp=0;
+  (LD.transactions||[]).forEach(function(tx){
+    if(tx.date.slice(0,7)!==ym)return;
+    if(tx.type==='income')calInc+=tx.amount;
+    else if(tx.type==='expense')calExp+=tx.amount;
+  });
+
   let html='';
   html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">';
   html+='<div style="display:flex;align-items:center;gap:8px">';
   html+='<button class="btn bg bsm" onclick="ledgerPrevMonth()">‹</button>';
   html+='<div style="font-size:1.1em;font-weight:500;min-width:80px;text-align:center">'+ledgerYear+'년 '+MN[ledgerMonth]+'</div>';
   html+='<button class="btn bg bsm" onclick="ledgerNextMonth()">›</button>';
+  html+='<span style="font-size:0.82em;color:var(--green);margin-left:8px">+'+fmtMoney(calInc)+'</span>';
+  html+='<span style="font-size:0.82em;color:var(--red)">-'+fmtMoney(calExp)+'</span>';
   html+='</div>';
   html+='<button class="btn bp bsm" onclick="openLedgerTxForm(\'\')">+ 내역 추가</button></div>';
 

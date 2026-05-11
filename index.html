@@ -2955,14 +2955,20 @@ function renderLedgerCalendar(){
     dayMap[tx.date].txs.push(tx);
   });
 
-  // 이번 달 총 수입/지출 계산
+  // 이번 달 총 수입/지출 계산 (고정지출 포함)
   const ym=ledgerYear+'-'+String(ledgerMonth+1).padStart(2,'0');
   let calInc=0,calExp=0;
+  // 고정 지출 합산
+  (LD.fixedItems||[]).forEach(function(fi){
+    if(fi.amount&&fi.amount!=='req_input') calExp+=Number(fi.amount)||0;
+  });
   (LD.transactions||[]).forEach(function(tx){
     if(tx.date.slice(0,7)!==ym)return;
     if(tx.type==='income')calInc+=tx.amount;
     else if(tx.type==='expense')calExp+=tx.amount;
   });
+  // 고정 지출 합계
+  const fixedTotal=(LD.fixedItems||[]).reduce(function(s,fi){return s+(fi.amount&&fi.amount!=='req_input'?Number(fi.amount)||0:0);},0);
 
   let html='';
   html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">';
@@ -3000,7 +3006,9 @@ function renderLedgerCalendar(){
   // 고정 지출 등록 섹션
   html+='<div class="card">';
   html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">';
-  html+='<div class="ct">📌 고정 지출 관리</div>';
+  html+='<div style="display:flex;align-items:center;gap:10px"><div class="ct">📌 고정 지출 관리</div>';
+  if(fixedTotal>0)html+='<span style="font-size:0.88em;color:var(--red);font-weight:500">월 합계 -'+fmtMoney(fixedTotal)+'</span>';
+  html+='</div>';
   html+='<button class="btn bp bsm" onclick="openLedgerFixedForm()">+ 등록</button></div>';
   if(fixedItems.length===0){
     html+='<div class="empty">고정 지출을 등록하면 매달 달력에 표시돼요</div>';

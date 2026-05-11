@@ -2807,10 +2807,10 @@ function renderLedgerCalendar(){
     const dow=idx%7;
     const textColor=isT?'var(--accent)':!cell.cur?'var(--t3)':dow===0?'var(--red)':dow===6?'var(--blue)':'var(--text)';
     const hasPending=(di.fixed||[]).some(f=>!f.amount||f.amount==='req_input');
-    html+='<div onclick="openLedgerDayModal(\''+ds+'\')" style="min-height:72px;border-radius:6px;padding:4px 5px;background:'+(isT?'var(--al)':'transparent')+';border:1px solid '+(isT?'var(--accent)':'var(--border)')+';cursor:pointer;transition:background .1s" onmouseover="this.style.background=\'var(--s2)\'" onmouseout="this.style.background=\''+(isT?'var(--al)':'transparent')+'\'">';
-    html+='<div style="font-size:0.75em;font-weight:'+(isT?'700':'400')+';color:'+textColor+';text-align:right;margin-bottom:2px">'+cell.d+(hasPending?'<span style="color:var(--accent);margin-left:2px">·</span>':'')+'</div>';
-    if(di.inc>0)html+='<div style="font-size:0.62em;color:var(--green);text-align:right;font-weight:500">+'+new Intl.NumberFormat('ko-KR').format(di.inc)+'</div>';
-    if(di.exp>0)html+='<div style="font-size:0.62em;color:var(--red);text-align:right;font-weight:500">-'+new Intl.NumberFormat('ko-KR').format(di.exp)+'</div>';
+    html+='<div onclick="openLedgerDayModal(\''+ds+'\')" style="min-height:86px;border-radius:6px;padding:4px 5px;background:'+(isT?'var(--al)':'transparent')+';border:1px solid '+(isT?'var(--accent)':'var(--border)')+';cursor:pointer;transition:background .1s" onmouseover="this.style.background=\'var(--s2)\'" onmouseout="this.style.background=\''+(isT?'var(--al)':'transparent')+'\'">';
+    html+='<div style="font-size:0.75em;font-weight:'+(isT?'700':'500')+';color:'+textColor+';text-align:right;margin-bottom:2px">'+cell.d+(hasPending?'<span style="color:var(--accent);margin-left:2px">·</span>':'')+'</div>';
+    if(di.inc>0)html+='<div style="font-size:0.78em;color:var(--green);text-align:right;font-weight:500">+'+new Intl.NumberFormat('ko-KR').format(di.inc)+'</div>';
+    if(di.exp>0)html+='<div style="font-size:0.78em;color:var(--red);text-align:right;font-weight:500">-'+new Intl.NumberFormat('ko-KR').format(di.exp)+'</div>';
     html+='</div>';
   });
   html+='</div></div>';
@@ -2892,8 +2892,10 @@ function openLedgerDayModal(ds){
     inner+='</div>';
   });
   inner+='</div>';
-  inner+='<div style="padding:12px 24px 20px">'+
-    '<button class="btn bp" style="width:100%" onclick="document.getElementById(\'ledger-day-overlay\').remove();openLedgerTxForm(\''+ds+'\')">+ 이 날 내역 추가</button></div>';
+  inner+='<div style="padding:12px 24px 20px;display:flex;gap:8px">'+
+    '<button class="btn bp" style="flex:1" onclick="document.getElementById(\'ledger-day-overlay\').remove();openLedgerTxFormTyped(\''+ds+'\',\'income\')">+ 수입 추가</button>'+
+    '<button class="btn bg" style="flex:1;border-color:var(--red);color:var(--red)" onclick="document.getElementById(\'ledger-day-overlay\').remove();openLedgerTxFormTyped(\''+ds+'\',\'expense\')">- 지출 추가</button>'+
+    '</div>';
 
   const overlay=document.createElement('div');
   overlay.id='ledger-day-overlay';
@@ -3396,7 +3398,60 @@ function openLedgerTxForm(idOrDate){
   document.body.appendChild(overlay);
 }
 
-function _ltxDayOpts(){
+function openLedgerTxFormTyped(ds, type){
+  // 기존 overlay 제거
+  const old=document.getElementById('ledger-tx-overlay'); if(old)old.remove();
+  const cats=LD.categories||defaultLedgerCategories;
+  const majors=Object.keys(cats[type]||{});
+  const selMajor=majors[0]||'';
+  const minors=(cats[type]||{})[selMajor]||[];
+  const accs=LD.accounts||defaultLedgerAccounts;
+  const [iy,im,id2]=(ds||todStr()).split('-').map(Number);
+
+  function daysInMonth(y,m){return new Date(y,m,0).getDate();}
+  function yearOpts(){let s='';for(let y=2020;y<=2030;y++)s+='<option '+(y===iy?'selected':'')+'>'+y+'</option>';return s;}
+  function monthOpts(){let s='';for(let m=1;m<=12;m++)s+='<option '+(m===im?'selected':'')+'>'+String(m).padStart(2,'0')+'</option>';return s;}
+  function dayOpts(y,m){const last=daysInMonth(y,m);let s='';for(let d=1;d<=last;d++)s+='<option '+(d===id2?'selected':'')+'>'+String(d).padStart(2,'0')+'</option>';return s;}
+
+  const typeBtn=(v,label)=>'<label style="flex:1;cursor:pointer"><input type="radio" name="otx-type" value="'+v+'" '+(type===v?'checked':'')+' onchange="_ltxTypeChange(this.value)" style="display:none">'+
+    '<div class="otx-type-div" style="text-align:center;padding:7px 4px;border-radius:6px;font-size:0.88em;transition:all .15s;background:'+(type===v?'var(--surface)':'transparent')+';color:'+(type===v?'var(--accent)':'var(--t2)')+';box-shadow:'+(type===v?'var(--sh)':'none')+'">'+label+'</div></label>';
+
+  const inner=
+    '<div style="padding:20px 24px 0;display:flex;align-items:center;justify-content:space-between">'+
+    '<div style="font-size:1.1em;font-weight:500">'+(type==='income'?'수입 추가':'지출 추가')+'</div>'+
+    '<button class="bi" onclick="document.getElementById(\'ledger-tx-overlay\').remove()">✕</button></div>'+
+    '<div style="padding:16px 24px;overflow-y:auto;flex:1">'+
+    '<div style="display:flex;gap:2px;background:var(--s2);border-radius:8px;padding:3px;margin-bottom:14px">'+
+      typeBtn('income','수입 +')+typeBtn('expense','지출 -')+typeBtn('transfer','이체')+
+    '</div>'+
+    '<div class="fg"><label class="fl">날짜</label>'+
+    '<div style="display:flex;gap:6px;align-items:center">'+
+    '<select class="sel" id="otx-y" style="flex:2" onchange="_ltxDayOpts()">'+yearOpts()+'</select>'+
+    '<span style="color:var(--t3);font-size:0.9em">년</span>'+
+    '<select class="sel" id="otx-m" style="flex:1.5" onchange="_ltxDayOpts()">'+monthOpts()+'</select>'+
+    '<span style="color:var(--t3);font-size:0.9em">월</span>'+
+    '<select class="sel" id="otx-d" style="flex:1.5">'+dayOpts(iy,im)+'</select>'+
+    '<span style="color:var(--t3);font-size:0.9em">일</span>'+
+    '</div></div>'+
+    '<div class="fg"><label class="fl">결제 수단</label><select class="sel" id="otx-acc">'+accs.map(a=>'<option>'+a+'</option>').join('')+'</select></div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">'+
+    '<div><label class="fl">대분류</label><select class="sel" id="otx-major" onchange="_ltxMajorChange(this.value)">'+majors.map(m=>'<option '+(m===selMajor?'selected':'')+'>'+m+'</option>').join('')+'</select></div>'+
+    '<div><label class="fl">소분류</label><select class="sel" id="otx-minor">'+minors.map(m=>'<option>'+m+'</option>').join('')+'</select></div></div>'+
+    '<div class="fg"><label class="fl">금액 (원)</label><input type="number" class="inp" id="otx-amt" step="1000" placeholder="0" inputmode="numeric"></div>'+
+    '<div class="fg"><label class="fl">메모 (선택)</label><input class="inp" id="otx-memo" placeholder="메모"></div>'+
+    '</div>'+
+    '<div style="padding:0 24px 20px;display:flex;gap:8px;justify-content:flex-end;flex-shrink:0">'+
+    '<button class="btn bg" onclick="document.getElementById(\'ledger-tx-overlay\').remove()">취소</button>'+
+    '<button class="btn bp" onclick="_ltxSave(\'\')">저장</button></div>';
+
+  const overlay=document.createElement('div');
+  overlay.id='ledger-tx-overlay';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:1001;display:flex;align-items:center;justify-content:center;padding:20px';
+  overlay.innerHTML='<div style="background:var(--surface);border-radius:16px;width:100%;max-width:440px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.15)">'+inner+'</div>';
+  overlay.addEventListener('click',function(e){if(e.target===overlay)overlay.remove();});
+  document.body.appendChild(overlay);
+  ledgerEditTx=null;
+}
   const y=parseInt(document.getElementById('otx-y').value);
   const m=parseInt(document.getElementById('otx-m').value);
   const dSel=document.getElementById('otx-d');

@@ -1051,7 +1051,11 @@ function renderMonthly(){
   for(let d=1;d<=rem;d++){const nm=monthlyM===11?0:monthlyM+1,ny=monthlyM===11?monthlyY+1:monthlyY;cells.push({d,m:nm,y:ny,cur:false});}
 
   const evMap={};
-  (S.calEvents||[]).forEach(e=>{if(!evMap[e.date])evMap[e.date]=[];evMap[e.date].push(e);});
+  (S.calEvents||[]).forEach(e=>{
+    if(!evMap[e.date])evMap[e.date]=[];
+    const pr=e.projectId?S.projects.find(p=>p.id===e.projectId):null;
+    evMap[e.date].push(Object.assign({},e,{color:pr?pr.color:(e.color||'var(--accent)')}));
+  });
   (S.deadlines||[]).forEach(d=>{if(!evMap[d.date])evMap[d.date]=[];const pr=S.projects.find(p=>p.id===d.projectId);evMap[d.date].push(Object.assign({},d,{isDl:true,color:pr?pr.color:'#C14A3C'}));});
 
   let calHtml='<div style="display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:4px">';
@@ -1872,7 +1876,12 @@ function renderCalendar(){
   for(var d=1;d<=rem;d++){var nm=calM===11?0:calM+1,ny=calM===11?calY+1:calY;cells.push({d:d,m:nm,y:ny,cur:false});}
 
   var evMap={};
-  (S.calEvents||[]).forEach(e=>{if(!evMap[e.date])evMap[e.date]=[];evMap[e.date].push(e);});
+  (S.calEvents||[]).forEach(e=>{
+    if(!evMap[e.date])evMap[e.date]=[];
+    // 프로젝트 색상 실시간 반영
+    const pr=e.projectId?S.projects.find(p=>p.id===e.projectId):null;
+    evMap[e.date].push(Object.assign({},e,{color:pr?pr.color:(e.color||'var(--accent)')}));
+  });
   (S.deadlines||[]).forEach(dl=>{if(!evMap[dl.date])evMap[dl.date]=[];const pr=S.projects.find(p=>p.id===dl.projectId);evMap[dl.date].push(Object.assign({},dl,{isDl:true,color:pr?pr.color:'#C14A3C'}));});
 
   var calHtml='<div style="display:grid;grid-template-columns:repeat(7,1fr);border-bottom:1px solid var(--border)">';

@@ -2840,10 +2840,10 @@ function renderLedgerCalendar(){
     const dow=idx%7;
     const textColor=isT?'var(--accent)':!cell.cur?'var(--t3)':dow===0?'var(--red)':dow===6?'var(--blue)':'var(--text)';
     const hasPending=(di.fixed||[]).some(f=>!f.amount||f.amount==='req_input');
-    html+='<div onclick="openLedgerDayModal(\''+ds+'\')" style="min-height:86px;border-radius:6px;padding:4px 5px;background:'+(isT?'var(--al)':'transparent')+';border:1px solid '+(isT?'var(--accent)':'var(--border)')+';cursor:pointer;transition:background .1s" onmouseover="this.style.background=\'var(--s2)\'" onmouseout="this.style.background=\''+(isT?'var(--al)':'transparent')+'\'">';
+    html+='<div onclick="openLedgerDayModal(\''+ds+'\')" style="min-height:90px;border-radius:6px;padding:4px 5px;background:'+(isT?'var(--al)':'transparent')+';border:1px solid '+(isT?'var(--accent)':'var(--border)')+';cursor:pointer;transition:background .1s" onmouseover="this.style.background=\'var(--s2)\'" onmouseout="this.style.background=\''+(isT?'var(--al)':'transparent')+'\'">';
     html+='<div style="font-size:0.75em;font-weight:'+(isT?'700':'500')+';color:'+textColor+';text-align:right;margin-bottom:2px">'+cell.d+(hasPending?'<span style="color:var(--accent);margin-left:2px">·</span>':'')+'</div>';
-    if(di.inc>0)html+='<div style="font-size:0.78em;color:var(--green);text-align:right;font-weight:500">+'+new Intl.NumberFormat('ko-KR').format(di.inc)+'</div>';
-    if(di.exp>0)html+='<div style="font-size:0.78em;color:var(--red);text-align:right;font-weight:500">-'+new Intl.NumberFormat('ko-KR').format(di.exp)+'</div>';
+    if(di.inc>0)html+='<div style="font-size:0.86em;color:var(--green);text-align:right;font-weight:500">+'+new Intl.NumberFormat('ko-KR').format(di.inc)+'</div>';
+    if(di.exp>0)html+='<div style="font-size:0.86em;color:var(--red);text-align:right;font-weight:500">-'+new Intl.NumberFormat('ko-KR').format(di.exp)+'</div>';
     html+='</div>';
   });
   html+='</div></div>';
@@ -3134,11 +3134,11 @@ function renderLedgerSettings(){
   html+='<button class="btn bp bsm" onclick="addLedgerAccount()">추가</button></div>';
   html+='</div></div>';
 
-  // 2행: 지출카테(왼) + 수입카테(오)
-  html+='<div class="g2" style="margin-bottom:16px">';
+  // 2행: 지출카테(왼) + 수입카테(중) + 자산/부채카테(오)
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px">';
 
   // 지출 카테고리
-  html+='<div class="card" style="margin-bottom:0"><div class="ct" style="margin-bottom:14px">🗂️ 카테고리 관리 (지출)</div>';
+  html+='<div class="card" style="margin-bottom:0"><div class="ct" style="margin-bottom:14px">🗂️ 지출 카테고리</div>';
   Object.entries(cats.expense||{}).forEach(function([major,minors]){
     html+='<div style="margin-bottom:10px;background:var(--s2);border-radius:8px;padding:10px">';
     html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">';
@@ -3149,19 +3149,16 @@ function renderLedgerSettings(){
       html+='<span style="font-size:0.78em;background:var(--surface);border:1px solid var(--border);border-radius:99px;padding:2px 8px;display:inline-flex;align-items:center;gap:4px">'+m+
         '<button onclick="deleteLedgerMinor(\'expense\',\''+major+'\',\''+m+'\')" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:0.9em;padding:0;line-height:1">×</button></span>';
     });
-    html+='</div>';
-    html+='<div style="display:flex;gap:6px;margin-top:8px">';
+    html+='</div><div style="display:flex;gap:6px;margin-top:8px">';
     html+='<input class="inp ledger-minor-inp" data-major="'+major+'" placeholder="소분류 추가" style="flex:1;font-size:0.85em;padding:5px 8px">';
-    html+='<button class="btn bg bsm" onclick="addLedgerMinor(\'expense\',\''+major+'\')">+</button></div>';
-    html+='</div>';
+    html+='<button class="btn bg bsm" onclick="addLedgerMinor(\'expense\',\''+major+'\')">+</button></div></div>';
   });
   html+='<div style="display:flex;gap:8px;margin-top:10px">';
   html+='<input class="inp" id="new-major-expense" placeholder="대분류 추가" style="flex:1">';
-  html+='<button class="btn bp bsm" onclick="addLedgerMajor(\'expense\')">추가</button></div>';
-  html+='</div>';
+  html+='<button class="btn bp bsm" onclick="addLedgerMajor(\'expense\')">추가</button></div></div>';
 
   // 수입 카테고리
-  html+='<div class="card" style="margin-bottom:0"><div class="ct" style="margin-bottom:14px">🗂️ 카테고리 관리 (수입)</div>';
+  html+='<div class="card" style="margin-bottom:0"><div class="ct" style="margin-bottom:14px">🗂️ 수입 카테고리</div>';
   Object.entries(cats.income||{}).forEach(function([major,minors]){
     html+='<div style="margin-bottom:10px;background:var(--s2);border-radius:8px;padding:10px">';
     html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">';
@@ -3172,40 +3169,32 @@ function renderLedgerSettings(){
       html+='<span style="font-size:0.78em;background:var(--surface);border:1px solid var(--border);border-radius:99px;padding:2px 8px;display:inline-flex;align-items:center;gap:4px">'+m+
         '<button onclick="deleteLedgerMinor(\'income\',\''+major+'\',\''+m+'\')" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:0.9em;padding:0;line-height:1">×</button></span>';
     });
-    html+='</div>';
-    html+='<div style="display:flex;gap:6px;margin-top:8px">';
+    html+='</div><div style="display:flex;gap:6px;margin-top:8px">';
     html+='<input class="inp ledger-minor-inp" data-type="income" data-major="'+major+'" placeholder="소분류 추가" style="flex:1;font-size:0.85em;padding:5px 8px">';
-    html+='<button class="btn bg bsm" onclick="addLedgerMinorByType(\'income\',\''+major+'\')">+</button></div>';
-    html+='</div>';
+    html+='<button class="btn bg bsm" onclick="addLedgerMinorByType(\'income\',\''+major+'\')">+</button></div></div>';
   });
   html+='<div style="display:flex;gap:8px;margin-top:10px">';
   html+='<input class="inp" id="new-major-income" placeholder="대분류 추가" style="flex:1">';
-  html+='<button class="btn bp bsm" onclick="addLedgerMajor(\'income\')">추가</button></div>';
-  html+='</div></div>';
+  html+='<button class="btn bp bsm" onclick="addLedgerMajor(\'income\')">추가</button></div></div>';
 
-  // 3행: 자산카테(왼) + 부채카테(오)
+  // 자산/부채 카테고리 (3번째 열 — 위아래로)
   const assetCats=LD.assetCats||['현금/입출금','예적금','주식/펀드','부동산','기타'];
   const liabCats=LD.liabCats||['대출','신용카드값','할부','보증금 대출','기타'];
-
-  html+='<div class="g2" style="margin-bottom:16px">';
+  html+='<div style="display:flex;flex-direction:column;gap:16px">';
   html+='<div class="card" style="margin-bottom:0"><div class="ct" style="margin-bottom:14px">🏦 자산 카테고리</div>';
   html+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">';
   assetCats.forEach(function(c){
     html+='<span style="font-size:0.82em;background:var(--s2);border:1px solid var(--border);border-radius:99px;padding:3px 10px;display:inline-flex;align-items:center;gap:5px">'+c+
       '<button onclick="deleteLedgerAssetCat(\'asset\',\''+c+'\')" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:0.9em;padding:0;line-height:1">×</button></span>';
   });
-  html+='</div>';
-  html+='<div style="display:flex;gap:8px"><input class="inp" id="new-asset-cat" placeholder="카테고리 추가" style="flex:1"><button class="btn bp bsm" onclick="addLedgerAssetCat(\'asset\')">추가</button></div>';
-  html+='</div>';
-
+  html+='</div><div style="display:flex;gap:8px"><input class="inp" id="new-asset-cat" placeholder="카테고리 추가" style="flex:1"><button class="btn bp bsm" onclick="addLedgerAssetCat(\'asset\')">추가</button></div></div>';
   html+='<div class="card" style="margin-bottom:0"><div class="ct" style="margin-bottom:14px">💸 부채 카테고리</div>';
   html+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">';
   liabCats.forEach(function(c){
     html+='<span style="font-size:0.82em;background:var(--s2);border:1px solid var(--border);border-radius:99px;padding:3px 10px;display:inline-flex;align-items:center;gap:5px">'+c+
       '<button onclick="deleteLedgerAssetCat(\'liability\',\''+c+'\')" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:0.9em;padding:0;line-height:1">×</button></span>';
   });
-  html+='</div>';
-  html+='<div style="display:flex;gap:8px"><input class="inp" id="new-liab-cat" placeholder="카테고리 추가" style="flex:1"><button class="btn bp bsm" onclick="addLedgerAssetCat(\'liability\')">추가</button></div>';
+  html+='</div><div style="display:flex;gap:8px"><input class="inp" id="new-liab-cat" placeholder="카테고리 추가" style="flex:1"><button class="btn bp bsm" onclick="addLedgerAssetCat(\'liability\')">추가</button></div></div>';
   html+='</div></div>';
 
   return html;

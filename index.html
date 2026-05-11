@@ -2533,7 +2533,8 @@ function applyTheme(t){
   }
   var fw = S.fontWeight || '400';
   styleEl.textContent =
-    'html, body { font-size: '+fs+'px !important; font-weight: '+fw+' !important; }' +
+    'html, body { font-size: '+fs+'px !important; }' +
+    '*, *::before, *::after, button, input, textarea, select, span, div, a, p, label { font-weight: '+fw+' !important; }' +
     ':root { --sans: '+chosen+'; --serif: '+chosen+'; --mono: '+chosen+'; }';
 }
 
@@ -2797,52 +2798,37 @@ function renderLedgerDashboard(){
   html+='<button class="btn bg bsm" onclick="openYearlyDashboard('+ledgerYear+')">📅 연 대시보드</button>';
   html+='</div>';
 
-  // 요약 카드 (수입/지출 카테고리 상세 포함)
+  // 1행: 수입카드(대분류만) + 지출카드(대분류만)
   html+='<div class="g2" style="margin-bottom:16px">';
 
-  // 수입 카드
+  // 수입 카드 — 대분류만
   html+='<div class="card" style="margin-bottom:0">';
   html+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px">';
   html+='<div style="font-size:0.82em;color:var(--t3)">이번 달 수입</div>';
   html+='<div style="font-size:1.5em;font-weight:600;color:var(--green)">'+fmtMoney(curInc)+'</div></div>';
-  if(Object.keys(incCatMap).length>0){
-    Object.entries(incCatMap).sort((a,b)=>b[1].total-a[1].total).forEach(function([major,data]){
-      html+='<div style="margin-bottom:8px">';
-      html+='<div style="display:flex;justify-content:space-between;font-size:0.88em;font-weight:500;margin-bottom:3px">';
-      html+='<span>'+major+'</span><span style="color:var(--green)">'+fmtMoney(data.total)+'</span></div>';
-      Object.entries(data.subs).forEach(function([sub,amt]){
-        html+='<div style="display:flex;justify-content:space-between;font-size:0.78em;color:var(--t3);padding-left:10px">';
-        html+='<span>'+sub+'</span><span>'+fmtMoney(amt)+'</span></div>';
-      });
-      html+='</div>';
-    });
-  }
+  Object.entries(incCatMap).sort((a,b)=>b[1].total-a[1].total).forEach(function([major,data]){
+    html+='<div style="display:flex;justify-content:space-between;font-size:0.88em;padding:5px 0;border-bottom:1px solid var(--border)">';
+    html+='<span style="font-weight:500">'+major+'</span><span style="color:var(--green)">'+fmtMoney(data.total)+'</span></div>';
+  });
   html+='</div>';
 
-  // 지출 카드
+  // 지출 카드 — 대분류만
   html+='<div class="card" style="margin-bottom:0">';
   html+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px">';
   html+='<div style="font-size:0.82em;color:var(--t3)">이번 달 지출</div>';
   html+='<div style="font-size:1.5em;font-weight:600;color:var(--red)">'+fmtMoney(curExp)+'</div></div>';
-  if(Object.keys(expCatMapDetail).length>0){
-    Object.entries(expCatMapDetail).sort((a,b)=>b[1].total-a[1].total).forEach(function([major,data]){
-      html+='<div style="margin-bottom:8px">';
-      html+='<div style="display:flex;justify-content:space-between;font-size:0.88em;font-weight:500;margin-bottom:3px">';
-      html+='<span>'+major+'</span><span style="color:var(--red)">'+fmtMoney(data.total)+'</span></div>';
-      Object.entries(data.subs).forEach(function([sub,amt]){
-        html+='<div style="display:flex;justify-content:space-between;font-size:0.78em;color:var(--t3);padding-left:10px">';
-        html+='<span>'+sub+'</span><span>'+fmtMoney(amt)+'</span></div>';
-      });
-      html+='</div>';
-    });
-  }
+  Object.entries(expCatMapDetail).sort((a,b)=>b[1].total-a[1].total).forEach(function([major,data]){
+    html+='<div style="display:flex;justify-content:space-between;font-size:0.88em;padding:5px 0;border-bottom:1px solid var(--border)">';
+    html+='<span style="font-weight:500">'+major+'</span><span style="color:var(--red)">'+fmtMoney(data.total)+'</span></div>';
+  });
   html+='</div></div>';
 
-  // 순수지 제거됨
+  // 2행: 예산진행률(왼) + 이번달 지출 대+소분류(오)
+  html+='<div class="g2" style="margin-bottom:16px">';
 
-  // 예산 진행 (소분류 포함)
+  // 왼쪽: 예산 진행률
   if(totalBudget>0){
-    html+='<div class="card" style="margin-bottom:16px">';
+    html+='<div class="card" style="margin-bottom:0">';
     html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
     html+='<div class="ct">🎯 월 예산 진행률</div>';
     html+='<div style="font-size:0.88em;color:var(--t2)">'+fmtMoney(totalSpent)+' / '+fmtMoney(totalBudget)+'</div></div>';
@@ -2858,16 +2844,32 @@ function renderLedgerDashboard(){
       html+='<span>'+cat+'</span>';
       html+='<span style="color:'+(over?'var(--red)':'var(--text)')+'">'+fmtMoney(sp)+' <span style="color:var(--t3);font-weight:400">/ '+fmtMoney(b)+'</span></span></div>';
       html+='<div class="pw" style="height:5px;margin-bottom:4px"><div class="pb" style="width:'+pct+'%;background:'+(over?'var(--red)':'var(--green)')+'"></div></div>';
-      // 소분류
-      const subData=expCatMapDetail[cat]?expCatMapDetail[cat].subs:{};
-      Object.entries(subData).forEach(function([sub,amt]){
+      html+='</div>';
+    });
+    html+='</div>';
+  } else {
+    html+='<div class="card" style="margin-bottom:0"><div class="empty">설정에서 예산을 등록해요</div></div>';
+  }
+
+  // 오른쪽: 이번달 지출 대분류+소분류 전체
+  html+='<div class="card" style="margin-bottom:0"><div class="ct" style="margin-bottom:14px">📊 이번달 지출 상세</div>';
+  if(Object.keys(expCatMapDetail).length===0){
+    html+='<div class="empty">지출 내역이 없어요</div>';
+  } else {
+    Object.entries(expCatMapDetail).sort((a,b)=>b[1].total-a[1].total).forEach(function([major,data]){
+      const pct=curExp===0?0:Math.round(data.total/curExp*100);
+      html+='<div style="margin-bottom:12px">';
+      html+='<div style="display:flex;justify-content:space-between;font-size:0.9em;font-weight:500;margin-bottom:4px">';
+      html+='<span>'+major+'</span><span style="color:var(--red)">'+fmtMoney(data.total)+' <span style="font-size:0.82em;color:var(--t3);font-weight:400">'+pct+'%</span></span></div>';
+      html+='<div class="pw" style="height:4px;margin-bottom:5px"><div class="pb" style="width:'+pct+'%;background:var(--red);opacity:0.6"></div></div>';
+      Object.entries(data.subs).sort((a,b)=>b[1]-a[1]).forEach(function([sub,amt]){
         html+='<div style="display:flex;justify-content:space-between;font-size:0.78em;color:var(--t3);padding-left:10px;margin-top:2px">';
         html+='<span>'+sub+'</span><span>'+fmtMoney(amt)+'</span></div>';
       });
       html+='</div>';
     });
-    html+='</div>';
   }
+  html+='</div></div>';
 
   // 월별 흐름
   html+='<div class="card" style="margin-bottom:16px">';

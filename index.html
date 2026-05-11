@@ -2626,6 +2626,60 @@ function renderLedger(){
 }
 
 function fmtMoney(n){if(!n&&n!==0)return '0원';return new Intl.NumberFormat('ko-KR').format(Math.round(n))+'원';}
+
+function openYearlyDashboard(year){
+  let totalInc=0,totalExp=0,totalSav=0;
+  const incCats={},expCats={};
+  (LD.fixedItems||[]).forEach(function(fi){
+    if(fi.amount&&fi.amount!=='req_input'){
+      const amt=Number(fi.amount)||0;
+      totalExp+=amt*12;
+      if(!expCats['고정 지출'])expCats['고정 지출']={total:0,subs:{}};
+      expCats['고정 지출'].total+=amt*12;
+      expCats['고정 지출'].subs[fi.title||'고정']=(expCats['고정 지출'].subs[fi.title||'고정']||0)+amt*12;
+    }
+  });
+  (LD.transactions||[]).forEach(function(tx){
+    if(!tx.date.startsWith(year+'-'))return;
+    if(tx.type==='income'){
+      totalInc+=tx.amount;
+      if(!incCats[tx.majorCategory])incCats[tx.majorCategory]={total:0,subs:{}};
+      incCats[tx.majorCategory].total+=tx.amount;
+      const s=tx.minorCategory||'기타';
+      incCats[tx.majorCategory].subs[s]=(incCats[tx.majorCategory].subs[s]||0)+tx.amount;
+    } else if(tx.type==='expense'){
+      totalExp+=tx.amount;
+      if(!expCats[tx.majorCategory])expCats[tx.majorCategory]={total:0,subs:{}};
+      expCats[tx.majorCategory].total+=tx.amount;
+      const s=tx.minorCategory||'기타';
+      expCats[tx.majorCategory].subs[s]=(expCats[tx.majorCategory].subs[s]||0)+tx.amount;
+    }
+  });
+  (S.savings&&S.savings.entries||[]).forEach(function(e){
+    if(e.date&&e.date.startsWith(year+'-'))totalSav+=e.amount||0;
+  });
+  function catRows(map,color){
+    return Object.entries(map).sort((a,b)=>b[1].total-a[1].total).map(function([major,data]){
+      let r='<div style="margin-bottom:10px">';
+      r+='<div style="display:flex;justify-content:space-between;font-size:0.9em;font-weight:600;padding:4px 0;border-bottom:1px solid var(--border)"><span>'+major+'</span><span style="color:'+color+'">'+fmtMoney(data.total)+'</span></div>';
+      Object.entries(data.subs).sort((a,b)=>b[1]-a[1]).forEach(function([sub,amt]){
+        r+='<div style="display:flex;justify-content:space-between;font-size:0.78em;color:var(--t3);padding-left:10px;margin-top:2px"><span>'+sub+'</span><span>'+fmtMoney(amt)+'</span></div>';
+      });
+      return r+'</div>';
+    }).join('');
+  }
+  const body=
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:20px">'+
+    '<div style="text-align:center;padding:16px;background:var(--s2);border-radius:12px"><div style="font-size:0.78em;color:var(--t3);margin-bottom:4px">연간 총 수입</div><div style="font-size:1.3em;font-weight:700;color:var(--green)">'+fmtMoney(totalInc)+'</div></div>'+
+    '<div style="text-align:center;padding:16px;background:var(--s2);border-radius:12px"><div style="font-size:0.78em;color:var(--t3);margin-bottom:4px">연간 총 지출</div><div style="font-size:1.3em;font-weight:700;color:var(--red)">'+fmtMoney(totalExp)+'</div></div>'+
+    '<div style="text-align:center;padding:16px;background:var(--s2);border-radius:12px"><div style="font-size:0.78em;color:var(--t3);margin-bottom:4px">연간 저축</div><div style="font-size:1.3em;font-weight:700;color:var(--accent)">'+fmtMoney(totalSav)+'</div></div>'+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">'+
+    '<div><div style="font-size:0.88em;font-weight:600;color:var(--t2);margin-bottom:10px">💚 수입</div>'+catRows(incCats,'var(--green)')+'</div>'+
+    '<div><div style="font-size:0.88em;font-weight:600;color:var(--t2);margin-bottom:10px">❤️ 지출</div>'+catRows(expCats,'var(--red)')+'</div>'+
+    '</div>';
+  openMo(year+'년 연간 대시보드',body,'<button class=\"btn bg\" onclick=\"closeMo()\">닫기</button>');
+}
 function ledgerPrevMonth(){if(ledgerMonth===0){ledgerMonth=11;ledgerYear--;}else ledgerMonth--;render();}
 function ledgerNextMonth(){if(ledgerMonth===11){ledgerMonth=0;ledgerYear++;}else ledgerMonth++;render();}
 
@@ -2635,6 +2689,11 @@ function renderLedgerDashboard(){
   const MN=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
 
   let curInc=0,curExp=0,prevExp=0;
+  // 고정 지출 이번달 합산
+  const fixedItems=LD.fixedItems||[];
+  fixedItems.forEach(function(fi){
+    if(fi.amount&&fi.amount!=='req_input') curExp+=Number(fi.amount)||0;
+  });
   (LD.transactions||[]).forEach(function(tx){
     const txYm=tx.date.slice(0,7);
     if(txYm===ym){
@@ -2709,7 +2768,7 @@ function renderLedgerDashboard(){
   html+='<div style="font-size:1.1em;font-weight:500;min-width:80px;text-align:center">'+ledgerYear+'년 '+MN[ledgerMonth]+'</div>';
   html+='<button class="btn bg bsm" onclick="ledgerNextMonth()">›</button>';
   html+='</div>';
-  html+='<button class="btn bp bsm" onclick="openLedgerTxForm(\'\')">+ 내역 추가</button>';
+  html+='<button class="btn bg bsm" onclick="openYearlyDashboard('+ledgerYear+')">📅 연 대시보드</button>';
   html+='</div>';
 
   // 요약 카드 (수입/지출 카테고리 상세 포함)

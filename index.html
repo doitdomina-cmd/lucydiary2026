@@ -520,13 +520,16 @@ async function loadFromCloud() {
 function chunkData(data) {
   const FIELDS = ['routines','checks','projects','deadlines','savings','notes','calEvents',
     'lifeGoal','theme','customThemeColor','diaryEntries','monthlyGoals','monthlyMemo',
-    'weeklyGoals','weeklyMemo','diaryStickers','font','fontSize','customFonts',
-    'lifeAreas','todoToday','todoTmr'];
+    'weeklyGoals','weeklyMemo','diaryStickers','font','fontSize','fontWeight','customFonts',
+    'lifeAreas','todoList','todoListTmr'];
   const chunks = {};
   FIELDS.forEach(f => { if (data[f] !== undefined) chunks[f] = data[f]; });
-  // 나머지
+  // customFontData는 Firestore 용량 초과 → 저장 제외 (localStorage에만)
+  // 나머지 소형 데이터
   const rest = {};
-  Object.keys(data).forEach(k => { if (!FIELDS.includes(k)) rest[k] = data[k]; });
+  Object.keys(data).forEach(k => {
+    if (!FIELDS.includes(k) && k !== 'customFontData') rest[k] = data[k];
+  });
   if (Object.keys(rest).length > 0) chunks['_misc'] = rest;
   return chunks;
 }
@@ -3782,12 +3785,26 @@ auth.onAuthStateChanged(async function(user){
     // 클라우드에서 데이터 로드
     const cloudData = await loadFromCloud();
     if(cloudData){
-      // 클라우드 데이터가 있으면 우선 적용
+      // localStorage에서 폰트 데이터 미리 보존 (Firestore에 없으므로)
+      let localFontData = ['','',''];
+      try {
+        const localRaw = localStorage.getItem(KEY);
+        if(localRaw) {
+          const localS = JSON.parse(localRaw);
+          if(localS.customFontData) localFontData = localS.customFontData;
+        }
+      } catch(e) {}
+
+      // 클라우드 데이터 적용
       const ledgerData = cloudData._ledger;
       delete cloudData._ledger;
       S = Object.assign({}, S, cloudData);
       if(ledgerData) LD = Object.assign({}, LD, ledgerData);
-      // localStorage도 업데이트
+
+      // 폰트 데이터 복원 (클라우드엔 없으므로 localStorage 것 유지)
+      S.customFontData = localFontData;
+
+      // localStorage 업데이트
       localStorage.setItem(KEY, JSON.stringify(S));
       localStorage.setItem(LEDGER_KEY, JSON.stringify(LD));
     } else {

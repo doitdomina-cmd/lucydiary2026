@@ -2533,8 +2533,8 @@ function applyTheme(t){
   }
   var fw = S.fontWeight || '400';
   styleEl.textContent =
-    'html, body { font-size: '+fs+'px !important; }' +
-    '*, *::before, *::after, button, input, textarea, select, span, div, a, p, label { font-weight: '+fw+' !important; }' +
+    'html, body { font-size: '+fs+'px !important; font-weight: '+fw+' !important; }' +
+    '.app, .app * { font-weight: '+fw+' !important; }' +
     ':root { --sans: '+chosen+'; --serif: '+chosen+'; --mono: '+chosen+'; }';
 }
 
@@ -2699,13 +2699,16 @@ function renderLedgerDashboard(){
   const MN=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
 
   let curInc=0,curExp=0,prevExp=0;
+
+  // 카테고리별 지출 (먼저 선언)
+  const catMap={};
+
   // 고정 지출 이번달 합산
   const fixedItems=LD.fixedItems||[];
   fixedItems.forEach(function(fi){
     if(fi.amount&&fi.amount!=='req_input'){
       const amt=Number(fi.amount)||0;
       curExp+=amt;
-      // catMap에도 추가
       const major=fi.majorCategory||'고정 지출';
       catMap[major]=(catMap[major]||0)+amt;
     }
@@ -2714,20 +2717,15 @@ function renderLedgerDashboard(){
     const txYm=tx.date.slice(0,7);
     if(txYm===ym){
       if(tx.type==='income')curInc+=tx.amount;
-      else if(tx.type==='expense')curExp+=tx.amount;
+      else if(tx.type==='expense'){
+        curExp+=tx.amount;
+        catMap[tx.majorCategory]=(catMap[tx.majorCategory]||0)+tx.amount;
+      }
     }
     if(txYm===prevYm&&tx.type==='expense')prevExp+=tx.amount;
   });
   const diff=curExp-prevExp;
   const diffPct=prevExp===0?0:(diff/prevExp*100);
-
-  // 카테고리별 지출
-  const catMap={};
-  (LD.transactions||[]).forEach(function(tx){
-    if(tx.date.slice(0,7)===ym&&tx.type==='expense'){
-      catMap[tx.majorCategory]=(catMap[tx.majorCategory]||0)+tx.amount;
-    }
-  });
   const cats=Object.entries(catMap).sort((a,b)=>b[1]-a[1]);
 
   // 예산 진행

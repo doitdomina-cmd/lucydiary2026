@@ -1075,8 +1075,8 @@ function renderMonthly(){
       'overflow:hidden">'+
       '<div style="font-size:0.75em;font-weight:'+(isT?'700':'400')+';color:'+textColor+';text-align:right">'+cell.d+'</div>';
     evs.slice(0,2).forEach(function(ev){
-      calHtml+='<div style="background:'+ev.color+'25;color:'+ev.color+';border-left:2px solid '+ev.color+';'+
-        'border-radius:0 3px 3px 0;font-size:0.6em;padding:1px 3px;margin-top:1px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:500">'+
+      calHtml+='<div style="background:'+ev.color+'18;color:#555;border-left:2px solid '+ev.color+'60;'+
+        'border-radius:0 3px 3px 0;font-size:0.6em;padding:1px 3px;margin-top:1px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:400">'+
         (ev.isDl?'🚨':'')+ev.title+'</div>';
     });
     if(evs.length>2) calHtml+='<div style="font-size:0.55em;color:var(--t3);text-align:right">+'+(evs.length-2)+'</div>';
@@ -1226,10 +1226,14 @@ function renderWeekly(){
       '</div>';
     }
     evs.slice(0,2).forEach(function(ev){
-      dayGrid+='<div style="background:'+ev.color+'25;color:'+ev.color+';border-left:2px solid '+ev.color+';padding:2px 5px;border-radius:0 4px 4px 0;margin-bottom:3px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:500">'+ev.title+'</div>';
+      const pr=ev.projectId?S.projects.find(p=>p.id===ev.projectId):null;
+      const c=pr?pr.color:(ev.color||'var(--accent)');
+      dayGrid+='<div style="background:'+c+'18;color:#555;border-left:2px solid '+c+'60;padding:2px 5px;border-radius:0 4px 4px 0;margin-bottom:3px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:400">'+ev.title+'</div>';
     });
     dls.slice(0,1).forEach(function(d){
-      dayGrid+='<div style="background:var(--rl);color:var(--red);padding:2px 5px;border-radius:4px;margin-bottom:3px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:500">🚨 '+d.title+'</div>';
+      const pr=d.projectId?S.projects.find(p=>p.id===d.projectId):null;
+      const c=pr?pr.color:'#C14A3C';
+      dayGrid+='<div style="background:'+c+'18;color:#555;border-left:2px solid '+c+'60;padding:2px 5px;border-radius:4px;margin-bottom:3px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:400">🚨 '+d.title+'</div>';
     });
     dayGrid+='</div></div>';
   });
@@ -1691,14 +1695,47 @@ function renderPjDetail(pid){
   if(tk.length>0)html+='<div class="card" style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:0.9286em;color:var(--t3)">전체 진행률</span><span style="font-family:var(--mono);font-size:0.9286em">'+dn+'/'+tk.length+'</span></div><div class="pw" style="height:10px"><div class="pb" style="width:'+pc+'%;background:'+p.color+'"></div></div></div>';
   html+='<div class="g2">';
   html+='<div class="card"><div class="ch"><div class="ct">✅ 태스크</div><button class="btn bp bsm" onclick="openTkModal(\''+pid+'\')">+ 추가</button></div>'+
-    (tk.length===0?'<div class="empty">태스크를 추가해요</div>':tk.map((t,i)=>'<div class="ci"><div class="cb '+(t.done?'on':'')+'" style="'+(t.done?'background:'+p.color+';border-color:'+p.color:'')+'" onclick="togTk(\''+pid+'\','+i+')"></div><div style="flex:1"><div class="ck '+(t.done?'done':'')+'">'+t.text+'</div>'+(t.due?'<span class="cd">마감: '+t.due+'</span>':'')+'</div><button class="bi" onclick="delTk(\''+pid+'\','+i+')" style="color:var(--red);font-size:0.8571em">✕</button></div>').join(''))+
+    (tk.length===0?'<div class="empty">태스크를 추가해요</div>':tk.map((t,i)=>{
+      const dd=t.due?dLeft(t.due):null;
+      const dueColor=dd===null?'var(--t3)':dd<0?'var(--red)':dd===0?'var(--red)':dd<=3?'var(--accent)':'var(--t3)';
+      const dueLabel=dd===null?'':dd<0?'D+'+Math.abs(dd):dd===0?'오늘':'D-'+dd;
+      return '<div class="ci">'+
+        '<div class="cb '+(t.done?'on':'')+'" style="'+(t.done?'background:'+p.color+';border-color:'+p.color:'')+'" onclick="togTk(\''+pid+'\','+i+')"></div>'+
+        '<div style="flex:1">'+
+          '<div class="ck '+(t.done?'done':'')+'">'+t.text+'</div>'+
+          (t.due?'<div style="display:flex;align-items:center;gap:6px;margin-top:3px">'+
+            '<span style="font-size:0.78em;color:var(--t3)">📅 '+t.due+'</span>'+
+            '<span style="font-size:0.75em;font-weight:600;color:'+dueColor+'">'+dueLabel+'</span>'+
+          '</div>':'')+
+        '</div>'+
+        '<button class="bi" onclick="openTkEditModal(\''+pid+'\','+i+')" style="font-size:0.8em">✎</button>'+
+        '<button class="bi" onclick="delTk(\''+pid+'\','+i+')" style="color:var(--red);font-size:0.8571em">✕</button>'+
+      '</div>';
+    }).join(''))+
     '</div>';
+  // 마감일 카드 — 태스크 마감 + 별도 마감 통합해서 날짜순
+  const allDl=S.deadlines.filter(d=>d.projectId===pid).sort((a,b)=>a.date.localeCompare(b.date));
   html+='<div>'+
-    '<div class="card" style="margin-bottom:16px"><div class="ch"><div class="ct">🏁 마일스톤</div><button class="btn bg bsm" onclick="openMsModal(\''+pid+'\')">+ 추가</button></div>'+
-    (ms.length===0?'<div class="empty">마일스톤 없음</div>':ms.map((m,i)=>'<div class="msi"><div class="mss '+(m.done?'on':'')+'" onclick="togMs(\''+pid+'\','+i+')"></div><div style="flex:1"><div style="font-size:0.9286em;'+(m.done?'text-decoration:line-through;color:var(--t3)':'')+'">'+m.text+'</div>'+(m.date?'<div style="font-size:0.7857em;color:var(--t3);font-family:var(--mono)">'+m.date+'</div>':'')+'</div><button class="bi" onclick="delMs(\''+pid+'\','+i+')" style="font-size:0.8571em;color:var(--red)">✕</button></div>').join(''))+
+    '<div class="card" style="margin-bottom:16px"><div class="ch"><div class="ct">🚨 마감일</div><button class="btn bg bsm" onclick="openDlModal(\''+pid+'\')">+ 추가</button></div>'+
+    (allDl.length===0?'<div class="empty">마감일 없음<br><span style="font-size:0.85em;color:var(--t3)">태스크에 마감일을 입력하면 자동으로 여기 나와요</span></div>':
+      allDl.map(d=>{
+        const dd=dLeft(d.date),f=fmtDateObj(d.date);
+        return '<div class="dl">'+
+          '<div class="db"><div class="dm">'+f.month+'</div><div class="dd">'+f.day+'</div></div>'+
+          '<div style="flex:1">'+
+            '<div style="font-size:0.9643em">'+d.title+'</div>'+
+            (d._tkId?'<div style="font-size:0.78em;color:var(--t3)">📌 태스크 마감</div>':'')+ 
+          '</div>'+
+          '<div style="font-family:var(--mono);font-size:0.8571em;font-weight:500;color:'+(dd<0?'var(--red)':dd===0?'var(--red)':dd<=3?'var(--accent)':'var(--t3)')+'">'+
+            (dd<0?'D+'+Math.abs(dd):dd===0?'오늘':'D-'+dd)+
+          '</div>'+
+          (d._tkId?'':  // 태스크 연동 마감은 태스크에서만 삭제
+            '<button class="bi" onclick="delDl(\''+d.id+'\')" style="font-size:0.8571em;color:var(--t3)">✕</button>')+
+        '</div>';
+      }).join(''))+
     '</div>'+
-    '<div class="card"><div class="ch"><div class="ct">🚨 마감일</div><button class="btn bg bsm" onclick="openDlModal(\''+pid+'\')">+ 추가</button></div>'+
-    (pjDl.length===0?'<div class="empty">마감일 없음</div>':pjDl.map(d=>{const dd=dLeft(d.date),f=fmtDateObj(d.date);return '<div class="dl"><div class="db"><div class="dm">'+f.month+'</div><div class="dd">'+f.day+'</div></div><div style="flex:1"><div style="font-size:0.9643em">'+d.title+'</div></div><div style="font-family:var(--mono);font-size:0.8571em;font-weight:500;color:'+(dd<=0?'var(--red)':dd<=3?'var(--accent)':'var(--t3)')+'">'+( dd<0?'D+'+Math.abs(dd):dd===0?'오늘':'D-'+dd)+'</div><button class="bi" onclick="delDl(\''+d.id+'\')" style="font-size:0.8571em;color:var(--t3)">✕</button></div>';}).join(''))+
+    '<div class="card"><div class="ch"><div class="ct">🏁 마일스톤</div><button class="btn bg bsm" onclick="openMsModal(\''+pid+'\')">+ 추가</button></div>'+
+    (ms.length===0?'<div class="empty">마일스톤 없음</div>':ms.map((m,i)=>'<div class="msi"><div class="mss '+(m.done?'on':'')+'" onclick="togMs(\''+pid+'\','+i+')"></div><div style="flex:1"><div style="font-size:0.9286em;'+(m.done?'text-decoration:line-through;color:var(--t3)':'')+'">'+m.text+'</div>'+(m.date?'<div style="font-size:0.7857em;color:var(--t3);font-family:var(--mono)">'+m.date+'</div>':'')+'</div><button class="bi" onclick="delMs(\''+pid+'\','+i+')" style="font-size:0.8571em;color:var(--red)">✕</button></div>').join(''))+
     '</div></div></div>';
   html+='<div class="g2" style="margin-top:0">';
   html+='<div class="card"><div class="ch"><div class="ct">🔁 루틴화 일정</div><button class="btn bg bsm" onclick="openRzModal(\''+pid+'\')">+ 추가</button></div>'+
@@ -1712,19 +1749,168 @@ function renderPjDetail(pid){
   html+='<div class="card"><div class="ch"><div class="ct">🔗 링크 바로가기</div><button class="btn bg bsm" onclick="openLkModal(\''+pid+'\')">+ 추가</button></div>'+
     ((p.links||[]).length===0?'<div class="empty">자주 쓰는 링크를 추가해요</div>':(p.links||[]).map((lk,i)=>'<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)"><div style="font-size:1.2857em">'+(lk.emoji||'🔗')+'</div><div style="flex:1;overflow:hidden"><div style="font-size:0.9286em;font-weight:500">'+lk.label+'</div><div style="font-size:0.7857em;color:var(--t3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+lk.url+'</div></div><a href="'+lk.url+'" target="_blank" class="btn bg bsm" style="flex-shrink:0">열기 →</a><button class="bi" onclick="delLk(\''+pid+'\','+i+')" style="font-size:0.8571em;color:var(--t3)">✕</button></div>').join(''))+
     '</div></div>';
+  // 📚 학습 자료
+  const materials=p.materials||[];
+  html+='<div class="card" style="margin-top:0"><div class="ch"><div class="ct">📚 학습 자료</div><button class="btn bp bsm" onclick="openMatModal(\''+pid+'\')">+ 추가</button></div>';
+  if(materials.length===0){
+    html+='<div class="empty">PDF, 책 등 학습 자료를 등록해요</div>';
+  } else {
+    materials.forEach(function(m,i){
+      const pct=m.total>0?Math.min(100,Math.round((m.current||0)/m.total*100)):0;
+      html+='<div style="padding:12px 0;border-bottom:1px solid var(--border)">';
+      html+='<div style="display:flex;align-items:flex-start;gap:10px">';
+      html+='<div style="font-size:1.4em;flex-shrink:0">'+( m.type==='pdf'?'📄':'📖')+'</div>';
+      html+='<div style="flex:1;min-width:0">';
+      html+='<div style="font-size:0.9286em;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+m.title+'</div>';
+      if(m.total>0){
+        html+='<div style="display:flex;align-items:center;gap:8px;margin:6px 0 4px">';
+        html+='<div style="flex:1;background:var(--s3);border-radius:99px;height:6px;overflow:hidden"><div style="width:'+pct+'%;height:100%;background:'+p.color+';border-radius:99px;transition:width .4s"></div></div>';
+        html+='<span style="font-size:0.78em;color:var(--t2);white-space:nowrap;font-weight:500">'+pct+'% ('+(m.current||0)+'/'+m.total+(m.unit||'p')+')</span>';
+        html+='</div>';
+        // 진도 빠른 입력
+        html+='<div style="display:flex;align-items:center;gap:6px;margin-top:4px">';
+        html+='<span style="font-size:0.78em;color:var(--t3)">현재 진도</span>';
+        html+='<input type="number" value="'+(m.current||0)+'" min="0" max="'+m.total+'" style="width:64px;font-size:0.82em;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--s2);color:var(--text);text-align:center" onchange="updateMatProgress(\''+pid+'\','+i+',this.value)">';
+        html+='<span style="font-size:0.78em;color:var(--t3)">/ '+m.total+(m.unit||'p')+'</span>';
+        html+='</div>';
+      }
+      if(m.memo){
+        html+='<div style="font-size:0.78em;color:var(--t3);margin-top:4px;white-space:pre-wrap">'+m.memo+'</div>';
+      }
+      html+='</div>';
+      html+='<div style="display:flex;gap:2px;flex-shrink:0">';
+      html+='<button class="bi" onclick="openMatEditModal(\''+pid+'\','+i+')" style="font-size:0.8em">✎</button>';
+      html+='<button class="bi" onclick="delMat(\''+pid+'\','+i+')" style="font-size:0.8em;color:var(--red)">✕</button>';
+      html+='</div>';
+      html+='</div></div>';
+    });
+  }
+  html+='</div>';
   html+='<div class="card"><div class="ct" style="margin-bottom:12px">📝 프로젝트 노트</div><textarea class="ta" style="min-height:120px" placeholder="메모, 아이디어..." onchange="savePjN(\''+pid+'\',this.value)">'+(p.notes||'')+'</textarea></div>';
   return html;
 }
 
 function togTk(pid,i){const p=S.projects.find(x=>x.id===pid);p.tasks[i].done=!p.tasks[i].done;save();render();}
-function delTk(pid,i){const p=S.projects.find(x=>x.id===pid);p.tasks.splice(i,1);save();render();}
-function openTkModal(pid){openMo('태스크 추가','<div class="fg"><label class="fl">태스크</label><input class="inp" id="t-t" placeholder="할 일"></div><div class="fg"><label class="fl">마감일 (선택)</label><input type="date" class="inp" id="t-d"></div>','<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="saveTk(\''+pid+'\')">추가</button>');}
-function saveTk(pid){const text=document.getElementById('t-t').value.trim(),due=document.getElementById('t-d').value;if(!text)return;const p=S.projects.find(x=>x.id===pid);if(!p.tasks)p.tasks=[];p.tasks.push({id:gid(),text,due,done:false});save();closeMo();render();}
+function delTk(pid,i){
+  const p=S.projects.find(x=>x.id===pid);
+  const t=p.tasks[i];
+  // 캘린더에서 해당 태스크 마감일 제거
+  if(t.due) S.deadlines=S.deadlines.filter(d=>!(d.projectId===pid&&d._tkIdx===i&&d.date===t.due));
+  p.tasks.splice(i,1);
+  save();render();
+}
+function openTkModal(pid){
+  openMo('태스크 추가',
+    '<div class="fg"><label class="fl">태스크</label><input class="inp" id="t-t" placeholder="할 일"></div>'+
+    '<div class="fg"><label class="fl">마감일 (선택) — 캘린더에 자동 표시</label><input type="date" class="inp" id="t-d"></div>',
+    '<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="saveTk(\''+pid+'\')">추가</button>');
+}
+function openTkEditModal(pid,i){
+  const p=S.projects.find(x=>x.id===pid);if(!p)return;
+  const t=p.tasks[i];
+  openMo('태스크 수정',
+    '<div class="fg"><label class="fl">태스크</label><input class="inp" id="te-t" value="'+t.text+'"></div>'+
+    '<div class="fg"><label class="fl">마감일 (선택)</label><input type="date" class="inp" id="te-d" value="'+(t.due||'')+'"></div>',
+    '<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="saveTkEdit(\''+pid+'\','+i+')">저장</button>');
+}
+function saveTkEdit(pid,i){
+  const text=document.getElementById('te-t').value.trim();
+  const due=document.getElementById('te-d').value;
+  if(!text)return;
+  const p=S.projects.find(x=>x.id===pid);
+  const old=p.tasks[i];
+  // 기존 마감일 캘린더에서 제거
+  if(old.due) S.deadlines=S.deadlines.filter(d=>!(d._tkId===old.id));
+  p.tasks[i]=Object.assign({},old,{text,due});
+  // 새 마감일 캘린더 등록
+  if(due){
+    S.deadlines=S.deadlines.filter(d=>d._tkId!==old.id);
+    S.deadlines.push({id:gid(),title:text,date:due,projectId:pid,_tkId:old.id});
+  }
+  save();closeMo();render();
+}
+function saveTk(pid){
+  const text=document.getElementById('t-t').value.trim(),due=document.getElementById('t-d').value;
+  if(!text)return;
+  const p=S.projects.find(x=>x.id===pid);
+  if(!p.tasks)p.tasks=[];
+  const tkId=gid();
+  p.tasks.push({id:tkId,text,due,done:false});
+  // 마감일 있으면 캘린더에 자동 등록
+  if(due){
+    S.deadlines.push({id:gid(),title:text,date:due,projectId:pid,_tkId:tkId});
+  }
+  save();closeMo();render();
+}
 function togMs(pid,i){const p=S.projects.find(x=>x.id===pid);p.milestones[i].done=!p.milestones[i].done;save();render();}
 function delMs(pid,i){const p=S.projects.find(x=>x.id===pid);p.milestones.splice(i,1);save();render();}
 function openMsModal(pid){openMo('마일스톤 추가','<div class="fg"><label class="fl">내용</label><input class="inp" id="ms-t" placeholder="마일스톤 내용"></div><div class="fg"><label class="fl">목표 날짜</label><input type="date" class="inp" id="ms-d"></div>','<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="saveMsF(\''+pid+'\')">추가</button>');}
 function saveMsF(pid){const text=document.getElementById('ms-t').value.trim(),date=document.getElementById('ms-d').value;if(!text)return;const p=S.projects.find(x=>x.id===pid);if(!p.milestones)p.milestones=[];p.milestones.push({id:gid(),text,date,done:false});save();closeMo();render();}
 function savePjN(pid,v){const p=S.projects.find(x=>x.id===pid);if(p){p.notes=v;save();}}
+
+// ═══════════ 학습 자료 ═══════════
+function openMatModal(pid){
+  openMo('학습 자료 추가',
+    '<div class="fg"><label class="fl">종류</label><select class="sel" id="mat-type"><option value="pdf">📄 PDF</option><option value="book">📖 책</option></select></div>'+
+    '<div class="fg"><label class="fl">제목</label><input class="inp" id="mat-title" placeholder="예: 클립스튜디오 완전정복.pdf"></div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">'+
+    '<div><label class="fl">전체 분량</label><input type="number" class="inp" id="mat-total" placeholder="예: 200" min="0"></div>'+
+    '<div><label class="fl">단위</label><select class="sel" id="mat-unit"><option value="p">페이지</option><option value="챕터">챕터</option><option value="강">강의</option><option value="화">화</option></select></div></div>'+
+    '<div class="fg"><label class="fl">현재 진도</label><input type="number" class="inp" id="mat-cur" placeholder="0" min="0"></div>'+
+    '<div class="fg"><label class="fl">메모 (선택)</label><textarea class="ta" id="mat-memo" style="min-height:60px" placeholder="핵심 내용, 챕터 메모 등..."></textarea></div>',
+    '<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="saveMat(\''+pid+'\')">추가</button>');
+}
+function saveMat(pid){
+  const type=document.getElementById('mat-type').value;
+  const title=document.getElementById('mat-title').value.trim();
+  const total=parseInt(document.getElementById('mat-total').value)||0;
+  const unit=document.getElementById('mat-unit').value;
+  const current=parseInt(document.getElementById('mat-cur').value)||0;
+  const memo=document.getElementById('mat-memo').value.trim();
+  if(!title)return;
+  const p=S.projects.find(x=>x.id===pid);
+  if(!p.materials)p.materials=[];
+  p.materials.push({id:gid(),type,title,total,unit,current,memo});
+  save();closeMo();render();
+}
+function openMatEditModal(pid,i){
+  const p=S.projects.find(x=>x.id===pid);if(!p)return;
+  const m=p.materials[i];
+  openMo('학습 자료 수정',
+    '<div class="fg"><label class="fl">종류</label><select class="sel" id="mat-type"><option value="pdf" '+(m.type==='pdf'?'selected':'')+'>📄 PDF</option><option value="book" '+(m.type==='book'?'selected':'')+'>📖 책</option></select></div>'+
+    '<div class="fg"><label class="fl">제목</label><input class="inp" id="mat-title" value="'+m.title+'"></div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">'+
+    '<div><label class="fl">전체 분량</label><input type="number" class="inp" id="mat-total" value="'+m.total+'" min="0"></div>'+
+    '<div><label class="fl">단위</label><select class="sel" id="mat-unit">'+
+      ['p','챕터','강의','화'].map(u=>'<option value="'+u+'" '+(m.unit===u?'selected':'')+'>'+u+'</option>').join('')+
+    '</select></div></div>'+
+    '<div class="fg"><label class="fl">현재 진도</label><input type="number" class="inp" id="mat-cur" value="'+(m.current||0)+'" min="0"></div>'+
+    '<div class="fg"><label class="fl">메모</label><textarea class="ta" id="mat-memo" style="min-height:60px">'+(m.memo||'')+'</textarea></div>',
+    '<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="saveMatEdit(\''+pid+'\','+i+')">저장</button>');
+}
+function saveMatEdit(pid,i){
+  const type=document.getElementById('mat-type').value;
+  const title=document.getElementById('mat-title').value.trim();
+  const total=parseInt(document.getElementById('mat-total').value)||0;
+  const unit=document.getElementById('mat-unit').value;
+  const current=parseInt(document.getElementById('mat-cur').value)||0;
+  const memo=document.getElementById('mat-memo').value.trim();
+  if(!title)return;
+  const p=S.projects.find(x=>x.id===pid);
+  p.materials[i]=Object.assign({},p.materials[i],{type,title,total,unit,current,memo});
+  save();closeMo();render();
+}
+function updateMatProgress(pid,i,val){
+  const p=S.projects.find(x=>x.id===pid);if(!p||!p.materials[i])return;
+  p.materials[i].current=parseInt(val)||0;
+  save();
+}
+function delMat(pid,i){
+  if(!confirm('삭제할까요?'))return;
+  const p=S.projects.find(x=>x.id===pid);
+  p.materials.splice(i,1);
+  save();render();
+}
 
 // ═══════════ ROUTINIZED ═══════════
 function openRzModal(pid){
@@ -1906,7 +2092,7 @@ function renderCalendar(){
         'font-size:0.85em;font-weight:'+(isT?'700':'500')+';margin-bottom:3px;'+
         'color:'+(isT?'var(--accent)':!cell.cur?'var(--t3)':ci===0?'var(--red)':ci===6?'var(--blue)':'var(--text)')+'">'+cell.d+'</div>';
     evs.slice(0,3).forEach(function(ev){
-      calHtml+='<div style="background:'+(ev.color||'var(--accent)')+'14;color:'+(ev.color||'var(--accent)')+';'+
+      calHtml+='<div style="background:'+(ev.color||'var(--accent)')+'14;color:#555;'+
         'border-left:2px solid '+(ev.color||'var(--accent)')+'60;border-radius:0 4px 4px 0;'+
         'font-size:0.8em;padding:3px 6px;margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:400">'+
         (ev.isDl?'🚨 ':'')+ev.title+'</div>';

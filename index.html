@@ -842,12 +842,13 @@ function renderToday(){
   // 오늘/내일 할일 체크리스트
   if(!S.todoList)S.todoList={};
   if(!S.todoList[t])S.todoList[t]=[];
-  if(!S.todoList[tmr])S.todoList[tmr]=[];
+  if(!S.todoListTmr)S.todoListTmr={};
+  if(!S.todoListTmr[t])S.todoListTmr[t]=[];
 
   // 자동 이월: 어제 미완료 항목을 오늘로
   const yest=addDays(t,-1);
   if(S.todoList[yest]){
-    const carry=S.todoList[yest].filter(item=>!item.done);
+    const carry=S.todoList[yest].filter(item=>!item.done&&!item._carried);
     carry.forEach(function(item){
       const already=S.todoList[t].some(x=>x.text===item.text&&x._carried);
       if(!already){
@@ -856,9 +857,19 @@ function renderToday(){
     });
     if(carry.length>0)save();
   }
+  // 어제 내일할일 → 오늘 할일로 이월
+  if(S.todoListTmr&&S.todoListTmr[yest]&&S.todoListTmr[yest].length>0){
+    S.todoListTmr[yest].filter(item=>!item.done).forEach(function(item){
+      const already=S.todoList[t].some(x=>x.text===item.text&&x._carried);
+      if(!already){
+        S.todoList[t].unshift({id:gid(),text:item.text,done:false,_carried:true});
+      }
+    });
+    save();
+  }
 
   const todayItems=S.todoList[t];
-  const tmrItems=S.todoList[tmr];
+  const tmrItems=S.todoListTmr[t]||[];
 
   function renderTodoList(items,ds,label){
     const safeDs=ds.replace(/-/g,'_');
@@ -970,19 +981,41 @@ function addTodoInline(ds,inputId){
   const el=document.getElementById(inputId);
   if(!el||!el.value.trim())return;
   const text=el.value.trim();
-  if(!S.todoList)S.todoList={};
-  if(!S.todoList[ds])S.todoList[ds]=[];
-  S.todoList[ds].push({id:gid(),text,done:false});
+  const t=todStr();
+  const isTmr=(ds!==t);
+  if(isTmr){
+    if(!S.todoListTmr)S.todoListTmr={};
+    if(!S.todoListTmr[t])S.todoListTmr[t]=[];
+    S.todoListTmr[t].push({id:gid(),text,done:false});
+  } else {
+    if(!S.todoList)S.todoList={};
+    if(!S.todoList[ds])S.todoList[ds]=[];
+    S.todoList[ds].push({id:gid(),text,done:false});
+  }
   save();render();
 }
 function togTodoItem(ds,i){
-  if(!S.todoList||!S.todoList[ds])return;
-  S.todoList[ds][i].done=!S.todoList[ds][i].done;
+  const t=todStr();
+  const isTmr=(ds!==t);
+  if(isTmr){
+    if(!S.todoListTmr||!S.todoListTmr[t])return;
+    S.todoListTmr[t][i].done=!S.todoListTmr[t][i].done;
+  } else {
+    if(!S.todoList||!S.todoList[ds])return;
+    S.todoList[ds][i].done=!S.todoList[ds][i].done;
+  }
   save();render();
 }
 function delTodoItem(ds,i){
-  if(!S.todoList||!S.todoList[ds])return;
-  S.todoList[ds].splice(i,1);
+  const t=todStr();
+  const isTmr=(ds!==t);
+  if(isTmr){
+    if(!S.todoListTmr||!S.todoListTmr[t])return;
+    S.todoListTmr[t].splice(i,1);
+  } else {
+    if(!S.todoList||!S.todoList[ds])return;
+    S.todoList[ds].splice(i,1);
+  }
   save();render();
 }
 

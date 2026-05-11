@@ -3157,8 +3157,12 @@ async function loadRoyaltyFromFirebase(){
   const statusEl=document.getElementById('royalty-status');
   if(statusEl)statusEl.textContent='불러오는 중...';
   try{
-    const url='https://firestore.googleapis.com/v1/projects/writer-routine/databases/(default)/documents/royalty/latest?key=AIzaSyCYWsMUSAaxnnTNoNjxw8YfZThv9-5mHak';
-    const res=await fetch(url);
+    // 로그인된 사용자 토큰으로 요청
+    const user=auth.currentUser;
+    if(!user)throw new Error('로그인 필요');
+    const token=await user.getIdToken();
+    const url='https://firestore.googleapis.com/v1/projects/writer-routine/databases/(default)/documents/royalty/latest';
+    const res=await fetch(url,{headers:{Authorization:'Bearer '+token}});
     if(!res.ok)throw new Error('HTTP '+res.status);
     const json=await res.json();
     const raw=json.fields&&json.fields.data&&json.fields.data.stringValue;
@@ -3167,7 +3171,7 @@ async function loadRoyaltyFromFirebase(){
     showRoyaltyImportModal(royalty);
     if(statusEl)statusEl.textContent='';
   }catch(e){
-    if(statusEl)statusEl.textContent='❌ 불러오기 실패: '+e.message+' (인세 앱이 실행 중인지 확인해요)';
+    if(statusEl)statusEl.textContent='❌ 불러오기 실패: '+e.message;
   }
 }
 

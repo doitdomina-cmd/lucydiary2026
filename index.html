@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Lucy's Space</title>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist+Mono:wght@300;400;500&family=Pretendard:wght@300;400;500;600&display=swap" rel="stylesheet">
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -390,6 +394,26 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 </style>
 </head>
 <body>
+<!-- 로그인 화면 -->
+<div id="login-screen" style="display:flex;position:fixed;inset:0;background:var(--bg);z-index:9999;align-items:center;justify-content:center;flex-direction:column;gap:0">
+  <div style="background:var(--surface);border-radius:24px;padding:48px 44px;box-shadow:0 8px 40px rgba(0,0,0,.10);max-width:380px;width:90%;text-align:center;border:1px solid var(--border)">
+    <div style="font-size:2.8em;margin-bottom:12px">✨</div>
+    <div style="font-family:var(--serif);font-size:1.8em;margin-bottom:6px">Lucy's Space</div>
+    <div style="font-size:0.88em;color:var(--t3);margin-bottom:32px">나만의 작업 공간에 오신 걸 환영해요</div>
+    <button onclick="signInWithGoogle()" style="
+      display:inline-flex;align-items:center;justify-content:center;gap:10px;
+      width:100%;padding:13px 20px;border-radius:12px;border:1.5px solid var(--border);
+      background:var(--surface);cursor:pointer;font-size:0.95em;font-family:var(--sans);
+      color:var(--text);transition:all .15s;box-shadow:var(--sh)
+    " onmouseover="this.style.background='var(--s2)'" onmouseout="this.style.background='var(--surface)'">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.08 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-3.59-13.46-8.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+      Google로 로그인
+    </button>
+  </div>
+</div>
+
+<!-- 앱 본체 -->
+<div id="app-wrap" style="display:none;height:100vh">
 <div class="app">
 
 <!-- SIDEBAR -->
@@ -420,6 +444,11 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     </div>
   </div>
   <div class="sb-ft">
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:6px;border-radius:var(--rsm);background:var(--s3)">
+      <img id="user-photo" style="display:none;width:26px;height:26px;border-radius:50%;object-fit:cover" src="">
+      <div style="flex:1;min-width:0"><div id="user-name" style="font-size:0.78em;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)"></div></div>
+      <button class="bi" onclick="signOut()" style="font-size:0.85em;color:var(--t3)" title="로그아웃">↪</button>
+    </div>
     <button class="nav" id="nav-settings" onclick="go('settings')"><span class="nav-ic">⚙️</span>설정</button>
   </div>
 </div>
@@ -435,8 +464,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
   <div class="content" id="main"></div>
 </div>
 </div>
-
-<!-- MODAL -->
+</div>
 <div class="mo" id="mo" onclick="moOut(event)">
   <div class="md">
     <div class="mh"><div class="mt" id="mo-t"></div><button class="bi" onclick="closeMo()">✕</button></div>
@@ -447,6 +475,103 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 
 <script>
 'use strict';
+// ═══════════ FIREBASE ═══════════
+const firebaseConfig = {
+  apiKey: "AIzaSyC1I0GQHJ4U5t0bIgWyXWlKT6pZZMZh2yI",
+  authDomain: "syno-eb309.firebaseapp.com",
+  projectId: "syno-eb309",
+  storageBucket: "syno-eb309.firebasestorage.app",
+  messagingSenderId: "200512932521",
+  appId: "1:200512932521:web:7797b1eefa2639d0e237b8",
+  measurementId: "G-EZ5MJR77NW"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+let currentUser = null;
+
+// Firestore 저장/로드
+async function saveToCloud(data) {
+  if (!currentUser) return;
+  try {
+    const chunks = chunkData(data);
+    const batch = db.batch();
+    Object.entries(chunks).forEach(([key, val]) => {
+      const ref = db.collection('users').doc(currentUser.uid).collection('data').doc(key);
+      batch.set(ref, { value: JSON.stringify(val), updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    });
+    await batch.commit();
+  } catch(e) { console.error('Cloud save error:', e); }
+}
+
+async function loadFromCloud() {
+  if (!currentUser) return null;
+  try {
+    const snap = await db.collection('users').doc(currentUser.uid).collection('data').get();
+    if (snap.empty) return null;
+    const merged = {};
+    snap.forEach(doc => {
+      try { merged[doc.id] = JSON.parse(doc.data().value); } catch(e) {}
+    });
+    return mergeChunks(merged);
+  } catch(e) { console.error('Cloud load error:', e); return null; }
+}
+
+// 큰 데이터를 필드별로 나눠서 저장 (Firestore 1MB 제한 대응)
+function chunkData(data) {
+  const FIELDS = ['routines','checks','projects','deadlines','savings','notes','calEvents',
+    'lifeGoal','theme','customThemeColor','diaryEntries','monthlyGoals','monthlyMemo',
+    'weeklyGoals','weeklyMemo','diaryStickers','font','fontSize','customFonts',
+    'lifeAreas','todoToday','todoTmr'];
+  const chunks = {};
+  FIELDS.forEach(f => { if (data[f] !== undefined) chunks[f] = data[f]; });
+  // 나머지
+  const rest = {};
+  Object.keys(data).forEach(k => { if (!FIELDS.includes(k)) rest[k] = data[k]; });
+  if (Object.keys(rest).length > 0) chunks['_misc'] = rest;
+  return chunks;
+}
+function mergeChunks(chunks) {
+  const result = {};
+  Object.entries(chunks).forEach(([k, v]) => {
+    if (k === '_misc') Object.assign(result, v);
+    else result[k] = v;
+  });
+  return result;
+}
+
+// 로그인 화면 표시
+function showLoginScreen() {
+  document.getElementById('app-wrap').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+function hideLoginScreen() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-wrap').style.display = 'flex';
+}
+
+function signInWithGoogle() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider).catch(e => {
+    alert('로그인 실패: ' + e.message);
+  });
+}
+function signOut() {
+  if (!confirm('로그아웃 할까요?')) return;
+  auth.signOut();
+}
+
+// 저장 디바운스 (너무 자주 저장 방지)
+let saveTimer = null;
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => saveToCloud(S), 1500);
+}
+function scheduleSaveLedger() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => saveToCloud({...S, _ledger: LD}), 1500);
+}
+
 // ═══════════ DATA ═══════════
 const KEY = 'lucy_v4';
 const COLORS = ['#C17C3C','#4A7C6F','#7C4A6F','#3C6BC1','#C14A3C','#6B7C3C','#3C7C7C','#7C6B3C'];
@@ -501,7 +626,10 @@ let S = {
 };
 
 function load(){try{const d=localStorage.getItem(KEY);if(d)S=Object.assign({},S,JSON.parse(d));}catch(e){}}
-function save(){localStorage.setItem(KEY,JSON.stringify(S));}
+function save(){
+  localStorage.setItem(KEY,JSON.stringify(S));
+  scheduleSave();
+}
 function gid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,5);}
 function todStr(){return new Date().toISOString().split('T')[0];}
 function dateStr(d){return d.toISOString().split('T')[0];}
@@ -691,33 +819,95 @@ function resetView(){viewDate=todStr();render();}
 // ═══════════ TODAY PAGE ═══════════
 function renderToday(){
   const t=todStr();
+  const tmr=addDays(t,1);
   const checks=S.checks[t]||{};
   const rods=routinesForDate(t);
   const done=rods.filter(r=>checks[r.id]).length;
   const total=rods.length;
   const pct=total?Math.round(done/total*100):0;
-  const upcoming=S.deadlines.filter(d=>{const n=dLeft(d.date);return n>=0&&n<=7;}).sort((a,b)=>a.date.localeCompare(b.date));
   const spct=S.savings.goal?Math.min(100,Math.round(S.savings.current/S.savings.goal*100)):0;
-  const note=S.notes[t]||'';
+
+  // 이번 달 목표
+  const ym=t.slice(0,7);
+  const monthGoals=S.monthlyGoals[ym]||[];
+  const MN_KO=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  const curMonthName=MN_KO[new Date().getMonth()];
+
+  // 이번 주 마감
+  const upcoming=S.deadlines.filter(d=>{const n=dLeft(d.date);return n>=0&&n<=7;}).sort((a,b)=>a.date.localeCompare(b.date));
+
+  // 오늘/내일 할일 (notes 대신 todoToday/todoTmr 키)
+  const todoToday=S.todoToday&&S.todoToday[t]||'';
+  // 내일 할일은 오늘 날짜 키로 저장, 내일이 되면 todoToday로 자동 반영
+  const todoTmr=S.todoTmr&&S.todoTmr[t]||'';
 
   const rightCol=
-    '<div class="g3" style="margin-bottom:16px">'+
-      '<div class="stat"><div class="sl">루틴 달성</div><div class="sv">'+pct+'<span style="font-size:1.2857em;font-weight:300">%</span></div><div class="pw" style="margin-top:6px"><div class="pb" style="width:'+pct+'%;background:var(--green)"></div></div><div class="ss">'+done+' / '+total+' 완료</div></div>'+
-      '<div class="stat"><div class="sl">이번 주 마감</div><div class="sv">'+upcoming.length+'</div><div class="ss">'+(upcoming.length?upcoming[0].title+' 등':'없음')+'</div></div>'+
-      '<div class="stat"><div class="sl">저축 달성</div><div class="sv">'+spct+'<span style="font-size:1.2857em;font-weight:300">%</span></div><div class="pw" style="margin-top:6px"><div class="pb" style="width:'+spct+'%;background:var(--accent)"></div></div><div class="ss">'+money(S.savings.current)+'</div></div>'+
+    // 상단 통계 2개
+    '<div class="g2" style="margin-bottom:16px">'+
+      '<div class="stat"><div class="sl">루틴 달성</div><div class="sv">'+pct+'%</div><div class="pw" style="margin-top:6px"><div class="pb" style="width:'+pct+'%;background:var(--green)"></div></div><div class="ss">'+done+' / '+total+' 완료</div></div>'+
+      '<div class="stat"><div class="sl">저축 달성</div><div class="sv">'+spct+'%</div><div class="pw" style="margin-top:6px"><div class="pb" style="width:'+spct+'%;background:var(--accent)"></div></div><div class="ss">'+money(S.savings.current)+'</div></div>'+
     '</div>'+
-    (upcoming.length>0?
-      '<div class="card" style="margin-bottom:16px"><div class="ch"><div class="ct">🚨 이번 주 마감</div><button class="btn bg bsm" onclick="go(\'deadlines\')">전체 →</button></div>'+
-      upcoming.slice(0,3).map(d=>{
-        const f=fmtDateObj(d.date),dd=dLeft(d.date);
-        return '<div class="dl"><div class="db"><div class="dm">'+f.month+'</div><div class="dd">'+f.day+'</div></div><div style="flex:1"><div style="font-size:0.9643em">'+d.title+'</div></div><div style="font-family:var(--mono);font-size:0.8571em;font-weight:600;color:'+(dd===0?'var(--red)':dd<=3?'var(--accent)':'var(--t3)')+'">'+( dd===0?'오늘':'D-'+dd)+'</div></div>';
-      }).join('')+
-      '</div>':'')+
-    '<div class="card"><div class="ch"><div class="ct">📝 오늘의 메모</div></div><textarea class="ta" style="min-height:90px" placeholder="오늘 하루를 기록해요..." onchange="saveNote(this.value,\''+t+'\')">'+note+'</textarea></div>'+
+    // 이번 달 목표 + 이번 주 마감
+    '<div class="g2" style="margin-bottom:16px">'+
+      '<div class="card" style="margin-bottom:0">'+
+        '<div class="ch"><div class="ct">🎯 '+curMonthName+' 목표</div><button class="btn bg bsm" onclick="go(\'calendar\')">전체 →</button></div>'+
+        (monthGoals.length===0?'<div style="font-size:0.85em;color:var(--t3);padding:4px 0">목표가 없어요</div>':
+          '<div style="display:flex;flex-direction:column;gap:5px">'+
+          monthGoals.slice(0,4).map(function(g,i){
+            return '<div style="display:flex;align-items:center;gap:7px;font-size:0.88em">'+
+              '<div onclick="togMonthlyGoal(\''+ym+'\','+i+')" style="width:14px;height:14px;border-radius:3px;border:1.5px solid '+(g.done?'var(--green)':'var(--border2)')+';background:'+(g.done?'var(--green)':'transparent')+';cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center">'+
+              (g.done?'<span style="color:#fff;font-size:0.6em">✓</span>':'')+
+              '</div>'+
+              '<span style="'+(g.done?'text-decoration:line-through;color:var(--t3)':'')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+g.text+'</span></div>';
+          }).join('')+
+          (monthGoals.length>4?'<div style="font-size:0.78em;color:var(--t3)">+ '+(monthGoals.length-4)+'개 더</div>':'')+
+          '</div>')+
+      '</div>'+
+      '<div class="card" style="margin-bottom:0">'+
+        '<div class="ch"><div class="ct">🚨 이번 주 마감</div><button class="btn bg bsm" onclick="go(\'deadlines\')">전체 →</button></div>'+
+        (upcoming.length===0?'<div style="font-size:0.85em;color:var(--t3);padding:4px 0">마감 없음 🎉</div>':
+          upcoming.slice(0,4).map(d=>{
+            const f=fmtDateObj(d.date),dd=dLeft(d.date);
+            return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">'+
+              '<div style="min-width:36px;text-align:center;background:var(--s2);border-radius:6px;padding:3px 5px">'+
+                '<div style="font-size:0.62em;color:var(--t3)">'+f.month+'</div>'+
+                '<div style="font-size:0.85em;font-weight:600">'+f.day+'</div>'+
+              '</div>'+
+              '<div style="flex:1;font-size:0.88em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+d.title+'</div>'+
+              '<div style="font-size:0.78em;font-weight:600;color:'+(dd===0?'var(--red)':dd<=3?'var(--accent)':'var(--t3)')+'">'+( dd===0?'오늘':'D-'+dd)+'</div>'+
+            '</div>';
+          }).join(''))+
+      '</div>'+
+    '</div>'+
+    // 오늘 할일 + 내일 할일
+    '<div class="g2" style="margin-bottom:16px">'+
+      '<div class="card" style="margin-bottom:0">'+
+        '<div class="ch"><div class="ct">✅ 오늘 할 일</div></div>'+
+        '<textarea class="ta" style="min-height:100px;font-size:0.9em" placeholder="오늘 할 일을 적어요..." onchange="saveTodayTodo(this.value,\''+t+'\')">'+todoToday+'</textarea>'+
+      '</div>'+
+      '<div class="card" style="margin-bottom:0">'+
+        '<div class="ch"><div class="ct">📋 내일 할 일</div></div>'+
+        '<textarea class="ta" style="min-height:100px;font-size:0.9em" placeholder="내일 할 일을 미리 적어요..." onchange="saveTmrTodo(this.value,\''+t+'\')">'+todoTmr+'</textarea>'+
+      '</div>'+
+    '</div>'+
+    // 진행 중 프로젝트 (3열)
     (S.projects.length>0?
-      '<div class="card"><div class="ch"><div class="ct">🗂️ 진행 중 프로젝트</div><button class="btn bg bsm" onclick="go(\'projects\')">전체 →</button></div><div style="display:flex;gap:10px;flex-wrap:wrap">'+
-      S.projects.slice(0,4).map(p=>{const tk=p.tasks||[],dn=tk.filter(t2=>t2.done).length,pc=tk.length?Math.round(dn/tk.length*100):0;return '<div onclick="go(\'projects\',\''+p.id+'\')" style="flex:1;min-width:140px;cursor:pointer;border:1px solid var(--border);border-radius:10px;padding:12px;transition:box-shadow .2s" onmouseenter="this.style.boxShadow=\'var(--shm)\'" onmouseleave="this.style.boxShadow=\'none\'"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><div style="width:10px;height:10px;border-radius:3px;background:'+p.color+'"></div><div style="font-size:0.9286em;font-weight:500">'+p.name+'</div></div><div class="pw"><div class="pb" style="width:'+pc+'%;background:'+p.color+'"></div></div><div class="pl"><span>'+dn+'/'+tk.length+'</span><span>'+pc+'%</span></div></div>';}).join('')+
-      '</div></div>':'');
+      '<div class="card">'+
+        '<div class="ch"><div class="ct">🗂️ 진행 중 프로젝트</div><button class="btn bg bsm" onclick="go(\'projects\')">전체 →</button></div>'+
+        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">'+
+        S.projects.slice(0,6).map(p=>{
+          const tk=p.tasks||[],dn=tk.filter(t2=>t2.done).length,pc=tk.length?Math.round(dn/tk.length*100):0;
+          return '<div onclick="go(\'projects\',\''+p.id+'\')" style="cursor:pointer;border:1px solid var(--border);border-radius:10px;padding:12px;transition:box-shadow .2s" onmouseenter="this.style.boxShadow=\'var(--shm)\'" onmouseleave="this.style.boxShadow=\'none\'">'+
+            '<div style="display:flex;align-items:center;gap:7px;margin-bottom:8px">'+
+              '<div style="width:9px;height:9px;border-radius:2px;background:'+p.color+';flex-shrink:0"></div>'+
+              '<div style="font-size:0.88em;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+p.name+'</div>'+
+            '</div>'+
+            '<div class="pw" style="height:4px"><div class="pb" style="width:'+pc+'%;background:'+p.color+'"></div></div>'+
+            '<div class="pl" style="margin-top:3px"><span>'+dn+'/'+tk.length+'</span><span>'+pc+'%</span></div>'+
+          '</div>';
+        }).join('')+
+        '</div>'+
+      '</div>':'');
 
   var goalBar=(S.lifeGoal&&S.lifeGoal.text)
     ? '<div style="padding:10px 0 16px;font-size:0.9286em;color:var(--t2);font-style:italic;border-bottom:1px solid var(--border);margin-bottom:20px">🎯 '+S.lifeGoal.text+'</div>'
@@ -729,6 +919,20 @@ function renderToday(){
 }
 
 function saveNote(v,ds){S.notes[ds]=v;save();}
+function saveTodayTodo(v,ds){
+  if(!S.todoToday)S.todoToday={};
+  S.todoToday[ds]=v;
+  save();
+}
+function saveTmrTodo(v,ds){
+  if(!S.todoTmr)S.todoTmr={};
+  // 내일 날짜의 오늘 할일에도 미리 저장
+  const tmr=addDays(ds,1);
+  S.todoTmr[ds]=v;
+  if(!S.todoToday)S.todoToday={};
+  S.todoToday[tmr]=v;
+  save();
+}
 
 // ═══════════ ROUTINE SETTINGS PAGE ═══════════
 function renderRoutinePage(){
@@ -1686,12 +1890,12 @@ function renderCalendar(){
         'font-size:0.85em;font-weight:'+(isT?'700':'500')+';margin-bottom:3px;'+
         'color:'+(isT?'var(--accent)':!cell.cur?'var(--t3)':ci===0?'var(--red)':ci===6?'var(--blue)':'var(--text)')+'">'+cell.d+'</div>';
     evs.slice(0,3).forEach(function(ev){
-      calHtml+='<div style="background:'+(ev.color||'var(--accent)')+'22;color:'+(ev.color||'var(--accent)')+';'+
-        'border-left:2px solid '+(ev.color||'var(--accent)')+';border-radius:0 3px 3px 0;'+
-        'font-size:0.72em;padding:2px 5px;margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:500">'+
+      calHtml+='<div style="background:'+(ev.color||'var(--accent)')+'14;color:'+(ev.color||'var(--accent)')+';'+
+        'border-left:2px solid '+(ev.color||'var(--accent)')+'60;border-radius:0 4px 4px 0;'+
+        'font-size:0.8em;padding:3px 6px;margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:400">'+
         (ev.isDl?'🚨 ':'')+ev.title+'</div>';
     });
-    if(evs.length>3) calHtml+='<div style="font-size:0.6em;color:var(--t3)">+'+(evs.length-3)+'</div>';
+    if(evs.length>3) calHtml+='<div style="font-size:0.65em;color:var(--t3)">+'+(evs.length-3)+'</div>';
     calHtml+='</div>';
   }
   calHtml+='</div>';
@@ -2036,7 +2240,10 @@ let LD = {
 };
 
 function loadLedger(){try{const d=localStorage.getItem(LEDGER_KEY);if(d)LD=Object.assign({},LD,JSON.parse(d));}catch(e){}}
-function saveLedger(){localStorage.setItem(LEDGER_KEY,JSON.stringify(LD));}
+function saveLedger(){
+  localStorage.setItem(LEDGER_KEY,JSON.stringify(LD));
+  scheduleSaveLedger();
+}
 
 let ledgerYear=new Date().getFullYear(), ledgerMonth=new Date().getMonth();
 let ledgerShowTxForm=false, ledgerEditTx=null, ledgerTxDate='', ledgerShowDayModal=false, ledgerDayModalDate='';
@@ -2497,13 +2704,13 @@ function changeLedgerFixedMajor(major){
 }
 function saveLedgerFixed(){
   const day=parseInt(document.getElementById('lf-day').value);
-  const acc=document.getElementById('lf-acc').value;
-  const major=document.getElementById('lf-major').value;
-  const minor=document.getElementById('lf-minor').value;
-  const amtVal=document.getElementById('lf-amt').value;
-  const memo=document.getElementById('lf-memo').value.trim();
-  if(!day||day<1||day>31||!memo)return;
-  const amount=amtVal?parseInt(amtVal):'req_input';
+  const acc=document.getElementById('lf-acc')?document.getElementById('lf-acc').value:'';
+  const major=document.getElementById('lf-major')?document.getElementById('lf-major').value:'';
+  const minor=document.getElementById('lf-minor')?document.getElementById('lf-minor').value:'';
+  const amtVal=document.getElementById('lf-amt')?document.getElementById('lf-amt').value.trim():'';
+  const memo=(document.getElementById('lf-memo')?document.getElementById('lf-memo').value.trim():'')||major||'고정 지출';
+  if(!day||isNaN(day)||day<1||day>31)return;
+  const amount=amtVal?parseInt(amtVal,10):'req_input';
   if(!LD.fixedItems)LD.fixedItems=[];
   LD.fixedItems.push({id:gid(),day,type:'expense',account:acc,majorCategory:major,minorCategory:minor,amount,memo});
   LD.fixedItems.sort((a,b)=>a.day-b.day);
@@ -2781,8 +2988,9 @@ function changeLedgerTxType(v){_ltxTypeChange(v);}
 function changeLedgerMajor(major){_ltxMajorChange(major);}
 function saveLedgerTx(){}
 
-function init(){
+function initApp(){
   load();
+  loadLedger();
   applyTheme(S.theme||'sky');
   syncRzToRoutines();
   viewDate=todStr();
@@ -2825,6 +3033,14 @@ function init(){
   document.getElementById('sb-date').textContent=(d.getMonth()+1)+'월 '+d.getDate()+'일 '+days[d.getDay()];
   document.getElementById('tb-date').textContent=todLabel();
 
+  // 로그인한 사용자 정보 표시
+  if(currentUser){
+    const nameEl=document.getElementById('user-name');
+    const imgEl=document.getElementById('user-photo');
+    if(nameEl)nameEl.textContent=currentUser.displayName||currentUser.email||'';
+    if(imgEl&&currentUser.photoURL){imgEl.src=currentUser.photoURL;imgEl.style.display='';}
+  }
+
   render();
 
   setInterval(()=>{
@@ -2834,7 +3050,41 @@ function init(){
   },30000);
 }
 
-init();
+// Firebase Auth 상태 감지 → 앱 시작점
+auth.onAuthStateChanged(async function(user){
+  if(user){
+    currentUser = user;
+    // 로딩 표시
+    document.getElementById('login-screen').innerHTML=
+      '<div style="text-align:center;color:#6B6560"><div style="font-size:2em;margin-bottom:12px">✨</div><div style="font-size:1.1em;font-weight:500">데이터 불러오는 중...</div></div>';
+    document.getElementById('login-screen').style.display='flex';
+    document.getElementById('app-wrap').style.display='none';
+
+    // 클라우드에서 데이터 로드
+    const cloudData = await loadFromCloud();
+    if(cloudData){
+      // 클라우드 데이터가 있으면 우선 적용
+      const ledgerData = cloudData._ledger;
+      delete cloudData._ledger;
+      S = Object.assign({}, S, cloudData);
+      if(ledgerData) LD = Object.assign({}, LD, ledgerData);
+      // localStorage도 업데이트
+      localStorage.setItem(KEY, JSON.stringify(S));
+      localStorage.setItem(LEDGER_KEY, JSON.stringify(LD));
+    } else {
+      // 클라우드에 없으면 localStorage 데이터를 클라우드에 올림
+      load(); loadLedger();
+      await saveToCloud({...S, _ledger: LD});
+    }
+    hideLoginScreen();
+    initApp();
+  } else {
+    currentUser = null;
+    showLoginScreen();
+  }
+});
+
+function init(){} // auth.onAuthStateChanged가 대신함
 </script>
 </body>
 </html>

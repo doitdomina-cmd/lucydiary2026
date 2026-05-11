@@ -839,10 +839,45 @@ function renderToday(){
   // 이번 주 마감
   const upcoming=S.deadlines.filter(d=>{const n=dLeft(d.date);return n>=0&&n<=7;}).sort((a,b)=>a.date.localeCompare(b.date));
 
-  // 오늘/내일 할일 (notes 대신 todoToday/todoTmr 키)
-  const todoToday=S.todoToday&&S.todoToday[t]||'';
-  // 내일 할일은 오늘 날짜 키로 저장, 내일이 되면 todoToday로 자동 반영
-  const todoTmr=S.todoTmr&&S.todoTmr[t]||'';
+  // 오늘/내일 할일 체크리스트
+  if(!S.todoList)S.todoList={};
+  if(!S.todoList[t])S.todoList[t]=[];
+  if(!S.todoList[tmr])S.todoList[tmr]=[];
+
+  // 자동 이월: 어제 미완료 항목을 오늘로
+  const yest=addDays(t,-1);
+  if(S.todoList[yest]){
+    const carry=S.todoList[yest].filter(item=>!item.done);
+    carry.forEach(function(item){
+      const already=S.todoList[t].some(x=>x.text===item.text&&x._carried);
+      if(!already){
+        S.todoList[t].unshift({id:gid(),text:item.text,done:false,_carried:true});
+      }
+    });
+    if(carry.length>0)save();
+  }
+
+  const todayItems=S.todoList[t];
+  const tmrItems=S.todoList[tmr];
+
+  function renderTodoList(items,ds,label){
+    return '<div class="card" style="margin-bottom:0">'+
+      '<div class="ch"><div class="ct">'+label+'</div>'+
+      '<button class="btn bp bsm" onclick="addTodoItem(\''+ds+'\')">+ 추가</button></div>'+
+      (items.length===0?'<div style="font-size:0.85em;color:var(--t3);padding:8px 0">할 일을 추가해요</div>':
+        items.map(function(item,i){
+          return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">'+
+            '<div onclick="togTodoItem(\''+ds+'\','+i+')" style="width:16px;height:16px;border-radius:4px;border:1.5px solid '+(item.done?'var(--green)':'var(--border2)')+';background:'+(item.done?'var(--green)':'transparent')+';cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center">'+
+            (item.done?'<span style="color:#fff;font-size:0.6em">✓</span>':'')+
+            '</div>'+
+            '<div style="flex:1;font-size:0.9em;'+(item.done?'text-decoration:line-through;color:var(--t3)':'')+(item._carried?';color:var(--accent)':'')+'">'+
+              item.text+(item._carried?'<span style="font-size:0.72em;color:var(--accent);margin-left:4px">↩이월</span>':'')+
+            '</div>'+
+            '<button class="bi" onclick="delTodoItem(\''+ds+'\','+i+')" style="font-size:0.8em;color:var(--t3)">✕</button>'+
+          '</div>';
+        }).join(''))+
+    '</div>';
+  }
 
   const rightCol=
     // 상단 통계 2개
@@ -882,16 +917,10 @@ function renderToday(){
           }).join(''))+
       '</div>'+
     '</div>'+
-    // 오늘 할일 + 내일 할일
+    // 오늘 할일 + 내일 할일 체크리스트
     '<div class="g2" style="margin-bottom:16px">'+
-      '<div class="card" style="margin-bottom:0">'+
-        '<div class="ch"><div class="ct">✅ 오늘 할 일</div></div>'+
-        '<textarea class="ta" style="min-height:100px;font-size:0.9em" placeholder="오늘 할 일을 적어요..." onchange="saveTodayTodo(this.value,\''+t+'\')">'+todoToday+'</textarea>'+
-      '</div>'+
-      '<div class="card" style="margin-bottom:0">'+
-        '<div class="ch"><div class="ct">📋 내일 할 일</div></div>'+
-        '<textarea class="ta" style="min-height:100px;font-size:0.9em" placeholder="내일 할 일을 미리 적어요..." onchange="saveTmrTodo(this.value,\''+t+'\')">'+todoTmr+'</textarea>'+
-      '</div>'+
+      renderTodoList(todayItems,t,'✅ 오늘 할 일')+
+      renderTodoList(tmrItems,tmr,'📋 내일 할 일')+
     '</div>'+
     // 진행 중 프로젝트 (3열)
     (S.projects.length>0?
@@ -922,19 +951,25 @@ function renderToday(){
 }
 
 function saveNote(v,ds){S.notes[ds]=v;save();}
-function saveTodayTodo(v,ds){
-  if(!S.todoToday)S.todoToday={};
-  S.todoToday[ds]=v;
-  save();
+
+// ═══════════ TODO 체크리스트 ═══════════
+function addTodoItem(ds){
+  const text=prompt('할 일을 입력해요');
+  if(!text||!text.trim())return;
+  if(!S.todoList)S.todoList={};
+  if(!S.todoList[ds])S.todoList[ds]=[];
+  S.todoList[ds].push({id:gid(),text:text.trim(),done:false});
+  save();render();
 }
-function saveTmrTodo(v,ds){
-  if(!S.todoTmr)S.todoTmr={};
-  // 내일 날짜의 오늘 할일에도 미리 저장
-  const tmr=addDays(ds,1);
-  S.todoTmr[ds]=v;
-  if(!S.todoToday)S.todoToday={};
-  S.todoToday[tmr]=v;
-  save();
+function togTodoItem(ds,i){
+  if(!S.todoList||!S.todoList[ds])return;
+  S.todoList[ds][i].done=!S.todoList[ds][i].done;
+  save();render();
+}
+function delTodoItem(ds,i){
+  if(!S.todoList||!S.todoList[ds])return;
+  S.todoList[ds].splice(i,1);
+  save();render();
 }
 
 // ═══════════ ROUTINE SETTINGS PAGE ═══════════
@@ -1851,6 +1886,9 @@ function savePjN(pid,v){const p=S.projects.find(x=>x.id===pid);if(p){p.notes=v;s
 // ═══════════ 학습 자료 ═══════════
 function openMatModal(pid){
   openMo('학습 자료 추가',
+    '<div class="fg"><label class="fl">PDF 자동 감지 <span style="color:var(--t3);font-size:0.88em">— 올리면 제목·페이지 자동 입력</span></label>'+
+    '<label class="btn bg" style="cursor:pointer;width:100%;justify-content:center">📄 PDF 파일 선택'+
+    '<input type="file" accept=".pdf" style="display:none" onchange="detectPdf(this)"></label></div>'+
     '<div class="fg"><label class="fl">종류</label><select class="sel" id="mat-type"><option value="pdf">📄 PDF</option><option value="book">📖 책</option></select></div>'+
     '<div class="fg"><label class="fl">제목</label><input class="inp" id="mat-title" placeholder="예: 클립스튜디오 완전정복.pdf"></div>'+
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">'+
@@ -1859,6 +1897,38 @@ function openMatModal(pid){
     '<div class="fg"><label class="fl">현재 진도</label><input type="number" class="inp" id="mat-cur" placeholder="0" min="0"></div>'+
     '<div class="fg"><label class="fl">메모 (선택)</label><textarea class="ta" id="mat-memo" style="min-height:60px" placeholder="핵심 내용, 챕터 메모 등..."></textarea></div>',
     '<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="saveMat(\''+pid+'\')">추가</button>');
+}
+
+function detectPdf(input){
+  const file=input.files[0];
+  if(!file)return;
+  // 제목 자동 입력 (확장자 제거)
+  const titleEl=document.getElementById('mat-title');
+  if(titleEl&&!titleEl.value){
+    titleEl.value=file.name.replace(/\.pdf$/i,'');
+  }
+  // PDF 페이지 수 읽기
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const arr=new Uint8Array(e.target.result);
+      const str=Array.from(arr.slice(0,Math.min(arr.length,500000))).map(b=>String.fromCharCode(b)).join('');
+      // /Count N 패턴으로 페이지 수 추출
+      const matches=[...str.matchAll(/\/Count\s+(\d+)/g)];
+      if(matches.length>0){
+        const pages=Math.max(...matches.map(m=>parseInt(m[1])));
+        const totalEl=document.getElementById('mat-total');
+        if(totalEl)totalEl.value=pages;
+        // 단위 자동으로 페이지로
+        const unitEl=document.getElementById('mat-unit');
+        if(unitEl)unitEl.value='p';
+        // 안내 메시지
+        const titleEl2=document.getElementById('mat-title');
+        if(titleEl2)titleEl2.placeholder='제목 확인 후 수정하세요';
+      }
+    }catch(err){console.log('PDF 파싱 오류',err);}
+  };
+  reader.readAsArrayBuffer(file.slice(0,500000)); // 앞 500KB만 읽음
 }
 function saveMat(pid){
   const type=document.getElementById('mat-type').value;

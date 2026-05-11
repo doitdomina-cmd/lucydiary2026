@@ -3026,7 +3026,17 @@ function deleteLedgerAsset(id){if(!confirm('삭제할까요?'))return;LD.assets=
 
 function renderLedgerSettings(){
   const cats=LD.categories||defaultLedgerCategories;
-  let html='<div class="card" style="margin-bottom:16px">';
+  let html='';
+
+  // 📥 정산 데이터 불러오기
+  html+='<div class="card" style="margin-bottom:16px;border:1.5px solid var(--accent)20">';
+  html+='<div class="ct" style="margin-bottom:10px">📥 인세 정산 불러오기</div>';
+  html+='<div style="font-size:0.85em;color:var(--t3);margin-bottom:12px">인세 관리 앱에서 자동 동기화된 정산 데이터를 가계부 수입으로 가져와요</div>';
+  html+='<button class="btn bp" onclick="loadRoyaltyFromFirebase()">🔄 정산 데이터 불러오기</button>';
+  html+='<div id="royalty-status" style="font-size:0.82em;color:var(--t3);margin-top:8px"></div>';
+  html+='</div>';
+
+  html+='<div class="card" style="margin-bottom:16px">';
   html+='<div class="ct" style="margin-bottom:14px">🎯 월간 예산 설정</div>';
   Object.keys(cats.expense||{}).filter(c=>!c.includes('저축')&&!c.includes('투자')).forEach(function(cat){
     const b=(LD.budgets||{})[cat]||0;
@@ -3103,6 +3113,123 @@ function renderLedgerSettings(){
 }
 
 function setLedgerBudget(cat,val){if(!LD.budgets)LD.budgets={};LD.budgets[cat]=parseInt(val)||0;saveLedger();}
+
+// ═══════════ 인세 정산 불러오기 ═══════════
+async function loadRoyaltyFromFirebase(){
+  const statusEl=document.getElementById('royalty-status');
+  if(statusEl)statusEl.textContent='불러오는 중...';
+  try{
+    const url='https://firestore.googleapis.com/v1/projects/writer-routine/databases/(default)/documents/royalty/latest?key=AIzaSyCYWsMUSAaxnnTNoNjxw8YfZThv9-5mHak';
+    const res=await fetch(url);
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const json=await res.json();
+    const raw=json.fields&&json.fields.data&&json.fields.data.stringValue;
+    if(!raw)throw new Error('데이터 없음');
+    const royalty=JSON.parse(raw);
+    showRoyaltyImportModal(royalty);
+    if(statusEl)statusEl.textContent='';
+  }catch(e){
+    if(statusEl)statusEl.textContent='❌ 불러오기 실패: '+e.message+' (인세 앱이 실행 중인지 확인해요)';
+  }
+}
+
+function showRoyaltyImportModal(royalty){
+  const months=Object.keys(royalty).sort().reverse().slice(0,12);
+  const MN=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+
+  let monthOpts=months.map(m=>'<option value="'+m+'">'+m+'</option>').join('');
+  let html='<div class="fg"><label class="fl">가져올 월 선택</label><select class="sel" id="roy-month" onchange="previewRoyalty(this.value)">'+monthOpts+'</select></div>';
+  html+='<div id="roy-preview" style="margin-top:10px"></div>';
+
+  openMo('📥 인세 정산 가져오기', html,
+    '<button class="btn bg" onclick="closeMo()">취소</button>'+
+    '<button class="btn bp" onclick="importRoyaltyMonth()">수입으로 등록</button>');
+
+  // 저장해두기
+  window._royaltyData=royalty;
+  // 첫 달 미리보기
+  setTimeout(function(){previewRoyalty(months[0]);},100);
+}
+
+function previewRoyalty(ym){
+  const royalty=window._royaltyData;
+  if(!royalty||!royalty[ym])return;
+  const items=royalty[ym];
+  const prev=document.getElementById('roy-preview');
+  if(!prev)return;
+  let html='<div style="font-size:0.82em;color:var(--t3);margin-bottom:8px">등록될 수입 내역 (출판사별 입금일에 등록)</div>';
+  let total=0;
+  items.forEach(function(item){
+    const day=item.paymentDay==='말일'?'말일':item.paymentDay?item.paymentDay+'일':'?';
+    html+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:0.88em">';
+    html+='<span><span style="color:var(--t3);margin-right:6px">'+day+'</span>'+item.publisher+'</span>';
+    html+='<span style="font-weight:500">'+new Intl.NumberFormat('ko-KR').format(item.amount)+'원</span>';
+    html+='</div>';
+    total+=item.amount;
+  });
+  html+='<div style="display:flex;justify-content:space-between;padding:8px 0;font-weight:600;font-size:0.9em">';
+  html+='<span>합계</span><span style="color:var(--green)">'+new Intl.NumberFormat('ko-KR').format(total)+'원</span></div>';
+  prev.innerHTML=html;
+}
+
+function importRoyaltyMonth(){
+  const sel=document.getElementById('roy-month');
+  if(!sel)return;
+  const ym=sel.value;
+  const royalty=window._royaltyData;
+  if(!royalty||!royalty[ym])return;
+  const items=royalty[ym];
+  const [year,month]=ym.split('-').map(Number);
+
+  let added=0;
+  items.forEach(function(item){
+    // 입금일 계산
+    let day=15;
+    if(item.paymentDay==='말일'||item.paymentDay==='말'){
+      day=new Date(year,month,0).getDate(); // 말일
+    } else if(item.paymentDay){
+      day=parseInt(item.paymentDay)||15;
+    }
+    const dateStr=year+'-'+String(month).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+
+    // 이미 같은 달 같은 출판사 정산이 있으면 스킵
+    const dup=(LD.transactions||[]).some(function(t){
+      return t.date.slice(0,7)===ym&&t.memo&&t.memo.includes(item.publisher)&&t._royalty;
+    });
+    if(dup)return;
+
+    if(!LD.transactions)LD.transactions=[];
+    LD.transactions.push({
+      id:gid(),
+      type:'income',
+      date:dateStr,
+      account:(LD.accounts&&LD.accounts[0])||'사업용 기업은행',
+      majorCategory:'인세 수익',
+      minorCategory:item.publisher,
+      amount:item.amount,
+      memo:item.publisher+' '+ym.replace('-','년 ')+'월 정산',
+      _royalty:true
+    });
+    added++;
+  });
+
+  // 카테고리에 출판사 소분류 자동 추가
+  if(!LD.categories)LD.categories=JSON.parse(JSON.stringify(defaultLedgerCategories));
+  if(!LD.categories.income)LD.categories.income={'인세 수익':[],'기타 수익':['외주/강연','이자/투자','기타']};
+  if(!LD.categories.income['인세 수익'])LD.categories.income['인세 수익']=[];
+  items.forEach(function(item){
+    if(!LD.categories.income['인세 수익'].includes(item.publisher)){
+      LD.categories.income['인세 수익'].push(item.publisher);
+    }
+  });
+
+  LD.transactions.sort((a,b)=>b.date.localeCompare(a.date));
+  saveLedger();
+  closeMo();
+  ledgerTab='dashboard';
+  alert(added+'건의 정산 수입이 등록됐어요! 🎉');
+  render();
+}
 function deleteLedgerAccount(acc){if(!confirm(acc+' 삭제?'))return;LD.accounts=(LD.accounts||[]).filter(a=>a!==acc);saveLedger();render();}
 function addLedgerAccount(){const v=document.getElementById('new-acc').value.trim();if(!v)return;if(!LD.accounts)LD.accounts=[];if(!LD.accounts.includes(v))LD.accounts.push(v);saveLedger();render();}
 function deleteLedgerMajor(type,major){if(!confirm('대분류 '+major+' 삭제?'))return;if(LD.categories&&LD.categories[type])delete LD.categories[type][major];saveLedger();render();}

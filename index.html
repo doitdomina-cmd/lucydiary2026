@@ -861,10 +861,10 @@ function renderToday(){
   const tmrItems=S.todoList[tmr];
 
   function renderTodoList(items,ds,label){
+    const safeDs=ds.replace(/-/g,'_');
     return '<div class="card" style="margin-bottom:0">'+
-      '<div class="ch"><div class="ct">'+label+'</div>'+
-      '<button class="btn bp bsm" onclick="addTodoItem(\''+ds+'\')">+ 추가</button></div>'+
-      (items.length===0?'<div style="font-size:0.85em;color:var(--t3);padding:8px 0">할 일을 추가해요</div>':
+      '<div class="ct" style="margin-bottom:10px">'+label+'</div>'+
+      (items.length===0?'':
         items.map(function(item,i){
           return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">'+
             '<div onclick="togTodoItem(\''+ds+'\','+i+')" style="width:16px;height:16px;border-radius:4px;border:1.5px solid '+(item.done?'var(--green)':'var(--border2)')+';background:'+(item.done?'var(--green)':'transparent')+';cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center">'+
@@ -876,6 +876,11 @@ function renderToday(){
             '<button class="bi" onclick="delTodoItem(\''+ds+'\','+i+')" style="font-size:0.8em;color:var(--t3)">✕</button>'+
           '</div>';
         }).join(''))+
+      '<div style="display:flex;align-items:center;gap:8px;padding-top:8px">'+
+        '<div style="width:16px;height:16px;border-radius:4px;border:1.5px dashed var(--border2);flex-shrink:0"></div>'+
+        '<input id="todo-inp-'+safeDs+'" class="inp" style="flex:1;padding:5px 8px;font-size:0.9em;background:transparent;border-color:transparent;border-bottom:1px solid var(--border);border-radius:0" placeholder="할 일 추가 후 Enter..." '+
+        'onkeydown="if(event.key===\'Enter\'){addTodoInline(\''+ds+'\',\'todo-inp-'+safeDs+'\');event.preventDefault()}">'+
+      '</div>'+
     '</div>';
   }
 
@@ -959,6 +964,15 @@ function addTodoItem(ds){
   if(!S.todoList)S.todoList={};
   if(!S.todoList[ds])S.todoList[ds]=[];
   S.todoList[ds].push({id:gid(),text:text.trim(),done:false});
+  save();render();
+}
+function addTodoInline(ds,inputId){
+  const el=document.getElementById(inputId);
+  if(!el||!el.value.trim())return;
+  const text=el.value.trim();
+  if(!S.todoList)S.todoList={};
+  if(!S.todoList[ds])S.todoList[ds]=[];
+  S.todoList[ds].push({id:gid(),text,done:false});
   save();render();
 }
 function togTodoItem(ds,i){
@@ -1764,29 +1778,33 @@ function renderPjDetail(pid){
           '<div style="font-family:var(--mono);font-size:0.8571em;font-weight:500;color:'+(dd<0?'var(--red)':dd===0?'var(--red)':dd<=3?'var(--accent)':'var(--t3)')+'">'+
             (dd<0?'D+'+Math.abs(dd):dd===0?'오늘':'D-'+dd)+
           '</div>'+
-          (d._tkId?'':  // 태스크 연동 마감은 태스크에서만 삭제
+          (d._tkId?'':
             '<button class="bi" onclick="delDl(\''+d.id+'\')" style="font-size:0.8571em;color:var(--t3)">✕</button>')+
         '</div>';
       }).join(''))+
     '</div>'+
-    '<div class="card"><div class="ch"><div class="ct">🏁 마일스톤</div><button class="btn bg bsm" onclick="openMsModal(\''+pid+'\')">+ 추가</button></div>'+
-    (ms.length===0?'<div class="empty">마일스톤 없음</div>':ms.map((m,i)=>'<div class="msi"><div class="mss '+(m.done?'on':'')+'" onclick="togMs(\''+pid+'\','+i+')"></div><div style="flex:1"><div style="font-size:0.9286em;'+(m.done?'text-decoration:line-through;color:var(--t3)':'')+'">'+m.text+'</div>'+(m.date?'<div style="font-size:0.7857em;color:var(--t3);font-family:var(--mono)">'+m.date+'</div>':'')+'</div><button class="bi" onclick="delMs(\''+pid+'\','+i+')" style="font-size:0.8571em;color:var(--red)">✕</button></div>').join(''))+
-    '</div></div></div>';
-  html+='<div class="g2" style="margin-top:0">';
-  html+='<div class="card"><div class="ch"><div class="ct">🔁 루틴화 일정</div><button class="btn bg bsm" onclick="openRzModal(\''+pid+'\')">+ 추가</button></div>'+
+    // 루틴화 일정 (마일스톤 위로)
+    '<div class="card" style="margin-bottom:16px"><div class="ch"><div class="ct">🔁 루틴화 일정</div><button class="btn bg bsm" onclick="openRzModal(\''+pid+'\')">+ 추가</button></div>'+
     '<div style="font-size:0.8571em;color:var(--t3);margin-bottom:10px">반복 일정을 캘린더에 8주치 자동 등록해요</div>'+
     ((p.routinized||[]).length===0?'<div class="empty">루틴화할 항목을 추가해요</div>':(p.routinized||[]).map((r,i)=>{
       const DL={mon:'월',tue:'화',wed:'수',thu:'목',fri:'금',sat:'토',sun:'일'};
       const days=(r.days||[]).map(d=>DL[d]||d).join(', ');
       return '<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)"><div style="width:8px;height:8px;border-radius:50%;background:'+p.color+';flex-shrink:0;margin-top:5px"></div><div style="flex:1"><div style="font-size:0.9286em;font-weight:500">'+r.task+'</div><div style="font-size:0.7857em;color:var(--t3);margin-top:2px">매주 '+days+(r.time?' · '+r.time:'')+(r.duration?' · '+r.duration+'분':'')+'</div></div><div style="display:flex;gap:2px"><button class="bi" onclick="openRzEditModal(\''+pid+'\','+i+')" style="font-size:0.8571em">✎</button><button class="bi" onclick="delRz(\''+pid+'\','+i+')" style="font-size:0.8571em;color:var(--red)">✕</button></div></div>';
     }).join(''))+
-    '</div>';
+    '</div>'+
+    // 마일스톤
+    '<div class="card"><div class="ch"><div class="ct">🏁 마일스톤</div><button class="btn bg bsm" onclick="openMsModal(\''+pid+'\')">+ 추가</button></div>'+
+    (ms.length===0?'<div class="empty">마일스톤 없음</div>':ms.map((m,i)=>'<div class="msi"><div class="mss '+(m.done?'on':'')+'" onclick="togMs(\''+pid+'\','+i+')"></div><div style="flex:1"><div style="font-size:0.9286em;'+(m.done?'text-decoration:line-through;color:var(--t3)':'')+'">'+m.text+'</div>'+(m.date?'<div style="font-size:0.7857em;color:var(--t3);font-family:var(--mono)">'+m.date+'</div>':'')+'</div><button class="bi" onclick="delMs(\''+pid+'\','+i+')" style="font-size:0.8571em;color:var(--red)">✕</button></div>').join(''))+
+    '</div></div></div>';
+
+  // 링크 + 학습자료 (2열)
+  html+='<div class="g2" style="margin-top:0">';
   html+='<div class="card"><div class="ch"><div class="ct">🔗 링크 바로가기</div><button class="btn bg bsm" onclick="openLkModal(\''+pid+'\')">+ 추가</button></div>'+
     ((p.links||[]).length===0?'<div class="empty">자주 쓰는 링크를 추가해요</div>':(p.links||[]).map((lk,i)=>'<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)"><div style="font-size:1.2857em">'+(lk.emoji||'🔗')+'</div><div style="flex:1;overflow:hidden"><div style="font-size:0.9286em;font-weight:500">'+lk.label+'</div><div style="font-size:0.7857em;color:var(--t3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+lk.url+'</div></div><a href="'+lk.url+'" target="_blank" class="btn bg bsm" style="flex-shrink:0">열기 →</a><button class="bi" onclick="delLk(\''+pid+'\','+i+')" style="font-size:0.8571em;color:var(--t3)">✕</button></div>').join(''))+
-    '</div></div>';
+    '</div>';
   // 📚 학습 자료
   const materials=p.materials||[];
-  html+='<div class="card" style="margin-top:0"><div class="ch"><div class="ct">📚 학습 자료</div><button class="btn bp bsm" onclick="openMatModal(\''+pid+'\')">+ 추가</button></div>';
+  html+='<div class="card"><div class="ch"><div class="ct">📚 학습 자료</div><button class="btn bp bsm" onclick="openMatModal(\''+pid+'\')">+ 추가</button></div>';
   if(materials.length===0){
     html+='<div class="empty">PDF, 책 등 학습 자료를 등록해요</div>';
   } else {
@@ -1820,7 +1838,7 @@ function renderPjDetail(pid){
       html+='</div></div>';
     });
   }
-  html+='</div>';
+  html+='</div></div>';  // 학습자료 카드 + g2 닫기
   html+='<div class="card"><div class="ct" style="margin-bottom:12px">📝 프로젝트 노트</div><textarea class="ta" style="min-height:120px" placeholder="메모, 아이디어..." onchange="savePjN(\''+pid+'\',this.value)">'+(p.notes||'')+'</textarea></div>';
   return html;
 }
@@ -1902,33 +1920,53 @@ function openMatModal(pid){
 function detectPdf(input){
   const file=input.files[0];
   if(!file)return;
-  // 제목 자동 입력 (확장자 제거)
+  // 제목 자동 입력
   const titleEl=document.getElementById('mat-title');
-  if(titleEl&&!titleEl.value){
-    titleEl.value=file.name.replace(/\.pdf$/i,'');
-  }
-  // PDF 페이지 수 읽기
+  if(titleEl&&!titleEl.value) titleEl.value=file.name.replace(/\.pdf$/i,'');
+
   const reader=new FileReader();
   reader.onload=function(e){
     try{
-      const arr=new Uint8Array(e.target.result);
-      const str=Array.from(arr.slice(0,Math.min(arr.length,500000))).map(b=>String.fromCharCode(b)).join('');
-      // /Count N 패턴으로 페이지 수 추출
-      const matches=[...str.matchAll(/\/Count\s+(\d+)/g)];
-      if(matches.length>0){
-        const pages=Math.max(...matches.map(m=>parseInt(m[1])));
-        const totalEl=document.getElementById('mat-total');
-        if(totalEl)totalEl.value=pages;
-        // 단위 자동으로 페이지로
-        const unitEl=document.getElementById('mat-unit');
-        if(unitEl)unitEl.value='p';
-        // 안내 메시지
-        const titleEl2=document.getElementById('mat-title');
-        if(titleEl2)titleEl2.placeholder='제목 확인 후 수정하세요';
+      const bytes=new Uint8Array(e.target.result);
+      // 바이너리를 latin1 문자열로 변환 (PDF 내부 구조 파싱용)
+      let str='';
+      for(let i=0;i<bytes.length;i++) str+=String.fromCharCode(bytes[i]);
+
+      let pages=0;
+
+      // 방법 1: /N 숫자 (Pages 딕셔너리 안)
+      const m1=str.match(/\/N\s+(\d+)/);
+      if(m1) pages=parseInt(m1[1]);
+
+      // 방법 2: /Count 숫자
+      if(!pages){
+        const counts=[...str.matchAll(/\/Count\s+(\d+)/g)].map(m=>parseInt(m[1]));
+        if(counts.length) pages=Math.max(...counts);
+      }
+
+      // 방법 3: PDF 전체에서 페이지 오브젝트 개수 세기
+      if(!pages){
+        const pageObjs=(str.match(/\/Type\s*\/Page[^s]/g)||[]).length;
+        if(pageObjs>0) pages=pageObjs;
+      }
+
+      // 방법 4: trailer의 /Size로 추정 (부정확하지만 없는 것보다 나음)
+      if(!pages){
+        const trailer=str.match(/\/Size\s+(\d+)/);
+        if(trailer) pages=Math.max(1,parseInt(trailer[1])-1);
+      }
+
+      const totalEl=document.getElementById('mat-total');
+      if(totalEl&&pages>0){
+        totalEl.value=pages;
+        document.getElementById('mat-unit').value='p';
+      } else if(totalEl){
+        totalEl.placeholder='페이지 수 직접 입력';
       }
     }catch(err){console.log('PDF 파싱 오류',err);}
   };
-  reader.readAsArrayBuffer(file.slice(0,500000)); // 앞 500KB만 읽음
+  // 앞 1MB 읽기 (페이지 정보는 대부분 앞부분에 있음)
+  reader.readAsArrayBuffer(file.slice(0,1024*1024));
 }
 function saveMat(pid){
   const type=document.getElementById('mat-type').value;

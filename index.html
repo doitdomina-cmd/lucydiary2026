@@ -980,7 +980,7 @@ function renderToday(){
     '</div></div>';
 }
 
-function saveNote(v,ds){S.notes[ds]=v;save();}
+
 
 // ═══════════ DRAG & DROP ═══════════
 // ═══════════ CSS 추가 ═══════════
@@ -2061,10 +2061,17 @@ function renderCalendar(){
         'font-size:0.85em;font-weight:'+(isT?'700':'500')+';margin-bottom:3px;'+
         'color:'+(isT?'var(--accent)':!cell.cur?'var(--t3)':ci===0?'var(--red)':ci===6?'var(--blue)':'var(--text)')+'">'+cell.d+'</div>';
     evs.slice(0,3).forEach(function(ev){
-      calHtml+='<div style="background:'+(ev.color||'var(--accent)')+'14;color:#555;'+
-        'border-left:2px solid '+(ev.color||'var(--accent)')+'60;border-radius:0 4px 4px 0;'+
-        'font-size:0.78em;padding:2px 5px;margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:400;line-height:1.4">'+
-        (ev.isDl?'🚨 ':'')+ev.title+'</div>';
+      if(ev.isDl) {
+        calHtml+='<div style="background:'+(ev.color||'var(--accent)')+'14;color:#555;'+
+          'border-left:2px solid '+(ev.color||'var(--accent)')+'60;border-radius:0 4px 4px 0;'+
+          'font-size:0.78em;padding:2px 5px;margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:400;line-height:1.4">'+
+          '🚨 '+ev.title+'</div>';
+      } else {
+        calHtml+='<div onclick="event.stopPropagation();openEvDetailModal(\''+ev.id+'\')" style="background:'+(ev.color||'var(--accent)')+'14;color:#555;'+
+          'border-left:2px solid '+(ev.color||'var(--accent)')+'60;border-radius:0 4px 4px 0;'+
+          'font-size:0.78em;padding:2px 5px;margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:400;line-height:1.4;cursor:pointer">'+
+          ev.title+'</div>';
+      }
     });
     if(evs.length>3) calHtml+='<div style="font-size:0.65em;color:var(--t3);text-align:right">+'+(evs.length-3)+'</div>';
     calHtml+='</div>';
@@ -2146,6 +2153,14 @@ function openEvModal(pre){
 }
 function pickEvC(el,c){selEvC=c;document.querySelectorAll('.cop').forEach(e=>e.classList.remove('on'));el.classList.add('on');}
 function saveEv(){var date=document.getElementById('ev-date').value,title=document.getElementById('ev-title').value.trim();if(!date||!title)return;S.calEvents.push({id:gid(),date,title,color:selEvC});save();closeMo();render();}
+function openEvDetailModal(id){
+  const ev=S.calEvents.find(e=>e.id===id);if(!ev)return;
+  openMo('일정',
+    '<div style="font-size:1em;font-weight:500;margin-bottom:6px">'+ev.title+'</div>'+
+    '<div style="font-size:0.88em;color:var(--t3)">📅 '+ev.date+'</div>',
+    '<button class="btn bg" onclick="closeMo()">닫기</button>'+
+    '<button class="btn" style="background:var(--rl);color:var(--red)" onclick="delEv(\''+id+'\')">🗑 삭제</button>');
+}
 function delEv(id){S.calEvents=S.calEvents.filter(e=>e.id!==id);save();closeMo();render();}
 
 // ═══════════ SETTINGS ═══════════
@@ -2235,7 +2250,7 @@ function renderSettings(){
 
 function setTheme(t){S.theme=t;save();applyTheme(t);render();}
 function setFont(f){S.font=f;save();applyTheme(S.theme||'sky');render();}
-function setFontSize(s){S.fontSize=parseInt(s);save();applyTheme(S.theme||'sky');render();}
+
 function setFontWeight(w){S.fontWeight=w;save();applyTheme(S.theme||'sky');render();}
 function updateFontSizeDisplay(el){var lbl=document.getElementById('fs-label');if(lbl)lbl.textContent=el.value+'px';S.fontSize=parseInt(el.value);save();applyTheme(S.theme||'sky');}
 function loadCustomFont(input, slot){
@@ -3197,6 +3212,16 @@ function renderLedgerSettings(){
   html+='</div><div style="display:flex;gap:8px"><input class="inp" id="new-liab-cat" placeholder="카테고리 추가" style="flex:1"><button class="btn bp bsm" onclick="addLedgerAssetCat(\'liability\')">추가</button></div></div>';
   html+='</div></div>';
 
+  // 데이터 관리
+  html+='<div class="card" style="margin-top:16px;margin-bottom:0">'+
+    '<div class="ct" style="margin-bottom:12px">🗄️ 데이터 관리</div>'+
+    '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
+      '<button class="btn bp bsm" onclick="exportLedger()">📤 내보내기</button>'+
+      '<label class="btn bg bsm" style="cursor:pointer">📥 가져오기<input type="file" accept=".json" style="display:none" onchange="importLedger(this)"></label>'+
+      '<button class="btn bsm" style="background:var(--rl);color:var(--red)" onclick="resetLedger()">🗑 초기화</button>'+
+    '</div>'+
+  '</div>';
+
   return html;
 }
 
@@ -3544,9 +3569,7 @@ function deleteLedgerTx(id){
 
 // 구 함수 호환성 유지 (캘린더 모달에서 호출)
 function renderLedgerTxModal(){return '';}
-function changeLedgerTxType(v){_ltxTypeChange(v);}
-function changeLedgerMajor(major){_ltxMajorChange(major);}
-function saveLedgerTx(){}
+
 
 function initApp(){
   load();

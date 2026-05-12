@@ -17,9 +17,7 @@
   --text:#1C1917;--t2:#6B6560;--t3:#A39E97;
   --accent:#C17C3C;--al:#F5E8D8;
   --green:#4A7C6F;--gl:#E0EDEA;
-  --purple:#7C4A6F;--pl:#EDDFEA;
   --red:#C14A3C;--rl:#F5DDD8;
-  --blue:#3C6BC1;--bl:#D8E5F5;
   --r:12px;--rsm:8px;
   --sh:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
   --shm:0 4px 12px rgba(0,0,0,.08),0 2px 4px rgba(0,0,0,.04);
@@ -29,10 +27,6 @@
   --sans:'Pretendard','Apple SD Gothic Neo',sans-serif;
   --serif:var(--sans);
   --mono:var(--sans);
-  
-  --font-hand:'Nanum Pen Script',cursive;
-  --font-gaegu:'Gaegu',cursive;
-  --font-code:'Nanum Gothic Coding',monospace;
 
   /* Routine card colors */
   --rc-bg:#E8F0F5;--rc-header:#7AAEC8;--rc-dot:#5A9AB8;
@@ -574,13 +568,14 @@ function signOut() {
 
 // 저장 디바운스 (너무 자주 저장 방지)
 let saveTimer = null;
+let saveLedgerTimer = null;
 function scheduleSave() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => saveToCloud(S), 1500);
 }
 function scheduleSaveLedger() {
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => saveToCloud({...S, _ledger: LD}), 1500);
+  clearTimeout(saveLedgerTimer);
+  saveLedgerTimer = setTimeout(() => saveToCloud({...S, _ledger: LD}), 1500);
 }
 
 // ═══════════ DATA ═══════════
@@ -624,6 +619,7 @@ let S = {
   diaryStickers: ['🌸','✨','💖','🌟','🎀','☁️','🌈','🍓','🌷','🦋','💫','🌙'],
   font: 'pretendard',
   fontSize: 14,
+  fontWeight: '400',
   customFonts: ['','',''],       
   customFontData: ['','',''],    
   lifeAreas: [
@@ -746,15 +742,6 @@ function render(){
   
   // Event Delegation
   setTimeout(function(){
-    var gl=document.getElementById('goal-list');
-    if(gl){
-      gl.addEventListener('click',function(e){
-        var nb=e.target.closest('.goal-num-btn');
-        var db=e.target.closest('.goal-del-btn');
-        if(nb)togGoal(nb.dataset.gid);
-        else if(db)delGoal(db.dataset.gid);
-      });
-    }
     document.querySelectorAll('.mini-cal-cell').forEach(function(el){
       el.addEventListener('click',function(){
         window.diaryDate=this.dataset.ds;
@@ -898,6 +885,12 @@ function renderToday(){
   if(!S.todoListTmr)S.todoListTmr={};
   if(!S.todoListTmr[t])S.todoListTmr[t]=[];
 
+  // 30일 이전 데이터 자동 정리 (누적 방지)
+  const cutoff=addDays(t,-30);
+  [S.todoList,S.todoListTmr].forEach(function(obj){
+    Object.keys(obj).forEach(function(k){if(k<cutoff)delete obj[k];});
+  });
+
   // 자동 이월: 어제 미완료 항목을 오늘로
   const yest=addDays(t,-1);
   if(S.todoList[yest]){
@@ -910,15 +903,17 @@ function renderToday(){
     });
     if(carry.length>0)save();
   }
-  // 어제 내일할일 → 오늘 할일로 이월
-  if(S.todoListTmr&&S.todoListTmr[yest]&&S.todoListTmr[yest].length>0){
-    S.todoListTmr[yest].filter(item=>!item.done).forEach(function(item){
+  // 어제 내일할일 → 오늘 할일로 이월 (처리되지 않은 것만, 한 번만)
+  if(S.todoListTmr&&S.todoListTmr[yest]){
+    const tmrCarry=S.todoListTmr[yest].filter(item=>!item.done&&!item._tmrCarried);
+    tmrCarry.forEach(function(item){
       const already=S.todoList[t].some(x=>x.text===item.text&&x._carried);
       if(!already){
         S.todoList[t].unshift({id:gid(),text:item.text,done:false,_carried:true});
       }
+      item._tmrCarried=true; // 재이월 방지 마킹
     });
-    save();
+    if(tmrCarry.length>0)save();
   }
 
   const todayItems=S.todoList[t];
@@ -1164,14 +1159,6 @@ function initDragAll(){
 })();
 
 // ═══════════ TODO 체크리스트 ═══════════
-function addTodoItem(ds){
-  const text=prompt('할 일을 입력해요');
-  if(!text||!text.trim())return;
-  if(!S.todoList)S.todoList={};
-  if(!S.todoList[ds])S.todoList[ds]=[];
-  S.todoList[ds].push({id:gid(),text:text.trim(),done:false});
-  save();render();
-}
 function addTodoInline(ds,inputId){
   const el=document.getElementById(inputId);
   if(!el)return;
@@ -1317,131 +1304,6 @@ function delR(id){S.routines=S.routines.filter(r=>r.id!==id);save();render();}
 // ═══════════ MONTHLY ═══════════
 let monthlyY=new Date().getFullYear(), monthlyM=new Date().getMonth();
 
-function renderMonthly(){
-  const MN=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
-  const ts=todStr();
-  const ym=monthlyY+'-'+String(monthlyM+1).padStart(2,'0');
-  const goals=S.monthlyGoals[ym]||[];
-  const memo=S.monthlyMemo[ym]||'';
-
-  let monthCards='<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:24px">';
-  for(let m=0;m<12;m++){
-    const key=monthlyY+'-'+String(m+1).padStart(2,'0');
-    const isCur=(m===monthlyM);
-    const mg=S.monthlyGoals[key]||[];
-    const mgDone=mg.filter(g=>g.done).length;
-    monthCards+='<div data-month="'+m+'" onclick="monthlyM=parseInt(this.dataset.month);render()" style="'+
-      'border-radius:10px;padding:10px 8px;cursor:pointer;text-align:center;'+
-      'background:'+(isCur?'var(--accent)':'var(--surface)')+';'+
-      'color:'+(isCur?'#fff':'var(--text)')+';'+
-      'border:1.5px solid '+(isCur?'var(--accent)':'var(--border)')+';transition:all .2s">'+
-      '<div style="font-size:0.95em;font-weight:600;margin-bottom:3px">'+MN[m]+'</div>'+
-      '<div style="font-size:0.7em;opacity:'+(isCur?'.85':'.55')+'">'+(mg.length?mgDone+'/'+mg.length:'-')+'</div>'+
-    '</div>';
-  }
-  monthCards+='</div>';
-
-  const first=new Date(monthlyY,monthlyM,1),last=new Date(monthlyY,monthlyM+1,0),sdow=first.getDay();
-  const prevLast=new Date(monthlyY,monthlyM,0);
-  let cells=[];
-  for(let i=sdow-1;i>=0;i--){const d=prevLast.getDate()-i,pm=monthlyM===0?11:monthlyM-1,py=monthlyM===0?monthlyY-1:monthlyY;cells.push({d,m:pm,y:py,cur:false});}
-  for(let d=1;d<=last.getDate();d++)cells.push({d,m:monthlyM,y:monthlyY,cur:true});
-  const rem=42-cells.length;
-  for(let d=1;d<=rem;d++){const nm=monthlyM===11?0:monthlyM+1,ny=monthlyM===11?monthlyY+1:monthlyY;cells.push({d,m:nm,y:ny,cur:false});}
-
-  const evMap={};
-  (S.calEvents||[]).forEach(e=>{
-    if(!evMap[e.date])evMap[e.date]=[];
-    const pr=e.projectId?S.projects.find(p=>p.id===e.projectId):null;
-    evMap[e.date].push(Object.assign({},e,{color:pr?pr.color:(e.color||'var(--accent)')}));
-  });
-  (S.deadlines||[]).forEach(d=>{if(!evMap[d.date])evMap[d.date]=[];const pr=S.projects.find(p=>p.id===d.projectId);evMap[d.date].push(Object.assign({},d,{isDl:true,color:pr?pr.color:'#C14A3C'}));});
-
-  let calHtml='<div style="display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:4px">';
-  ['일','월','화','수','목','금','토'].forEach(function(d,i){
-    calHtml+='<div style="text-align:center;font-size:0.7em;color:'+(i===0?'var(--red)':i===6?'var(--blue)':'var(--t3)')+';padding:4px 0;font-weight:500">'+d+'</div>';
-  });
-  calHtml+='</div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px">';
-  cells.forEach(function(cell,idx){
-    const ds=cell.y+'-'+String(cell.m+1).padStart(2,'0')+'-'+String(cell.d).padStart(2,'0');
-    const isT=ds===ts;
-    const evs=evMap[ds]||[];
-    const dow=idx%7;
-    const textColor=isT?'var(--accent)':!cell.cur?'var(--t3)':dow===0?'var(--red)':dow===6?'var(--blue)':'var(--text)';
-    calHtml+='<div style="min-height:60px;border-radius:6px;padding:4px;'+
-      'background:'+(isT?'var(--al)':'transparent')+';'+
-      'border:1px solid '+(isT?'var(--accent)':'var(--border)')+';'+
-      'overflow:hidden">'+
-      '<div style="font-size:0.75em;font-weight:'+(isT?'700':'400')+';color:'+textColor+';text-align:right">'+cell.d+'</div>';
-    evs.slice(0,2).forEach(function(ev){
-      calHtml+='<div style="background:'+ev.color+'18;color:#555;border-left:2px solid '+ev.color+'60;'+
-        'border-radius:0 3px 3px 0;font-size:0.6em;padding:1px 3px;margin-top:1px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:400">'+
-        (ev.isDl?'🚨':'')+ev.title+'</div>';
-    });
-    if(evs.length>2) calHtml+='<div style="font-size:0.55em;color:var(--t3);text-align:right">+'+(evs.length-2)+'</div>';
-    calHtml+='</div>';
-  });
-  calHtml+='</div>';
-
-  let goalHtml='<div style="display:flex;flex-direction:column;gap:6px">';
-  goals.forEach(function(g,i){
-    var doneBg=g.done?'var(--accent)':'transparent';
-    var doneBorder=g.done?'var(--accent)':'var(--border2)';
-    var checkMark=g.done?'<span style="color:#fff;font-size:0.6em;font-weight:700">&#10003;</span>':'';
-    var textStyle=g.done?'text-decoration:line-through;color:var(--t3)':'';
-    goalHtml+='<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--s2);border-radius:8px">'+
-      '<div data-ym="'+ym+'" data-idx="'+i+'" onclick="togMonthlyGoal(this.dataset.ym,parseInt(this.dataset.idx))" style="width:16px;height:16px;border-radius:4px;border:1.5px solid '+doneBorder+';background:'+doneBg+';cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+checkMark+'</div>'+
-      '<div style="flex:1;font-size:0.9em;'+textStyle+'">'+g.text+'</div>'+
-      '<button data-ym="'+ym+'" data-idx="'+i+'" onclick="delMonthlyGoal(this.dataset.ym,parseInt(this.dataset.idx))" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:0.85em;padding:2px 4px">&#10005;</button>'+
-    '</div>';
-  });
-  goalHtml+='</div>';
-
-  const monthDeadlines=(S.deadlines||[]).filter(d=>d.date.startsWith(ym)).sort((a,b)=>a.date.localeCompare(b.date));
-  let dlHtml='';
-  if(monthDeadlines.length>0){
-    dlHtml='<div class="card" style="margin-bottom:16px"><div style="font-size:0.85em;font-weight:500;margin-bottom:10px">🚨 이번 달 마감</div>';
-    monthDeadlines.forEach(function(d){
-      const dd=dLeft(d.date);
-      dlHtml+='<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:0.85em">'+
-        '<span style="font-family:var(--mono);color:var(--t3);min-width:36px">'+d.date.slice(5).replace('-','/')+'</span>'+
-        '<span style="flex:1">'+d.title+'</span>'+
-        '<span style="font-family:var(--mono);color:'+(dd<=0?'var(--red)':dd<=7?'var(--accent)':'var(--t3)')+'">'+
-        (dd<0?'D+'+Math.abs(dd):dd===0?'오늘':'D-'+dd)+'</span>'+
-      '</div>';
-    });
-    dlHtml+='</div>';
-  }
-
-  return '<div class="ph"><div class="pt">Monthly</div></div>'+
-    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'+
-      '<button class="btn bg bsm" onclick="monthlyY--;render()">← '+(monthlyY-1)+'</button>'+
-      '<div style="font-family:var(--serif);font-size:1.4em">'+monthlyY+'년</div>'+
-      '<button class="btn bg bsm" onclick="monthlyY++;render()">'+(monthlyY+1)+' →</button>'+
-    '</div>'+
-    monthCards+
-    '<div style="font-family:var(--serif);font-size:1.5em;margin-bottom:16px">'+MN[monthlyM]+'</div>'+
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">'+
-      '<div class="card">'+
-        '<div style="font-size:0.85em;font-weight:500;margin-bottom:12px">📅 '+MN[monthlyM]+' 달력</div>'+
-        calHtml+
-      '</div>'+
-      '<div>'+
-        dlHtml+
-        '<div class="card" style="margin-bottom:16px">'+
-          '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'+
-            '<div style="font-size:0.85em;font-weight:500">🎯 '+MN[monthlyM]+' 목표</div>'+
-            '<button class="btn bp bsm" data-ym="'+ym+'" onclick="openMonthlyGoalModal(this.dataset.ym)">+ 추가</button>'+
-          '</div>'+
-          (goals.length===0?'<div class="empty" style="padding:16px">이번 달 목표를 추가해요</div>':goalHtml)+
-        '</div>'+
-        '<div class="card">'+
-          '<div style="font-size:0.85em;font-weight:500;margin-bottom:10px">📝 월간 메모</div>'+
-          '<textarea class="ta" style="min-height:120px" placeholder="이번 달 느낀 점, 기억하고 싶은 것..." onchange="saveMonthlyMemo(this.value)">'+memo+'</textarea>'+
-        '</div>'+
-      '</div>'+
-    '</div>';
-}
 
 function openMonthlyGoalModal(ym){
   openMo(ym+' 목표 추가',
@@ -1471,109 +1333,6 @@ function getWeekDates(offset){
   return days;
 }
 
-function renderWeekly(){
-  const DOW_FULL=['월','화','수','목','금','토','일'];
-  const days=getWeekDates(weekOffset);
-  const wkey=days[0];
-  const startLabel=days[0].slice(5).replace('-','/');
-  const endLabel=days[6].slice(5).replace('-','/');
-  const ts=todStr();
-  const goals=S.weeklyGoals[wkey]||[];
-  const memo=S.weeklyMemo[wkey]||'';
-
-  let weekCards='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:24px">';
-  for(let i=-2;i<=1;i++){
-    const wd=getWeekDates(i);
-    const wk=wd[0];
-    const wg=S.weeklyGoals[wk]||[];
-    const wgDone=wg.filter(g=>g.done).length;
-    const isCur=i===weekOffset;
-    const sLabel=wd[0].slice(5).replace('-','/');
-    const eLabel=wd[6].slice(5).replace('-','/');
-    weekCards+='<div data-offset="'+i+'" onclick="weekOffset=parseInt(this.dataset.offset);render()" style="'+
-      'border-radius:10px;padding:12px 14px;cursor:pointer;text-align:center;'+
-      'background:'+(isCur?'var(--accent)':'var(--surface)')+';'+
-      'color:'+(isCur?'#fff':'var(--text)')+';'+
-      'border:1.5px solid '+(isCur?'var(--accent)':'var(--border)')+';transition:all .2s">'+
-      '<div style="font-size:0.78em;opacity:'+(isCur?'.85':'.55')+';margin-bottom:4px">'+(i===0?'이번 주':i===-1?'지난 주':i===1?'다음 주':i===-2?'2주 전':'')+'</div>'+
-      '<div style="font-size:0.9em;font-weight:600">'+sLabel+'~'+eLabel+'</div>'+
-      '<div style="font-size:0.7em;opacity:'+(isCur?'.85':'.55')+';margin-top:4px">목표 '+(wg.length?wgDone+'/'+wg.length:'-')+'</div>'+
-    '</div>';
-  }
-  weekCards+='</div>';
-
-  let dayGrid='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:24px">';
-  days.forEach(function(ds,i){
-    const isT=ds===ts;
-    const checks=S.checks[ds]||{};
-    const rods=routinesForDate(ds);
-    const done=rods.filter(r=>checks[r.id]).length;
-    const pct=rods.length?Math.round(done/rods.length*100):0;
-    const evs=(S.calEvents||[]).filter(e=>e.date===ds);
-    const dls=(S.deadlines||[]).filter(d=>d.date===ds);
-    const dd=new Date(ds+'T00:00:00');
-    dayGrid+='<div style="border-radius:10px;border:1.5px solid '+(isT?'var(--accent)':'var(--border)')+';background:'+(isT?'var(--al)':'var(--surface)')+';overflow:hidden">'+
-      '<div style="background:'+(isT?'var(--accent)':'var(--s2)')+';padding:8px 10px;text-align:center">'+
-        '<div style="font-size:0.7em;color:'+(isT?'rgba(255,255,255,.85)':'var(--t3)')+'">'+DOW_FULL[i]+'</div>'+
-        '<div style="font-size:1em;font-weight:600;color:'+(isT?'#fff':'var(--text)')+'">'+dd.getDate()+'</div>'+
-      '</div>'+
-      '<div style="padding:8px;min-height:120px;font-size:0.75em">';
-    if(rods.length>0){
-      dayGrid+='<div style="margin-bottom:6px">'+
-        '<div style="display:flex;justify-content:space-between;font-size:0.85em;color:var(--t3);margin-bottom:3px"><span>루틴</span><span>'+done+'/'+rods.length+'</span></div>'+
-        '<div style="background:var(--s3);border-radius:99px;height:3px;overflow:hidden"><div style="width:'+pct+'%;height:100%;background:var(--green)"></div></div>'+
-      '</div>';
-    }
-    evs.slice(0,2).forEach(function(ev){
-      const pr=ev.projectId?S.projects.find(p=>p.id===ev.projectId):null;
-      const c=pr?pr.color:(ev.color||'var(--accent)');
-      dayGrid+='<div style="background:'+c+'18;color:#555;border-left:2px solid '+c+'60;padding:2px 5px;border-radius:0 4px 4px 0;margin-bottom:3px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:400">'+ev.title+'</div>';
-    });
-    dls.slice(0,1).forEach(function(d){
-      const pr=d.projectId?S.projects.find(p=>p.id===d.projectId):null;
-      const c=pr?pr.color:'#C14A3C';
-      dayGrid+='<div style="background:'+c+'18;color:#555;border-left:2px solid '+c+'60;padding:2px 5px;border-radius:4px;margin-bottom:3px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:400">🚨 '+d.title+'</div>';
-    });
-    dayGrid+='</div></div>';
-  });
-  dayGrid+='</div>';
-
-  let goalHtml='<div style="display:flex;flex-direction:column;gap:6px">';
-  goals.forEach(function(g,i){
-    var doneBg=g.done?'var(--accent)':'transparent';
-    var doneBorder=g.done?'var(--accent)':'var(--border2)';
-    var checkMark=g.done?'<span style="color:#fff;font-size:0.6em;font-weight:700">&#10003;</span>':'';
-    var textStyle=g.done?'text-decoration:line-through;color:var(--t3)':'';
-    goalHtml+='<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--s2);border-radius:8px">'+
-      '<div data-wk="'+wkey+'" data-idx="'+i+'" onclick="togWeeklyGoal(this.dataset.wk,parseInt(this.dataset.idx))" style="width:16px;height:16px;border-radius:4px;border:1.5px solid '+doneBorder+';background:'+doneBg+';cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+checkMark+'</div>'+
-      '<div style="flex:1;font-size:0.9em;'+textStyle+'">'+g.text+'</div>'+
-      '<button data-wk="'+wkey+'" data-idx="'+i+'" onclick="delWeeklyGoal(this.dataset.wk,parseInt(this.dataset.idx))" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:0.85em;padding:2px 4px">&#10005;</button>'+
-    '</div>';
-  });
-  goalHtml+='</div>';
-
-  return '<div class="ph"><div class="pt">Weekly</div></div>'+
-    weekCards+
-    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'+
-      '<button class="btn bg bsm" onclick="weekOffset--;render()">← 이전 주</button>'+
-      '<div style="font-family:var(--serif);font-size:1.3em">'+startLabel+' — '+endLabel+'</div>'+
-      '<button class="btn bg bsm" onclick="weekOffset++;render()">다음 주 →</button>'+
-    '</div>'+
-    dayGrid+
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">'+
-      '<div class="card">'+
-        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'+
-          '<div style="font-size:0.85em;font-weight:500">🎯 이번 주 목표</div>'+
-          '<button class="btn bp bsm" data-wk="'+wkey+'" onclick="openWeeklyGoalModal(this.dataset.wk)">+ 추가</button>'+
-        '</div>'+
-        (goals.length===0?'<div class="empty" style="padding:16px">이번 주 목표를 추가해요</div>':goalHtml)+
-      '</div>'+
-      '<div class="card">'+
-        '<div style="font-size:0.85em;font-weight:500;margin-bottom:10px">📝 주간 메모</div>'+
-        '<textarea class="ta" style="min-height:120px" placeholder="이번 주의 다짐, 회고..." onchange="saveWeeklyMemo(this.value)">'+memo+'</textarea>'+
-      '</div>'+
-    '</div>';
-}
 
 function openWeeklyGoalModal(wk){
   openMo('이번 주 목표 추가',
@@ -1651,7 +1410,6 @@ function renderDiary(){
           (entry.weather?'<span style="font-size:0.85em;line-height:1">'+entry.weather+'</span>':'')+
         '</div>':'')+
       (entry&&entry.title?'<div style="font-size:0.78em;font-weight:600;color:var(--accent);margin-top:4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">'+entry.title+'</div>':'')+
-      (!entry&&entry&&entry.text?'':'')+
       (isT&&!entry?'<div style="font-size:0.72em;color:var(--t3);margin-top:4px">write today</div>':'')+
       (entry&&(entry.text||entry.title)?
         '<div class="diary-preview">'+
@@ -1776,18 +1534,6 @@ function saveTodayDiaryDirect(ds, text){
   S.diaryEntries[ds].text=text;
   save();
 }
-function saveTodayDiary(ds){
-  const ta=document.getElementById('today-diary-ta');
-  if(!ta) return;
-  if(!S.diaryEntries) S.diaryEntries={};
-  if(!S.diaryEntries[ds]) S.diaryEntries[ds]={text:'',mood:'',weather:''};
-  S.diaryEntries[ds].text=ta.value;
-  save(); render();
-}
-function saveTodayDiaryAndOpen(ds){
-  // 바로 Thanks Diary 모달 열기
-  openDiaryModal(ds);
-}
 function saveDiaryFromModal(ds){
   var ta=document.getElementById('diary-ta'),ti=document.getElementById('diary-title-inp');
   if(!ta) return;
@@ -1873,8 +1619,6 @@ function saveGoal(){
   S.lifeGoal={text,sub,done:false};
   save();closeMo();render();
 }
-function clearGoal(){if(!confirm('목표를 삭제할까요?'))return;S.lifeGoal={text:'',sub:'',done:false};save();render();}
-function togGoal(){if(!S.lifeGoal)return;S.lifeGoal=Object.assign({},S.lifeGoal,{done:!S.lifeGoal.done});save();render();}
 
 let selAreaC=COLORS[0];
 function openAreaModal(id){
@@ -1950,6 +1694,7 @@ function setPjF(id){pjFilter=id;render();}
 function goToArea(areaId){pjFilter=areaId;go('projects');}
 
 let selPjC=COLORS[0],selPjA='';
+let selEvC=COLORS[0];
 function openPjModal(){
   selPjC=COLORS[0];selPjA='';
   const areas=S.lifeAreas||[];
@@ -2143,9 +1888,10 @@ function renderPjDetail(pid){
   return html;
 }
 
-function togTk(pid,i){const p=S.projects.find(x=>x.id===pid);p.tasks[i].done=!p.tasks[i].done;save();render();}
+function togTk(pid,i){const p=S.projects.find(x=>x.id===pid);if(!p||!p.tasks[i])return;p.tasks[i].done=!p.tasks[i].done;save();render();}
 function delTk(pid,i){
   const p=S.projects.find(x=>x.id===pid);
+  if(!p||!p.tasks[i])return;
   const t=p.tasks[i];
   // 캘린더에서 해당 태스크 마감일 제거
   if(t.due) S.deadlines=S.deadlines.filter(d=>!(d.projectId===pid&&d._tkIdx===i&&d.date===t.due));
@@ -2195,8 +1941,8 @@ function saveTk(pid){
   }
   save();closeMo();render();
 }
-function togMs(pid,i){const p=S.projects.find(x=>x.id===pid);p.milestones[i].done=!p.milestones[i].done;save();render();}
-function delMs(pid,i){const p=S.projects.find(x=>x.id===pid);p.milestones.splice(i,1);save();render();}
+function togMs(pid,i){const p=S.projects.find(x=>x.id===pid);if(!p||!p.milestones[i])return;p.milestones[i].done=!p.milestones[i].done;save();render();}
+function delMs(pid,i){const p=S.projects.find(x=>x.id===pid);if(!p)return;p.milestones.splice(i,1);save();render();}
 function openMsModal(pid){openMo('마일스톤 추가','<div class="fg"><label class="fl">내용</label><input class="inp" id="ms-t" placeholder="마일스톤 내용"></div><div class="fg"><label class="fl">목표 날짜</label><input type="date" class="inp" id="ms-d"></div>','<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="saveMsF(\''+pid+'\')">추가</button>');}
 function saveMsF(pid){const text=document.getElementById('ms-t').value.trim(),date=document.getElementById('ms-d').value;if(!text)return;const p=S.projects.find(x=>x.id===pid);if(!p.milestones)p.milestones=[];p.milestones.push({id:gid(),text,date,done:false});save();closeMo();render();}
 function savePjN(pid,v){const p=S.projects.find(x=>x.id===pid);if(p){p.notes=v;save();}}
@@ -2866,8 +2612,8 @@ const defaultLedgerCategories = {
 const defaultLedgerBudgets = {'고정 생활비':1000000,'변동 생활비':800000,'작업 유지비':500000};
 const defaultLedgerAccounts = ['사업용 기업은행','생활비 신한은행','신한 신용카드','국민 신용카드'];
 const defaultLedgerAssets = [
-  {id:'la1',type:'asset',category:'현금/입출금',name:'사업용 기업은행',amount:0},
-  {id:'la2',type:'asset',category:'예적금',name:'정기예금',amount:0,interestRate:0,maturityDate:''},
+  {id:'lda1',type:'asset',category:'현금/입출금',name:'사업용 기업은행',amount:0},
+  {id:'lda2',type:'asset',category:'예적금',name:'정기예금',amount:0,interestRate:0,maturityDate:''},
 ];
 const defaultLedgerFixedItems = [];
 
@@ -3479,13 +3225,6 @@ function openLedgerFixedForm(){
 }
 
 function deleteLedgerFixed(i){if(!confirm('삭제할까요?'))return;(LD.fixedItems||[]).splice(i,1);saveLedger();render();}
-function renderLedgerFixedModal(){return '';}
-function changeLedgerFixedMajor(major){
-  const cats=LD.categories||defaultLedgerCategories;
-  const minors=(cats.expense||{})[major]||[];
-  const sel=document.getElementById('lf-minor');
-  if(sel)sel.innerHTML=minors.map(m=>'<option>'+m+'</option>').join('');
-}
 function saveLedgerFixed(){
   const day=parseInt(document.getElementById('lf-day').value);
   const acc=document.getElementById('lf-acc')?document.getElementById('lf-acc').value:'';
@@ -3501,14 +3240,6 @@ function saveLedgerFixed(){
   saveLedger();
   const ov=document.getElementById('ledger-fixed-overlay'); if(ov)ov.remove();
   render();
-}
-function renderLedgerAssetModal(){return '';}
-function addLedgerAssetCat(type){
-  const id=type==='asset'?'new-asset-cat':'new-liab-cat';
-  const el=document.getElementById(id); if(!el||!el.value.trim())return;
-  if(type==='asset'){if(!LD.assetCats)LD.assetCats=['현금/입출금','예적금','주식/펀드','부동산','기타'];if(!LD.assetCats.includes(el.value.trim()))LD.assetCats.push(el.value.trim());}
-  else{if(!LD.liabCats)LD.liabCats=['대출','신용카드값','할부','보증금 대출','기타'];if(!LD.liabCats.includes(el.value.trim()))LD.liabCats.push(el.value.trim());}
-  saveLedger();render();
 }
 function deleteLedgerAssetCat(type,cat){
   if(type==='asset'){if(!LD.assetCats)LD.assetCats=['현금/입출금','예적금','주식/펀드','부동산','기타'];LD.assetCats=LD.assetCats.filter(c=>c!==cat);}
@@ -3589,7 +3320,7 @@ function renderLedgerSettings(){
     });
     html+='</div><div style="display:flex;gap:6px;margin-top:8px">';
     html+='<input class="inp ledger-minor-inp" data-major="'+major+'" placeholder="소분류 추가" style="flex:1;font-size:0.85em;padding:5px 8px">';
-    html+='<button class="btn bg bsm" onclick="addLedgerMinor(\'expense\',\''+major+'\')">+</button></div></div>';
+    html+='<button class="btn bg bsm" onclick="addLedgerMinorByType(\'expense\',\''+major+'\')">+</button></div></div>';
   });
   html+='<div style="display:flex;gap:8px;margin-top:10px">';
   html+='<input class="inp" id="new-major-expense" placeholder="대분류 추가" style="flex:1">';
@@ -3781,7 +3512,6 @@ function addLedgerMinorByType(type,major){
   LD.categories[type][major].push(el.value.trim());
   saveLedger();render();
 }
-function addLedgerMinor(type,major){const els=document.querySelectorAll('.ledger-minor-inp');let el=null;els.forEach(function(e){if(e.dataset.major===major)el=e;});if(!el||!el.value.trim())return;if(!LD.categories[type][major])LD.categories[type][major]=[];LD.categories[type][major].push(el.value.trim());saveLedger();render();}
 function exportLedger(){const a=document.createElement('a');a.href='data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(LD));a.download='lucy_ledger_'+todStr()+'.json';a.click();}
 function importLedger(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=function(e){try{if(!confirm('기존 데이터를 덮어씁니다. 계속할까요?'))return;LD=JSON.parse(e.target.result);saveLedger();render();alert('복구 완료!');}catch{alert('파일 오류');}};r.readAsText(f);}
 function resetLedger(){if(!confirm('가계부 데이터를 전부 삭제할까요?'))return;LD={transactions:[],categories:JSON.parse(JSON.stringify(defaultLedgerCategories)),budgets:{...defaultLedgerBudgets},accounts:[...defaultLedgerAccounts],assets:JSON.parse(JSON.stringify(defaultLedgerAssets)),fixedItems:[]};saveLedger();render();}
@@ -4098,7 +3828,7 @@ auth.onAuthStateChanged(async function(user){
   }
 });
 
-function init(){} // auth.onAuthStateChanged가 대신함
+
 </script>
 </body>
 </html>

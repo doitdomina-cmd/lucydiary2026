@@ -969,19 +969,29 @@ function renderToday(){
     // Thanks Diary 오늘 카드
     (function(){
       const entry=(S.diaryEntries||{})[t]||{};
-      const moods={'😊':'기쁨','😌':'평온','😔':'우울','😤':'화남','😰':'불안','🥰':'감사','😴':'피곤','🤩':'설렘'};
-      const moodList=Object.keys(moods);
-      const moodBar=moodList.map(function(m){
+      const moods=['😊','😌','😔','😤','😰','🥰','😴','🤩'];
+      const weathers=['☀️','🌤️','⛅','🌧️','❄️','🌊','🌈'];
+      const moodBar=moods.map(function(m){
         const sel=entry.mood===m;
-        return '<span onclick="setDiaryMood(\''+t+'\',\''+m+'\')" style="cursor:pointer;font-size:1.4em;opacity:'+(sel?'1':'0.35')+';transition:opacity .15s;'+(sel?'filter:drop-shadow(0 0 4px rgba(0,0,0,0.2))':'')+'">'+m+'</span>';
+        return '<span onclick="setDiaryMood(\''+t+'\',\''+m+'\')" style="cursor:pointer;font-size:1.3em;opacity:'+(sel?'1':'0.3')+';transition:all .15s;transform:'+(sel?'scale(1.2)':'scale(1)')+';display:inline-block">'+m+'</span>';
       }).join('');
-      return '<div class="card" style="border:1.5px solid var(--al)">'+
-        '<div class="ch" style="margin-bottom:12px">'+
+      const weatherBar=weathers.map(function(w){
+        const sel=entry.weather===w;
+        return '<span onclick="setDiaryWeather(\''+t+'\',\''+w+'\')" style="cursor:pointer;font-size:1.1em;opacity:'+(sel?'1':'0.3')+';transition:all .15s;transform:'+(sel?'scale(1.2)':'scale(1)')+';display:inline-block">'+w+'</span>';
+      }).join('');
+      return '<div class="card" style="border:1.5px solid var(--al);margin-top:0">'+
+        '<div class="ch" style="margin-bottom:10px">'+
           '<div class="ct">✨ 오늘의 감사 일기</div>'+
           '<button class="btn bg bsm" onclick="go(\'diary\')">전체 →</button>'+
         '</div>'+
-        '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">'+moodBar+'</div>'+
-        '<textarea class="ta" style="min-height:80px;font-size:0.9em;resize:none" placeholder="오늘 감사한 것을 적어요..." onchange="saveDiaryText(\''+t+'\',this.value)">'+( entry.text||'')+'</textarea>'+
+        '<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">'+
+          '<span style="font-size:0.75em;color:var(--t3);margin-right:2px">기분</span>'+moodBar+
+        '</div>'+
+        '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center">'+
+          '<span style="font-size:0.75em;color:var(--t3);margin-right:2px">날씨</span>'+weatherBar+
+        '</div>'+
+        '<textarea id="today-diary-ta" class="ta" style="min-height:80px;font-size:0.9em;resize:none" placeholder="오늘 감사한 것을 적어요...">'+( entry.text||'')+'</textarea>'+
+        '<button class="btn bp bsm" style="margin-top:8px;width:100%" onclick="saveTodayDiary(\''+t+'\')">저장</button>'+
       '</div>';
     })();
 
@@ -1449,12 +1459,14 @@ function renderDiary(){
       'min-height:96px;padding:6px 8px;cursor:pointer;'+
       'border-right:'+(isLC?'none':'1px solid var(--border)')+';'+
       'border-bottom:'+(isLR?'none':'1px solid var(--border)')+';'+
-      'background:'+(isT?'var(--accent)15':hasDiary?'var(--s2)15':'transparent')+';'+
+      (isT?'outline:2px solid var(--accent);outline-offset:-2px;z-index:1;position:relative;':'')+
+      'background:'+(isT?'var(--al)':hasDiary?'var(--s2)15':'transparent')+';'+
       'transition:background .15s">'+
       '<div style="display:flex;align-items:flex-start;justify-content:space-between">'+
         '<span style="font-size:0.8em;font-weight:'+(isT?'700':'400')+';'+
           'color:'+(isT?'var(--accent)':!cell.cur?'var(--t3)':ci===0?'var(--red)':ci===6?'var(--blue)':'var(--text)')+'">'+cell.d+'</span>'+
-        (entry&&entry.mood?'<span style="font-size:0.9em">'+entry.mood+'</span>':'')+
+        (isT?'<span style="font-size:0.62em;font-weight:700;color:var(--accent);letter-spacing:0.04em">TODAY</span>':'')+
+        (entry&&entry.mood&&!isT?'<span style="font-size:0.9em">'+entry.mood+'</span>':'')+
       '</div>'+
       (entry&&entry.title?'<div style="font-size:0.78em;font-weight:600;color:var(--accent);margin-top:4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">'+entry.title+'</div>':'')+
       (!entry&&entry&&entry.text?'':'')+
@@ -1526,16 +1538,25 @@ function openDiaryModal(ds){
 
 function getLineNums(text){if(!text) return '1'; return text.split('\n').map(function(_,i){return i+1;}).join('<br>');}
 function updateLineNums(ta){var nums=document.getElementById('diary-line-nums');if(!nums) return; nums.innerHTML=ta.value.split('\n').map(function(_,i){return i+1;}).join('<br>');}
-function setDiaryMood(mood, ds){
+function setDiaryMood(ds, mood){
   if(!S.diaryEntries) S.diaryEntries={};
-  if(!S.diaryEntries[ds]) S.diaryEntries[ds]={text:'',mood:''};
+  if(!S.diaryEntries[ds]) S.diaryEntries[ds]={text:'',mood:'',weather:''};
   S.diaryEntries[ds].mood = S.diaryEntries[ds].mood===mood ? '' : mood;
-  save();
-  document.querySelectorAll('[data-key="mood"]').forEach(function(el){
-    var sel=el.dataset.val===S.diaryEntries[ds].mood;
-    el.style.background=sel?'var(--al)':'transparent';
-    el.style.borderColor=sel?'var(--accent)':'var(--border)';
-  });
+  save(); render();
+}
+function setDiaryWeather(ds, weather){
+  if(!S.diaryEntries) S.diaryEntries={};
+  if(!S.diaryEntries[ds]) S.diaryEntries[ds]={text:'',mood:'',weather:''};
+  S.diaryEntries[ds].weather = S.diaryEntries[ds].weather===weather ? '' : weather;
+  save(); render();
+}
+function saveTodayDiary(ds){
+  const ta=document.getElementById('today-diary-ta');
+  if(!ta) return;
+  if(!S.diaryEntries) S.diaryEntries={};
+  if(!S.diaryEntries[ds]) S.diaryEntries[ds]={text:'',mood:'',weather:''};
+  S.diaryEntries[ds].text=ta.value;
+  save(); render();
 }
 function saveDiaryFromModal(ds){
   var ta=document.getElementById('diary-ta'),ti=document.getElementById('diary-title-inp');

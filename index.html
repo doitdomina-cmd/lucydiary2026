@@ -755,6 +755,8 @@ function render(){
         openDiaryModal(this.dataset.ds);
       });
     });
+    // 드래그 초기화
+    initDragAll();
   },0);
 }
 
@@ -905,106 +907,181 @@ function renderToday(){
     '</div>';
   }
 
-  const rightCol=
-    // 상단 통계 2개
-    '<div class="g2" style="margin-bottom:16px">'+
-      '<div class="stat"><div class="sl">루틴 달성</div><div class="sv">'+pct+'%</div><div class="pw" style="margin-top:6px"><div class="pb" style="width:'+pct+'%;background:var(--green)"></div></div><div class="ss">'+done+' / '+total+' 완료</div></div>'+
-      '<div class="stat"><div class="sl">저축 달성</div><div class="sv">'+spct+'%</div><div class="pw" style="margin-top:6px"><div class="pb" style="width:'+spct+'%;background:var(--accent)"></div></div><div class="ss">'+money(S.savings.current)+'</div></div>'+
-    '</div>'+
-    // 이번 달 목표 + 이번 주 마감
-    '<div class="g2" style="margin-bottom:16px">'+
-      '<div class="card" style="margin-bottom:0">'+
-        '<div class="ch"><div class="ct">🎯 '+curMonthName+' 목표</div><button class="btn bg bsm" onclick="go(\'calendar\')">전체 →</button></div>'+
-        (monthGoals.length===0?'<div style="font-size:0.85em;color:var(--t3);padding:4px 0">목표가 없어요</div>':
-          '<div style="display:flex;flex-direction:column;gap:5px">'+
-          monthGoals.slice(0,4).map(function(g,i){
-            return '<div style="display:flex;align-items:center;gap:7px;font-size:0.88em">'+
-              '<div onclick="togMonthlyGoal(\''+ym+'\','+i+')" style="width:14px;height:14px;border-radius:3px;border:1.5px solid '+(g.done?'var(--green)':'var(--border2)')+';background:'+(g.done?'var(--green)':'transparent')+';cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center">'+
-              (g.done?'<span style="color:#fff;font-size:0.6em">✓</span>':'')+
-              '</div>'+
-              '<span style="'+(g.done?'text-decoration:line-through;color:var(--t3)':'')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+g.text+'</span></div>';
-          }).join('')+
-          (monthGoals.length>4?'<div style="font-size:0.78em;color:var(--t3)">+ '+(monthGoals.length-4)+'개 더</div>':'')+
-          '</div>')+
-      '</div>'+
-      '<div class="card" style="margin-bottom:0">'+
-        '<div class="ch"><div class="ct">🚨 이번 주 마감</div><button class="btn bg bsm" onclick="go(\'deadlines\')">전체 →</button></div>'+
-        (upcoming.length===0?'<div style="font-size:0.85em;color:var(--t3);padding:4px 0">마감 없음 🎉</div>':
-          upcoming.slice(0,4).map(d=>{
-            const f=fmtDateObj(d.date),dd=dLeft(d.date);
-            return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">'+
-              '<div style="min-width:36px;text-align:center;background:var(--s2);border-radius:6px;padding:3px 5px">'+
-                '<div style="font-size:0.62em;color:var(--t3)">'+f.month+'</div>'+
-                '<div style="font-size:0.85em;font-weight:600">'+f.day+'</div>'+
-              '</div>'+
-              '<div style="flex:1;font-size:0.88em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+d.title+'</div>'+
-              '<div style="font-size:0.78em;font-weight:600;color:'+(dd===0?'var(--red)':dd<=3?'var(--accent)':'var(--t3)')+'">'+( dd===0?'오늘':'D-'+dd)+'</div>'+
-            '</div>';
-          }).join(''))+
-      '</div>'+
-    '</div>'+
-    // 오늘 할일 + 내일 할일 체크리스트
-    '<div class="g2" style="margin-bottom:16px">'+
-      renderTodoList(todayItems,t,'✅ 오늘 할 일')+
-      renderTodoList(tmrItems,tmr,'📋 내일 할 일')+
-    '</div>'+
-    // 진행 중 프로젝트 (3열)
-    (S.projects.length>0?
-      '<div class="card" style="margin-bottom:16px">'+
-        '<div class="ch"><div class="ct">🗂️ 진행 중 프로젝트</div><button class="btn bg bsm" onclick="go(\'projects\')">전체 →</button></div>'+
-        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">'+
-        S.projects.slice(0,6).map(p=>{
-          const tk=p.tasks||[],dn=tk.filter(t2=>t2.done).length,pc=tk.length?Math.round(dn/tk.length*100):0;
-          return '<div onclick="go(\'projects\',\''+p.id+'\')" style="cursor:pointer;border:1px solid var(--border);border-radius:10px;padding:12px;transition:box-shadow .2s" onmouseenter="this.style.boxShadow=\'var(--shm)\'" onmouseleave="this.style.boxShadow=\'none\'">'+
-            '<div style="display:flex;align-items:center;gap:7px;margin-bottom:8px">'+
-              '<div style="width:9px;height:9px;border-radius:2px;background:'+p.color+';flex-shrink:0"></div>'+
-              '<div style="font-size:0.88em;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+p.name+'</div>'+
-            '</div>'+
-            '<div class="pw" style="height:4px"><div class="pb" style="width:'+pc+'%;background:'+p.color+'"></div></div>'+
-            '<div class="pl" style="margin-top:3px"><span>'+dn+'/'+tk.length+'</span><span>'+pc+'%</span></div>'+
-          '</div>';
-        }).join('')+
-        '</div>'+
-      '</div>':'')+''+
-    // Thanks Diary 오늘 카드
-    (function(){
-      const entry=(S.diaryEntries||{})[t]||{};
-      const moods=['😊','😌','😔','😤','😰','🥰','😴','🤩'];
-      const weathers=['☀️','🌤️','⛅','🌧️','❄️','🌊','🌈'];
-      const moodBar=moods.map(function(m){
-        const sel=entry.mood===m;
-        return '<span onclick="setDiaryMood(\''+t+'\',\''+m+'\')" style="cursor:pointer;font-size:1.3em;opacity:'+(sel?'1':'0.3')+';transition:all .15s;transform:'+(sel?'scale(1.2)':'scale(1)')+';display:inline-block">'+m+'</span>';
-      }).join('');
-      const weatherBar=weathers.map(function(w){
-        const sel=entry.weather===w;
-        return '<span onclick="setDiaryWeather(\''+t+'\',\''+w+'\')" style="cursor:pointer;font-size:1.1em;opacity:'+(sel?'1':'0.3')+';transition:all .15s;transform:'+(sel?'scale(1.2)':'scale(1)')+';display:inline-block">'+w+'</span>';
-      }).join('');
-      return '<div class="card" style="border:1.5px solid var(--al);margin-top:0">'+
-        '<div class="ch" style="margin-bottom:10px">'+
-          '<div class="ct">✨ 오늘의 감사 일기</div>'+
-          '<button class="btn bg bsm" onclick="go(\'diary\')">전체 →</button>'+
-        '</div>'+
-        '<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">'+
-          '<span style="font-size:0.75em;color:var(--t3);margin-right:2px">기분</span>'+moodBar+
-        '</div>'+
-        '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center">'+
-          '<span style="font-size:0.75em;color:var(--t3);margin-right:2px">날씨</span>'+weatherBar+
-        '</div>'+
-        '<textarea id="today-diary-ta" class="ta" style="min-height:80px;font-size:0.9em;resize:none" placeholder="오늘 감사한 것을 적어요...">'+( entry.text||'')+'</textarea>'+
-        '<button class="btn bp bsm" style="margin-top:8px;width:100%" onclick="saveTodayDiary(\''+t+'\')">저장</button>'+
-      '</div>';
-    })();
 
   var goalBar=(S.lifeGoal&&S.lifeGoal.text)
     ? '<div style="padding:10px 0 16px;font-size:0.9286em;color:var(--t2);font-style:italic;border-bottom:1px solid var(--border);margin-bottom:20px">🎯 '+S.lifeGoal.text+'</div>'
     : '';
   return goalBar+'<div class="today-wrap">'+
     '<div>'+routineCard(viewDate)+'</div>'+
-    '<div>'+rightCol+'</div>'+
+    '<div class="today-right-drag" data-drag-type="today" style="display:flex;flex-direction:column;gap:16px">'+
+      '<div class="today-drag-card" data-card-id="stats" style="margin-bottom:0">'+
+        '<div class="g2">'+
+          '<div class="stat"><div class="sl">루틴 달성</div><div class="sv">'+pct+'%</div><div class="pw" style="margin-top:6px"><div class="pb" style="width:'+pct+'%;background:var(--green)"></div></div><div class="ss">'+done+' / '+total+' 완료</div></div>'+
+          '<div class="stat"><div class="sl">저축 달성</div><div class="sv">'+spct+'%</div><div class="pw" style="margin-top:6px"><div class="pb" style="width:'+spct+'%;background:var(--accent)"></div></div><div class="ss">'+money(S.savings.current)+'</div></div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="today-drag-card" data-card-id="goals">'+
+        '<div class="g2">'+
+          '<div class="card" style="margin-bottom:0">'+
+            '<div class="ch"><div class="ct">🎯 '+curMonthName+' 목표</div><button class="btn bg bsm" onclick="go(\'calendar\')">전체 →</button></div>'+
+            (monthGoals.length===0?'<div style="font-size:0.85em;color:var(--t3);padding:4px 0">목표가 없어요</div>':
+              '<div style="display:flex;flex-direction:column;gap:5px">'+
+              monthGoals.slice(0,4).map(function(g,i){
+                return '<div style="display:flex;align-items:center;gap:7px;font-size:0.88em">'+
+                  '<div onclick="togMonthlyGoal(\''+ym+'\','+i+')" style="width:14px;height:14px;border-radius:3px;border:1.5px solid '+(g.done?'var(--green)':'var(--border2)')+';background:'+(g.done?'var(--green)':'transparent')+';cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center">'+
+                  (g.done?'<span style="color:#fff;font-size:0.6em">✓</span>':'')+
+                  '</div>'+
+                  '<span style="'+(g.done?'text-decoration:line-through;color:var(--t3)':'')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+g.text+'</span></div>';
+              }).join('')+
+              (monthGoals.length>4?'<div style="font-size:0.78em;color:var(--t3)">+ '+(monthGoals.length-4)+'개 더</div>':'')+
+              '</div>')+
+          '</div>'+
+          '<div class="card" style="margin-bottom:0">'+
+            '<div class="ch"><div class="ct">🚨 이번 주 마감</div><button class="btn bg bsm" onclick="go(\'deadlines\')">전체 →</button></div>'+
+            (upcoming.length===0?'<div style="font-size:0.85em;color:var(--t3);padding:4px 0">마감 없음 🎉</div>':
+              upcoming.slice(0,4).map(d=>{
+                const f=fmtDateObj(d.date),dd=dLeft(d.date);
+                return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">'+
+                  '<div style="min-width:36px;text-align:center;background:var(--s2);border-radius:6px;padding:3px 5px">'+
+                    '<div style="font-size:0.62em;color:var(--t3)">'+f.month+'</div>'+
+                    '<div style="font-size:0.85em;font-weight:600">'+f.day+'</div>'+
+                  '</div>'+
+                  '<div style="flex:1;font-size:0.88em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+d.title+'</div>'+
+                  '<div style="font-size:0.78em;font-weight:600;color:'+(dd===0?'var(--red)':dd<=3?'var(--accent)':'var(--t3)')+'">'+( dd===0?'오늘':'D-'+dd)+'</div>'+
+                '</div>';
+              }).join(''))+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="today-drag-card" data-card-id="todo">'+
+        '<div class="g2">'+
+          renderTodoList(todayItems,t,'✅ 오늘 할 일')+
+          renderTodoList(tmrItems,tmr,'📋 내일 할 일')+
+        '</div>'+
+      '</div>'+
+      (S.projects.length>0?
+      '<div class="today-drag-card" data-card-id="projects">'+
+        '<div class="card">'+
+          '<div class="ch"><div class="ct">🗂️ 진행 중 프로젝트</div><button class="btn bg bsm" onclick="go(\'projects\')">전체 →</button></div>'+
+          '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">'+
+          S.projects.slice(0,6).map(p=>{
+            const tk=p.tasks||[],dn=tk.filter(t2=>t2.done).length,pc=tk.length?Math.round(dn/tk.length*100):0;
+            return '<div onclick="go(\'projects\',\''+p.id+'\')" style="cursor:pointer;border:1px solid var(--border);border-radius:10px;padding:12px;transition:box-shadow .2s" onmouseenter="this.style.boxShadow=\'var(--shm)\'" onmouseleave="this.style.boxShadow=\'none\'">'+
+              '<div style="display:flex;align-items:center;gap:7px;margin-bottom:8px">'+
+                '<div style="width:9px;height:9px;border-radius:2px;background:'+p.color+';flex-shrink:0"></div>'+
+                '<div style="font-size:0.88em;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+p.name+'</div>'+
+              '</div>'+
+              '<div class="pw" style="height:4px"><div class="pb" style="width:'+pc+'%;background:'+p.color+'"></div></div>'+
+              '<div class="pl" style="margin-top:3px"><span>'+dn+'/'+tk.length+'</span><span>'+pc+'%</span></div>'+
+            '</div>';
+          }).join('')+
+          '</div>'+
+        '</div>'+
+      '</div>':'')+''+
+      '<div class="today-drag-card" data-card-id="diary">'+
+        (function(){
+          const entry=(S.diaryEntries||{})[t]||{};
+          const moods=['😊','😌','😔','😤','😰','🥰','😴','🤩'];
+          const weathers=['☀️','🌤️','⛅','🌧️','❄️','🌊','🌈'];
+          const moodBar=moods.map(function(m){
+            const sel=entry.mood===m;
+            return '<span onclick="setDiaryMood(\''+t+'\',\''+m+'\')" style="cursor:pointer;font-size:1.3em;opacity:'+(sel?'1':'0.3')+';transition:all .15s;display:inline-block">'+m+'</span>';
+          }).join('');
+          const weatherBar=weathers.map(function(w){
+            const sel=entry.weather===w;
+            return '<span onclick="setDiaryWeather(\''+t+'\',\''+w+'\')" style="cursor:pointer;font-size:1.1em;opacity:'+(sel?'1':'0.3')+';transition:all .15s;display:inline-block">'+w+'</span>';
+          }).join('');
+          return '<div class="card" style="border:1.5px solid var(--al)">'+
+            '<div class="ch" style="margin-bottom:10px"><div class="ct">✨ 오늘의 감사 일기</div><button class="btn bg bsm" onclick="go(\'diary\')">전체 →</button></div>'+
+            '<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center"><span style="font-size:0.75em;color:var(--t3);margin-right:2px">기분</span>'+moodBar+'</div>'+
+            '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center"><span style="font-size:0.75em;color:var(--t3);margin-right:2px">날씨</span>'+weatherBar+'</div>'+
+            '<textarea id="today-diary-ta" class="ta" style="min-height:80px;font-size:0.9em;resize:none" placeholder="오늘 감사한 것을 적어요...">'+( entry.text||'')+'</textarea>'+
+            '<button class="btn bp bsm" style="margin-top:8px;width:100%" onclick="saveTodayDiary(\''+t+'\')">저장</button>'+
+          '</div>';
+        })()+
+      '</div>'+
+    '</div>'+
   '</div>';
 }
 
 function saveNote(v,ds){S.notes[ds]=v;save();}
+
+// ═══════════ DRAG & DROP ═══════════
+var _drag={el:null,src:null,type:null};
+
+function initDrag(container, itemSelector, onReorder){
+  const items=container.querySelectorAll(itemSelector);
+  items.forEach(function(item){
+    item.draggable=true;
+    item.addEventListener('dragstart',function(e){
+      _drag.el=item;
+      _drag.type=container.dataset.dragType||'';
+      item.style.opacity='0.4';
+      e.dataTransfer.effectAllowed='move';
+    });
+    item.addEventListener('dragend',function(){
+      item.style.opacity='';
+      container.querySelectorAll(itemSelector).forEach(function(i){i.classList.remove('drag-over');});
+    });
+    item.addEventListener('dragover',function(e){
+      e.preventDefault();
+      if(_drag.el&&_drag.el!==item){
+        item.classList.add('drag-over');
+        const rect=item.getBoundingClientRect();
+        const after=e.clientY>rect.top+rect.height/2;
+        container.insertBefore(_drag.el, after?item.nextSibling:item);
+      }
+    });
+    item.addEventListener('dragleave',function(){item.classList.remove('drag-over');});
+    item.addEventListener('drop',function(e){
+      e.preventDefault();
+      item.classList.remove('drag-over');
+      if(onReorder) onReorder(container);
+    });
+  });
+}
+
+function initDragAll(){
+  // Today 카드들 (루틴 제외 오른쪽)
+  const todayRight=document.querySelector('.today-right-drag');
+  if(todayRight){
+    initDrag(todayRight,'.today-drag-card',function(c){
+      const order=[...c.querySelectorAll('.today-drag-card')].map(function(el){return el.dataset.cardId;});
+      S.todayCardOrder=order; save();
+    });
+  }
+  // 태스크 드래그
+  const tkContainers=document.querySelectorAll('.task-drag-container');
+  tkContainers.forEach(function(tc){
+    const pid=tc.dataset.pid;
+    initDrag(tc,'.task-drag-item',function(c){
+      const p=S.projects.find(x=>x.id===pid); if(!p)return;
+      const ids=[...c.querySelectorAll('.task-drag-item')].map(function(el){return el.dataset.tid;});
+      p.tasks=ids.map(function(id){return p.tasks.find(function(t){return t.id===id;});}).filter(Boolean);
+      save();
+    });
+  });
+  // 나의 라이프 프로젝트 드래그
+  const lifeContainers=document.querySelectorAll('.life-proj-drag');
+  lifeContainers.forEach(function(lc){
+    const areaId=lc.dataset.areaId;
+    initDrag(lc,'.life-proj-item',function(c){
+      const ids=[...c.querySelectorAll('.life-proj-item')].map(function(el){return el.dataset.pid;});
+      // 해당 area 프로젝트 순서 재정렬
+      const others=S.projects.filter(function(p){return p.lifeAreaId!==areaId;});
+      const reordered=ids.map(function(id){return S.projects.find(function(p){return p.id===id;});}).filter(Boolean);
+      S.projects=[...others,...reordered];
+      save(); render();
+    });
+  });
+}
+
+// CSS 추가
+(function(){
+  var s=document.createElement('style');
+  s.textContent='.drag-over{outline:2px dashed var(--accent);outline-offset:-2px;border-radius:10px;}[draggable=true]{cursor:grab;}[draggable=true]:active{cursor:grabbing;}';
+  document.head.appendChild(s);
+})();
 
 // ═══════════ TODO 체크리스트 ═══════════
 function addTodoItem(ds){
@@ -1678,12 +1755,12 @@ function renderProjects(){
   html+='<button class="btn bp bsm" onclick="openPjModal()" style="margin-left:auto">+ 새 프로젝트</button></div>';
   if(filtered.length===0){html+='<div class="empty" style="padding:60px"><div class="ei">🗂️</div>'+(pjFilter?'이 영역의 프로젝트가 없어요':'첫 프로젝트를 만들어 보세요!')+'</div>';}
   else{
-    html+='<div class="pj-grid">';
+  html+='<div class="pj-grid life-proj-drag" data-area-id="all">';
     filtered.forEach(p=>{
       const tk=p.tasks||[],dn=tk.filter(t=>t.done).length,pc=tk.length?Math.round(dn/tk.length*100):0;
       const ud=S.deadlines.filter(d=>d.projectId===p.id).sort((a,b)=>a.date.localeCompare(b.date))[0];
       const area=areas.find(a=>a.id===p.lifeAreaId);
-      html+='<div class="pj-card" onclick="go(\'projects\',\''+p.id+'\')" onmouseenter="this.style.boxShadow=\'var(--shm)\';this.style.transform=\'translateY(-2px)\'" onmouseleave="this.style.boxShadow=\'var(--sh)\';this.style.transform=\'none\'">'+
+      html+='<div class="pj-card life-proj-item" data-pid="'+p.id+'" onclick="go(\'projects\',\''+p.id+'\')" onmouseenter="this.style.boxShadow=\'var(--shm)\';this.style.transform=\'translateY(-2px)\'" onmouseleave="this.style.boxShadow=\'var(--sh)\';this.style.transform=\'none\'">'+
         '<div class="pj-bar" style="background:'+p.color+'"></div>'+
         '<div class="pj-body">'+
           '<div style="display:flex;align-items:flex-start;justify-content:space-between">'+
@@ -1826,11 +1903,14 @@ function renderPjDetail(pid){
   if(tk.length>0)html+='<div class="card" style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:0.9286em;color:var(--t3)">전체 진행률</span><span style="font-family:var(--mono);font-size:0.9286em">'+dn+'/'+tk.length+'</span></div><div class="pw" style="height:10px"><div class="pb" style="width:'+pc+'%;background:'+p.color+'"></div></div></div>';
   html+='<div class="g2">';
   html+='<div class="card"><div class="ch"><div class="ct">✅ 태스크</div><button class="btn bp bsm" onclick="openTkModal(\''+pid+'\')">+ 추가</button></div>'+
-    (tk.length===0?'<div class="empty">태스크를 추가해요</div>':tk.map((t,i)=>{
+    (tk.length===0?'<div class="empty">태스크를 추가해요</div>':
+    '<div class="task-drag-container" data-pid="'+pid+'">'+
+    tk.map((t,i)=>{
       const dd=t.due?dLeft(t.due):null;
       const dueColor=dd===null?'var(--t3)':dd<0?'var(--red)':dd===0?'var(--red)':dd<=3?'var(--accent)':'var(--t3)';
       const dueLabel=dd===null?'':dd<0?'D+'+Math.abs(dd):dd===0?'오늘':'D-'+dd;
-      return '<div class="ci">'+
+      return '<div class="ci task-drag-item" data-tid="'+(t.id||i)+'" style="cursor:grab">'+
+        '<span style="color:var(--t3);font-size:0.8em;margin-right:4px;cursor:grab">⠿</span>'+
         '<div class="cb '+(t.done?'on':'')+'" style="'+(t.done?'background:'+p.color+';border-color:'+p.color:'')+'" onclick="togTk(\''+pid+'\','+i+')"></div>'+
         '<div style="flex:1">'+
           '<div class="ck '+(t.done?'done':'')+'">'+t.text+'</div>'+
@@ -1842,7 +1922,8 @@ function renderPjDetail(pid){
         '<button class="bi" onclick="openTkEditModal(\''+pid+'\','+i+')" style="font-size:0.8em">✎</button>'+
         '<button class="bi" onclick="delTk(\''+pid+'\','+i+')" style="color:var(--red);font-size:0.8571em">✕</button>'+
       '</div>';
-    }).join(''))+
+    }).join('')+
+    '</div>')+
     '</div>';
   // 마감일 카드 — 태스크 마감 + 별도 마감 통합해서 날짜순
   const allDl=S.deadlines.filter(d=>d.projectId===pid).sort((a,b)=>a.date.localeCompare(b.date));

@@ -676,11 +676,7 @@ function go(p, pid){
   const topbar=document.querySelector('.topbar');
   const hideTopbarPages=['ledger','today','calendar','diary','deadlines'];
   if(hideTopbarPages.includes(p)){
-    if(topbar){
-      // 모바일에서만 숨김 (768px 이하)
-      if(window.innerWidth<=768) topbar.style.display='none';
-      else topbar.style.display='';
-    }
+    if(topbar) topbar.style.display='none';
     // 모바일용 플로팅 햄버거 버튼
     let fhbg=document.getElementById('float-hbg');
     if(!fhbg){
@@ -873,7 +869,7 @@ function renderToday(){
   if(!S.todoList)S.todoList={};
   if(!S.todoList[t])S.todoList[t]=[];
   if(!S.todoListTmr)S.todoListTmr={};
-  if(!S.todoListTmr[t])S.todoListTmr[t]=[];
+  if(!S.todoListTmr[tmr])S.todoListTmr[tmr]=[];
 
   // 30일 이전 데이터 자동 정리 (누적 방지)
   const cutoff=addDays(t,-30);
@@ -893,21 +889,21 @@ function renderToday(){
     });
     if(carry.length>0)save();
   }
-  // 어제 내일할일 → 오늘 할일로 이월 (처리되지 않은 것만, 한 번만)
-  if(S.todoListTmr&&S.todoListTmr[yest]){
-    const tmrCarry=S.todoListTmr[yest].filter(item=>!item.done&&!item._tmrCarried);
+  // 어제 내일할일(=오늘 날짜로 저장된 것) → 오늘 할일로 이월
+  if(S.todoListTmr&&S.todoListTmr[t]){
+    const tmrCarry=S.todoListTmr[t].filter(item=>!item.done&&!item._tmrCarried);
     tmrCarry.forEach(function(item){
       const already=S.todoList[t].some(x=>x.text===item.text&&x._carried);
       if(!already){
         S.todoList[t].unshift({id:gid(),text:item.text,done:false,_carried:true});
       }
-      item._tmrCarried=true; // 재이월 방지 마킹
+      item._tmrCarried=true;
     });
     if(tmrCarry.length>0)save();
   }
 
   const todayItems=S.todoList[t];
-  const tmrItems=S.todoListTmr[t]||[];
+  const tmrItems=S.todoListTmr[tmr]||[];
 
   function renderTodoList(items,ds,label){
     const safeDs=ds.replace(/-/g,'_');
@@ -1026,9 +1022,10 @@ function addTodoInline(ds,inputId){
   const t=todStr();
   const isTmr=(ds!==t);
   if(isTmr){
+    // ds = 내일 날짜 → 내일 날짜 키로 저장
     if(!S.todoListTmr)S.todoListTmr={};
-    if(!S.todoListTmr[t])S.todoListTmr[t]=[];
-    S.todoListTmr[t].push({id:gid(),text,done:false});
+    if(!S.todoListTmr[ds])S.todoListTmr[ds]=[];
+    S.todoListTmr[ds].push({id:gid(),text,done:false});
   } else {
     if(!S.todoList)S.todoList={};
     if(!S.todoList[ds])S.todoList[ds]=[];
@@ -1045,15 +1042,15 @@ function togTodoItem(ds,i){
   const t=todStr();
   const isTmr=(ds!==t);
   if(isTmr){
-    if(!S.todoListTmr||!S.todoListTmr[t])return;
-    S.todoListTmr[t][i].done=!S.todoListTmr[t][i].done;
+    if(!S.todoListTmr||!S.todoListTmr[ds])return;
+    S.todoListTmr[ds][i].done=!S.todoListTmr[ds][i].done;
   } else {
     if(!S.todoList||!S.todoList[ds])return;
     S.todoList[ds][i].done=!S.todoList[ds][i].done;
   }
   save();
   // DOM만 업데이트 (깜빡임 방지)
-  const list=isTmr?S.todoListTmr[t]:S.todoList[ds];
+  const list=isTmr?S.todoListTmr[ds]:S.todoList[ds];
   const item=list[i];
   // 해당 체크박스 찾기 - onclick 속성으로 찾기
   const allBoxes=document.querySelectorAll('[onclick*="togTodoItem"]');
@@ -1072,8 +1069,8 @@ function delTodoItem(ds,i){
   const t=todStr();
   const isTmr=(ds!==t);
   if(isTmr){
-    if(!S.todoListTmr||!S.todoListTmr[t])return;
-    S.todoListTmr[t].splice(i,1);
+    if(!S.todoListTmr||!S.todoListTmr[ds])return;
+    S.todoListTmr[ds].splice(i,1);
   } else {
     if(!S.todoList||!S.todoList[ds])return;
     S.todoList[ds].splice(i,1);

@@ -757,6 +757,11 @@ function render(){
     });
     // 드래그 초기화
     initDragAll();
+    // 편집 모드 상태 복원
+    if(todayEditMode&&page==='today'){
+      todayEditMode=false; // reset so toggleTodayEdit activates it
+      setTimeout(toggleTodayEdit,10);
+    }
   },0);
 }
 
@@ -911,16 +916,27 @@ function renderToday(){
   var goalBar=(S.lifeGoal&&S.lifeGoal.text)
     ? '<div style="padding:10px 0 16px;font-size:0.9286em;color:var(--t2);font-style:italic;border-bottom:1px solid var(--border);margin-bottom:20px">🎯 '+S.lifeGoal.text+'</div>'
     : '';
-  return goalBar+'<div class="today-wrap">'+
+  return goalBar+
+    '<div style="display:flex;justify-content:flex-end;margin-bottom:8px">'+
+      '<button id="today-lock-btn" onclick="toggleTodayEdit()" title="레이아웃 편집" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:1.1em;opacity:0.35;transition:all .2s;padding:4px 6px;border-radius:6px" onmouseover="this.style.opacity=\'1\'" onmouseout="this.style.opacity=todayEditMode?\'1\':\'0.35\'">🔒</button>'+
+    '</div>'+
+    '<div class="today-wrap">'+
     '<div>'+routineCard(viewDate)+'</div>'+
     '<div id="today-grid" class="today-right-drag" data-drag-type="today" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-content:start">'+
-      '<div class="today-drag-card" data-card-id="stats" style="grid-column:span 2">'+
+      (function(){
+        // 카드 기본 span 설정
+        if(!S.todayCardSpan)S.todayCardSpan={};
+        var defaultSpan={stats:2,'monthly-goal':1,deadlines:1,'todo-today':1,'todo-tmr':1,projects:2,diary:2};
+        function cs(id){return S.todayCardSpan[id]||defaultSpan[id]||1;}
+        return '';
+      })()+
+      '<div class="today-drag-card" data-card-id="stats" '+'style="grid-column:span '+(S.todayCardSpan&&S.todayCardSpan['stats']||2)+'">'+
         '<div class="g2" style="margin-bottom:0">'+
           '<div class="stat"><div class="sl">루틴 달성</div><div class="sv">'+pct+'%</div><div class="pw" style="margin-top:6px"><div class="pb" style="width:'+pct+'%;background:var(--green)"></div></div><div class="ss">'+done+' / '+total+' 완료</div></div>'+
           '<div class="stat"><div class="sl">저축 달성</div><div class="sv">'+spct+'%</div><div class="pw" style="margin-top:6px"><div class="pb" style="width:'+spct+'%;background:var(--accent)"></div></div><div class="ss">'+money(S.savings.current)+'</div></div>'+
         '</div>'+
       '</div>'+
-      '<div class="today-drag-card" data-card-id="monthly-goal">'+
+      '<div class="today-drag-card" data-card-id="monthly-goal" '+'style="grid-column:span '+(S.todayCardSpan&&S.todayCardSpan['monthly-goal']||1)+'">'+
         '<div class="card" style="margin-bottom:0;height:100%">'+
           '<div class="ch"><div class="ct">🎯 '+curMonthName+' 목표</div><button class="btn bg bsm" onclick="go(\'calendar\')">전체 →</button></div>'+
           (monthGoals.length===0?'<div style="font-size:0.85em;color:var(--t3)">목표가 없어요</div>':
@@ -936,7 +952,7 @@ function renderToday(){
             '</div>')+
         '</div>'+
       '</div>'+
-      '<div class="today-drag-card" data-card-id="deadlines">'+
+      '<div class="today-drag-card" data-card-id="deadlines" '+'style="grid-column:span '+(S.todayCardSpan&&S.todayCardSpan['deadlines']||1)+'">'+
         '<div class="card" style="margin-bottom:0;height:100%">'+
           '<div class="ch"><div class="ct">🚨 이번 주 마감</div><button class="btn bg bsm" onclick="go(\'deadlines\')">전체 →</button></div>'+
           (upcoming.length===0?'<div style="font-size:0.85em;color:var(--t3)">마감 없음 🎉</div>':
@@ -953,14 +969,14 @@ function renderToday(){
             }).join(''))+
         '</div>'+
       '</div>'+
-      '<div class="today-drag-card" data-card-id="todo-today">'+
+      '<div class="today-drag-card" data-card-id="todo-today" '+'style="grid-column:span '+(S.todayCardSpan&&S.todayCardSpan['todo-today']||1)+'">'+
         renderTodoList(todayItems,t,'✅ 오늘 할 일')+
       '</div>'+
-      '<div class="today-drag-card" data-card-id="todo-tmr">'+
+      '<div class="today-drag-card" data-card-id="todo-tmr" '+'style="grid-column:span '+(S.todayCardSpan&&S.todayCardSpan['todo-tmr']||1)+'">'+
         renderTodoList(tmrItems,tmr,'📋 내일 할 일')+
       '</div>'+
       (S.projects.length>0?
-      '<div class="today-drag-card" data-card-id="projects" style="grid-column:span 2">'+
+      '<div class="today-drag-card" data-card-id="projects" '+'style="grid-column:span '+(S.todayCardSpan&&S.todayCardSpan['projects']||2)+'">'+
         '<div class="card" style="margin-bottom:0">'+
           '<div class="ch"><div class="ct">🗂️ 진행 중 프로젝트</div><button class="btn bg bsm" onclick="go(\'projects\')">전체 →</button></div>'+
           '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">'+
@@ -978,7 +994,7 @@ function renderToday(){
           '</div>'+
         '</div>'+
       '</div>':'')+
-      '<div class="today-drag-card" data-card-id="diary" style="grid-column:span 2">'+
+      '<div class="today-drag-card" data-card-id="diary" '+'style="grid-column:span '+(S.todayCardSpan&&S.todayCardSpan['diary']||2)+'">'+
         (function(){
           const entry=(S.diaryEntries||{})[t]||{};
           const moods=['😊','😌','😔','😤','😰','🥰','😴','🤩'];
@@ -1007,7 +1023,57 @@ function renderToday(){
 function saveNote(v,ds){S.notes[ds]=v;save();}
 
 // ═══════════ DRAG & DROP ═══════════
-var _drag={el:null,src:null,type:null};
+var _drag={el:null,src:null,type:null,container:null};
+var todayEditMode=false;
+
+function toggleTodayEdit(){
+  todayEditMode=!todayEditMode;
+  const btn=document.getElementById('today-lock-btn');
+  const grid=document.getElementById('today-grid');
+  if(!btn||!grid)return;
+  if(todayEditMode){
+    btn.textContent='🔓';btn.style.opacity='1';btn.title='편집 중 — 클릭해서 잠금';
+    grid.style.outline='2px dashed var(--accent)40';grid.style.outlineOffset='6px';
+    grid.querySelectorAll('.today-drag-card').forEach(function(card){
+      card.draggable=true;card.style.cursor='grab';
+      if(!card.querySelector('.span-btns')){
+        var btns=document.createElement('div');
+        btns.className='span-btns';
+        btns.style.cssText='position:absolute;top:6px;right:6px;display:flex;gap:3px;z-index:10;background:var(--surface);border-radius:6px;padding:2px;box-shadow:var(--sh)';
+        var cur=(S.todayCardSpan&&S.todayCardSpan[card.dataset.cardId])||2;
+        [[1,'1칸'],[2,'2칸']].forEach(function(b){
+          var btn2=document.createElement('button');
+          btn2.textContent=b[1];
+          btn2.style.cssText='padding:2px 7px;border-radius:4px;border:none;background:'+(cur===b[0]?'var(--accent)':'transparent')+';color:'+(cur===b[0]?'#fff':'var(--t2)')+';cursor:pointer;font-size:0.72em;font-family:var(--sans)';
+          btn2.onclick=function(e){e.stopPropagation();setCardSpan(card,b[0]);};
+          btns.appendChild(btn2);
+        });
+        card.style.position='relative';
+        card.appendChild(btns);
+      }
+    });
+    initDragAll();
+  } else {
+    btn.textContent='🔒';btn.style.opacity='0.35';btn.title='레이아웃 편집';
+    grid.style.outline='';grid.style.outlineOffset='';
+    grid.querySelectorAll('.span-btns').forEach(function(b){b.remove();});
+    grid.querySelectorAll('.today-drag-card').forEach(function(c){c.draggable=false;c.style.cursor='';});
+    // 순서 저장
+    const order=[...grid.querySelectorAll('.today-drag-card')].map(function(el){return el.dataset.cardId;});
+    S.todayCardOrder=order;save();
+  }
+}
+
+function setCardSpan(card,span){
+  card.style.gridColumn='span '+span;
+  if(!S.todayCardSpan)S.todayCardSpan={};
+  S.todayCardSpan[card.dataset.cardId]=span;
+  save();
+  card.querySelectorAll('.span-btns button').forEach(function(b,i){
+    b.style.background=(i+1)===span?'var(--accent)':'transparent';
+    b.style.color=(i+1)===span?'#fff':'var(--t2)';
+  });
+}
 
 function initDrag(container, itemSelector, onReorder){
   const items=container.querySelectorAll(itemSelector);
@@ -1549,8 +1615,12 @@ function renderDiary(){
         '<span style="font-size:0.8em;font-weight:'+(isT?'700':'400')+';'+
           'color:'+(isT?'var(--accent)':!cell.cur?'var(--t3)':ci===0?'var(--red)':ci===6?'var(--blue)':'var(--text)')+'">'+cell.d+'</span>'+
         (isT?'<span style="font-size:0.62em;font-weight:700;color:var(--accent);letter-spacing:0.04em">TODAY</span>':'')+
-        (entry&&entry.mood&&!isT?'<span style="font-size:0.9em">'+entry.mood+'</span>':'')+
       '</div>'+
+      (entry&&(entry.mood||entry.weather)?
+        '<div style="display:flex;gap:2px;margin-top:3px">'+
+          (entry.mood?'<span style="font-size:0.85em;line-height:1">'+entry.mood+'</span>':'')+
+          (entry.weather?'<span style="font-size:0.85em;line-height:1">'+entry.weather+'</span>':'')+
+        '</div>':'')+
       (entry&&entry.title?'<div style="font-size:0.78em;font-weight:600;color:var(--accent);margin-top:4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">'+entry.title+'</div>':'')+
       (!entry&&entry&&entry.text?'':'')+
       (isT&&!entry?'<div style="font-size:0.72em;color:var(--t3);margin-top:4px">write today</div>':'')+
@@ -1600,7 +1670,7 @@ function openDiaryModal(ds){
   const weathers=['☀️','🌤️','⛅','🌧️','❄️','🌊','🌈'];
   var weatherHtml=weathers.map(function(w){
     var sel=entry.weather===w;
-    return '<div onclick="setDiaryWeather(\''+ds+'\',\''+w+'\')" style="'+
+    return '<div data-key="weather" data-val="'+w+'" onclick="setDiaryWeather(\''+ds+'\',\''+w+'\')" style="'+
       'padding:5px 9px;border-radius:8px;cursor:pointer;font-size:1.1em;'+
       'background:'+(sel?'var(--al)':'transparent')+';'+
       'border:1.5px solid '+(sel?'var(--accent)':'var(--border)')+';transition:all .15s">'+w+'</div>';
@@ -1636,13 +1706,35 @@ function setDiaryMood(ds, mood){
   if(!S.diaryEntries) S.diaryEntries={};
   if(!S.diaryEntries[ds]) S.diaryEntries[ds]={text:'',mood:'',weather:''};
   S.diaryEntries[ds].mood = S.diaryEntries[ds].mood===mood ? '' : mood;
-  save(); render();
+  save();
+  // 모달 안에 있으면 UI만 업데이트 (render 안함)
+  const moEl=document.getElementById('mo');
+  if(moEl&&moEl.style.display!=='none'){
+    document.querySelectorAll('[data-key="mood"]').forEach(function(el){
+      var sel=el.dataset.val===S.diaryEntries[ds].mood;
+      el.style.background=sel?'var(--al)':'transparent';
+      el.style.borderColor=sel?'var(--accent)':'var(--border)';
+    });
+  } else {
+    render();
+  }
 }
 function setDiaryWeather(ds, weather){
   if(!S.diaryEntries) S.diaryEntries={};
   if(!S.diaryEntries[ds]) S.diaryEntries[ds]={text:'',mood:'',weather:''};
   S.diaryEntries[ds].weather = S.diaryEntries[ds].weather===weather ? '' : weather;
-  save(); render();
+  save();
+  // 모달 안에 있으면 UI만 업데이트
+  const moEl=document.getElementById('mo');
+  if(moEl&&moEl.style.display!=='none'){
+    document.querySelectorAll('[data-key="weather"]').forEach(function(el){
+      var sel=el.dataset.val===S.diaryEntries[ds].weather;
+      el.style.background=sel?'var(--al)':'transparent';
+      el.style.borderColor=sel?'var(--accent)':'var(--border)';
+    });
+  } else {
+    render();
+  }
 }
 function saveTodayDiary(ds){
   const ta=document.getElementById('today-diary-ta');

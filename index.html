@@ -950,7 +950,7 @@ function renderToday(){
     '</div>'+
     // 진행 중 프로젝트 (3열)
     (S.projects.length>0?
-      '<div class="card">'+
+      '<div class="card" style="margin-bottom:16px">'+
         '<div class="ch"><div class="ct">🗂️ 진행 중 프로젝트</div><button class="btn bg bsm" onclick="go(\'projects\')">전체 →</button></div>'+
         '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">'+
         S.projects.slice(0,6).map(p=>{
@@ -965,7 +965,25 @@ function renderToday(){
           '</div>';
         }).join('')+
         '</div>'+
-      '</div>':'');
+      '</div>':'')+''+
+    // Thanks Diary 오늘 카드
+    (function(){
+      const entry=(S.diaryEntries||{})[t]||{};
+      const moods={'😊':'기쁨','😌':'평온','😔':'우울','😤':'화남','😰':'불안','🥰':'감사','😴':'피곤','🤩':'설렘'};
+      const moodList=Object.keys(moods);
+      const moodBar=moodList.map(function(m){
+        const sel=entry.mood===m;
+        return '<span onclick="setDiaryMood(\''+t+'\',\''+m+'\')" style="cursor:pointer;font-size:1.4em;opacity:'+(sel?'1':'0.35')+';transition:opacity .15s;'+(sel?'filter:drop-shadow(0 0 4px rgba(0,0,0,0.2))':'')+'">'+m+'</span>';
+      }).join('');
+      return '<div class="card" style="border:1.5px solid var(--al)">'+
+        '<div class="ch" style="margin-bottom:12px">'+
+          '<div class="ct">✨ 오늘의 감사 일기</div>'+
+          '<button class="btn bg bsm" onclick="go(\'diary\')">전체 →</button>'+
+        '</div>'+
+        '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">'+moodBar+'</div>'+
+        '<textarea class="ta" style="min-height:80px;font-size:0.9em;resize:none" placeholder="오늘 감사한 것을 적어요..." onchange="saveDiaryText(\''+t+'\',this.value)">'+( entry.text||'')+'</textarea>'+
+      '</div>';
+    })();
 
   var goalBar=(S.lifeGoal&&S.lifeGoal.text)
     ? '<div style="padding:10px 0 16px;font-size:0.9286em;color:var(--t2);font-style:italic;border-bottom:1px solid var(--border);margin-bottom:20px">🎯 '+S.lifeGoal.text+'</div>'
@@ -1428,7 +1446,7 @@ function renderDiary(){
     var hasDiary=!!(entry&&(entry.text||entry.mood));
     var isLR=ri===5, isLC=ci===6;
     calHtml+='<div class="diary-cell" data-ds="'+ds+'" style="'+
-      'min-height:80px;padding:6px 8px;cursor:pointer;'+
+      'min-height:96px;padding:6px 8px;cursor:pointer;'+
       'border-right:'+(isLC?'none':'1px solid var(--border)')+';'+
       'border-bottom:'+(isLR?'none':'1px solid var(--border)')+';'+
       'background:'+(isT?'var(--accent)15':hasDiary?'var(--s2)15':'transparent')+';'+

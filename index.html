@@ -932,7 +932,7 @@ function renderToday(){
       '<div style="display:flex;align-items:center;gap:8px;padding-top:8px">'+
         '<div style="width:16px;height:16px;border-radius:4px;border:1.5px dashed var(--border2);flex-shrink:0"></div>'+
         '<input id="todo-inp-'+safeDs+'" class="inp" style="flex:1;padding:5px 8px;font-size:0.9em;background:transparent;border-color:transparent;border-bottom:1px solid var(--border);border-radius:0" placeholder="할 일 추가 후 Enter..." '+
-        'onkeydown="if(event.key===\'Enter\'){addTodoInline(\''+ds+'\',\'todo-inp-'+safeDs+'\');event.preventDefault()}">'+
+        'onkeydown="if(event.key===\'Enter\'||event.keyCode===13){addTodoInline(\''+ds+'\',\'todo-inp-'+safeDs+'\');event.preventDefault();event.stopPropagation();}">'+
       '</div>'+
     '</div>';
   }
@@ -991,10 +991,8 @@ function renderToday(){
       }).join('')+'</div></div>':'',
     'diary':'<div class="card" style="border:1.5px solid var(--al)">'+
       '<div class="ch" style="margin-bottom:10px"><div class="ct">✨ 오늘의 감사 일기</div>'+
-      '<div style="display:flex;gap:6px"><button class="btn bp bsm" onclick="saveTodayDiaryAndOpen(\''+t+'\')">✏️ 작성·저장</button><button class="btn bg bsm" onclick="go(\'diary\')">전체 →</button></div></div>'+
-      '<div style="display:flex;gap:10px;margin-bottom:10px;align-items:center;flex-wrap:wrap"><span style="font-size:0.75em;color:var(--t3)">기분</span>'+moodBar+'<span style="font-size:0.75em;color:var(--t3);margin-left:6px">날씨</span>'+weatherBar+'</div>'+
-      (entry.text?'<div style="font-size:0.88em;color:var(--t2);background:var(--s2);border-radius:8px;padding:10px 12px;line-height:1.7;white-space:pre-wrap;cursor:pointer" onclick="saveTodayDiaryAndOpen(\''+t+'\')">'+entry.text.slice(0,120)+(entry.text.length>120?'...':'')+'</div>':
-      '<div style="font-size:0.85em;color:var(--t3);padding:8px 0;cursor:pointer" onclick="saveTodayDiaryAndOpen(\''+t+'\')">✏️ 오늘 감사한 것을 적어요...</div>')+
+      '<button class="btn bg bsm" onclick="go(\'diary\')">전체 →</button></div>'+
+      '<textarea id="today-diary-ta" class="ta" style="min-height:90px;font-size:0.9em;resize:none" placeholder="오늘 감사한 것을 적어요..." onblur="saveTodayDiaryDirect(\''+t+'\',this.value)">'+( entry.text||'')+'</textarea>'+
       '</div>'
   };
 
@@ -1076,17 +1074,26 @@ function setCardSpan(card,span){
   });
 }
 
+const _dragInitialized = new WeakSet();
+
 function initDrag(container, itemSelector, onReorder){
   const items=container.querySelectorAll(itemSelector);
   items.forEach(function(item){
-    // draggable은 핸들에서만 true로 설정
+    // 이미 초기화된 아이템은 스킵
+    if(_dragInitialized.has(item)) return;
+    _dragInitialized.add(item);
+
     item.draggable=false;
     const handle=item.querySelector('.drag-handle');
+
+    function onMouseDown(){item.draggable=true;}
+    function onMouseLeave(){if(!_drag.el)item.draggable=false;}
+
     if(handle){
-      handle.addEventListener('mousedown',function(){item.draggable=true;});
-      handle.addEventListener('mouseleave',function(){if(!_drag.el)item.draggable=false;});
+      handle.addEventListener('mousedown',onMouseDown);
+      handle.addEventListener('mouseleave',onMouseLeave);
     } else {
-      item.draggable=true; // 핸들 없으면 전체 드래그
+      item.draggable=true;
     }
 
     item.addEventListener('dragstart',function(e){
@@ -1100,7 +1107,7 @@ function initDrag(container, itemSelector, onReorder){
     });
     item.addEventListener('dragend',function(){
       item.style.opacity='';
-      item.draggable=false;
+      item.draggable=!!(!handle); // 핸들 있으면 false, 없으면 true 유지
       _drag.el=null;
       _drag.container=null;
       container.querySelectorAll(itemSelector).forEach(function(i){i.classList.remove('drag-over');});
@@ -1108,7 +1115,7 @@ function initDrag(container, itemSelector, onReorder){
     item.addEventListener('dragover',function(e){
       e.preventDefault();
       e.stopPropagation();
-      if(!_drag.el||_drag.el===item||_drag.container!==container)return;
+      if(!_drag.el||_drag.el===item||_drag.container!==container) return;
       item.classList.add('drag-over');
       const rect=item.getBoundingClientRect();
       const isGrid=getComputedStyle(container).display==='grid';
@@ -1129,7 +1136,7 @@ function initDrag(container, itemSelector, onReorder){
 }
 
 function initDragAll(){
-  // Today 카드들 (루틴 제외 오른쪽)
+  // Today 카드들
   const todayRight=document.querySelector('.today-right-drag');
   if(todayRight){
     initDrag(todayRight,'.today-drag-card',function(c){
@@ -1138,8 +1145,7 @@ function initDragAll(){
     });
   }
   // 태스크 드래그
-  const tkContainers=document.querySelectorAll('.task-drag-container');
-  tkContainers.forEach(function(tc){
+  document.querySelectorAll('.task-drag-container').forEach(function(tc){
     const pid=tc.dataset.pid;
     initDrag(tc,'.task-drag-item',function(c){
       const p=S.projects.find(x=>x.id===pid); if(!p)return;
@@ -1149,15 +1155,22 @@ function initDragAll(){
     });
   });
   // 나의 라이프 프로젝트 드래그
-  const lifeContainers=document.querySelectorAll('.life-proj-drag');
-  lifeContainers.forEach(function(lc){
+  document.querySelectorAll('.life-proj-drag').forEach(function(lc){
     const areaId=lc.dataset.areaId;
     initDrag(lc,'.life-proj-item',function(c){
       const ids=[...c.querySelectorAll('.life-proj-item')].map(function(el){return el.dataset.pid;});
-      // 해당 area 프로젝트 순서 재정렬
       const others=S.projects.filter(function(p){return p.lifeAreaId!==areaId;});
       const reordered=ids.map(function(id){return S.projects.find(function(p){return p.id===id;});}).filter(Boolean);
       S.projects=[...others,...reordered];
+      save(); render();
+    });
+  });
+  // 프로젝트 목록 드래그
+  document.querySelectorAll('.life-proj-drag[data-area-id="all"]').forEach(function(pg){
+    initDrag(pg,'.life-proj-item',function(c){
+      const ids=[...c.querySelectorAll('.life-proj-item')].map(function(el){return el.dataset.pid;});
+      S.projects=ids.map(function(id){return S.projects.find(function(p){return p.id===id;});}).filter(Boolean)
+        .concat(S.projects.filter(function(p){return !ids.includes(p.id);}));
       save(); render();
     });
   });
@@ -1183,6 +1196,7 @@ function addTodoInline(ds,inputId){
   const el=document.getElementById(inputId);
   if(!el||!el.value.trim())return;
   const text=el.value.trim();
+  el.value='';
   const t=todStr();
   const isTmr=(ds!==t);
   if(isTmr){
@@ -1195,6 +1209,11 @@ function addTodoInline(ds,inputId){
     S.todoList[ds].push({id:gid(),text,done:false});
   }
   save();render();
+  // 렌더 후 같은 입력창에 포커스 복원
+  setTimeout(function(){
+    var newEl=document.getElementById(inputId);
+    if(newEl)newEl.focus();
+  },50);
 }
 function togTodoItem(ds,i){
   const t=todStr();
@@ -1206,7 +1225,22 @@ function togTodoItem(ds,i){
     if(!S.todoList||!S.todoList[ds])return;
     S.todoList[ds][i].done=!S.todoList[ds][i].done;
   }
-  save();render();
+  save();
+  // DOM만 업데이트 (깜빡임 방지)
+  const list=isTmr?S.todoListTmr[t]:S.todoList[ds];
+  const item=list[i];
+  // 해당 체크박스 찾기 - onclick 속성으로 찾기
+  const allBoxes=document.querySelectorAll('[onclick*="togTodoItem"]');
+  allBoxes.forEach(function(box){
+    const attr=box.getAttribute('onclick')||'';
+    if(attr.includes('\''+ds+'\'')&&attr.includes(','+i+')')){
+      box.style.background=item.done?'var(--green)':'transparent';
+      box.style.borderColor=item.done?'var(--green)':'var(--border2)';
+      box.innerHTML=item.done?'<span style="color:#fff;font-size:0.6em">✓</span>':'';
+      const textDiv=box.parentElement.querySelector('[style*="font-size:0.9em"]');
+      if(textDiv)textDiv.style.textDecoration=item.done?'line-through':'';
+    }
+  });
 }
 function delTodoItem(ds,i){
   const t=todStr();
@@ -1754,6 +1788,12 @@ function setDiaryWeather(ds, weather){
   } else {
     render();
   }
+}
+function saveTodayDiaryDirect(ds, text){
+  if(!S.diaryEntries) S.diaryEntries={};
+  if(!S.diaryEntries[ds]) S.diaryEntries[ds]={text:'',mood:'',weather:''};
+  S.diaryEntries[ds].text=text;
+  save();
 }
 function saveTodayDiary(ds){
   const ta=document.getElementById('today-diary-ta');

@@ -420,7 +420,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 <div class="sb" id="sb">
   <div class="sb-head">
     <div class="logo"><div class="logo-dot"></div>Lucy's Space</div>
-    <div class="logo-sub" id="sb-date"></div>
+    <div class="logo-sub" id="sb-date" style="display:none"></div>
   </div>
   <div class="sb-sc">
     <div class="sb-sec">
@@ -932,7 +932,9 @@ function renderToday(){
       '<div style="display:flex;align-items:center;gap:8px;padding-top:8px">'+
         '<div style="width:16px;height:16px;border-radius:4px;border:1.5px dashed var(--border2);flex-shrink:0"></div>'+
         '<input id="todo-inp-'+safeDs+'" class="inp" style="flex:1;padding:5px 8px;font-size:0.9em;background:transparent;border-color:transparent;border-bottom:1px solid var(--border);border-radius:0" placeholder="할 일 추가 후 Enter..." '+
-        'onkeydown="if(event.key===\'Enter\'||event.keyCode===13){addTodoInline(\''+ds+'\',\'todo-inp-'+safeDs+'\');event.preventDefault();event.stopPropagation();}">'+
+        'onmousedown="event.stopPropagation()" '+
+        'ondragstart="event.preventDefault();event.stopPropagation()" '+
+        'onkeydown="event.stopPropagation();if(event.key===\'Enter\'||event.keyCode===13){addTodoInline(\''+ds+'\',\'todo-inp-'+safeDs+'\');event.preventDefault();}">'+
       '</div>'+
     '</div>';
   }
@@ -958,7 +960,7 @@ function renderToday(){
       '<div class="stat"><div class="sl">저축 달성</div><div class="sv">'+spct+'%</div><div class="pw" style="margin-top:6px"><div class="pb" style="width:'+spct+'%;background:var(--accent)"></div></div><div class="ss">'+money(S.savings.current)+'</div></div>'+
       '</div>',
     'monthly-goal':'<div class="card" style="margin-bottom:0;height:100%">'+
-      '<div class="ch"><div class="ct">🎯 '+curMonthName+' 목표</div><button class="btn bg bsm" onclick="go(\'calendar\')">전체 →</button></div>'+
+      '<div class="ch"><div class="ct">🎯 '+curMonthName+' 목표</div></div>'+
       (monthGoals.length===0?'<div style="font-size:0.85em;color:var(--t3)">목표가 없어요</div>':
         '<div style="display:flex;flex-direction:column;gap:5px">'+monthGoals.slice(0,4).map(function(g,i){
           return '<div style="display:flex;align-items:center;gap:7px;font-size:0.88em">'+
@@ -969,7 +971,7 @@ function renderToday(){
         '</div>')+
       '</div>',
     'deadlines':'<div class="card" style="margin-bottom:0;height:100%">'+
-      '<div class="ch"><div class="ct">🚨 이번 주 마감</div><button class="btn bg bsm" onclick="go(\'deadlines\')">전체 →</button></div>'+
+      '<div class="ch"><div class="ct">🚨 이번 주 마감</div></div>'+
       (upcoming.length===0?'<div style="font-size:0.85em;color:var(--t3)">마감 없음 🎉</div>':
         upcoming.slice(0,4).map(function(d){var f=fmtDateObj(d.date),dd=dLeft(d.date);
           return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">'+
@@ -981,7 +983,7 @@ function renderToday(){
     'todo-today':renderTodoList(todayItems,t,'✅ 오늘 할 일'),
     'todo-tmr':renderTodoList(tmrItems,tmr,'📋 내일 할 일'),
     'projects':S.projects.length>0?
-      '<div class="card" style="margin-bottom:0"><div class="ch"><div class="ct">🗂️ 진행 중 프로젝트</div><button class="btn bg bsm" onclick="go(\'projects\')">전체 →</button></div>'+
+      '<div class="card" style="margin-bottom:0"><div class="ch"><div class="ct">🗂️ 진행 중 프로젝트</div></div>'+
       '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">'+
       S.projects.slice(0,6).map(function(p){var tk=p.tasks||[],dn=tk.filter(function(t2){return t2.done;}).length,pc=tk.length?Math.round(dn/tk.length*100):0;
         return '<div onclick="go(\'projects\',\''+p.id+'\')" style="cursor:pointer;border:1px solid var(--border);border-radius:10px;padding:12px;transition:box-shadow .2s" onmouseenter="this.style.boxShadow=\'var(--shm)\'" onmouseleave="this.style.boxShadow=\'none\'">'+
@@ -990,9 +992,8 @@ function renderToday(){
           '<div class="pl" style="margin-top:3px"><span>'+dn+'/'+tk.length+'</span><span>'+pc+'%</span></div></div>';
       }).join('')+'</div></div>':'',
     'diary':'<div class="card" style="border:1.5px solid var(--al)">'+
-      '<div class="ch" style="margin-bottom:10px"><div class="ct">✨ 오늘의 감사 일기</div>'+
-      '<button class="btn bg bsm" onclick="go(\'diary\')">전체 →</button></div>'+
-      '<textarea id="today-diary-ta" class="ta" style="min-height:90px;font-size:0.9em;resize:none" placeholder="오늘 감사한 것을 적어요..." onblur="saveTodayDiaryDirect(\''+t+'\',this.value)">'+( entry.text||'')+'</textarea>'+
+      '<div class="ch" style="margin-bottom:10px"><div class="ct">✨ 오늘의 감사 일기</div></div>'+
+      '<textarea id="today-diary-ta" class="ta" style="min-height:90px;font-size:0.9em;resize:none;background:transparent;border:none;padding:0;outline:none" placeholder="오늘 감사한 것을 적어요..." onblur="saveTodayDiaryDirect(\''+t+'\',this.value)">'+( entry.text||'')+'</textarea>'+
       '</div>'
   };
 
@@ -1194,26 +1195,35 @@ function addTodoItem(ds){
 }
 function addTodoInline(ds,inputId){
   const el=document.getElementById(inputId);
-  if(!el||!el.value.trim())return;
+  if(!el)return;
   const text=el.value.trim();
+  if(!text)return;
   el.value='';
   const t=todStr();
   const isTmr=(ds!==t);
+  const newItem={id:gid(),text,done:false};
   if(isTmr){
     if(!S.todoListTmr)S.todoListTmr={};
     if(!S.todoListTmr[t])S.todoListTmr[t]=[];
-    S.todoListTmr[t].push({id:gid(),text,done:false});
+    S.todoListTmr[t].push(newItem);
   } else {
     if(!S.todoList)S.todoList={};
     if(!S.todoList[ds])S.todoList[ds]=[];
-    S.todoList[ds].push({id:gid(),text,done:false});
+    S.todoList[ds].push(newItem);
   }
-  save();render();
-  // 렌더 후 같은 입력창에 포커스 복원
-  setTimeout(function(){
-    var newEl=document.getElementById(inputId);
-    if(newEl)newEl.focus();
-  },50);
+  save();
+  // input 컨테이너 앞에 새 항목 DOM 직접 추가
+  const row=document.createElement('div');
+  row.style.cssText='display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)';
+  row.innerHTML=
+    '<div style="width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border2);background:transparent;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center"></div>'+
+    '<div style="flex:1;font-size:0.9em">'+text+'</div>'+
+    '<button style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:0.8em;padding:0">✕</button>';
+  const inputRow=el.closest('div');
+  if(inputRow&&inputRow.parentElement) inputRow.parentElement.insertBefore(row,inputRow);
+  el.focus();
+  // 백그라운드에서 render (체크/삭제 기능 복원)
+  setTimeout(function(){render();},100);
 }
 function togTodoItem(ds,i){
   const t=todStr();

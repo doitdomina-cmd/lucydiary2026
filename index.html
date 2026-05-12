@@ -426,7 +426,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <div class="sb-sec">
       <div class="sb-lbl">메인</div>
       <button class="nav on" id="nav-today" onclick="go('today')"><span class="nav-ic"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#F5C842"></span></span>Today<span class="nav-bd" id="today-bd" style="display:none"></span></button>
-      <button class="nav" id="nav-calendar" onclick="go('calendar')"><span class="nav-ic"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#61C0BF"></span></span>캘린더</button>
+      <button class="nav" id="nav-calendar" onclick="go('calendar')"><span class="nav-ic"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#61C0BF"></span></span>Monthly</button>
       <button class="nav" id="nav-diary" onclick="go('diary')"><span class="nav-ic"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#B2B0E8"></span></span>Thanks Diary</button>
       <button class="nav" id="nav-deadlines" onclick="go('deadlines')"><span class="nav-ic"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#E07070"></span></span>마감 관리</button>
       <button class="nav" id="nav-ledger" onclick="go('ledger')"><span class="nav-ic"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#7CB9A8"></span></span>가계부</button>
@@ -779,6 +779,17 @@ function render(){
     });
     // 드래그 초기화
     initDragAll();
+    // 투두 입력창 이벤트 바인딩 (draggable 버그 우회)
+    document.querySelectorAll('[data-todo-input="1"]').forEach(function(inp){
+      inp.addEventListener('keydown',function(e){
+        e.stopPropagation();
+        if(e.key==='Enter'||e.keyCode===13){
+          e.preventDefault();
+          var ds=inp.dataset.ds;
+          addTodoInline(ds, inp.id);
+        }
+      });
+    });
     // 편집 모드 상태 복원 (render 후 재활성화)
     if(page==='today'){
       var _wasEdit=todayEditMode;
@@ -931,10 +942,7 @@ function renderToday(){
         }).join(''))+
       '<div style="display:flex;align-items:center;gap:8px;padding-top:8px">'+
         '<div style="width:16px;height:16px;border-radius:4px;border:1.5px dashed var(--border2);flex-shrink:0"></div>'+
-        '<input id="todo-inp-'+safeDs+'" class="inp" style="flex:1;padding:5px 8px;font-size:0.9em;background:transparent;border-color:transparent;border-bottom:1px solid var(--border);border-radius:0" placeholder="할 일 추가 후 Enter..." '+
-        'onmousedown="event.stopPropagation()" '+
-        'ondragstart="event.preventDefault();event.stopPropagation()" '+
-        'onkeydown="event.stopPropagation();if(event.key===\'Enter\'||event.keyCode===13){addTodoInline(\''+ds+'\',\'todo-inp-'+safeDs+'\');event.preventDefault();}">'+
+        '<input id="todo-inp-'+safeDs+'" class="inp" style="flex:1;padding:5px 8px;font-size:0.9em;background:transparent;border-color:transparent;border-bottom:1px solid var(--border);border-radius:0" placeholder="할 일 추가 후 Enter..." data-ds="'+ds+'" data-todo-input="1">'+
       '</div>'+
     '</div>';
   }
@@ -1155,7 +1163,7 @@ function initDragAll(){
       save();
     });
   });
-  // 나의 라이프 프로젝트 드래그
+  // 나의 라이프 프로젝트 드래그 (life area 카드 안)
   document.querySelectorAll('.life-proj-drag').forEach(function(lc){
     const areaId=lc.dataset.areaId;
     initDrag(lc,'.life-proj-item',function(c){
@@ -1166,12 +1174,13 @@ function initDragAll(){
       save(); render();
     });
   });
-  // 프로젝트 목록 드래그
-  document.querySelectorAll('.life-proj-drag[data-area-id="all"]').forEach(function(pg){
-    initDrag(pg,'.life-proj-item',function(c){
-      const ids=[...c.querySelectorAll('.life-proj-item')].map(function(el){return el.dataset.pid;});
-      S.projects=ids.map(function(id){return S.projects.find(function(p){return p.id===id;});}).filter(Boolean)
-        .concat(S.projects.filter(function(p){return !ids.includes(p.id);}));
+  // 프로젝트 그리드 드래그 (별도 클래스)
+  document.querySelectorAll('.pj-drag-grid').forEach(function(pg){
+    initDrag(pg,'.pj-drag-item',function(c){
+      const ids=[...c.querySelectorAll('.pj-drag-item')].map(function(el){return el.dataset.pid;});
+      const reordered=ids.map(function(id){return S.projects.find(function(p){return p.id===id;});}).filter(Boolean);
+      const rest=S.projects.filter(function(p){return !ids.includes(p.id);});
+      S.projects=[...reordered,...rest];
       save(); render();
     });
   });
@@ -1201,29 +1210,21 @@ function addTodoInline(ds,inputId){
   el.value='';
   const t=todStr();
   const isTmr=(ds!==t);
-  const newItem={id:gid(),text,done:false};
   if(isTmr){
     if(!S.todoListTmr)S.todoListTmr={};
     if(!S.todoListTmr[t])S.todoListTmr[t]=[];
-    S.todoListTmr[t].push(newItem);
+    S.todoListTmr[t].push({id:gid(),text,done:false});
   } else {
     if(!S.todoList)S.todoList={};
     if(!S.todoList[ds])S.todoList[ds]=[];
-    S.todoList[ds].push(newItem);
+    S.todoList[ds].push({id:gid(),text,done:false});
   }
   save();
-  // input 컨테이너 앞에 새 항목 DOM 직접 추가
-  const row=document.createElement('div');
-  row.style.cssText='display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)';
-  row.innerHTML=
-    '<div style="width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border2);background:transparent;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center"></div>'+
-    '<div style="flex:1;font-size:0.9em">'+text+'</div>'+
-    '<button style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:0.8em;padding:0">✕</button>';
-  const inputRow=el.closest('div');
-  if(inputRow&&inputRow.parentElement) inputRow.parentElement.insertBefore(row,inputRow);
-  el.focus();
-  // 백그라운드에서 render (체크/삭제 기능 복원)
-  setTimeout(function(){render();},100);
+  render();
+  setTimeout(function(){
+    var inp=document.getElementById(inputId);
+    if(inp)inp.focus();
+  },50);
 }
 function togTodoItem(ds,i){
   const t=todStr();
@@ -1944,7 +1945,7 @@ function renderProjects(){
   html+='<button class="btn bp bsm" onclick="openPjModal()" style="margin-left:auto">+ 새 프로젝트</button></div>';
   if(filtered.length===0){html+='<div class="empty" style="padding:60px"><div class="ei">🗂️</div>'+(pjFilter?'이 영역의 프로젝트가 없어요':'첫 프로젝트를 만들어 보세요!')+'</div>';}
   else{
-  html+='<div class="pj-grid life-proj-drag" data-area-id="all">';
+  html+='<div class="pj-grid pj-drag-grid" data-area-id="all">';
     filtered.forEach(p=>{
       const tk=p.tasks||[],dn=tk.filter(t=>t.done).length,pc=tk.length?Math.round(dn/tk.length*100):0;
       const ud=S.deadlines.filter(d=>d.projectId===p.id).sort((a,b)=>a.date.localeCompare(b.date))[0];
@@ -2593,7 +2594,7 @@ function renderCalendar(){
   return ''+  
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'+
       '<button class="btn bg bsm" onclick="calY--;render()">← '+(calY-1)+'</button>'+
-      '<div style="font-family:var(--serif);font-size:1.8em !important;font-weight:700 !important">'+calY+'년</div>'+
+      '<div style="font-family:var(--serif);font-size:1.8em !important;font-weight:700 !important">'+calY+'</div>'+
       '<button class="btn bg bsm" onclick="calY++;render()">'+(calY+1)+' →</button>'+
     '</div>'+
     monthCards+

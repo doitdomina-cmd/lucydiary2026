@@ -554,6 +554,11 @@ function hideLoginScreen() {
   wrap.style.height = '100vh';
   wrap.style.width = '100%';
   wrap.style.overflow = 'hidden';
+  // 모바일 어두운 오버레이 제거
+  const sbOv = document.getElementById('sb-ov');
+  if(sbOv) sbOv.style.display = 'none';
+  const sb = document.getElementById('sb');
+  if(sb) sb.classList.remove('open');
 }
 
 function signInWithGoogle() {
@@ -676,8 +681,21 @@ function go(p, pid){
   const hideTopbarPages=['ledger','today','calendar','diary','deadlines'];
   if(hideTopbarPages.includes(p)){
     if(topbar)topbar.style.display='none';
+    // 모바일용 플로팅 햄버거 버튼 표시
+    let fhbg=document.getElementById('float-hbg');
+    if(!fhbg){
+      fhbg=document.createElement('button');
+      fhbg.id='float-hbg';
+      fhbg.onclick=toggleSB;
+      fhbg.textContent='☰';
+      fhbg.style.cssText='display:none;position:fixed;top:12px;left:12px;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:1.1em;cursor:pointer;box-shadow:var(--sh)';
+      document.body.appendChild(fhbg);
+    }
+    fhbg.style.display='';
   } else {
     if(topbar)topbar.style.display='';
+    const fhbg=document.getElementById('float-hbg');
+    if(fhbg)fhbg.style.display='none';
     if(pid){
       const proj=S.projects.find(x=>x.id===pid)||{name:'프로젝트'};
       const area=(S.lifeAreas||[]).find(a=>a.id===proj.lifeAreaId);
@@ -759,8 +777,9 @@ function render(){
     initDragAll();
     // 편집 모드 상태 복원
     if(todayEditMode&&page==='today'){
-      todayEditMode=false; // reset so toggleTodayEdit activates it
-      setTimeout(toggleTodayEdit,10);
+      var _prev=todayEditMode;
+      todayEditMode=false;
+      if(_prev) setTimeout(function(){toggleTodayEdit();},50);
     }
   },0);
 }
@@ -1008,9 +1027,17 @@ function renderToday(){
             return '<span onclick="setDiaryWeather(\''+t+'\',\''+w+'\')" style="cursor:pointer;font-size:1.1em;opacity:'+(sel?'1':'0.3')+';transition:all .15s;display:inline-block">'+w+'</span>';
           }).join('');
           return '<div class="card" style="border:1.5px solid var(--al)">'+
-            '<div class="ch" style="margin-bottom:10px"><div class="ct">✨ 오늘의 감사 일기</div><button class="btn bg bsm" onclick="go(\'diary\')">전체 →</button></div>'+
-            '<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center"><span style="font-size:0.75em;color:var(--t3);margin-right:2px">기분</span>'+moodBar+'</div>'+
-            '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center"><span style="font-size:0.75em;color:var(--t3);margin-right:2px">날씨</span>'+weatherBar+'</div>'+
+            '<div class="ch" style="margin-bottom:10px">'+
+              '<div class="ct">✨ 오늘의 감사 일기</div>'+
+              '<div style="display:flex;gap:6px">'+
+                '<button class="btn bp bsm" onclick="openDiaryModal(\''+t+'\')">✏️ 작성</button>'+
+                '<button class="btn bg bsm" onclick="go(\'diary\')">전체 →</button>'+
+              '</div>'+
+            '</div>'+
+            '<div style="display:flex;gap:10px;margin-bottom:10px;align-items:center;flex-wrap:wrap">'+
+              '<span style="font-size:0.75em;color:var(--t3)">기분</span>'+moodBar+
+              '<span style="font-size:0.75em;color:var(--t3);margin-left:6px">날씨</span>'+weatherBar+
+            '</div>'+
             '<textarea id="today-diary-ta" class="ta" style="min-height:80px;font-size:0.9em;resize:none" placeholder="오늘 감사한 것을 적어요...">'+( entry.text||'')+'</textarea>'+
             '<button class="btn bp bsm" style="margin-top:8px;width:100%" onclick="saveTodayDiary(\''+t+'\')">저장</button>'+
           '</div>';
@@ -1223,7 +1250,7 @@ function renderRoutinePage(){
     S.routines.forEach((r,i)=>{
       const dayLabels=(!r.days||r.days.length===0)?'매일':r.days.map(d=>DOW_KO[DOWS.indexOf(d)]).join('·');
       const isCur=r.time<=nowT&&(i===S.routines.length-1||S.routines[i+1].time>nowT);
-      html+='<div class="ci" style="'+(isCur?'border-left:2px solid var(--red);padding-left:8px;background:var(--rl);border-radius:0 6px 6px 0':'')+'">'+
+      html+='<div class="ci" style="'+(isCur?'border-left:2px solid var(--accent);padding-left:8px;background:var(--al);border-radius:0 6px 6px 0':'')+'">'+
         '<div style="flex:1">'+
           '<div style="display:flex;align-items:center;gap:8px"><span style="font-size:0.8571em;color:var(--rc-header);font-weight:600;font-family:var(--mono)">'+r.time+'</span>'+
           '<span style="font-size:0.9643em;font-weight:500">'+r.task+'</span>'+
@@ -2419,14 +2446,14 @@ function renderCalendar(){
   const ts=todStr();
   const ym=calY+'-'+String(calM+1).padStart(2,'0');
 
-  var monthCards='<div style="display:grid;grid-template-columns:repeat(12,1fr);gap:4px;margin-bottom:14px">';
+  var monthCards='<div style="display:flex;gap:4px;margin-bottom:14px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px">';
   for(var m=0;m<12;m++){
     var isCur=m===calM;
     var key=calY+'-'+String(m+1).padStart(2,'0');
     var evCount=(S.calEvents||[]).filter(e=>e.date.startsWith(key)).length;
     var dlCount=(S.deadlines||[]).filter(d=>d.date.startsWith(key)).length;
     monthCards+='<div data-m="'+m+'" onclick="calM=parseInt(this.dataset.m);render()" style="'+
-      'border-radius:8px;padding:7px 4px;cursor:pointer;text-align:center;'+
+      'flex-shrink:0;min-width:52px;border-radius:8px;padding:7px 4px;cursor:pointer;text-align:center;'+
       'background:'+(isCur?'var(--accent)':'var(--surface)')+';'+
       'border:1.5px solid '+(isCur?'var(--accent)':'var(--border)')+';transition:all .2s">'+
       '<div style="font-size:0.8em;font-weight:600;color:'+(isCur?'#fff':'var(--accent)')+'">'+MN[m]+'</div>'+

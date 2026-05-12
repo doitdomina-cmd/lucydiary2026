@@ -669,7 +669,7 @@ let activePid = null;
 let pjFilter = '';
 let viewDate = todStr();
 
-const titles = {today:'Today',diary:'Thanks Diary',calendar:'캘린더',routine:'루틴 설정',life:'나의 라이프',projects:'프로젝트',deadlines:'마감 관리',savings:'저축 목표',settings:'설정',ledger:'가계부'};
+const titles = {today:'Today',diary:'Thanks Diary',calendar:'Monthly',routine:'루틴 설정',life:'나의 라이프',projects:'프로젝트',deadlines:'마감 관리',savings:'저축 목표',settings:'설정',ledger:'가계부'};
 
 function go(p, pid){
   page=p; activePid=pid||null; if(p!=='projects') pjFilter='';
@@ -937,7 +937,12 @@ function renderToday(){
     : '';
   return goalBar+
     '<div style="display:flex;justify-content:flex-end;margin-bottom:8px">'+
-      '<button id="today-lock-btn" onclick="toggleTodayEdit()" title="레이아웃 편집" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:1.1em;opacity:0.35;transition:all .2s;padding:4px 6px;border-radius:6px" onmouseover="this.style.opacity=\'1\'" onmouseout="this.style.opacity=todayEditMode?\'1\':\'0.35\'">🔒</button>'+
+      '<button id="today-lock-btn" onclick="toggleTodayEdit()" title="레이아웃 편집" style="background:none;border:none;cursor:pointer;padding:6px;border-radius:8px;transition:all .2s;opacity:0.3" onmouseover="this.style.opacity=\'1\'" onmouseout="this.style.opacity=todayEditMode?\'1\':\'0.3\'">'+
+        '<svg id="today-lock-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+
+          '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>'+
+          '<path d="M7 11V7a5 5 0 0 1 10 0v4"></path>'+
+        '</svg>'+
+      '</button>'+
     '</div>'+
     '<div class="today-wrap">'+
     '<div>'+routineCard(viewDate)+'</div>'+
@@ -1030,7 +1035,7 @@ function renderToday(){
             '<div class="ch" style="margin-bottom:10px">'+
               '<div class="ct">✨ 오늘의 감사 일기</div>'+
               '<div style="display:flex;gap:6px">'+
-                '<button class="btn bp bsm" onclick="openDiaryModal(\''+t+'\')">✏️ 작성</button>'+
+                '<button class="btn bp bsm" onclick="saveTodayDiaryAndOpen(\''+t+'\')">✏️ 작성 · 저장</button>'+
                 '<button class="btn bg bsm" onclick="go(\'diary\')">전체 →</button>'+
               '</div>'+
             '</div>'+
@@ -1038,8 +1043,12 @@ function renderToday(){
               '<span style="font-size:0.75em;color:var(--t3)">기분</span>'+moodBar+
               '<span style="font-size:0.75em;color:var(--t3);margin-left:6px">날씨</span>'+weatherBar+
             '</div>'+
-            '<textarea id="today-diary-ta" class="ta" style="min-height:80px;font-size:0.9em;resize:none" placeholder="오늘 감사한 것을 적어요...">'+( entry.text||'')+'</textarea>'+
-            '<button class="btn bp bsm" style="margin-top:8px;width:100%" onclick="saveTodayDiary(\''+t+'\')">저장</button>'+
+            (entry.text?
+              '<div style="font-size:0.88em;color:var(--t2);background:var(--s2);border-radius:8px;padding:10px 12px;line-height:1.7;white-space:pre-wrap;cursor:pointer;margin-bottom:8px" onclick="saveTodayDiaryAndOpen(\''+t+'\')">'+
+                entry.text.slice(0,120)+(entry.text.length>120?'...':'')+
+              '</div>':
+              '<div style="font-size:0.85em;color:var(--t3);padding:8px 0;cursor:pointer" onclick="saveTodayDiaryAndOpen(\''+t+'\')">✏️ 오늘 감사한 것을 적어요...</div>'
+            )+
           '</div>';
         })()+
       '</div>'+
@@ -1059,7 +1068,9 @@ function toggleTodayEdit(){
   const grid=document.getElementById('today-grid');
   if(!btn||!grid)return;
   if(todayEditMode){
-    btn.textContent='🔓';btn.style.opacity='1';btn.title='편집 중 — 클릭해서 잠금';
+    btn.style.opacity='1';btn.title='편집 중 — 클릭해서 잠금';
+    // 열린 자물쇠 SVG
+    btn.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>';
     grid.style.outline='2px dashed var(--accent)40';grid.style.outlineOffset='6px';
     grid.querySelectorAll('.today-drag-card').forEach(function(card){
       card.draggable=true;card.style.cursor='grab';
@@ -1081,7 +1092,9 @@ function toggleTodayEdit(){
     });
     initDragAll();
   } else {
-    btn.textContent='🔒';btn.style.opacity='0.35';btn.title='레이아웃 편집';
+    btn.style.opacity='0.35';btn.title='레이아웃 편집';
+    // 닫힌 자물쇠 SVG
+    btn.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>';
     grid.style.outline='';grid.style.outlineOffset='';
     grid.querySelectorAll('.span-btns').forEach(function(b){b.remove();});
     grid.querySelectorAll('.today-drag-card').forEach(function(c){c.draggable=false;c.style.cursor='';});
@@ -1594,17 +1607,17 @@ const MN_D=['January','February','March','April','May','June','July','August','S
 
 function renderDiary(){
   const ts=todStr();
-  var monthCards='<div style="display:grid;grid-template-columns:repeat(12,1fr);gap:6px;margin-bottom:20px">';
+  var monthCards='<div style="display:flex;gap:4px;margin-bottom:20px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px">';
   for(var m=0;m<12;m++){
     var isCur=m===diaryM;
     var key=diaryY+'-'+String(m+1).padStart(2,'0');
     var cnt=Object.keys(S.diaryEntries||{}).filter(k=>k.startsWith(key)&&(S.diaryEntries[k].text||S.diaryEntries[k].mood)).length;
     monthCards+='<div data-m="'+m+'" onclick="diaryM=parseInt(this.dataset.m);render()" style="'+
-      'border-radius:8px;padding:7px 4px;cursor:pointer;text-align:center;'+
+      'flex-shrink:0;min-width:72px;border-radius:10px;padding:9px 6px;cursor:pointer;text-align:center;'+
       'background:'+(isCur?'var(--accent)':'var(--surface)')+';'+
       'border:1.5px solid '+(isCur?'var(--accent)':'var(--border)')+';transition:all .2s">'+
-      '<div style="font-size:0.8em;font-weight:600;color:'+(isCur?'#fff':'var(--accent)')+'">'+MN_D[m].slice(0,3)+'</div>'+
-      (cnt?'<div style="font-size:0.6em;color:'+(isCur?'rgba(255,255,255,.7)':'var(--t3)')+'">'+cnt+'일</div>':'<div style="height:0.6em"></div>')+
+      '<div style="font-size:16px !important;font-weight:900 !important;color:'+(isCur?'#fff':'var(--accent)')+'">'+MN_D[m].slice(0,3)+'</div>'+
+      (cnt?'<div style="font-size:11px !important;font-weight:400 !important;color:'+(isCur?'rgba(255,255,255,.7)':'var(--t3)')+'">'+cnt+'일</div>':'<div style="height:14px"></div>')+
     '</div>';
   }
   monthCards+='</div>';
@@ -1770,6 +1783,10 @@ function saveTodayDiary(ds){
   if(!S.diaryEntries[ds]) S.diaryEntries[ds]={text:'',mood:'',weather:''};
   S.diaryEntries[ds].text=ta.value;
   save(); render();
+}
+function saveTodayDiaryAndOpen(ds){
+  // 바로 Thanks Diary 모달 열기
+  openDiaryModal(ds);
 }
 function saveDiaryFromModal(ds){
   var ta=document.getElementById('diary-ta'),ti=document.getElementById('diary-title-inp');
@@ -2446,20 +2463,20 @@ function renderCalendar(){
   const ts=todStr();
   const ym=calY+'-'+String(calM+1).padStart(2,'0');
 
-  var monthCards='<div style="display:flex;gap:4px;margin-bottom:14px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px">';
+  var monthCards='<div style="display:grid;grid-template-columns:repeat(12,1fr);gap:4px;margin-bottom:14px">';
   for(var m=0;m<12;m++){
     var isCur=m===calM;
     var key=calY+'-'+String(m+1).padStart(2,'0');
     var evCount=(S.calEvents||[]).filter(e=>e.date.startsWith(key)).length;
     var dlCount=(S.deadlines||[]).filter(d=>d.date.startsWith(key)).length;
     monthCards+='<div data-m="'+m+'" onclick="calM=parseInt(this.dataset.m);render()" style="'+
-      'flex-shrink:0;min-width:52px;border-radius:8px;padding:7px 4px;cursor:pointer;text-align:center;'+
+      'border-radius:10px;padding:9px 4px;cursor:pointer;text-align:center;'+
       'background:'+(isCur?'var(--accent)':'var(--surface)')+';'+
       'border:1.5px solid '+(isCur?'var(--accent)':'var(--border)')+';transition:all .2s">'+
-      '<div style="font-size:0.8em;font-weight:600;color:'+(isCur?'#fff':'var(--accent)')+'">'+MN[m]+'</div>'+
-      (dlCount?'<div style="font-size:0.6em;color:'+(isCur?'rgba(255,255,255,.7)':'var(--t3)')+'">🚨'+dlCount+'</div>':
-       evCount?'<div style="font-size:0.6em;color:'+(isCur?'rgba(255,255,255,.7)':'var(--t3)')+'">·'+evCount+'</div>':
-       '<div style="height:0.9em"></div>')+
+      '<div style="font-size:16px !important;font-weight:900 !important;color:'+(isCur?'#fff':'var(--accent)')+'">'+MN[m]+'</div>'+
+      (dlCount?'<div style="font-size:11px !important;font-weight:400 !important;color:'+(isCur?'rgba(255,255,255,.7)':'var(--t3)')+'">🚨'+dlCount+'</div>':
+       evCount?'<div style="font-size:11px !important;font-weight:400 !important;color:'+(isCur?'rgba(255,255,255,.7)':'var(--t3)')+'">·'+evCount+'</div>':
+       '<div style="height:14px"></div>')+
     '</div>';
   }
   monthCards+='</div>';
@@ -2494,7 +2511,7 @@ function renderCalendar(){
     var isT=ds===ts;
     var evs=evMap[ds]||[];
     calHtml+='<div class="cal-cell" data-ds="'+ds+'" style="'+
-      'min-height:88px;padding:6px 8px;'+
+      'min-height:100px;padding:6px 8px;'+
       'border-right:'+(ci===6?'none':'1px solid var(--border)')+';'+
       'border-bottom:'+(ri===5?'none':'1px solid var(--border)')+';'+
       'background:'+(isT?'var(--accent)15':'transparent')+'">'+
@@ -2505,10 +2522,10 @@ function renderCalendar(){
     evs.slice(0,3).forEach(function(ev){
       calHtml+='<div style="background:'+(ev.color||'var(--accent)')+'14;color:#555;'+
         'border-left:2px solid '+(ev.color||'var(--accent)')+'60;border-radius:0 4px 4px 0;'+
-        'font-size:0.8em;padding:3px 6px;margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:400">'+
+        'font-size:0.78em;padding:2px 5px;margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:400;line-height:1.4">'+
         (ev.isDl?'🚨 ':'')+ev.title+'</div>';
     });
-    if(evs.length>3) calHtml+='<div style="font-size:0.65em;color:var(--t3)">+'+(evs.length-3)+'</div>';
+    if(evs.length>3) calHtml+='<div style="font-size:0.65em;color:var(--t3);text-align:right">+'+(evs.length-3)+'</div>';
     calHtml+='</div>';
   }
   calHtml+='</div>';

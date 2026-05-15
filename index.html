@@ -310,6 +310,7 @@ html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--t
 
 /* ── TODAY LAYOUT ── */
 .today-wrap{display:grid;grid-template-columns:320px 1fr;gap:20px;align-items:start}
+.today-wrap>div:first-child{position:sticky;top:0}
 
 /* ── ROUTINE CARD (screenshot style) ── */
 .rc{background:var(--rc-bg);border-radius:16px;overflow:hidden;box-shadow:var(--sh)}
@@ -319,7 +320,7 @@ html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--t
 .rc-nav{display:flex;align-items:center;gap:6px}
 .rc-nav-btn{background:rgba(255,255,255,.25);border:none;color:#fff;width:26px;height:26px;border-radius:50%;cursor:pointer;font-size:1em;display:flex;align-items:center;justify-content:center;transition:background .15s}
 .rc-nav-btn:hover{background:rgba(255,255,255,.4)}
-.rc-body{padding:16px}
+.rc-body{padding:8px 8px 8px 0;position:relative;overflow-y:auto;max-height:1040px}
 .rc-item{display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid rgba(0,0,0,.05)}
 .rc-item:last-child{border-bottom:none;padding-bottom:0}
 .rc-item:first-child{padding-top:0}
@@ -515,7 +516,7 @@ function chunkData(data) {
   const FIELDS = ['routines','checks','projects','deadlines','savings','notes','calEvents',
     'lifeGoal','theme','customThemeColor','diaryEntries','monthlyGoals','monthlyMemo',
     'weeklyGoals','weeklyMemo','diaryStickers','font','fontSize','fontWeight','customFonts',
-    'lifeAreas','todoList','todoListTmr'];
+    'lifeAreas','todoList','todoListTmr','freeNotes'];
   const chunks = {};
   FIELDS.forEach(f => { if (data[f] !== undefined) chunks[f] = data[f]; });
   // customFontData는 Firestore 용량 초과 → 저장 제외 (localStorage에만)
@@ -630,6 +631,7 @@ let S = {
     {id:'la5',name:'관계',emoji:'🤝',color:'#7C4A6F'},
     {id:'la6',name:'마인드',emoji:'🧘',color:'#3C7C7C'},
   ],
+  freeNotes: {},
 };
 
 function load(){try{const d=localStorage.getItem(KEY);if(d)S=Object.assign({},S,JSON.parse(d));}catch(e){}}
@@ -787,7 +789,29 @@ function updateSB(){
   } else sec.style.display='none';
 }
 
-// ═══════════ ROUTINE CARD ═══════════
+// ═══════════ ROUTINE CARD (타임라인 뷰) ═══════════
+// 타임라인 설정
+const TL_START = 6;   // 시작 시간 (6시)
+const TL_END   = 24;  // 종료 시간 (24시)
+const TL_SLOT  = 30;  // 슬롯 단위 (분)
+const TL_H     = 28;  // 슬롯 1개 높이 (px)
+
+function timeToSlot(t){ // "HH:MM" → slot index (0=TL_START:00)
+  const [h,m]=t.split(':').map(Number);
+  return (h - TL_START) * (60/TL_SLOT) + Math.floor(m/TL_SLOT);
+}
+function slotToTop(slot){ return slot * TL_H; }
+function slotToTime(slot){
+  const totalMin = TL_START*60 + slot*TL_SLOT;
+  const h=Math.floor(totalMin/60), m=totalMin%60;
+  return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
+}
+function totalSlots(){ return (TL_END - TL_START)*(60/TL_SLOT); }
+
+// freeNote 저장소: { 'YYYY-MM-DD': [ {id, slot, span, text} ] }
+if(!S.freeNotes) S.freeNotes = {};
+function getFreeNotes(ds){ if(!S.freeNotes[ds]) S.freeNotes[ds]=[]; return S.freeNotes[ds]; }
+
 function routineCard(ds){
   const dow=dowOf(ds);
   const dayName=DOW_KO[dow];
@@ -796,29 +820,87 @@ function routineCard(ds){
   const done=rods.filter(r=>checks[r.id]).length;
   const pct=rods.length?Math.round(done/rods.length*100):0;
   const isToday=ds===todStr();
-
   const dt=new Date(ds+'T00:00:00');
   const dateLabel=(dt.getMonth()+1)+'월 '+dt.getDate()+'일 ('+dayName+')';
+  const total=totalSlots();
 
-  let itemsHtml='';
-  if(rods.length===0){
-    itemsHtml='<div class="rc-empty">이 요일 루틴이 없어요<br><small>루틴 설정에서 추가하세요</small></div>';
-  } else {
-    rods.forEach(r=>{
-      const isDone=!!checks[r.id];
-      itemsHtml+='<div class="rc-item" onclick="toggleCheck(\''+r.id+'\',\''+ds+'\')">'+
-        '<div class="rc-dot '+(isDone?'done':'')+'"></div>'+
-        '<div style="flex:1">'+
-          '<div style="display:flex;align-items:baseline;gap:8px">'+
-            '<div class="rc-time">'+r.time+'</div>'+
-            '<div class="rc-task '+(isDone?'done':'')+'">'+r.task+'</div>'+
-          '</div>'+
-          (r.detail?'<div class="rc-detail">'+r.detail+'</div>':'')+
-        '</div>'+
-        (isDone?'<div style="color:var(--green);font-size:1.1429em">✓</div>':'')+
-      '</div>';
-    });
+  // 시간 레이블
+  let timeLabels='';
+  for(let s=0;s<total;s++){
+    const t=slotToTime(s);
+    const isHour=t.endsWith(':00');
+    timeLabels+='<div style="position:absolute;top:'+(slotToTop(s))+'px;left:0;width:48px;height:'+TL_H+'px;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;pointer-events:none">'+
+      (isHour?'<span style="font-size:0.72em;color:var(--t3);font-family:var(--mono);font-variant-numeric:tabular-nums;line-height:1">'+t+'</span>':
+               '<span style="font-size:0.65em;color:var(--border2);font-family:var(--mono)">·</span>')+
+    '</div>';
   }
+
+  // 격자 선
+  let gridLines='';
+  for(let s=0;s<total;s++){
+    const isHour=slotToTime(s).endsWith(':00');
+    gridLines+='<div style="position:absolute;top:'+(slotToTop(s))+'px;left:0;right:0;height:'+TL_H+'px;border-top:1px solid '+(isHour?'var(--border)':'var(--border)')+'opacity:'+(isHour?'1':'0.4')+';pointer-events:none;box-sizing:border-box"></div>';
+  }
+
+  // 루틴 블록 (기본 1슬롯 = 30분)
+  let routineBlocks='';
+  rods.forEach(r=>{
+    const slot=timeToSlot(r.time);
+    if(slot<0||slot>=total) return;
+    const isDone=!!checks[r.id];
+    const savedSpan=r.span||2; // 기본 2슬롯(1시간)
+    const h=savedSpan*TL_H;
+    routineBlocks+='<div class="tl-routine-block" data-rid="'+r.id+'" data-ds="'+ds+'" data-slot="'+slot+'" data-span="'+savedSpan+'" '+
+      'style="position:absolute;top:'+(slotToTop(slot))+'px;left:0;right:4px;height:'+(h)+'px;'+
+      'background:'+(isDone?'var(--gl)':'var(--rc-bg)')+';border:1.5px solid '+(isDone?'var(--green)':'var(--rc-header)')+';'+
+      'border-radius:8px;padding:5px 8px;box-sizing:border-box;cursor:pointer;overflow:hidden;user-select:none;'+
+      'transition:box-shadow .15s;z-index:2" '+
+      'onclick="toggleCheck(\''+r.id+'\',\''+ds+'\')">'+
+      '<div style="display:flex;align-items:center;gap:5px;margin-bottom:1px">'+
+        '<div style="width:7px;height:7px;border-radius:50%;background:'+(isDone?'var(--green)':'var(--rc-header)')+';flex-shrink:0"></div>'+
+        '<span style="font-size:0.75em;font-weight:600;color:'+(isDone?'var(--green)':'var(--rc-header)')+';font-family:var(--mono)">'+r.time+'</span>'+
+        (isDone?'<span style="margin-left:auto;color:var(--green);font-size:0.85em">✓</span>':'')+
+      '</div>'+
+      '<div style="font-size:0.82em;font-weight:500;color:var(--text);'+(isDone?'text-decoration:line-through;color:var(--t3)':'')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+r.task+'</div>'+
+      (r.detail&&h>TL_H?'<div style="font-size:0.72em;color:var(--t2);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+r.detail+'</div>':'')+
+      '<div class="tl-resize-handle" data-rid="'+r.id+'" data-ds="'+ds+'" '+
+        'style="position:absolute;bottom:0;left:0;right:0;height:10px;cursor:s-resize;background:transparent;border-radius:0 0 8px 8px;z-index:5" '+
+        'onmousedown="startRoutineResize(event,\''+r.id+'\',\''+ds+'\')" ontouchstart="startRoutineResize(event,\''+r.id+'\',\''+ds+'\')"></div>'+
+    '</div>';
+  });
+
+  // 자유 메모 블록
+  const freeNotes=getFreeNotes(ds);
+  let freeBlocks='';
+  freeNotes.forEach(fn=>{
+    const h=fn.span*TL_H;
+    freeBlocks+='<div class="tl-free-block" data-fnid="'+fn.id+'" data-ds="'+ds+'" '+
+      'style="position:absolute;top:'+(slotToTop(fn.slot))+'px;left:0;right:4px;height:'+h+'px;'+
+      'background:var(--surface);border:1.5px dashed var(--border2);border-radius:8px;padding:5px 8px;box-sizing:border-box;overflow:hidden;z-index:1;user-select:none">'+
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px;height:100%">'+
+        '<textarea class="tl-free-ta" data-fnid="'+fn.id+'" data-ds="'+ds+'" '+
+          'style="flex:1;border:none;background:transparent;resize:none;font-size:0.78em;color:var(--text);font-family:var(--sans);outline:none;height:100%;padding:0;overflow:hidden;cursor:text" '+
+          'placeholder="메모..." onblur="saveFreeNote(\''+ds+'\',\''+fn.id+'\',this.value)">'+( fn.text||'')+'</textarea>'+
+        '<button onclick="deleteFreeNote(\''+ds+'\',\''+fn.id+'\')" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:0.7em;padding:0;flex-shrink:0;opacity:0.5;line-height:1" title="삭제">✕</button>'+
+      '</div>'+
+      '<div class="tl-resize-handle" data-fnid="'+fn.id+'" data-ds="'+ds+'" '+
+        'style="position:absolute;bottom:0;left:0;right:0;height:10px;cursor:s-resize;background:transparent;border-radius:0 0 8px 8px;z-index:5" '+
+        'onmousedown="startFreeResize(event,\''+fn.id+'\',\''+ds+'\')" ontouchstart="startFreeResize(event,\''+fn.id+'\',\''+ds+'\')"></div>'+
+    '</div>';
+  });
+
+  // 현재 시간 표시선
+  let nowLine='';
+  if(isToday){
+    const now=new Date();
+    const nowSlot=(now.getHours()-TL_START)*(60/TL_SLOT)+now.getMinutes()/TL_SLOT;
+    if(nowSlot>=0&&nowSlot<total){
+      nowLine='<div style="position:absolute;top:'+(nowSlot*TL_H)+'px;left:0;right:0;height:2px;background:var(--red);opacity:0.7;z-index:10;pointer-events:none">'+
+        '<div style="position:absolute;left:0;top:-4px;width:8px;height:8px;border-radius:50%;background:var(--red)"></div></div>';
+    }
+  }
+
+  const tlH=total*TL_H;
 
   return '<div class="rc">'+
     '<div class="rc-head">'+
@@ -832,9 +914,121 @@ function routineCard(ds){
         '</div>'+
       '</div>'+
     '</div>'+
-    '<div class="rc-body">'+itemsHtml+'</div>'+
+    '<div class="rc-body" style="padding:8px 8px 8px 0">'+
+      '<div id="tl-wrap-'+ds.replace(/-/g,'_')+'" style="position:relative;margin-left:52px;height:'+tlH+'px;cursor:crosshair" '+
+        'onclick="tlAddFreeNote(event,\''+ds+'\')">'+
+        gridLines+
+        routineBlocks+
+        freeBlocks+
+        nowLine+
+      '</div>'+
+      // 시간 레이블은 왼쪽 절대 위치
+      '<div style="position:absolute;left:8px;top:8px;width:48px;height:'+tlH+'px;pointer-events:none">'+timeLabels+'</div>'+
+    '</div>'+
     (rods.length>0?'<div class="rc-progress"><div class="rc-pbar-wrap"><div class="rc-pbar" style="width:'+pct+'%"></div></div><div class="rc-pct">'+done+'/'+rods.length+'</div></div>':'')+
   '</div>';
+}
+
+// 타임라인 클릭 → 자유 메모 추가
+function tlAddFreeNote(e, ds){
+  // 루틴 블록이나 자유블록, resize handle 클릭 시 무시
+  if(e.target.closest('.tl-routine-block')||e.target.closest('.tl-free-block')) return;
+  const wrap=e.currentTarget;
+  const rect=wrap.getBoundingClientRect();
+  const y=e.clientY-rect.top;
+  const slot=Math.floor(y/TL_H);
+  if(slot<0||slot>=totalSlots()) return;
+  if(!S.freeNotes) S.freeNotes={};
+  if(!S.freeNotes[ds]) S.freeNotes[ds]=[];
+  // 이미 해당 슬롯에 겹치는 블록 있으면 무시
+  const overlap=S.freeNotes[ds].some(fn=>slot>=fn.slot&&slot<fn.slot+fn.span);
+  if(overlap) return;
+  const id=gid();
+  S.freeNotes[ds].push({id, slot, span:2, text:''});
+  save(); render();
+  // 렌더 후 해당 textarea에 포커스
+  setTimeout(()=>{
+    const ta=document.querySelector('.tl-free-ta[data-fnid="'+id+'"]');
+    if(ta) ta.focus();
+  },50);
+}
+
+function saveFreeNote(ds, id, text){
+  if(!S.freeNotes||!S.freeNotes[ds]) return;
+  const fn=S.freeNotes[ds].find(f=>f.id===id);
+  if(fn){ fn.text=text; save(); }
+}
+function deleteFreeNote(ds, id){
+  if(!S.freeNotes||!S.freeNotes[ds]) return;
+  S.freeNotes[ds]=S.freeNotes[ds].filter(f=>f.id!==id);
+  save(); render();
+}
+
+// ── 루틴 블록 리사이즈 ──
+let _rzState=null;
+function startRoutineResize(e, rid, ds){
+  e.stopPropagation(); e.preventDefault();
+  const clientY=e.touches?e.touches[0].clientY:e.clientY;
+  const block=document.querySelector('.tl-routine-block[data-rid="'+rid+'"]');
+  if(!block) return;
+  const startY=clientY;
+  const startSpan=parseInt(block.dataset.span)||2;
+  _rzState={type:'routine',rid,ds,startY,startSpan};
+  document.addEventListener('mousemove',_rzMove);
+  document.addEventListener('mouseup',_rzEnd);
+  document.addEventListener('touchmove',_rzMove,{passive:false});
+  document.addEventListener('touchend',_rzEnd);
+}
+function startFreeResize(e, fnid, ds){
+  e.stopPropagation(); e.preventDefault();
+  const clientY=e.touches?e.touches[0].clientY:e.clientY;
+  const block=document.querySelector('.tl-free-block[data-fnid="'+fnid+'"]');
+  if(!block) return;
+  const fn=(S.freeNotes[ds]||[]).find(f=>f.id===fnid);
+  if(!fn) return;
+  const startY=clientY;
+  const startSpan=fn.span||2;
+  _rzState={type:'free',fnid,ds,startY,startSpan};
+  document.addEventListener('mousemove',_rzMove);
+  document.addEventListener('mouseup',_rzEnd);
+  document.addEventListener('touchmove',_rzMove,{passive:false});
+  document.addEventListener('touchend',_rzEnd);
+}
+function _rzMove(e){
+  if(!_rzState) return;
+  if(e.cancelable) e.preventDefault();
+  const clientY=e.touches?e.touches[0].clientY:e.clientY;
+  const dy=clientY-_rzState.startY;
+  const deltaSlots=Math.round(dy/TL_H);
+  const newSpan=Math.max(1,_rzState.startSpan+deltaSlots);
+  if(_rzState.type==='routine'){
+    const block=document.querySelector('.tl-routine-block[data-rid="'+_rzState.rid+'"]');
+    if(block){ block.style.height=(newSpan*TL_H)+'px'; block.dataset.span=newSpan; }
+  } else {
+    const block=document.querySelector('.tl-free-block[data-fnid="'+_rzState.fnid+'"]');
+    if(block){ block.style.height=(newSpan*TL_H)+'px'; }
+  }
+}
+function _rzEnd(e){
+  if(!_rzState) return;
+  const clientY=e.changedTouches?e.changedTouches[0].clientY:(e.clientY||_rzState.startY);
+  const dy=clientY-_rzState.startY;
+  const deltaSlots=Math.round(dy/TL_H);
+  const newSpan=Math.max(1,_rzState.startSpan+deltaSlots);
+  if(_rzState.type==='routine'){
+    const r=S.routines.find(r=>r.id===_rzState.rid);
+    if(r){ r.span=newSpan; save(); }
+  } else {
+    if(S.freeNotes&&S.freeNotes[_rzState.ds]){
+      const fn=S.freeNotes[_rzState.ds].find(f=>f.id===_rzState.fnid);
+      if(fn){ fn.span=newSpan; save(); }
+    }
+  }
+  _rzState=null;
+  document.removeEventListener('mousemove',_rzMove);
+  document.removeEventListener('mouseup',_rzEnd);
+  document.removeEventListener('touchmove',_rzMove);
+  document.removeEventListener('touchend',_rzEnd);
 }
 
 function toggleCheck(rid, ds){

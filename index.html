@@ -320,7 +320,11 @@ html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--t
 .rc-nav{display:flex;align-items:center;gap:6px}
 .rc-nav-btn{background:rgba(255,255,255,.25);border:none;color:#fff;width:26px;height:26px;border-radius:50%;cursor:pointer;font-size:1em;display:flex;align-items:center;justify-content:center;transition:background .15s}
 .rc-nav-btn:hover{background:rgba(255,255,255,.4)}
-.rc-body{padding:8px 8px 8px 0;position:relative;overflow-y:auto;max-height:1040px}
+.rc-body{padding:0;position:relative;overflow-y:auto;max-height:680px}
+.nb-canvas{user-select:none}
+.nb-canvas:active{cursor:text}
+.nb-free-drag:hover{opacity:1 !important}
+.nb-free:hover>button{opacity:0.7 !important}
 .rc-item{display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid rgba(0,0,0,.05)}
 .rc-item:last-child{border-bottom:none;padding-bottom:0}
 .rc-item:first-child{padding-top:0}
@@ -789,246 +793,276 @@ function updateSB(){
   } else sec.style.display='none';
 }
 
-// ═══════════ ROUTINE CARD (타임라인 뷰) ═══════════
-// 타임라인 설정
-const TL_START = 6;   // 시작 시간 (6시)
-const TL_END   = 24;  // 종료 시간 (24시)
-const TL_SLOT  = 30;  // 슬롯 단위 (분)
-const TL_H     = 28;  // 슬롯 1개 높이 (px)
+// ═══════════ NOTEBOOK TIMELINE ═══════════
+const TL_START = 6;
+const TL_END   = 24;
+const TL_LINE  = 30; // px per line (= 30분)
 
-function timeToSlot(t){ // "HH:MM" → slot index (0=TL_START:00)
+function tlMinutes(){ return (TL_END - TL_START) * 60; }
+function tlTotalH(){ return (tlMinutes() / 30) * TL_LINE; }
+function tlTopFromTime(t){
   const [h,m]=t.split(':').map(Number);
-  return (h - TL_START) * (60/TL_SLOT) + Math.floor(m/TL_SLOT);
+  return ((h - TL_START)*60 + m) / 30 * TL_LINE;
 }
-function slotToTop(slot){ return slot * TL_H; }
-function slotToTime(slot){
-  const totalMin = TL_START*60 + slot*TL_SLOT;
-  const h=Math.floor(totalMin/60), m=totalMin%60;
-  return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
+function tlSlotFromY(y){ return Math.max(0, Math.min(Math.floor(y / TL_LINE), (tlMinutes()/30)-1)); }
+function tlTimeFromSlot(s){
+  const totalMin = TL_START*60 + s*30;
+  return String(Math.floor(totalMin/60)).padStart(2,'0')+':'+String(totalMin%60).padStart(2,'0');
 }
-function totalSlots(){ return (TL_END - TL_START)*(60/TL_SLOT); }
 
-// freeNote 저장소: { 'YYYY-MM-DD': [ {id, slot, span, text} ] }
 if(!S.freeNotes) S.freeNotes = {};
 function getFreeNotes(ds){ if(!S.freeNotes[ds]) S.freeNotes[ds]=[]; return S.freeNotes[ds]; }
 
 function routineCard(ds){
   const dow=dowOf(ds);
-  const dayName=DOW_KO[dow];
   const checks=S.checks[ds]||{};
   const rods=routinesForDate(ds);
   const done=rods.filter(r=>checks[r.id]).length;
   const pct=rods.length?Math.round(done/rods.length*100):0;
   const isToday=ds===todStr();
   const dt=new Date(ds+'T00:00:00');
-  const dateLabel=(dt.getMonth()+1)+'월 '+dt.getDate()+'일 ('+dayName+')';
-  const total=totalSlots();
+  const dateLabel=(dt.getMonth()+1)+'월 '+dt.getDate()+'일 ('+DOW_KO[dow]+')';
+  const TH=tlTotalH();
+  const slots=tlMinutes()/30;
 
-  // 시간 레이블
-  let timeLabels='';
-  for(let s=0;s<total;s++){
-    const t=slotToTime(s);
+  // ── 노트 줄 ──
+  let lines='';
+  for(let s=0;s<slots;s++){
+    const top=s*TL_LINE;
+    const t=tlTimeFromSlot(s);
     const isHour=t.endsWith(':00');
-    timeLabels+='<div style="position:absolute;top:'+(slotToTop(s))+'px;left:0;width:48px;height:'+TL_H+'px;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;pointer-events:none">'+
-      (isHour?'<span style="font-size:0.72em;color:var(--t3);font-family:var(--mono);font-variant-numeric:tabular-nums;line-height:1">'+t+'</span>':
-               '<span style="font-size:0.65em;color:var(--border2);font-family:var(--mono)">·</span>')+
+    lines+=
+      '<div style="position:absolute;top:'+top+'px;left:0;right:0;height:'+TL_LINE+'px;pointer-events:none;box-sizing:border-box;'+
+        'border-bottom:1px solid '+(isHour?'rgba(0,0,0,0.10)':'rgba(0,0,0,0.045)')+'">'+ 
+      '</div>';
+  }
+
+  // ── 시간 레이블 (정시만) ──
+  let timeLabels='';
+  for(let s=0;s<slots;s++){
+    const t=tlTimeFromSlot(s);
+    if(!t.endsWith(':00')) continue;
+    const top=s*TL_LINE;
+    timeLabels+='<div style="position:absolute;top:'+top+'px;left:0;width:42px;height:'+TL_LINE+'px;display:flex;align-items:flex-start;justify-content:flex-end;padding-right:8px;padding-top:3px;pointer-events:none">'+
+      '<span style="font-size:0.68em;color:var(--t3);font-family:var(--mono);font-variant-numeric:tabular-nums;line-height:1;letter-spacing:-.02em">'+t+'</span>'+
     '</div>';
   }
 
-  // 격자 선
-  let gridLines='';
-  for(let s=0;s<total;s++){
-    const isHour=slotToTime(s).endsWith(':00');
-    gridLines+='<div style="position:absolute;top:'+(slotToTop(s))+'px;left:0;right:0;height:'+TL_H+'px;border-top:1px solid '+(isHour?'var(--border)':'var(--border)')+'opacity:'+(isHour?'1':'0.4')+';pointer-events:none;box-sizing:border-box"></div>';
-  }
-
-  // 루틴 블록 (기본 1슬롯 = 30분)
+  // ── 루틴 블록 ──
   let routineBlocks='';
   rods.forEach(r=>{
-    const slot=timeToSlot(r.time);
-    if(slot<0||slot>=total) return;
+    const top=tlTopFromTime(r.time);
+    if(top<0||top>=TH) return;
     const isDone=!!checks[r.id];
-    const savedSpan=r.span||2; // 기본 2슬롯(1시간)
-    const h=savedSpan*TL_H;
-    routineBlocks+='<div class="tl-routine-block" data-rid="'+r.id+'" data-ds="'+ds+'" data-slot="'+slot+'" data-span="'+savedSpan+'" '+
-      'style="position:absolute;top:'+(slotToTop(slot))+'px;left:0;right:4px;height:'+(h)+'px;'+
-      'background:'+(isDone?'var(--gl)':'var(--rc-bg)')+';border:1.5px solid '+(isDone?'var(--green)':'var(--rc-header)')+';'+
-      'border-radius:8px;padding:5px 8px;box-sizing:border-box;cursor:pointer;overflow:hidden;user-select:none;'+
-      'transition:box-shadow .15s;z-index:2" '+
-      'onclick="toggleCheck(\''+r.id+'\',\''+ds+'\')">'+
-      '<div style="display:flex;align-items:center;gap:5px;margin-bottom:1px">'+
-        '<div style="width:7px;height:7px;border-radius:50%;background:'+(isDone?'var(--green)':'var(--rc-header)')+';flex-shrink:0"></div>'+
-        '<span style="font-size:0.75em;font-weight:600;color:'+(isDone?'var(--green)':'var(--rc-header)')+';font-family:var(--mono)">'+r.time+'</span>'+
-        (isDone?'<span style="margin-left:auto;color:var(--green);font-size:0.85em">✓</span>':'')+
-      '</div>'+
-      '<div style="font-size:0.82em;font-weight:500;color:var(--text);'+(isDone?'text-decoration:line-through;color:var(--t3)':'')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+r.task+'</div>'+
-      (r.detail&&h>TL_H?'<div style="font-size:0.72em;color:var(--t2);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+r.detail+'</div>':'')+
-      '<div class="tl-resize-handle" data-rid="'+r.id+'" data-ds="'+ds+'" '+
-        'style="position:absolute;bottom:0;left:0;right:0;height:10px;cursor:s-resize;background:transparent;border-radius:0 0 8px 8px;z-index:5" '+
-        'onmousedown="startRoutineResize(event,\''+r.id+'\',\''+ds+'\')" ontouchstart="startRoutineResize(event,\''+r.id+'\',\''+ds+'\')"></div>'+
-    '</div>';
+    const span=r.span||2;
+    const h=span*TL_LINE;
+    const accentColor=isDone?'var(--green)':'var(--rc-header)';
+    routineBlocks+=
+      '<div class="nb-routine" data-rid="'+r.id+'" data-ds="'+ds+'" data-span="'+span+'" '+
+      'style="position:absolute;top:'+top+'px;left:0;right:0;height:'+h+'px;z-index:3;pointer-events:auto">'+
+        // 왼쪽 컬러 바
+        '<div style="position:absolute;left:0;top:3px;bottom:3px;width:3px;border-radius:2px;background:'+accentColor+';pointer-events:none"></div>'+
+        // 내용 클릭 영역
+        '<div onclick="toggleCheck(\''+r.id+'\',\''+ds+'\')" style="position:absolute;left:8px;right:0;top:0;bottom:12px;cursor:pointer;display:flex;align-items:center;gap:6px;padding:0 4px">'+
+          '<span style="font-size:0.72em;color:'+accentColor+';font-family:var(--mono);font-weight:600;flex-shrink:0;font-variant-numeric:tabular-nums">'+r.time+'</span>'+
+          '<span style="font-size:0.82em;color:var(--text);'+(isDone?'text-decoration:line-through;color:var(--t3)':'')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">'+r.task+'</span>'+
+          (isDone?'<span style="font-size:0.75em;color:var(--green);flex-shrink:0">✓</span>':'')+
+        '</div>'+
+        // 리사이즈 핸들
+        '<div onmousedown="nbStartResize(event,\'routine\',\''+r.id+'\',\''+ds+'\')" ontouchstart="nbStartResize(event,\'routine\',\''+r.id+'\',\''+ds+'\')" '+
+          'style="position:absolute;bottom:0;left:0;right:0;height:12px;cursor:s-resize;display:flex;align-items:center;justify-content:center">'+
+          '<div style="width:20px;height:2px;border-radius:1px;background:'+accentColor+';opacity:0.4;pointer-events:none"></div>'+
+        '</div>'+
+      '</div>';
   });
 
-  // 자유 메모 블록
+  // ── 자유 메모 블록 ──
   const freeNotes=getFreeNotes(ds);
   let freeBlocks='';
   freeNotes.forEach(fn=>{
-    const h=fn.span*TL_H;
-    freeBlocks+='<div class="tl-free-block" data-fnid="'+fn.id+'" data-ds="'+ds+'" '+
-      'style="position:absolute;top:'+(slotToTop(fn.slot))+'px;left:0;right:4px;height:'+h+'px;'+
-      'background:var(--surface);border:1.5px dashed var(--border2);border-radius:8px;padding:5px 8px;box-sizing:border-box;overflow:hidden;z-index:1;user-select:none">'+
-      '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px;height:100%">'+
-        '<textarea class="tl-free-ta" data-fnid="'+fn.id+'" data-ds="'+ds+'" '+
-          'style="flex:1;border:none;background:transparent;resize:none;font-size:0.78em;color:var(--text);font-family:var(--sans);outline:none;height:100%;padding:0;overflow:hidden;cursor:text" '+
-          'placeholder="메모..." onblur="saveFreeNote(\''+ds+'\',\''+fn.id+'\',this.value)">'+( fn.text||'')+'</textarea>'+
-        '<button onclick="deleteFreeNote(\''+ds+'\',\''+fn.id+'\')" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:0.7em;padding:0;flex-shrink:0;opacity:0.5;line-height:1" title="삭제">✕</button>'+
-      '</div>'+
-      '<div class="tl-resize-handle" data-fnid="'+fn.id+'" data-ds="'+ds+'" '+
-        'style="position:absolute;bottom:0;left:0;right:0;height:10px;cursor:s-resize;background:transparent;border-radius:0 0 8px 8px;z-index:5" '+
-        'onmousedown="startFreeResize(event,\''+fn.id+'\',\''+ds+'\')" ontouchstart="startFreeResize(event,\''+fn.id+'\',\''+ds+'\')"></div>'+
-    '</div>';
+    const top=fn.slot*TL_LINE;
+    const h=fn.span*TL_LINE;
+    freeBlocks+=
+      '<div class="nb-free" data-fnid="'+fn.id+'" data-ds="'+ds+'" data-slot="'+fn.slot+'" data-span="'+fn.span+'" '+
+      'style="position:absolute;top:'+top+'px;left:0;right:0;height:'+h+'px;z-index:4;pointer-events:auto">'+
+        // 드래그 헤더 (왼쪽 점선 바)
+        '<div class="nb-free-drag" data-fnid="'+fn.id+'" data-ds="'+ds+'" '+
+          'onmousedown="nbStartDrag(event,\''+fn.id+'\',\''+ds+'\')" ontouchstart="nbStartDrag(event,\''+fn.id+'\',\''+ds+'\')" '+
+          'style="position:absolute;left:0;top:2px;bottom:2px;width:14px;cursor:grab;display:flex;align-items:center;justify-content:center">'+
+          '<div style="width:3px;height:60%;border-radius:2px;background:var(--accent);opacity:0.35;pointer-events:none"></div>'+
+        '</div>'+
+        // textarea — 노트에 직접 적는 느낌
+        '<textarea class="nb-free-ta" data-fnid="'+fn.id+'" data-ds="'+ds+'" '+
+          'style="position:absolute;left:16px;right:0;top:0;bottom:12px;border:none;background:transparent;resize:none;'+
+          'font-size:0.84em;color:var(--text);font-family:var(--sans);outline:none;padding:4px 4px 0 2px;overflow:hidden;cursor:text;line-height:'+TL_LINE+'px" '+
+          'placeholder="여기에 바로 적어요..." onblur="nbSaveFree(\''+ds+'\',\''+fn.id+'\',this.value)">'+( fn.text||'')+'</textarea>'+
+        // 삭제 버튼 (호버시)
+        '<button onmousedown="event.stopPropagation()" onclick="nbDeleteFree(\''+ds+'\',\''+fn.id+'\')" '+
+          'style="position:absolute;right:2px;top:2px;background:none;border:none;cursor:pointer;color:var(--t3);font-size:0.65em;padding:2px;opacity:0.4;line-height:1;z-index:6" title="삭제">✕</button>'+
+        // 리사이즈 핸들
+        '<div onmousedown="nbStartResize(event,\'free\',\''+fn.id+'\',\''+ds+'\')" ontouchstart="nbStartResize(event,\'free\',\''+fn.id+'\',\''+ds+'\')" '+
+          'style="position:absolute;bottom:0;left:16px;right:0;height:12px;cursor:s-resize;display:flex;align-items:center;justify-content:center">'+
+          '<div style="width:20px;height:2px;border-radius:1px;background:var(--border2);opacity:0.5;pointer-events:none"></div>'+
+        '</div>'+
+      '</div>';
   });
 
-  // 현재 시간 표시선
+  // ── 현재 시간선 ──
   let nowLine='';
   if(isToday){
     const now=new Date();
-    const nowSlot=(now.getHours()-TL_START)*(60/TL_SLOT)+now.getMinutes()/TL_SLOT;
-    if(nowSlot>=0&&nowSlot<total){
-      nowLine='<div style="position:absolute;top:'+(nowSlot*TL_H)+'px;left:0;right:0;height:2px;background:var(--red);opacity:0.7;z-index:10;pointer-events:none">'+
-        '<div style="position:absolute;left:0;top:-4px;width:8px;height:8px;border-radius:50%;background:var(--red)"></div></div>';
+    const py=((now.getHours()-TL_START)*60+now.getMinutes())/30*TL_LINE;
+    if(py>=0&&py<=TH){
+      nowLine='<div style="position:absolute;top:'+py+'px;left:-6px;right:0;height:1.5px;background:var(--accent);opacity:0.6;z-index:10;pointer-events:none">'+
+        '<div style="position:absolute;left:0;top:-3px;width:6px;height:6px;border-radius:50%;background:var(--accent);opacity:0.8"></div></div>';
     }
   }
 
-  const tlH=total*TL_H;
-
-  return '<div class="rc">'+
+  return (
+    '<div class="rc">'+
     '<div class="rc-head">'+
-      '<div class="rc-head-title">⏰ 데일리 루틴</div>'+
+      '<div class="rc-head-title">오늘 하루</div>'+
       '<div style="display:flex;align-items:center;gap:8px">'+
         '<div class="rc-head-date">'+dateLabel+'</div>'+
         '<div class="rc-nav">'+
           '<button class="rc-nav-btn" onclick="shiftView(-1)">‹</button>'+
-          (isToday?'':'<button class="rc-nav-btn" onclick="resetView()" title="오늘로" style="font-size:0.7143em;width:32px;border-radius:8px">오늘</button>')+
+          (isToday?'':'<button class="rc-nav-btn" onclick="resetView()" style="font-size:0.7em;width:32px;border-radius:8px">오늘</button>')+
           '<button class="rc-nav-btn" onclick="shiftView(1)">›</button>'+
         '</div>'+
       '</div>'+
     '</div>'+
-    '<div class="rc-body" style="padding:8px 8px 8px 0">'+
-      '<div id="tl-wrap-'+ds.replace(/-/g,'_')+'" style="position:relative;margin-left:52px;height:'+tlH+'px;cursor:crosshair" '+
-        'onclick="tlAddFreeNote(event,\''+ds+'\')">'+
-        gridLines+
-        routineBlocks+
-        freeBlocks+
-        nowLine+
+    // 노트 본체
+    '<div class="rc-body" style="padding:0;position:relative">'+
+      // 전체 래퍼: 왼쪽 시간레이블 + 노트 영역
+      '<div style="display:flex;padding:12px 12px 12px 0">'+
+        // 시간 레이블 컬럼
+        '<div style="width:42px;flex-shrink:0;position:relative;height:'+TH+'px;pointer-events:none">'+timeLabels+'</div>'+
+        // 노트 영역
+        '<div id="nb-canvas-'+ds.replace(/-/g,'_')+'" data-ds="'+ds+'" class="nb-canvas" '+
+          'style="flex:1;position:relative;height:'+TH+'px;'+
+          // 노트 종이 배경 — 줄 간격은 TL_LINE(30px)
+          'background-image:repeating-linear-gradient(to bottom, transparent, transparent '+(TL_LINE-1)+'px, rgba(0,0,0,0.06) '+(TL_LINE-1)+'px, rgba(0,0,0,0.06) '+TL_LINE+'px);'+
+          'background-color:var(--surface);border-radius:6px;border:1px solid var(--border);overflow:hidden;cursor:text" '+
+          'onclick="nbCanvasClick(event,\''+ds+'\')">'+
+          lines+
+          routineBlocks+
+          freeBlocks+
+          nowLine+
+        '</div>'+
       '</div>'+
-      // 시간 레이블은 왼쪽 절대 위치
-      '<div style="position:absolute;left:8px;top:8px;width:48px;height:'+tlH+'px;pointer-events:none">'+timeLabels+'</div>'+
     '</div>'+
-    (rods.length>0?'<div class="rc-progress"><div class="rc-pbar-wrap"><div class="rc-pbar" style="width:'+pct+'%"></div></div><div class="rc-pct">'+done+'/'+rods.length+'</div></div>':'')+
-  '</div>';
+    (rods.length>0?
+      '<div class="rc-progress"><div class="rc-pbar-wrap"><div class="rc-pbar" style="width:'+pct+'%"></div></div><div class="rc-pct">'+done+'/'+rods.length+'</div></div>'
+    :'')+
+    '</div>'
+  );
 }
 
-// 타임라인 클릭 → 자유 메모 추가
-function tlAddFreeNote(e, ds){
-  // 루틴 블록이나 자유블록, resize handle 클릭 시 무시
-  if(e.target.closest('.tl-routine-block')||e.target.closest('.tl-free-block')) return;
-  const wrap=e.currentTarget;
-  const rect=wrap.getBoundingClientRect();
+// ── 캔버스 클릭 → 빈 곳에 자유 메모 생성 ──
+function nbCanvasClick(e, ds){
+  if(e.target.closest('.nb-routine')||e.target.closest('.nb-free')) return;
+  const canvas=e.currentTarget;
+  const rect=canvas.getBoundingClientRect();
   const y=e.clientY-rect.top;
-  const slot=Math.floor(y/TL_H);
-  if(slot<0||slot>=totalSlots()) return;
+  const slot=tlSlotFromY(y);
   if(!S.freeNotes) S.freeNotes={};
   if(!S.freeNotes[ds]) S.freeNotes[ds]=[];
-  // 이미 해당 슬롯에 겹치는 블록 있으면 무시
-  const overlap=S.freeNotes[ds].some(fn=>slot>=fn.slot&&slot<fn.slot+fn.span);
-  if(overlap) return;
   const id=gid();
   S.freeNotes[ds].push({id, slot, span:2, text:''});
   save(); render();
-  // 렌더 후 해당 textarea에 포커스
-  setTimeout(()=>{
-    const ta=document.querySelector('.tl-free-ta[data-fnid="'+id+'"]');
-    if(ta) ta.focus();
-  },50);
+  setTimeout(()=>{ const ta=document.querySelector('.nb-free-ta[data-fnid="'+id+'"]'); if(ta) ta.focus(); },40);
 }
 
-function saveFreeNote(ds, id, text){
+function nbSaveFree(ds, id, text){
   if(!S.freeNotes||!S.freeNotes[ds]) return;
   const fn=S.freeNotes[ds].find(f=>f.id===id);
   if(fn){ fn.text=text; save(); }
 }
-function deleteFreeNote(ds, id){
+function nbDeleteFree(ds, id){
   if(!S.freeNotes||!S.freeNotes[ds]) return;
   S.freeNotes[ds]=S.freeNotes[ds].filter(f=>f.id!==id);
   save(); render();
 }
 
-// ── 루틴 블록 리사이즈 ──
-let _rzState=null;
-function startRoutineResize(e, rid, ds){
+// ── 드래그 이동 & 리사이즈 공통 상태 ──
+let _nbDrag=null;
+
+function nbStartDrag(e, fnid, ds){
   e.stopPropagation(); e.preventDefault();
   const clientY=e.touches?e.touches[0].clientY:e.clientY;
-  const block=document.querySelector('.tl-routine-block[data-rid="'+rid+'"]');
-  if(!block) return;
-  const startY=clientY;
-  const startSpan=parseInt(block.dataset.span)||2;
-  _rzState={type:'routine',rid,ds,startY,startSpan};
-  document.addEventListener('mousemove',_rzMove);
-  document.addEventListener('mouseup',_rzEnd);
-  document.addEventListener('touchmove',_rzMove,{passive:false});
-  document.addEventListener('touchend',_rzEnd);
-}
-function startFreeResize(e, fnid, ds){
-  e.stopPropagation(); e.preventDefault();
-  const clientY=e.touches?e.touches[0].clientY:e.clientY;
-  const block=document.querySelector('.tl-free-block[data-fnid="'+fnid+'"]');
+  const block=document.querySelector('.nb-free[data-fnid="'+fnid+'"]');
   if(!block) return;
   const fn=(S.freeNotes[ds]||[]).find(f=>f.id===fnid);
   if(!fn) return;
-  const startY=clientY;
-  const startSpan=fn.span||2;
-  _rzState={type:'free',fnid,ds,startY,startSpan};
-  document.addEventListener('mousemove',_rzMove);
-  document.addEventListener('mouseup',_rzEnd);
-  document.addEventListener('touchmove',_rzMove,{passive:false});
-  document.addEventListener('touchend',_rzEnd);
+  _nbDrag={mode:'drag',fnid,ds,startY:clientY,startSlot:fn.slot};
+  block.style.opacity='0.7';
+  document.addEventListener('mousemove',_nbMove);
+  document.addEventListener('mouseup',_nbEnd);
+  document.addEventListener('touchmove',_nbMove,{passive:false});
+  document.addEventListener('touchend',_nbEnd);
 }
-function _rzMove(e){
-  if(!_rzState) return;
+
+function nbStartResize(e, type, id, ds){
+  e.stopPropagation(); e.preventDefault();
+  const clientY=e.touches?e.touches[0].clientY:e.clientY;
+  if(type==='routine'){
+    const r=S.routines.find(r=>r.id===id);
+    if(!r) return;
+    _nbDrag={mode:'resize-routine',rid:id,ds,startY:clientY,startSpan:r.span||2};
+  } else {
+    const fn=(S.freeNotes[ds]||[]).find(f=>f.id===id);
+    if(!fn) return;
+    _nbDrag={mode:'resize-free',fnid:id,ds,startY:clientY,startSpan:fn.span||2};
+  }
+  document.addEventListener('mousemove',_nbMove);
+  document.addEventListener('mouseup',_nbEnd);
+  document.addEventListener('touchmove',_nbMove,{passive:false});
+  document.addEventListener('touchend',_nbEnd);
+}
+
+function _nbMove(e){
+  if(!_nbDrag) return;
   if(e.cancelable) e.preventDefault();
   const clientY=e.touches?e.touches[0].clientY:e.clientY;
-  const dy=clientY-_rzState.startY;
-  const deltaSlots=Math.round(dy/TL_H);
-  const newSpan=Math.max(1,_rzState.startSpan+deltaSlots);
-  if(_rzState.type==='routine'){
-    const block=document.querySelector('.tl-routine-block[data-rid="'+_rzState.rid+'"]');
-    if(block){ block.style.height=(newSpan*TL_H)+'px'; block.dataset.span=newSpan; }
-  } else {
-    const block=document.querySelector('.tl-free-block[data-fnid="'+_rzState.fnid+'"]');
-    if(block){ block.style.height=(newSpan*TL_H)+'px'; }
+  const dy=clientY-_nbDrag.startY;
+  const delta=Math.round(dy/TL_LINE);
+  if(_nbDrag.mode==='drag'){
+    const newSlot=Math.max(0, Math.min(_nbDrag.startSlot+delta, (tlMinutes()/30)-1));
+    const block=document.querySelector('.nb-free[data-fnid="'+_nbDrag.fnid+'"]');
+    if(block) block.style.top=(newSlot*TL_LINE)+'px';
+  } else if(_nbDrag.mode==='resize-routine'){
+    const newSpan=Math.max(1,_nbDrag.startSpan+delta);
+    const block=document.querySelector('.nb-routine[data-rid="'+_nbDrag.rid+'"]');
+    if(block) block.style.height=(newSpan*TL_LINE)+'px';
+  } else if(_nbDrag.mode==='resize-free'){
+    const newSpan=Math.max(1,_nbDrag.startSpan+delta);
+    const block=document.querySelector('.nb-free[data-fnid="'+_nbDrag.fnid+'"]');
+    if(block) block.style.height=(newSpan*TL_LINE)+'px';
   }
 }
-function _rzEnd(e){
-  if(!_rzState) return;
-  const clientY=e.changedTouches?e.changedTouches[0].clientY:(e.clientY||_rzState.startY);
-  const dy=clientY-_rzState.startY;
-  const deltaSlots=Math.round(dy/TL_H);
-  const newSpan=Math.max(1,_rzState.startSpan+deltaSlots);
-  if(_rzState.type==='routine'){
-    const r=S.routines.find(r=>r.id===_rzState.rid);
-    if(r){ r.span=newSpan; save(); }
-  } else {
-    if(S.freeNotes&&S.freeNotes[_rzState.ds]){
-      const fn=S.freeNotes[_rzState.ds].find(f=>f.id===_rzState.fnid);
-      if(fn){ fn.span=newSpan; save(); }
-    }
+
+function _nbEnd(e){
+  if(!_nbDrag) return;
+  const clientY=e.changedTouches?e.changedTouches[0].clientY:(e.clientY||_nbDrag.startY);
+  const dy=clientY-_nbDrag.startY;
+  const delta=Math.round(dy/TL_LINE);
+  if(_nbDrag.mode==='drag'){
+    const fn=(S.freeNotes[_nbDrag.ds]||[]).find(f=>f.id===_nbDrag.fnid);
+    if(fn){ fn.slot=Math.max(0,Math.min(_nbDrag.startSlot+delta,(tlMinutes()/30)-1)); save(); }
+    const block=document.querySelector('.nb-free[data-fnid="'+_nbDrag.fnid+'"]');
+    if(block) block.style.opacity='';
+  } else if(_nbDrag.mode==='resize-routine'){
+    const r=S.routines.find(r=>r.id===_nbDrag.rid);
+    if(r){ r.span=Math.max(1,_nbDrag.startSpan+delta); save(); }
+  } else if(_nbDrag.mode==='resize-free'){
+    const fn=(S.freeNotes[_nbDrag.ds]||[]).find(f=>f.id===_nbDrag.fnid);
+    if(fn){ fn.span=Math.max(1,_nbDrag.startSpan+delta); save(); }
   }
-  _rzState=null;
-  document.removeEventListener('mousemove',_rzMove);
-  document.removeEventListener('mouseup',_rzEnd);
-  document.removeEventListener('touchmove',_rzMove);
-  document.removeEventListener('touchend',_rzEnd);
+  _nbDrag=null;
+  document.removeEventListener('mousemove',_nbMove);
+  document.removeEventListener('mouseup',_nbEnd);
+  document.removeEventListener('touchmove',_nbMove);
+  document.removeEventListener('touchend',_nbEnd);
 }
 
 function toggleCheck(rid, ds){

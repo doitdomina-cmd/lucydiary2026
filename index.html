@@ -766,6 +766,13 @@ function render(){
       }
       inp.addEventListener('keydown', handleEnter);
       inp.addEventListener('keyup', handleEnter);
+      // 모바일 소프트키보드 "완료/보내기" 대응
+      inp.addEventListener('input', function(e){
+        if(inp.value.endsWith('\n')){
+          inp.value=inp.value.replace(/\n/g,'');
+          addTodoInline(inp.dataset.ds, inp.id);
+        }
+      });
     });
   },0);
 }
@@ -899,7 +906,8 @@ function renderToday(){
         }).join(''))+
       '<div style="display:flex;align-items:center;gap:8px;padding-top:8px">'+
         '<div style="width:16px;height:16px;border-radius:4px;border:1.5px dashed var(--border2);flex-shrink:0"></div>'+
-      '<input id="todo-inp-'+safeDs+'" class="inp" style="flex:1;padding:5px 8px;font-size:0.9em;background:transparent;border-color:transparent;border-bottom:1px solid var(--border);border-radius:0" placeholder="할 일 추가 후 Enter..." data-ds="'+ds+'" data-todo-input="1" onkeydown="if(event.key===\'Enter\'||event.keyCode===13){event.preventDefault();event.stopPropagation();addTodoInline(\''+ds+'\',\'todo-inp-'+safeDs+'\');}">'+
+        '<input id="todo-inp-'+safeDs+'" class="inp" style="flex:1;padding:5px 8px;font-size:0.9em;background:transparent;border-color:transparent;border-bottom:1px solid var(--border);border-radius:0" placeholder="할 일 추가..." data-ds="'+ds+'" data-todo-input="1" enterkeyhint="send" inputmode="text">'+
+        '<button onclick="addTodoInline(\''+ds+'\',\'todo-inp-'+safeDs+'\')" style="flex-shrink:0;width:28px;height:28px;border-radius:8px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-size:1em;display:flex;align-items:center;justify-content:center;line-height:1">+</button>'+
       '</div>'+
     '</div>';
   }
@@ -1994,7 +2002,8 @@ function renderCalendar(){
   const ts=todStr();
   const ym=calY+'-'+String(calM+1).padStart(2,'0');
 
-  var monthCards='<div style="display:grid;grid-template-columns:repeat(12,1fr);gap:4px;margin-bottom:14px">';
+  var monthCards='<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:14px;padding-bottom:4px">'+
+    '<div style="display:grid;grid-template-columns:repeat(12,minmax(56px,1fr));gap:4px;min-width:600px">';
   for(var m=0;m<12;m++){
     var isCur=m===calM;
     var key=calY+'-'+String(m+1).padStart(2,'0');
@@ -2004,10 +2013,10 @@ function renderCalendar(){
       'border-radius:10px;padding:9px 4px;cursor:pointer;text-align:center;'+
       'background:'+(isCur?'var(--accent)':'var(--surface)')+';'+
       'border:1.5px solid '+(isCur?'var(--accent)':'var(--border)')+';transition:all .2s">'+
-      '<div style="font-size:16px !important;font-weight:900 !important;color:'+(isCur?'#fff':'var(--accent)')+'">'+MN[m]+'</div>'+
+      '<div style="font-size:13px;font-weight:700;color:'+(isCur?'#fff':'var(--accent)')+'">'+MN[m]+'</div>'+
     '</div>';
   }
-  monthCards+='</div>';
+  monthCards+='</div></div>';
 
   const first=new Date(calY,calM,1),last=new Date(calY,calM+1,0),sdow=first.getDay();
   const prevLast=new Date(calY,calM,0);
@@ -2026,7 +2035,8 @@ function renderCalendar(){
   });
   (S.deadlines||[]).forEach(dl=>{if(!evMap[dl.date])evMap[dl.date]=[];const pr=S.projects.find(p=>p.id===dl.projectId);evMap[dl.date].push(Object.assign({},dl,{isDl:true,color:pr?pr.color:'#C14A3C'}));});
 
-  var calHtml='<div style="display:grid;grid-template-columns:repeat(7,1fr);border-bottom:1px solid var(--border)">';
+  var calHtml='<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><div style="min-width:560px">'+
+    '<div style="display:grid;grid-template-columns:repeat(7,1fr);border-bottom:1px solid var(--border)">';
   ['일','월','화','수','목','금','토'].forEach(function(d,i){
     calHtml+='<div style="text-align:center;padding:8px 0;font-size:0.75em;font-weight:500;color:'+(i===0?'var(--red)':i===6?'var(--blue)':'var(--t3)')+'">'+d+'</div>';
   });
@@ -2063,7 +2073,7 @@ function renderCalendar(){
     if(evs.length>3) calHtml+='<div style="font-size:0.65em;color:var(--t3);text-align:right">+'+(evs.length-3)+'</div>';
     calHtml+='</div>';
   }
-  calHtml+='</div>';
+  calHtml+='</div></div></div>'; // grid close + min-width wrapper + scroll wrapper
 
   var goals=S.monthlyGoals&&S.monthlyGoals[ym]||[];
   var goalHtml='';

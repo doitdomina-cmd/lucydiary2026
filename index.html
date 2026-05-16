@@ -381,9 +381,10 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
   .hbg{display:flex}
   .content{padding:20px 14px}
   .g2,.g3,.pj-grid,.la-grid{grid-template-columns:1fr}
-  .topbar{padding:0 14px}
+  .topbar{padding:0 14px;display:flex !important}
   .pt{font-size:1.8571em}
   .today-wrap{grid-template-columns:1fr}
+  .tb-date{display:block !important}
 }
 </style>
 </head>
@@ -674,33 +675,28 @@ function go(p, pid){
   if(n) n.classList.add('on');
   const tbTitle=document.getElementById('tb-title');
   const topbar=document.querySelector('.topbar');
+  const isMobile=window.innerWidth<=768;
   const hideTopbarPages=['ledger','today','calendar','diary','deadlines'];
-  if(hideTopbarPages.includes(p)){
+
+  // 모바일에서는 항상 탑바 표시, 데스크탑에서만 hideTopbarPages 적용
+  if(!isMobile && hideTopbarPages.includes(p)){
     if(topbar) topbar.style.display='none';
-    // 모바일용 플로팅 햄버거 버튼
-    let fhbg=document.getElementById('float-hbg');
-    if(!fhbg){
-      fhbg=document.createElement('button');
-      fhbg.id='float-hbg';
-      fhbg.onclick=toggleSB;
-      fhbg.textContent='☰';
-      fhbg.style.cssText='display:none;position:fixed;top:12px;left:12px;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:1.1em;cursor:pointer;box-shadow:var(--sh)';
-      document.body.appendChild(fhbg);
-    }
-    fhbg.style.display=window.innerWidth<=768?'':'none';
   } else {
-    if(topbar)topbar.style.display='';
-    const fhbg=document.getElementById('float-hbg');
-    if(fhbg)fhbg.style.display='none';
-    if(pid){
-      const proj=S.projects.find(x=>x.id===pid)||{name:'프로젝트'};
-      const area=(S.lifeAreas||[]).find(a=>a.id===proj.lifeAreaId);
-      const colorDot='<span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:'+(proj.color||'#999')+';margin-right:6px;vertical-align:middle;flex-shrink:0"></span>';
-      const areaBadge=area?'<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:99px;font-size:0.78em;font-weight:500;background:'+area.color+'18;color:'+area.color+';margin-left:8px;vertical-align:middle">'+area.emoji+' '+area.name+'</span>':'';
-      tbTitle.innerHTML=colorDot+proj.name+areaBadge;
-    } else {
-      tbTitle.textContent=titles[p];
-    }
+    if(topbar) topbar.style.display='';
+  }
+
+  // 플로팅 햄버거는 항상 숨김 (모바일 탑바로 대체)
+  const fhbg=document.getElementById('float-hbg');
+  if(fhbg) fhbg.style.display='none';
+
+  if(pid){
+    const proj=S.projects.find(x=>x.id===pid)||{name:'프로젝트'};
+    const area=(S.lifeAreas||[]).find(a=>a.id===proj.lifeAreaId);
+    const colorDot='<span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:'+(proj.color||'#999')+';margin-right:6px;vertical-align:middle;flex-shrink:0"></span>';
+    const areaBadge=area?'<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:99px;font-size:0.78em;font-weight:500;background:'+area.color+'18;color:'+area.color+';margin-left:8px;vertical-align:middle">'+area.emoji+' '+area.name+'</span>':'';
+    tbTitle.innerHTML=colorDot+proj.name+areaBadge;
+  } else {
+    tbTitle.textContent=titles[p]||'';
   }
   render(); closeSB();
 }
@@ -762,14 +758,14 @@ function render(){
     });
     // 투두 입력창 이벤트 바인딩 (draggable 버그 우회)
     document.querySelectorAll('[data-todo-input="1"]').forEach(function(inp){
-      inp.addEventListener('keydown',function(e){
-        e.stopPropagation();
+      function handleEnter(e){
         if(e.key==='Enter'||e.keyCode===13){
-          e.preventDefault();
-          var ds=inp.dataset.ds;
-          addTodoInline(ds, inp.id);
+          e.preventDefault(); e.stopPropagation();
+          addTodoInline(inp.dataset.ds, inp.id);
         }
-      });
+      }
+      inp.addEventListener('keydown', handleEnter);
+      inp.addEventListener('keyup', handleEnter);
     });
   },0);
 }
@@ -991,29 +987,20 @@ function renderToday(){
 })();
 
 // ═══════════ TODO 체크리스트 ═══════════
+let _todoAdding=false;
 function addTodoInline(ds,inputId){
+  if(_todoAdding) return;
   const el=document.getElementById(inputId);
   if(!el)return;
   const text=el.value.trim();
   if(!text)return;
+  _todoAdding=true;
   el.value='';
   if(!S.todoList)S.todoList={};
   if(!S.todoList[ds])S.todoList[ds]=[];
-  const newItem={id:gid(),text,done:false};
-  S.todoList[ds].push(newItem);
-  save();
-
-  // DOM 직접 삽입 (render() 호출 없이 — 깜빡임 방지)
-  const i=S.todoList[ds].length-1;
-  const row=document.createElement('div');
-  row.style.cssText='display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)';
-  row.innerHTML=
-    '<div onclick="togTodoItem(\''+ds+'\','+i+')" style="width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border2);background:transparent;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center"></div>'+
-    '<div style="flex:1;font-size:0.9em">'+text+'</div>'+
-    '<button class="bi" onclick="delTodoItem(\''+ds+'\','+i+')" style="font-size:0.8em;color:var(--t3)">✕</button>';
-  // input 행 바로 앞에 삽입
-  el.closest('div').parentElement.insertBefore(row, el.closest('div'));
-  el.focus();
+  S.todoList[ds].push({id:gid(),text,done:false});
+  save(); render();
+  setTimeout(()=>{ _todoAdding=false; const inp=document.getElementById(inputId); if(inp) inp.focus(); },100);
 }
 function togTodoItem(ds,i){
   if(!S.todoList||!S.todoList[ds]||!S.todoList[ds][i])return;

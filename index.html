@@ -296,6 +296,13 @@ html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--t
 .la-card{background:var(--surface);border-radius:14px;padding:20px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;border:1.5px solid transparent}
 .la-add{background:transparent;border:1.5px dashed var(--border2);border-radius:14px;padding:20px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:130px;transition:all .2s}
 .la-add:hover{border-color:var(--accent);background:var(--al)}
+.la-card.drag-over{border-color:var(--accent) !important;background:var(--al);box-shadow:0 0 0 2px var(--accent)40}
+.la-card.dragging{opacity:.4;transform:scale(.97)}
+.la-card[draggable="true"]{cursor:grab}
+.la-card[draggable="true"]:active{cursor:grabbing}
+.pj-drag-item{cursor:grab;user-select:none}
+.pj-drag-item.dragging{opacity:.4}
+.pj-drag-item.drag-over-top{border-top:2px solid var(--accent) !important}
 
 /* ── PROJECT CARD ── */
 .pj-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
@@ -1390,12 +1397,12 @@ function renderLife(){
   const areas=S.lifeAreas||[];
   let html='';
   html+=renderGoalSection();
-  html+='<div class="la-grid">';
+  html+='<div class="la-grid" id="la-grid">';
   areas.forEach(function(a){
     const projs=S.projects.filter(p=>p.lifeAreaId===a.id);
-    html+='<div class="la-card" data-aid="'+a.id+'" data-color="'+a.color+'" onclick="goToArea(this.dataset.aid)" style="border-color:'+a.color+'30;cursor:pointer">';
+    html+='<div class="la-card" draggable="true" data-aid="'+a.id+'" data-color="'+a.color+'" onclick="laCardClick(event,this.dataset.aid)" style="border-color:'+a.color+'30">';
     html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">';
-    html+='<div style="font-size:1.0714em;font-weight:600;color:var(--text)">'+a.name+'</div>';
+    html+='<div style="display:flex;align-items:center;gap:6px"><span style="color:var(--t3);font-size:0.9em;cursor:grab;user-select:none">⠿</span><div style="font-size:1.0714em;font-weight:600;color:var(--text)">'+a.name+'</div></div>';
     html+='<div class="la-btns" style="display:flex;gap:4px;opacity:0;transition:opacity .15s">';
     html+='<button class="bi" data-aid="'+a.id+'" onclick="event.stopPropagation();openAreaModal(this.dataset.aid)" style="color:var(--t3);font-size:1em" title="수정">'+
       '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>'+
@@ -1405,25 +1412,32 @@ function renderLife(){
     '</button>';
     html+='</div></div>';
     html+='<div style="width:32px;height:3px;border-radius:99px;background:'+a.color+';margin-bottom:12px"></div>';
+    html+='<div class="pj-drop-zone" data-aid="'+a.id+'" style="min-height:28px">';
     if(projs.length===0){
-      html+='<div style="font-size:0.8em;color:var(--t3);padding:4px 0">프로젝트 없음</div>';
+      html+='<div class="pj-empty-hint" style="font-size:0.8em;color:var(--t3);padding:4px 0">프로젝트 없음</div>';
     } else {
-      html+='<div>';
       projs.forEach(function(p){
         const tk=p.tasks||[], dn=tk.filter(t=>t.done).length, pc=tk.length?Math.round(dn/tk.length*100):0;
-        html+='<div data-pid="'+p.id+'" onclick="event.stopPropagation();go(\'projects\',this.dataset.pid)" '+
-          'style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;margin-bottom:4px;background:var(--s2);transition:background .15s;cursor:pointer">'+
+        html+='<div class="pj-drag-item" draggable="true" data-pid="'+p.id+'" data-aid="'+a.id+'" '+
+          'onclick="event.stopPropagation();go(\'projects\',this.dataset.pid)" '+
+          'style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;margin-bottom:4px;background:var(--s2)">'+
+          '<span style="color:var(--t3);font-size:0.8em;cursor:grab;user-select:none;flex-shrink:0">⠿</span>'+
           '<div style="width:6px;height:6px;border-radius:50%;background:'+p.color+';flex-shrink:0"></div>'+
           '<div style="flex:1;font-size:0.8571em;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+p.name+'</div>'+
           (tk.length>0?'<div style="font-size:0.75em;color:var(--t3);font-family:var(--mono)">'+pc+'%</div>':'')+
         '</div>';
       });
-      html+='</div>';
     }
+    html+='</div>';
     html+='</div>';
   });
   html+='<div class="la-add" onclick="openAreaModal()"><div style="font-size:1.7143em;color:var(--t3)">＋</div><div style="font-size:0.9286em;color:var(--t3)">영역 추가</div></div></div>';
   return html;
+}
+
+function laCardClick(e,aid){
+  if(window._laDragging)return;
+  goToArea(aid);
 }
 
 function renderGoalSection(){
@@ -1530,6 +1544,100 @@ function renderProjects(){
   }
   return html;
 }
+
+// ═══════════ LIFE 드래그앤드롭 ═══════════
+window._laDragging = false;
+var _dragAreaId = null;   // 드래그 중인 라이프 카드 aid
+var _dragPjId = null;     // 드래그 중인 프로젝트 pid
+
+document.addEventListener('dragstart', function(e){
+  var card = e.target.closest('.la-card[draggable]');
+  var pj   = e.target.closest('.pj-drag-item[draggable]');
+  window._laDragging = true;
+
+  if(pj && !card){
+    // 프로젝트 드래그
+    _dragPjId = pj.dataset.pid;
+    _dragAreaId = null;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('type','pj');
+    setTimeout(function(){pj.classList.add('dragging');},0);
+  } else if(card){
+    // 라이프 카드 드래그
+    _dragAreaId = card.dataset.aid;
+    _dragPjId = null;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('type','area');
+    setTimeout(function(){card.classList.add('dragging');},0);
+  }
+});
+
+document.addEventListener('dragend', function(e){
+  window._laDragging = false;
+  _dragAreaId = null; _dragPjId = null;
+  document.querySelectorAll('.la-card.dragging,.pj-drag-item.dragging').forEach(function(el){el.classList.remove('dragging');});
+  document.querySelectorAll('.la-card.drag-over,.pj-drop-zone.drag-over').forEach(function(el){el.classList.remove('drag-over');});
+});
+
+document.addEventListener('dragover', function(e){
+  e.preventDefault();
+  var type = e.dataTransfer.getData('type') || (_dragPjId?'pj':_dragAreaId?'area':'');
+
+  if(type==='pj'||_dragPjId){
+    // 프로젝트를 라이프 카드 위로
+    var zone = e.target.closest('.pj-drop-zone');
+    var card = e.target.closest('.la-card');
+    document.querySelectorAll('.pj-drop-zone.drag-over').forEach(function(el){el.classList.remove('drag-over');});
+    if(zone) zone.classList.add('drag-over');
+    else if(card){ var z=card.querySelector('.pj-drop-zone'); if(z) z.classList.add('drag-over'); }
+  } else if(type==='area'||_dragAreaId){
+    // 라이프 카드 순서 변경
+    var targetCard = e.target.closest('.la-card[draggable]');
+    document.querySelectorAll('.la-card.drag-over').forEach(function(el){el.classList.remove('drag-over');});
+    if(targetCard && targetCard.dataset.aid !== _dragAreaId) targetCard.classList.add('drag-over');
+  }
+});
+
+document.addEventListener('dragleave', function(e){
+  if(!e.currentTarget.contains(e.relatedTarget)){
+    document.querySelectorAll('.pj-drop-zone.drag-over,.la-card.drag-over').forEach(function(el){el.classList.remove('drag-over');});
+  }
+});
+
+document.addEventListener('drop', function(e){
+  e.preventDefault();
+  document.querySelectorAll('.pj-drop-zone.drag-over,.la-card.drag-over').forEach(function(el){el.classList.remove('drag-over');});
+
+  if(_dragPjId){
+    // 프로젝트 → 라이프 카드 이동
+    var zone = e.target.closest('.pj-drop-zone');
+    var card = e.target.closest('.la-card');
+    var targetAid = zone ? zone.dataset.aid : (card ? card.dataset.aid : null);
+    if(targetAid){
+      var pj = S.projects.find(function(p){return p.id===_dragPjId;});
+      if(pj && pj.lifeAreaId !== targetAid){
+        pj.lifeAreaId = targetAid;
+        save(); render();
+      }
+    }
+  } else if(_dragAreaId){
+    // 라이프 카드 순서 변경
+    var targetCard = e.target.closest('.la-card[draggable]');
+    if(targetCard && targetCard.dataset.aid !== _dragAreaId){
+      var areas = S.lifeAreas;
+      var fromIdx = areas.findIndex(function(a){return a.id===_dragAreaId;});
+      var toIdx   = areas.findIndex(function(a){return a.id===targetCard.dataset.aid;});
+      if(fromIdx>-1 && toIdx>-1){
+        var moved = areas.splice(fromIdx,1)[0];
+        areas.splice(toIdx,0,moved);
+        save(); render();
+      }
+    }
+  }
+  window._laDragging = false;
+  _dragAreaId = null; _dragPjId = null;
+});
+
 function setPjF(id){pjFilter=id;render();}
 function goToArea(areaId){pjFilter=areaId;go('projects');}
 

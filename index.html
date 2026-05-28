@@ -824,14 +824,14 @@ function routineCard(ds){
   }
 
   return '<div class="rc">'+
-    '<div class="rc-head">'+
-      '<div class="rc-head-title">⏰ 데일리 루틴</div>'+
-      '<div style="display:flex;align-items:center;gap:8px">'+
-        '<div class="rc-head-date">'+dateLabel+'</div>'+
-        '<div class="rc-nav">'+
-          '<button class="rc-nav-btn" onclick="shiftView(-1)">‹</button>'+
-          (isToday?'':'<button class="rc-nav-btn" onclick="resetView()" title="오늘로" style="font-size:0.7143em;width:32px;border-radius:8px">오늘</button>')+
-          '<button class="rc-nav-btn" onclick="shiftView(1)">›</button>'+
+    '<div class="rc-head" style="flex-wrap:nowrap;gap:6px">'+
+      '<div class="rc-head-title" style="white-space:nowrap;flex-shrink:0">⏰ 데일리 루틴</div>'+
+      '<div style="display:flex;align-items:center;gap:6px;flex:1;justify-content:flex-end;min-width:0">'+
+        '<div class="rc-head-date" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+dateLabel+'</div>'+
+        '<div class="rc-nav" style="flex-shrink:0">'+
+          '<button class="rc-nav-btn" onclick="event.stopPropagation();shiftView(-1)">‹</button>'+
+          (viewDate!==todStr()?'<button class="rc-nav-btn" onclick="event.stopPropagation();resetView()" title="오늘로" style="font-size:0.7143em;width:32px;border-radius:8px">오늘</button>':'')+
+          '<button class="rc-nav-btn" onclick="event.stopPropagation();shiftView(1)">›</button>'+
         '</div>'+
       '</div>'+
     '</div>'+
@@ -845,7 +845,8 @@ function toggleCheck(rid, ds){
   S.checks[ds][rid]=!S.checks[ds][rid];
   save(); render();
 }
-function shiftView(d){viewDate=addDays(viewDate,d);render();}
+let _shiftBusy=false;
+function shiftView(d){if(_shiftBusy)return;_shiftBusy=true;viewDate=addDays(viewDate,d);render();setTimeout(function(){_shiftBusy=false;},300);}
 function resetView(){viewDate=todStr();render();}
 
 // ═══════════ TODAY PAGE ═══════════
@@ -1539,7 +1540,8 @@ function savePj(){
   S.projects.push({id:gid(),name,emoji:document.getElementById('pj-e').value,desc:document.getElementById('pj-d').value,dday,lifeAreaId:selPjA,color:selPjC,tasks:[],milestones:[],notes:'',routinized:[],links:[]});
   save();closeMo();render();
 }
-function delPj(id){if(!confirm('프로젝트를 삭제할까요?'))return;S.projects=S.projects.filter(p=>p.id!==id);save();render();}
+function delPj(id){if(!confirm('프로젝트를 삭제할까요?
+(관련 마감일, 루틴화 일정, 캘린더 이벤트도 함께 삭제됩니다)'))return;const pj=S.projects.find(p=>p.id===id);const rzIds=pj&&pj.routinized?pj.routinized.map(r=>r.id):[];S.deadlines=S.deadlines.filter(d=>d.projectId!==id);S.calEvents=S.calEvents.filter(e=>e.projectId!==id);if(rzIds.length>0)S.routines=S.routines.filter(r=>!rzIds.includes(r.id));S.projects=S.projects.filter(p=>p.id!==id);if(activePid===id){activePid=null;page='projects';}save();render();}
 
 function openPjEditModal(pid){
   const p=S.projects.find(x=>x.id===pid);if(!p)return;

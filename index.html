@@ -668,8 +668,14 @@ let viewDate = todStr();
 
 const titles = {today:'Today',diary:'Thanks Diary',calendar:'Monthly',routine:'루틴 설정',life:'나의 라이프',projects:'프로젝트',deadlines:'마감 관리',savings:'저축 목표',settings:'설정',ledger:'가계부'};
 
-function go(p, pid){
+function go(p, pid, _fromPopstate){
   page=p; activePid=pid||null; if(p!=='projects') pjFilter='';
+  // 브라우저 히스토리에 상태 추가 (popstate로 인한 호출이 아닐 때만)
+  if(!_fromPopstate){
+    const state={page:p,pid:pid||null};
+    const url='#'+p+(pid?'/'+pid:'');
+    history.pushState(state,'',(p==='today'&&!pid)?window.location.pathname:url);
+  }
   document.querySelectorAll('.nav').forEach(e=>e.classList.remove('on'));
   const n=document.getElementById('nav-'+p);
   if(n) n.classList.add('on');
@@ -3573,10 +3579,22 @@ function deleteLedgerTx(id){
 function renderLedgerTxModal(){return '';}
 
 
+// ═══════════ BROWSER BACK BUTTON ═══════════
+window.addEventListener('popstate', function(e){
+  if(e.state && e.state.page){
+    go(e.state.page, e.state.pid||null, true);
+  } else {
+    // 히스토리 상태가 없으면 today로
+    go('today', null, true);
+  }
+});
+
 function initApp(){
   load();
   loadLedger();
   restoreCustomFont();
+  // 초기 상태를 히스토리에 등록 (뒤로가기해도 앱 밖으로 안 나가게)
+  history.replaceState({page:'today',pid:null},'',window.location.pathname);
   applyTheme(S.theme||'sky');
   syncRzToRoutines();
   viewDate=todStr();

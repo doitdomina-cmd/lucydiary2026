@@ -740,6 +740,24 @@ function render(){
   
   // Event Delegation
   setTimeout(function(){
+    // 루틴 카드 날짜 이동 버튼 - 이벤트 위임으로 중복 방지
+    document.querySelectorAll('[data-rcnav]').forEach(function(btn){
+      btn.addEventListener('click',function(e){
+        e.stopPropagation();
+        e.preventDefault();
+        var v=this.dataset.rcnav;
+        if(v==='0'){resetView();}
+        else{shiftView(parseInt(v));}
+      },{once:true});
+    });
+    // 루틴 카드 날짜 이동 버튼
+    document.querySelectorAll('[data-rcnav]').forEach(function(btn){
+      btn.addEventListener('click',function(e){
+        e.stopPropagation();e.preventDefault();
+        var v=this.dataset.rcnav;
+        if(v==='0'){resetView();}else{shiftView(parseInt(v));}
+      },{once:true});
+    });
     document.querySelectorAll('.mini-cal-cell').forEach(function(el){
       el.addEventListener('click',function(){
         window.diaryDate=this.dataset.ds;
@@ -834,9 +852,9 @@ function routineCard(ds){
       '<div style="display:flex;align-items:center;justify-content:space-between">'+
         '<div class="rc-head-title">데일리 루틴</div>'+
         '<div class="rc-nav">'+
-          '<button class="rc-nav-btn" onclick="event.stopPropagation();shiftView(-1)">‹</button>'+
-          (viewDate!==todStr()?'<button class="rc-nav-btn" onclick="event.stopPropagation();resetView()" title="오늘로" style="font-size:0.7143em;width:32px;border-radius:8px">오늘</button>':'')+
-          '<button class="rc-nav-btn" onclick="event.stopPropagation();shiftView(1)">›</button>'+
+          '<button class="rc-nav-btn" data-rcnav="-1" type="button">‹</button>'+
+          (viewDate!==todStr()?'<button class="rc-nav-btn" data-rcnav="0" type="button" style="font-size:0.7143em;width:32px;border-radius:8px">오늘</button>':'')+
+          '<button class="rc-nav-btn" data-rcnav="1" type="button">›</button>'+
         '</div>'+
       '</div>'+
       '<div class="rc-head-date">'+dateLabel+'</div>'+
@@ -851,14 +869,7 @@ function toggleCheck(rid, ds){
   S.checks[ds][rid]=!S.checks[ds][rid];
   save(); render();
 }
-let _lastShiftTime=0;
-function shiftView(d){
-  const now=Date.now();
-  if(now-_lastShiftTime<400)return;
-  _lastShiftTime=now;
-  viewDate=addDays(viewDate,d);
-  render();
-}
+function shiftView(d){viewDate=addDays(viewDate,d);render();}
 function resetView(){viewDate=todStr();render();}
 
 // ═══════════ TODAY PAGE ═══════════

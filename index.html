@@ -830,16 +830,16 @@ function routineCard(ds){
   }
 
   return '<div class="rc">'+
-    '<div class="rc-head" style="flex-wrap:nowrap;gap:6px">'+
-      '<div class="rc-head-title" style="white-space:nowrap;flex-shrink:0">⏰ 데일리 루틴</div>'+
-      '<div style="display:flex;align-items:center;gap:6px;flex:1;justify-content:flex-end;min-width:0">'+
-        '<div class="rc-head-date" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+dateLabel+'</div>'+
-        '<div class="rc-nav" style="flex-shrink:0">'+
+    '<div class="rc-head" style="flex-direction:column;gap:6px;align-items:stretch">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between">'+
+        '<div class="rc-head-title">데일리 루틴</div>'+
+        '<div class="rc-nav">'+
           '<button class="rc-nav-btn" onclick="event.stopPropagation();shiftView(-1)">‹</button>'+
           (viewDate!==todStr()?'<button class="rc-nav-btn" onclick="event.stopPropagation();resetView()" title="오늘로" style="font-size:0.7143em;width:32px;border-radius:8px">오늘</button>':'')+
           '<button class="rc-nav-btn" onclick="event.stopPropagation();shiftView(1)">›</button>'+
         '</div>'+
       '</div>'+
+      '<div class="rc-head-date">'+dateLabel+'</div>'+
     '</div>'+
     '<div class="rc-body">'+itemsHtml+'</div>'+
     (rods.length>0?'<div class="rc-progress"><div class="rc-pbar-wrap"><div class="rc-pbar" style="width:'+pct+'%"></div></div><div class="rc-pct">'+done+'/'+rods.length+'</div></div>':'')+
@@ -851,8 +851,14 @@ function toggleCheck(rid, ds){
   S.checks[ds][rid]=!S.checks[ds][rid];
   save(); render();
 }
-let _shiftBusy=false;
-function shiftView(d){if(_shiftBusy)return;_shiftBusy=true;viewDate=addDays(viewDate,d);render();setTimeout(function(){_shiftBusy=false;},300);}
+let _lastShiftTime=0;
+function shiftView(d){
+  const now=Date.now();
+  if(now-_lastShiftTime<400)return;
+  _lastShiftTime=now;
+  viewDate=addDays(viewDate,d);
+  render();
+}
 function resetView(){viewDate=todStr();render();}
 
 // ═══════════ TODAY PAGE ═══════════

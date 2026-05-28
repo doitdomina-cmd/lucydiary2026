@@ -1551,24 +1551,30 @@ var _dragAreaId = null;   // 드래그 중인 라이프 카드 aid
 var _dragPjId = null;     // 드래그 중인 프로젝트 pid
 
 document.addEventListener('dragstart', function(e){
+  // pj-drag-item 안에서 시작했는지 먼저 확인 (부모 카드보다 우선)
+  var pj = e.target.closest('.pj-drag-item[draggable]');
   var card = e.target.closest('.la-card[draggable]');
-  var pj   = e.target.closest('.pj-drag-item[draggable]');
-  window._laDragging = true;
 
-  if(pj && !card){
-    // 프로젝트 드래그
+  if(pj){
+    // 프로젝트 드래그 - 라이프 카드 드래그 차단
+    e.stopPropagation();
+    window._laDragging = true;
     _dragPjId = pj.dataset.pid;
     _dragAreaId = null;
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('type','pj');
     setTimeout(function(){pj.classList.add('dragging');},0);
-  } else if(card){
-    // 라이프 카드 드래그
+  } else if(card && !e.target.closest('.pj-drop-zone')){
+    // 라이프 카드 드래그 (프로젝트 영역에서 시작한 게 아닐 때만)
+    window._laDragging = true;
     _dragAreaId = card.dataset.aid;
     _dragPjId = null;
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('type','area');
     setTimeout(function(){card.classList.add('dragging');},0);
+  } else {
+    // 드래그 취소
+    e.preventDefault();
   }
 });
 

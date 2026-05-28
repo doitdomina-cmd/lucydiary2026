@@ -3581,10 +3581,13 @@ function renderLedgerTxModal(){return '';}
 
 // ═══════════ BROWSER BACK BUTTON ═══════════
 window.addEventListener('popstate', function(e){
+  // 로그인 전이거나 앱이 안 보이는 상태면 무시
+  if(!currentUser) return;
+  const appWrap = document.getElementById('app-wrap');
+  if(!appWrap || appWrap.style.display==='none') return;
   if(e.state && e.state.page){
     go(e.state.page, e.state.pid||null, true);
   } else {
-    // 히스토리 상태가 없으면 today로
     go('today', null, true);
   }
 });
@@ -3593,9 +3596,6 @@ function initApp(){
   load();
   loadLedger();
   restoreCustomFont();
-  // 초기 상태를 히스토리에 등록 (뒤로가기해도 앱 밖으로 안 나가게)
-  history.replaceState({page:'today',pid:null},'',window.location.pathname);
-  applyTheme(S.theme||'sky');
   syncRzToRoutines();
   viewDate=todStr();
 
@@ -3646,6 +3646,8 @@ function initApp(){
   }
 
   go('today');
+  // 초기 상태를 히스토리에 등록 (뒤로가기해도 앱 밖으로 안 나가게)
+  history.replaceState({page:'today',pid:null},'',window.location.pathname);
 
   setInterval(()=>{
     if(Notification.permission!=='granted')return;

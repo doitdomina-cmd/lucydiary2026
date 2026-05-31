@@ -441,6 +441,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <button class="nav" id="nav-diary" onclick="go('diary')"><span class="nav-ic"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#B2B0E8"></span></span>Thanks Diary</button>
       <button class="nav" id="nav-deadlines" onclick="go('deadlines')"><span class="nav-ic"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#E07070"></span></span>마감 관리</button>
       <button class="nav" id="nav-ledger" onclick="go('ledger')"><span class="nav-ic"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#7CB9A8"></span></span>가계부</button>
+      <button class="nav" id="nav-insights" onclick="go('insights')"><span class="nav-ic"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#B89BD9"></span></span>회고 & 통계</button>
     </div>
     <div class="sb-sec">
       <div class="sb-lbl">관리</div>
@@ -694,7 +695,7 @@ let activePid = null;
 let pjFilter = '';
 let viewDate = todStr();
 
-const titles = {today:'Today',diary:'Thanks Diary',calendar:'Monthly',routine:'루틴 설정',life:'나의 라이프',projects:'프로젝트',deadlines:'마감 관리',savings:'저축 목표',settings:'설정',ledger:'가계부'};
+const titles = {today:'Today',diary:'Thanks Diary',calendar:'Monthly',routine:'루틴 설정',life:'나의 라이프',projects:'프로젝트',deadlines:'마감 관리',savings:'저축 목표',settings:'설정',ledger:'가계부',insights:'회고 & 통계'};
 
 function go(p, pid, _fromPopstate){
   page=p; activePid=pid||null; if(p!=='projects') pjFilter='';
@@ -773,6 +774,7 @@ function render(){
   else if(page==='projects') div.innerHTML=activePid?renderPjDetail(activePid):renderProjects();
   else if(page==='deadlines') div.innerHTML=renderDeadlines();
   else if(page==='savings') div.innerHTML=renderSavings();
+  else if(page==='insights') div.innerHTML=renderInsights();
   else if(page==='settings') div.innerHTML=renderSettings();
   else if(page==='ledger') div.innerHTML=renderLedger();
   el.innerHTML=''; el.appendChild(div);
@@ -1565,21 +1567,16 @@ function laCardClick(e,aid){
 function renderGoalSection(){
   const g=S.lifeGoal||{text:'',sub:''};
   const hasGoal=!!(g.text);
-  var editBtn='<button class="goal-edit-btn" onclick="openGoalModal()" style="background:transparent;border:1px solid var(--goal-btn-border);color:var(--goal-sub);padding:5px 12px;border-radius:8px;cursor:pointer;font-size:0.8571em;font-family:var(--sans);opacity:0;transition:opacity .2s">'+(hasGoal?'✏️ 수정':'+ 작성')+'</button>';
+  var editBtn='<button class="goal-edit-btn" onclick="openGoalModal()" style="background:transparent;border:1px solid var(--border);color:var(--t3);padding:4px 11px;border-radius:8px;cursor:pointer;font-size:0.8em;font-family:var(--sans);opacity:0;transition:opacity .2s;flex-shrink:0">'+(hasGoal?'✏️ 수정':'+ 작성')+'</button>';
   var inner=hasGoal?
-    '<div style="background:var(--goal-item-bg);border-radius:12px;padding:18px 20px;border:1px solid var(--goal-item-border)">'+
-      '<div style="font-size:1.2143em;font-weight:500;color:var(--goal-text);line-height:1.6">'+g.text+'</div>'+
-      (g.sub?'<div style="font-size:0.9286em;color:var(--goal-sub);margin-top:6px">'+g.sub+'</div>':'')+
+    '<div><div style="font-size:1.35em;font-weight:600;color:var(--text);line-height:1.3">'+g.text+'</div>'+
+      (g.sub?'<div style="font-size:0.9em;color:var(--t3);margin-top:4px">'+g.sub+'</div>':'')+
     '</div>'
-    :'<div style="text-align:center;padding:16px 0;color:var(--goal-sub);font-size:0.9286em">아직 목표가 없어요. 궁극적인 목표를 적어보세요.</div>';
-  return '<div style="margin-bottom:24px;background:linear-gradient(135deg,var(--goal-bg1) 0%,var(--goal-bg2) 100%);border-radius:16px;padding:24px;border:1px solid var(--goal-border)" '+
+    :'<div style="color:var(--t3);font-size:0.9286em">아직 목표가 없어요. 궁극적인 목표를 적어보세요.</div>';
+  return '<div style="margin-bottom:24px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px" '+
     'onmouseenter="var b=this.querySelector(\'.goal-edit-btn\');if(b)b.style.opacity=\'1\'" '+
     'onmouseleave="var b=this.querySelector(\'.goal-edit-btn\');if(b)b.style.opacity=\'0\'">'+
-    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:'+(hasGoal?'14':'0')+'px">'+
-      '<div style="font-size:0.7857em;font-family:var(--mono);color:var(--goal-sub);text-transform:uppercase;letter-spacing:.1em">Ultimate Goal</div>'+
-      editBtn+
-    '</div>'+
-    inner+
+    inner+editBtn+
   '</div>';
 }
 function openGoalModal(){
@@ -2495,6 +2492,159 @@ function openSvGoal(){openMo('목표 수정','<div class="fg"><label class="fl">
 function saveSv(){const manwon=parseFloat(document.getElementById('sv-a').value),note=document.getElementById('sv-n').value,date=document.getElementById('sv-d').value;if(!manwon||isNaN(manwon))return;const amt=Math.round(manwon*10000);if(!S.savings.entries)S.savings.entries=[];S.savings.entries.push({id:gid(),amount:amt,note,date});S.savings.current+=amt;save();closeMo();render();}
 function saveSvG(){const g=parseFloat(document.getElementById('sv-g').value);if(!g||isNaN(g))return;S.savings.goal=Math.round(g*10000);save();closeMo();render();}
 function delSv(id){const e=S.savings.entries.find(x=>x.id===id);if(!e)return;S.savings.current-=e.amount;S.savings.entries=S.savings.entries.filter(x=>x.id!==id);save();render();}
+
+// ═══════════ 회고 & 통계 ═══════════
+function renderInsights(){
+  const today=todStr();
+  // ── 1) 최근 30일 루틴 달성률 ──
+  let cells30=[];
+  for(let i=29;i>=0;i--){
+    const ds=addDays(today,-i);
+    const rods=routinesForDate(ds);
+    const ck=S.checks[ds]||{};
+    const done=rods.filter(r=>ck[r.id]).length;
+    const pct=rods.length?Math.round(done/rods.length*100):0;
+    cells30.push({ds,done,total:rods.length,pct});
+  }
+  // 이번 주(최근 7일) 평균
+  const last7=cells30.slice(-7);
+  const avg7=last7.length?Math.round(last7.reduce((s,c)=>s+c.pct,0)/last7.length):0;
+  const avg30=cells30.length?Math.round(cells30.reduce((s,c)=>s+c.pct,0)/cells30.length):0;
+
+  // ── 2) 연속 달성(스트릭): 오늘부터 거꾸로, 그날 루틴 100% 달성한 날 ──
+  let streak=0;
+  for(let i=0;i<365;i++){
+    const ds=addDays(today,-i);
+    const rods=routinesForDate(ds);
+    if(rods.length===0){ if(i===0)continue; else break; }
+    const ck=S.checks[ds]||{};
+    const allDone=rods.every(r=>ck[r.id]);
+    if(allDone)streak++; else break;
+  }
+
+  // ── 3) 루틴별 달성 횟수 (최근 30일) ──
+  let routineStats={};
+  cells30.forEach(c=>{
+    const rods=routinesForDate(c.ds);
+    const ck=S.checks[c.ds]||{};
+    rods.forEach(r=>{
+      if(!routineStats[r.id])routineStats[r.id]={task:r.task,done:0,total:0};
+      routineStats[r.id].total++;
+      if(ck[r.id])routineStats[r.id].done++;
+    });
+  });
+  let statArr=Object.values(routineStats).map(function(s){s.rate=s.total?Math.round(s.done/s.total*100):0;return s;});
+  statArr.sort((a,b)=>b.rate-a.rate);
+  const best=statArr.slice(0,3);
+  const worst=statArr.slice().sort((a,b)=>a.rate-b.rate).slice(0,3);
+
+  // ── 4) 가계부 월 비교 ──
+  const now=new Date();
+  const ymThis=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  const prev=new Date(now.getFullYear(),now.getMonth()-1,1);
+  const ymPrev=prev.getFullYear()+'-'+String(prev.getMonth()+1).padStart(2,'0');
+  function sumMonth(ym,type){return (LD.transactions||[]).filter(t=>t.date.slice(0,7)===ym&&t.type===type).reduce((s,t)=>s+t.amount,0);}
+  const incThis=sumMonth(ymThis,'income'),incPrev=sumMonth(ymPrev,'income');
+  const expThis=sumMonth(ymThis,'expense'),expPrev=sumMonth(ymPrev,'expense');
+  function diffLabel(cur,prev){
+    if(prev===0)return cur>0?'<span style="color:var(--green)">신규</span>':'-';
+    const d=Math.round((cur-prev)/prev*100);
+    if(d===0)return '<span style="color:var(--t3)">변화 없음</span>';
+    const up=d>0;
+    return '<span style="color:'+(up?'var(--green)':'var(--red)')+'">'+(up?'▲':'▼')+' '+Math.abs(d)+'%</span>';
+  }
+
+  // ── 5) 저축 월별 추이 (최근 6개월 누적) ──
+  let svByMonth={};
+  (S.savings&&S.savings.entries||[]).forEach(function(e){
+    const m=e.date.slice(0,7);
+    svByMonth[m]=(svByMonth[m]||0)+e.amount;
+  });
+  let svMonths=[];
+  for(let i=5;i>=0;i--){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    const m=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    svMonths.push({m:(d.getMonth()+1)+'월',amount:svByMonth[m]||0});
+  }
+  const svMax=Math.max(1,...svMonths.map(x=>x.amount));
+
+  // ── 6) 감사 일기 돌아보기 ──
+  const diaryEntries=Object.keys(S.diaryEntries||{}).filter(k=>S.diaryEntries[k]&&S.diaryEntries[k].text).sort((a,b)=>b.localeCompare(a));
+  // 작년 오늘 / 한달 전
+  const monthAgo=addDays(today,-30);
+  const lookbacks=[];
+  if(S.diaryEntries&&S.diaryEntries[monthAgo]&&S.diaryEntries[monthAgo].text)lookbacks.push({label:'한 달 전',date:monthAgo,text:S.diaryEntries[monthAgo].text});
+  const yearAgo=(now.getFullYear()-1)+today.slice(4);
+  if(S.diaryEntries&&S.diaryEntries[yearAgo]&&S.diaryEntries[yearAgo].text)lookbacks.push({label:'작년 오늘',date:yearAgo,text:S.diaryEntries[yearAgo].text});
+
+  // ════════ HTML ════════
+  let html='';
+
+  // 상단 요약 4칸
+  html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:16px">';
+  html+='<div class="card" style="margin-bottom:0;padding:16px 18px"><div style="font-size:0.8em;color:var(--t3);margin-bottom:6px">🔥 연속 달성</div><div style="font-family:var(--serif);font-size:1.9em;line-height:1;color:var(--text)">'+streak+'<span style="font-size:0.5em;color:var(--t3)"> 일</span></div></div>';
+  html+='<div class="card" style="margin-bottom:0;padding:16px 18px"><div style="font-size:0.8em;color:var(--t3);margin-bottom:6px">이번 주 평균</div><div style="font-family:var(--serif);font-size:1.9em;line-height:1;color:var(--text)">'+avg7+'<span style="font-size:0.5em;color:var(--t3)"> %</span></div></div>';
+  html+='<div class="card" style="margin-bottom:0;padding:16px 18px"><div style="font-size:0.8em;color:var(--t3);margin-bottom:6px">최근 30일 평균</div><div style="font-family:var(--serif);font-size:1.9em;line-height:1;color:var(--text)">'+avg30+'<span style="font-size:0.5em;color:var(--t3)"> %</span></div></div>';
+  html+='<div class="card" style="margin-bottom:0;padding:16px 18px"><div style="font-size:0.8em;color:var(--t3);margin-bottom:6px">현재 저축</div><div style="font-family:var(--serif);font-size:1.6em;line-height:1;color:var(--text)">'+money(S.savings?S.savings.current:0)+'</div></div>';
+  html+='</div>';
+
+  // 최근 30일 히트맵
+  html+='<div class="card"><div class="ct" style="margin-bottom:14px">📊 최근 30일 루틴 달성</div>';
+  html+='<div style="display:grid;grid-template-columns:repeat(15,1fr);gap:5px">';
+  cells30.forEach(function(c){
+    var bg=c.total===0?'var(--s2)':c.pct===0?'var(--s3)':c.pct<50?'color-mix(in srgb,var(--accent) 30%,transparent)':c.pct<100?'color-mix(in srgb,var(--accent) 60%,transparent)':'var(--accent)';
+    var dnum=c.ds.slice(8);
+    html+='<div title="'+c.ds+' · '+c.done+'/'+c.total+'" style="aspect-ratio:1;border-radius:5px;background:'+bg+';display:flex;align-items:center;justify-content:center;font-size:0.6em;color:'+(c.pct>=100?'#fff':'var(--t3)')+'">'+parseInt(dnum)+'</div>';
+  });
+  html+='</div><div style="display:flex;align-items:center;gap:6px;margin-top:10px;font-size:0.7em;color:var(--t3)"><span>적음</span><div style="width:12px;height:12px;border-radius:3px;background:var(--s3)"></div><div style="width:12px;height:12px;border-radius:3px;background:color-mix(in srgb,var(--accent) 30%,transparent)"></div><div style="width:12px;height:12px;border-radius:3px;background:color-mix(in srgb,var(--accent) 60%,transparent)"></div><div style="width:12px;height:12px;border-radius:3px;background:var(--accent)"></div><span>많음</span></div></div>';
+
+  // 잘 지킨 / 자주 놓친 루틴
+  html+='<div class="g2">';
+  html+='<div class="card"><div class="ct" style="margin-bottom:12px">💚 잘 지킨 루틴</div>';
+  if(best.length===0||best[0].total===0){html+='<div class="empty">데이터가 쌓이면 보여요</div>';}
+  else{best.forEach(function(s){html+='<div style="display:flex;align-items:center;gap:10px;padding:7px 0"><div style="flex:1;font-size:0.88em">'+s.task+'</div><div style="flex:1.2;display:flex;align-items:center;gap:8px"><div class="pw" style="flex:1;height:7px"><div class="pb" style="width:'+s.rate+'%;background:var(--green)"></div></div><span style="font-size:0.78em;color:var(--t3);font-family:var(--mono);width:34px;text-align:right">'+s.rate+'%</span></div></div>';});}
+  html+='</div>';
+  html+='<div class="card"><div class="ct" style="margin-bottom:12px">💛 자주 놓친 루틴</div>';
+  if(worst.length===0||worst[0].total===0){html+='<div class="empty">데이터가 쌓이면 보여요</div>';}
+  else{worst.forEach(function(s){html+='<div style="display:flex;align-items:center;gap:10px;padding:7px 0"><div style="flex:1;font-size:0.88em">'+s.task+'</div><div style="flex:1.2;display:flex;align-items:center;gap:8px"><div class="pw" style="flex:1;height:7px"><div class="pb" style="width:'+s.rate+'%;background:var(--accent)"></div></div><span style="font-size:0.78em;color:var(--t3);font-family:var(--mono);width:34px;text-align:right">'+s.rate+'%</span></div></div>';});}
+  html+='</div>';
+  html+='</div>';
+
+  // 가계부 월 비교 + 저축 추이
+  html+='<div class="g2">';
+  html+='<div class="card"><div class="ct" style="margin-bottom:14px">📈 지난달 대비</div>';
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)"><div><div style="font-size:0.85em;color:var(--t3)">이번 달 수입</div><div style="font-size:1.1em;font-weight:600;color:var(--green)">'+money(incThis)+'</div></div><div style="font-size:0.85em">'+diffLabel(incThis,incPrev)+'</div></div>';
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0"><div><div style="font-size:0.85em;color:var(--t3)">이번 달 지출</div><div style="font-size:1.1em;font-weight:600;color:var(--red)">'+money(expThis)+'</div></div><div style="font-size:0.85em">'+diffLabel(expThis,expPrev)+'</div></div>';
+  html+='</div>';
+  html+='<div class="card"><div class="ct" style="margin-bottom:14px">💰 월별 저축 추이</div>';
+  html+='<div style="display:flex;gap:8px;align-items:flex-end;height:90px">';
+  svMonths.forEach(function(x){
+    var h=Math.round(x.amount/svMax*70);
+    html+='<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px"><div title="'+money(x.amount)+'" style="width:60%;background:var(--accent);border-radius:3px 3px 0 0;height:'+h+'px;min-height:'+(x.amount>0?3:0)+'px"></div><div style="font-size:0.68em;color:var(--t3)">'+x.m+'</div></div>';
+  });
+  html+='</div></div>';
+  html+='</div>';
+
+  // 감사 일기 돌아보기
+  html+='<div class="card"><div class="ct" style="margin-bottom:12px">✨ 감사 일기 돌아보기</div>';
+  if(lookbacks.length>0){
+    lookbacks.forEach(function(lb){
+      html+='<div style="padding:10px 14px;background:var(--s2);border-radius:10px;margin-bottom:8px"><div style="font-size:0.75em;color:var(--accent);font-weight:600;margin-bottom:4px">'+lb.label+' · '+lb.date+'</div><div style="font-size:0.9em;color:var(--text);line-height:1.5">'+lb.text+'</div></div>';
+    });
+  }
+  if(diaryEntries.length>0){
+    // 랜덤 1개 추천
+    const rand=diaryEntries[Math.floor(Math.random()*diaryEntries.length)];
+    html+='<div style="padding:10px 14px;background:var(--al);border-radius:10px"><div style="font-size:0.75em;color:var(--accent);font-weight:600;margin-bottom:4px">🎲 그 날의 감사 · '+rand+'</div><div style="font-size:0.9em;color:var(--text);line-height:1.5">'+S.diaryEntries[rand].text+'</div></div>';
+  }
+  if(lookbacks.length===0&&diaryEntries.length===0){
+    html+='<div class="empty">감사 일기를 쓰면 여기서 돌아볼 수 있어요</div>';
+  }
+  html+='<div style="text-align:center;margin-top:10px"><span style="font-size:0.78em;color:var(--t3)">총 '+diaryEntries.length+'개의 감사 일기를 작성했어요</span></div>';
+  html+='</div>';
+
+  return html;
+}
 
 // ═══════════ CALENDAR ═══════════
 let calY=new Date().getFullYear(), calM=new Date().getMonth();

@@ -503,19 +503,19 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
   <div class="sb-sc">
     <div class="sb-sec">
       <div class="sb-lbl">메인</div>
-      <button class="nav on" id="nav-today" onclick="go('today')"><span class="nav-ic"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#F5C842"></span></span>Today<span class="nav-bd" id="today-bd" style="display:none"></span></button>
-      <button class="nav" id="nav-calendar" onclick="go('calendar')"><span class="nav-ic"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#61C0BF"></span></span>Monthly</button>
-      <button class="nav" id="nav-diary" onclick="go('diary')"><span class="nav-ic"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#B2B0E8"></span></span>Thanks Diary</button>
-      <button class="nav" id="nav-deadlines" onclick="go('deadlines')"><span class="nav-ic"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#E07070"></span></span>마감 관리</button>
-      <button class="nav" id="nav-ledger" onclick="go('ledger')"><span class="nav-ic"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#7CB9A8"></span></span>가계부</button>
-      <button class="nav" id="nav-insights" onclick="go('insights')"><span class="nav-ic"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#B89BD9"></span></span>회고 & 통계</button>
+      <button class="nav on" id="nav-today" onclick="go('today')"><span class="nav-ic" data-color="#F5C842"></span>Today<span class="nav-bd" id="today-bd" style="display:none"></span></button>
+      <button class="nav" id="nav-calendar" onclick="go('calendar')"><span class="nav-ic" data-color="#61C0BF"></span>Monthly</button>
+      <button class="nav" id="nav-diary" onclick="go('diary')"><span class="nav-ic" data-color="#B2B0E8"></span>Thanks Diary</button>
+      <button class="nav" id="nav-deadlines" onclick="go('deadlines')"><span class="nav-ic" data-color="#E07070"></span>마감 관리</button>
+      <button class="nav" id="nav-ledger" onclick="go('ledger')"><span class="nav-ic" data-color="#7CB9A8"></span>가계부</button>
+      <button class="nav" id="nav-insights" onclick="go('insights')"><span class="nav-ic" data-color="#B89BD9"></span>회고 & 통계</button>
     </div>
     <div class="sb-sec">
       <div class="sb-lbl">관리</div>
-      <button class="nav" id="nav-life" onclick="go('life')"><span class="nav-ic"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#8BBF88"></span></span>나의 라이프</button>
-      <button class="nav" id="nav-projects" onclick="go('projects')"><span class="nav-ic"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#F5C490"></span></span>프로젝트</button>
-      <button class="nav" id="nav-routine" onclick="go('routine')"><span class="nav-ic"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#E8A87C"></span></span>루틴 설정</button>
-      <button class="nav" id="nav-savings" onclick="go('savings')"><span class="nav-ic"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#A8C5A0"></span></span>저축 목표</button>
+      <button class="nav" id="nav-life" onclick="go('life')"><span class="nav-ic" data-color="#8BBF88"></span>나의 라이프</button>
+      <button class="nav" id="nav-projects" onclick="go('projects')"><span class="nav-ic" data-color="#F5C490"></span>프로젝트</button>
+      <button class="nav" id="nav-routine" onclick="go('routine')"><span class="nav-ic" data-color="#E8A87C"></span>루틴 설정</button>
+      <button class="nav" id="nav-savings" onclick="go('savings')"><span class="nav-ic" data-color="#A8C5A0"></span>저축 목표</button>
     </div>
   </div>
   <div class="sb-pj-wrap" id="pj-nav-sec" style="display:none">
@@ -533,7 +533,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div style="flex:1;min-width:0"><div id="user-name" style="font-size:0.78em;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)"></div></div>
       <button class="bi" onclick="signOut()" style="font-size:0.85em;color:var(--t3)" title="로그아웃">↪</button>
     </div>
-    <button class="nav" id="nav-settings" onclick="go('settings')"><span class="nav-ic"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#B0A898"></span></span>설정</button>
+    <button class="nav" id="nav-settings" onclick="go('settings')"><span class="nav-ic" data-color="#B0A898"></span>설정</button>
   </div>
 </div>
 <div class="sb-ov" id="sb-ov" onclick="closeSB()"></div>
@@ -604,7 +604,7 @@ async function loadFromCloud() {
 function chunkData(data) {
   const FIELDS = ['routines','checks','projects','deadlines','savings','notes','calEvents',
     'lifeGoal','theme','customThemeColor','diaryEntries','monthlyGoals','monthlyMemo',
-    'weeklyGoals','weeklyMemo','diaryStickers','font','fontSize','fontWeight','customFonts','logoFont',
+    'weeklyGoals','weeklyMemo','diaryStickers','font','fontSize','fontWeight','customFonts','logoFont','navMarker',
     'lifeAreas','todoList','todoListTmr'];
   const chunks = {};
   FIELDS.forEach(f => { if (data[f] !== undefined) chunks[f] = data[f]; });
@@ -3059,12 +3059,34 @@ function renderSettings(){
   });
   logoFontHtml+='</div>';
 
+  // 메뉴 마커 선택 (동그라미 / 색하트 / 테마하트)
+  var curMk=S.navMarker||'dot';
+  var sampleColors=['#F5C842','#61C0BF','#B2B0E8'];
+  function mkSample(type){
+    return sampleColors.map(function(c){
+      if(type==='dot')return '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+c+'"></span>';
+      var hc=(type==='heartTheme')?'var(--accent)':c;
+      return '<svg width="13" height="13" viewBox="0 0 24 24" fill="'+hc+'"><path d="M12 21s-7.5-4.7-10-9.3C.4 8.5 1.5 5 4.7 4.2c2-.5 3.8.4 4.8 1.9l.5.8.5-.8c1-1.5 2.8-2.4 4.8-1.9C22.5 5 23.6 8.5 22 11.7 19.5 16.3 12 21 12 21z"/></svg>';
+    }).join('<span style="display:inline-block;width:5px"></span>');
+  }
+  var mkOpts=[{id:'dot',name:'동그라미'},{id:'heartColor',name:'하트 (색상별)'},{id:'heartTheme',name:'하트 (테마색)'}];
+  var markerHtml='<div style="display:flex;flex-direction:column;gap:8px">';
+  mkOpts.forEach(function(o){
+    var isCur=curMk===o.id;
+    markerHtml+='<div onclick="setNavMarker(\''+o.id+'\')" style="display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;border:1.5px solid '+(isCur?'var(--accent)':'var(--border)')+';border-radius:10px;padding:11px 14px;background:'+(isCur?'var(--al)':'var(--surface)')+';transition:all .2s">'+
+      '<span style="display:flex;align-items:center;gap:8px">'+mkSample(o.id)+'<span style="font-size:0.85em;color:var(--text);margin-left:4px">'+o.name+'</span></span>'+
+      (isCur?'<span style="color:var(--accent);font-weight:700">✓</span>':'')+
+    '</div>';
+  });
+  markerHtml+='</div>';
+
   return (
     '<div class="card" style="margin-bottom:14px"><div class="ct" style="margin-bottom:14px">🎨 테마 색상</div>'+themeHtml+'</div>'+
     '<div class="g2" style="margin-bottom:14px;align-items:start">'+
       '<div class="card" style="margin-bottom:0"><div class="ct" style="margin-bottom:14px">✍️ 글씨체</div>'+fontHtml+'</div>'+
       '<div class="card" style="margin-bottom:0"><div class="ct" style="margin-bottom:14px">🔤 로고 글씨체 <span style="font-size:0.75em;color:var(--t3);font-weight:400">(Lucy\'s Space)</span></div>'+logoFontHtml+'</div>'+
     '</div>'+
+    '<div class="card" style="margin-bottom:14px"><div class="ct" style="margin-bottom:14px">💗 메뉴 아이콘</div>'+markerHtml+'</div>'+
     '<div class="card" style="margin-bottom:14px"><div class="ct" style="margin-bottom:12px">🔠 글자 크기</div>'+
       '<div style="display:flex;align-items:center;gap:14px;padding:4px 0">'+
         '<span style="font-size:0.78em;color:var(--t3)">A</span>'+
@@ -3092,6 +3114,7 @@ function setTheme(t){S.theme=t;save();applyTheme(t);render();}
 function setFont(f){S.font=f;save();applyTheme(S.theme||'sky');render();}
 
 function setFontWeight(w){S.fontWeight=w;save();applyTheme(S.theme||'sky');render();}
+function setNavMarker(m){S.navMarker=m;save();applyNavMarkers();render();}
 function setLogoFont(lf){S.logoFont=lf;save();applyTheme(S.theme||'sky');
   // 필기체는 italic 해제 + 크기 보정
   var logo=document.querySelector('.logo');
@@ -3185,6 +3208,21 @@ function setCustomThemeVars(hex){
   root.setProperty('--ct-dark', darken(hex,0.25));
 }
 
+// 사이드바 메뉴 마커 (동그라미 / 색하트 / 테마하트)
+function applyNavMarkers(){
+  var mode=S.navMarker||'dot';
+  var accent=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#888';
+  document.querySelectorAll('.nav-ic[data-color]').forEach(function(ic){
+    var color=ic.dataset.color;
+    if(mode==='dot'){
+      ic.innerHTML='<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:'+color+'"></span>';
+    } else {
+      var hc=(mode==='heartTheme')?accent:color;
+      ic.innerHTML='<svg width="12" height="12" viewBox="0 0 24 24" fill="'+hc+'" style="display:block"><path d="M12 21s-7.5-4.7-10-9.3C.4 8.5 1.5 5 4.7 4.2c2-.5 3.8.4 4.8 1.9l.5.8.5-.8c1-1.5 2.8-2.4 4.8-1.9C22.5 5 23.6 8.5 22 11.7 19.5 16.3 12 21 12 21z"/></svg>';
+    }
+  });
+}
+
 function applyTheme(t){
   var validThemes = ['sky','sand','lightBeige','lightGray','coral','mint','cream','ocean','lilac','peach','charcoal','custom'];
   if(!validThemes.includes(t)) t = 'sky';
@@ -3265,6 +3303,8 @@ function applyTheme(t){
     'html, body { font-size: '+fs+'px !important; font-weight: '+fw+' !important; }' +
     '.app, .app * { font-weight: '+fw+' !important; }' +
     ':root { --sans: '+chosen+'; --serif: '+chosen+'; --mono: '+chosen+'; }';
+
+  applyNavMarkers();
 }
 
 function syncRzToRoutines(){

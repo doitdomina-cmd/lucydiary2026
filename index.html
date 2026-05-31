@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Lucy's Space</title>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist+Mono:wght@300;400;500&family=Pretendard:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Noto+Serif+KR:wght@400;500;600;700&family=Geist+Mono:wght@300;400;500&family=Pretendard:wght@300;400;500;600&display=swap" rel="stylesheet">
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -26,6 +26,7 @@
   /* 모든 영역(영문, 숫자 포함)을 선택한 폰트로 완벽히 통일 */
   --sans:'Pretendard','Apple SD Gothic Neo',sans-serif;
   --serif:var(--sans);
+  --serif-fancy:'Instrument Serif','Noto Serif KR',serif;
   --mono:var(--sans);
 
   /* Routine card colors */
@@ -177,7 +178,7 @@ html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--t
 /* ── SIDEBAR ── */
 .sb{width:var(--sw);min-width:var(--sw);background:var(--s2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;z-index:100;transition:transform .3s}
 .sb-head{padding:20px 16px 12px;border-bottom:1px solid var(--border)}
-.logo{font-family:var(--serif);font-size:1.5714em;display:flex;align-items:center;gap:8px}
+.logo{font-family:var(--serif-fancy);font-size:1.85em;display:flex;align-items:center;gap:9px;letter-spacing:0.5px;font-weight:400}
 .logo-dot{width:8px;height:8px;background:var(--accent);border-radius:50%}
 .logo-sub{font-size:0.7857em;color:var(--t3);font-family:var(--mono);margin-top:2px}
 .sb-sc{overflow-y:auto;flex:1}
@@ -406,7 +407,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 <div id="login-screen" style="display:flex;position:fixed;inset:0;background:var(--bg);z-index:9999;align-items:center;justify-content:center;flex-direction:column;gap:0">
   <div style="background:var(--surface);border-radius:24px;padding:48px 44px;box-shadow:0 8px 40px rgba(0,0,0,.10);max-width:380px;width:90%;text-align:center;border:1px solid var(--border)">
     <div style="font-size:2.8em;margin-bottom:12px">✨</div>
-    <div style="font-family:var(--serif);font-size:1.8em;margin-bottom:6px">Lucy's Space</div>
+    <div style="font-family:var(--serif-fancy);font-size:2.3em;letter-spacing:0.5px;margin-bottom:6px">Lucy's Space</div>
     <div style="font-size:0.88em;color:var(--t3);margin-bottom:32px">나만의 작업 공간에 오신 걸 환영해요</div>
     <button onclick="signInWithGoogle()" style="
       display:inline-flex;align-items:center;justify-content:center;gap:10px;
@@ -427,7 +428,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 <!-- SIDEBAR -->
 <div class="sb" id="sb">
   <div class="sb-head">
-    <div class="logo"><div class="logo-dot"></div>Lucy's Space</div>
+    <div class="logo"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Lucy's Space</div>
     <div class="logo-sub" id="sb-date" style="display:none"></div>
   </div>
   <div class="sb-sc">
@@ -708,14 +709,26 @@ function go(p, pid, _fromPopstate){
   const fhbg=document.getElementById('float-hbg');
   if(fhbg) fhbg.style.display='none';
 
+  const tbDate=document.getElementById('tb-date');
   if(pid){
     const proj=S.projects.find(x=>x.id===pid)||{name:'프로젝트'};
     const area=(S.lifeAreas||[]).find(a=>a.id===proj.lifeAreaId);
     const colorDot='<span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:'+(proj.color||'#999')+';margin-right:6px;vertical-align:middle;flex-shrink:0"></span>';
     const areaBadge=area?'<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:99px;font-size:0.78em;font-weight:500;background:'+area.color+'18;color:'+area.color+';margin-left:8px;vertical-align:middle">'+area.emoji+' '+area.name+'</span>':'';
     tbTitle.innerHTML=colorDot+proj.name+areaBadge;
+    // 날짜 자리에 수정 버튼
+    if(tbDate){
+      tbDate.innerHTML='<button class="btn bg bsm" onclick="openPjEditModal(\''+pid+'\')" style="font-family:var(--sans)">✏️ 수정</button>';
+      tbDate.style.fontFamily='var(--sans)';
+    }
   } else {
     tbTitle.textContent=titles[p]||'';
+    // 날짜 복원
+    if(tbDate){
+      tbDate.innerHTML='';
+      tbDate.style.fontFamily='';
+      tbDate.textContent=todLabel();
+    }
   }
   render(); closeSB();
 }
@@ -1013,7 +1026,7 @@ function renderToday(){
 
 
   var goalBar=(S.lifeGoal&&S.lifeGoal.text)
-    ? '<div style="padding:10px 0 16px;font-size:0.9286em;color:var(--t2);font-style:italic;border-bottom:1px solid var(--border);margin-bottom:20px">🎯 '+S.lifeGoal.text+'</div>'
+    ? '<div style="padding:10px 0 16px;border-bottom:1px solid var(--border);margin-bottom:20px;display:flex;align-items:center;gap:8px"><span style="font-size:1.2em">🎯</span><span style="font-family:var(--serif-fancy);font-size:1.45em;color:var(--text);letter-spacing:0.3px;line-height:1.3">'+S.lifeGoal.text+'</span></div>'
     : '';
 
   var entry=(S.diaryEntries||{})[t]||{};
@@ -1833,14 +1846,10 @@ function renderPjDetail(pid){
   const dn=tk.filter(t=>t.done).length,pc=tk.length?Math.round(dn/tk.length*100):0;
   const pjDl=S.deadlines.filter(d=>d.projectId===pid).sort((a,b)=>a.date.localeCompare(b.date));
   const area=(S.lifeAreas||[]).find(a=>a.id===p.lifeAreaId);
-  let html=
-    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap">'+
-    '<button class="btn bg bsm" onclick="openPjEditModal(\''+pid+'\')" style="margin-left:auto;flex-shrink:0">✏️ 수정</button>'+
-    '</div>'+
-    '';
+  let html='';
   if(tk.length>0)html+='<div class="card" style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:0.9286em;color:var(--t3)">전체 진행률</span><span style="font-family:var(--mono);font-size:0.9286em">'+dn+'/'+tk.length+'</span></div><div class="pw" style="height:10px"><div class="pb" style="width:'+pc+'%;background:'+p.color+'"></div></div></div>';
   html+='<div class="g2">';
-  html+='<div class="card"><div class="ch"><div class="ct">✅ 태스크</div><button class="btn bp bsm" onclick="openTkModal(\''+pid+'\')">+ 추가</button></div>'+
+  html+='<div class="card"><div class="ch"><div class="ct"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:0.85"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>태스크</div><button class="btn bp bsm" onclick="openTkModal(\''+pid+'\')">+ 추가</button></div>'+
     (tk.length===0?'<div class="empty">태스크를 추가해요</div>':
     '<div>'+
     tk.map((t,i)=>{
@@ -1865,7 +1874,7 @@ function renderPjDetail(pid){
   // 마감일 카드 — 태스크 마감 + 별도 마감 통합해서 날짜순
   const allDl=S.deadlines.filter(d=>d.projectId===pid).sort((a,b)=>a.date.localeCompare(b.date));
   html+='<div>'+
-    '<div class="card" style="margin-bottom:16px"><div class="ch"><div class="ct">🚨 마감일</div><button class="btn bg bsm" onclick="openDlModal(\''+pid+'\')">+ 추가</button></div>'+
+    '<div class="card" style="margin-bottom:16px"><div class="ch"><div class="ct"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:0.85"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>마감일</div><button class="btn bg bsm" onclick="openDlModal(\''+pid+'\')">+ 추가</button></div>'+
     (allDl.length===0?'<div class="empty">마감일 없음<br><span style="font-size:0.85em;color:var(--t3)">태스크에 마감일을 입력하면 자동으로 여기 나와요</span></div>':
       allDl.map(d=>{
         const dd=dLeft(d.date),f=fmtDateObj(d.date);
@@ -1884,7 +1893,7 @@ function renderPjDetail(pid){
       }).join(''))+
     '</div>'+
     // 루틴화 일정
-    '<div class="card"><div class="ch"><div class="ct">🔁 루틴화 일정</div><button class="btn bg bsm" onclick="openRzModal(\''+pid+'\')">+ 추가</button></div>'+
+    '<div class="card"><div class="ch"><div class="ct"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:0.85"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>루틴화 일정</div><button class="btn bg bsm" onclick="openRzModal(\''+pid+'\')">+ 추가</button></div>'+
     '<div style="font-size:0.8571em;color:var(--t3);margin-bottom:10px">반복 일정을 캘린더에 8주치 자동 등록해요</div>'+
     ((p.routinized||[]).length===0?'<div class="empty">루틴화할 항목을 추가해요</div>':(p.routinized||[]).map((r,i)=>{
       const DL={mon:'월',tue:'화',wed:'수',thu:'목',fri:'금',sat:'토',sun:'일'};
@@ -1897,7 +1906,7 @@ function renderPjDetail(pid){
   html+='<div class="g2" style="margin-top:0">';
   // 왼쪽: 마일스톤 + 링크
   html+='<div>'+
-    '<div class="card" style="margin-bottom:16px"><div class="ch"><div class="ct">🏁 마일스톤</div><button class="btn bg bsm" onclick="openMsModal(\''+pid+'\')">+ 추가</button></div>'+
+    '<div class="card" style="margin-bottom:16px"><div class="ch"><div class="ct"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:0.85"><path d="M4 22V4a1 1 0 0 1 1-1h14l-3 5 3 5H5"/></svg>마일스톤</div><button class="btn bg bsm" onclick="openMsModal(\''+pid+'\')">+ 추가</button></div>'+
     (ms.length===0?'<div class="empty">마일스톤 없음</div>':ms.map((m,i)=>'<div class="msi"><div class="mss '+(m.done?'on':'')+'" onclick="togMs(\''+pid+'\','+i+')"></div><div style="flex:1"><div style="font-size:0.9286em;'+(m.done?'text-decoration:line-through;color:var(--t3)':'')+'">'+m.text+'</div>'+(m.date?'<div style="font-size:0.7857em;color:var(--t3);font-family:var(--mono)">'+m.date+'</div>':'')+'</div><button class="bi" onclick="delMs(\''+pid+'\','+i+')" style="font-size:0.8571em;color:var(--red)">✕</button></div>').join(''))+
     '</div>'+
     '<div class="card"><div class="ch"><div class="ct">🔗 링크 바로가기</div><button class="btn bg bsm" onclick="openLkModal(\''+pid+'\')">+ 추가</button></div>'+
@@ -1905,7 +1914,7 @@ function renderPjDetail(pid){
     '</div></div>';
   // 오른쪽: 📚 학습 자료
   const materials=p.materials||[];
-  html+='<div class="card"><div class="ch"><div class="ct">📚 학습 자료</div><button class="btn bp bsm" onclick="openMatModal(\''+pid+'\')">+ 추가</button></div>';
+  html+='<div class="card"><div class="ch"><div class="ct"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:0.85"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>학습 자료</div><button class="btn bp bsm" onclick="openMatModal(\''+pid+'\')">+ 추가</button></div>';
   if(materials.length===0){
     html+='<div class="empty">PDF, 책 등 학습 자료를 등록해요</div>';
   } else {
@@ -1940,7 +1949,7 @@ function renderPjDetail(pid){
     });
   }
   html+='</div></div>';  // 학습자료 카드 + g2 닫기
-  html+='<div class="card"><div class="ct" style="margin-bottom:12px">📝 프로젝트 노트</div><textarea class="ta" style="min-height:120px" placeholder="메모, 아이디어..." onchange="savePjN(\''+pid+'\',this.value)">'+(p.notes||'')+'</textarea></div>';
+  html+='<div class="card"><div class="ct" style="margin-bottom:12px"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:0.85"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>프로젝트 노트</div><textarea class="ta" style="min-height:120px" placeholder="메모, 아이디어..." onchange="savePjN(\''+pid+'\',this.value)">'+(p.notes||'')+'</textarea></div>';
   return html;
 }
 

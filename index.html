@@ -917,9 +917,10 @@ function routineCard(ds){
       itemsHtml+='<div class="rc-item" onclick="toggleCheck(\''+r.id+'\',\''+ds+'\')">'+
         '<div class="rc-dot '+(isDone?'done':'')+'"></div>'+
         '<div style="flex:1">'+
-          '<div style="display:flex;align-items:baseline;gap:8px">'+
+          '<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">'+
             '<div class="rc-time">'+r.time+'</div>'+
             '<div class="rc-task '+(isDone?'done':'')+'">'+r.task+'</div>'+
+            (r.saveAmount>0?'<span style="font-size:0.72em;background:'+(isDone?'var(--green)':'var(--al)')+';color:'+(isDone?'#fff':'var(--accent)')+';padding:1px 7px;border-radius:99px;font-weight:600;white-space:nowrap">💰 '+money(r.saveAmount)+'</span>':'')+
           '</div>'+
           (r.detail?'<div class="rc-detail">'+r.detail+'</div>':'')+
         '</div>'+
@@ -948,7 +949,30 @@ function routineCard(ds){
 
 function toggleCheck(rid, ds){
   if(!S.checks[ds]) S.checks[ds]={};
-  S.checks[ds][rid]=!S.checks[ds][rid];
+  const nowChecked=!S.checks[ds][rid];
+  S.checks[ds][rid]=nowChecked;
+
+  // 저축 금액이 있는 루틴이면 저축 목표에 자동 반영
+  const r=(S.routines||[]).find(x=>x.id===rid);
+  if(r&&r.saveAmount>0){
+    if(!S.savings)S.savings={goal:0,current:0,entries:[]};
+    if(!S.savings.entries)S.savings.entries=[];
+    const svId='rzsave-'+rid+'-'+ds; // 루틴+날짜별 고유 ID
+    const existIdx=S.savings.entries.findIndex(e=>e.id===svId);
+    if(nowChecked){
+      // 체크 → 저축 입금 (중복 방지)
+      if(existIdx<0){
+        S.savings.entries.push({id:svId,amount:r.saveAmount,note:r.task+' (루틴 달성)',date:ds});
+        S.savings.current+=r.saveAmount;
+      }
+    } else {
+      // 체크 해제 → 저축 회수
+      if(existIdx>=0){
+        S.savings.current-=S.savings.entries[existIdx].amount;
+        S.savings.entries.splice(existIdx,1);
+      }
+    }
+  }
   save(); render();
 }
 // 루틴 카드 날짜 버튼 - document 위임 (렌더링 독립적)
@@ -1902,7 +1926,7 @@ function renderPjDetail(pid){
     ((p.routinized||[]).length===0?'<div class="empty">루틴화할 항목을 추가해요</div>':(p.routinized||[]).map((r,i)=>{
       const DL={mon:'월',tue:'화',wed:'수',thu:'목',fri:'금',sat:'토',sun:'일'};
       const days=(r.days||[]).map(d=>DL[d]||d).join(', ');
-      return '<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)"><div style="width:8px;height:8px;border-radius:50%;background:'+p.color+';flex-shrink:0;margin-top:5px"></div><div style="flex:1"><div style="font-size:0.9286em;font-weight:500">'+r.task+'</div><div style="font-size:0.7857em;color:var(--t3);margin-top:2px">'+(r.isMonthly?'매월 '+(r.monthDays||[]).map(function(d){return d==='last'?'말':d;}).join('·')+'일':'매주 '+(r.days||[]).map(d=>DOW_KO[DOWS.indexOf(d)]).join('·'))+(r.until?' ~ '+r.until:'')+(r.time?' · '+r.time:'')+(r.duration?' · '+r.duration+'분':'')+'</div></div><div style="display:flex;gap:2px"><button class="bi" onclick="openRzEditModal(\''+pid+'\','+i+')" style="font-size:0.8571em">✎</button><button class="bi" onclick="delRz(\''+pid+'\','+i+')" style="font-size:0.8571em;color:var(--red)">✕</button></div></div>';
+      return '<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)"><div style="width:8px;height:8px;border-radius:50%;background:'+p.color+';flex-shrink:0;margin-top:5px"></div><div style="flex:1"><div style="font-size:0.9286em;font-weight:500">'+r.task+'</div><div style="font-size:0.7857em;color:var(--t3);margin-top:2px">'+(r.isMonthly?'매월 '+(r.monthDays||[]).map(function(d){return d==='last'?'말':d;}).join('·')+'일':'매주 '+(r.days||[]).map(d=>DOW_KO[DOWS.indexOf(d)]).join('·'))+(r.until?' ~ '+r.until:'')+(r.time?' · '+r.time:'')+(r.duration?' · '+r.duration+'분':'')+(r.saveAmount>0?' · 💰'+money(r.saveAmount):'')+'</div></div><div style="display:flex;gap:2px"><button class="bi" onclick="openRzEditModal(\''+pid+'\','+i+')" style="font-size:0.8571em">✎</button><button class="bi" onclick="delRz(\''+pid+'\','+i+')" style="font-size:0.8571em;color:var(--red)">✕</button></div></div>';
     }).join(''))+
     '</div></div></div>';
 
@@ -2164,7 +2188,8 @@ function openRzModal(pid){
       '<input type="date" class="inp" id="rz-until" value="'+ddayVal+'">'+
     '</div>'+
     '<div class="fg"><label class="fl">시간 (선택)</label><input type="time" class="inp" id="rz-ti"></div>'+
-    '<div class="fg"><label class="fl">소요 시간 (분, 선택)</label><input type="number" class="inp" id="rz-du" placeholder="예: 60" min="5" step="5"></div>',
+    '<div class="fg"><label class="fl">소요 시간 (분, 선택)</label><input type="number" class="inp" id="rz-du" placeholder="예: 60" min="5" step="5"></div>'+
+    '<div class="fg"><label class="fl">💰 저축 금액 (선택) <span style="color:var(--t3);font-weight:400">- 체크 시 저축 목표에 자동 입금</span></label><div style="display:flex;align-items:center;gap:8px"><input type="number" class="inp" id="rz-save" placeholder="예: 1000" step="1" style="flex:1"><span style="color:var(--t2);white-space:nowrap;font-size:0.95em">만원</span></div></div>',
     '<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="saveRz(\''+pid+'\')">추가 + 캘린더 등록</button>');
 }
 function setRzMode(mode){
@@ -2194,6 +2219,8 @@ function saveRz(pid){
   const task=document.getElementById('rz-t').value.trim();
   const time=document.getElementById('rz-ti').value;
   const dur=document.getElementById('rz-du').value;
+  const saveAmtEl=document.getElementById('rz-save');
+  const saveAmt=saveAmtEl&&saveAmtEl.value?Math.round(parseFloat(saveAmtEl.value)*10000):0;
   const until=document.getElementById('rz-until').value;
   const isMonthly=(document.getElementById('rz-mode-month')&&document.getElementById('rz-mode-month').dataset.on==='1');
 
@@ -2210,9 +2237,9 @@ function saveRz(pid){
   }
 
   const p=S.projects.find(x=>x.id===pid);if(!p.routinized)p.routinized=[];
-  const entry={id:gid(),task,days:isMonthly?[]:days,monthDays:isMonthly?monthDays:[],isMonthly:!!isMonthly,time,duration:dur,projectId:pid,until};
+  const entry={id:gid(),task,days:isMonthly?[]:days,monthDays:isMonthly?monthDays:[],isMonthly:!!isMonthly,time,duration:dur,projectId:pid,until,saveAmount:saveAmt};
   p.routinized.push(entry);
-  S.routines.push({id:entry.id,time:time||'00:00',task,detail:p.name+' 루틴화',days:isMonthly?[]:days,monthDays:isMonthly?monthDays:[],isMonthly:!!isMonthly,isRz:true,rzProjectId:pid});
+  S.routines.push({id:entry.id,time:time||'00:00',task,detail:p.name+' 루틴화',days:isMonthly?[]:days,monthDays:isMonthly?monthDays:[],isMonthly:!!isMonthly,isRz:true,rzProjectId:pid,saveAmount:saveAmt});
   S.routines.sort((a,b)=>a.time.localeCompare(b.time));
 
   // 캘린더 등록: 오늘 ~ 마감일까지
@@ -2258,7 +2285,8 @@ function openRzEditModal(pid, idx){
     }).join('')+
     '</div></div>'+
     '<div class="fg"><label class="fl">시간 (선택)</label><input type="time" class="inp" id="rze-ti" value="'+(r.time||'')+'"></div>'+
-    '<div class="fg"><label class="fl">소요 시간 (분, 선택)</label><input type="number" class="inp" id="rze-du" value="'+(r.duration||'')+'" placeholder="예: 60" min="5" step="5"></div>',
+    '<div class="fg"><label class="fl">소요 시간 (분, 선택)</label><input type="number" class="inp" id="rze-du" value="'+(r.duration||'')+'" placeholder="예: 60" min="5" step="5"></div>'+
+    '<div class="fg"><label class="fl">💰 저축 금액 (선택)</label><div style="display:flex;align-items:center;gap:8px"><input type="number" class="inp" id="rze-saveamt" value="'+(r.saveAmount?r.saveAmount/10000:'')+'" placeholder="예: 1000" step="1" style="flex:1"><span style="color:var(--t2);white-space:nowrap;font-size:0.95em">만원</span></div></div>',
     '<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" id="rze-save">저장</button>');
   document.getElementById('rze-save').onclick=function(){ saveRzEdit(pid, idx); };
 }
@@ -2270,12 +2298,14 @@ function saveRzEdit(pid, idx){
   const task=document.getElementById('rze-t').value.trim();
   const time=document.getElementById('rze-ti').value;
   const dur=document.getElementById('rze-du').value;
+  const saveAmtEl=document.getElementById('rze-saveamt');
+  const saveAmt=saveAmtEl&&saveAmtEl.value?Math.round(parseFloat(saveAmtEl.value)*10000):0;
   const days=Array.from(document.querySelectorAll('.rzed-btn')).filter(el=>el.dataset.on==='1').map(el=>el.dataset.k);
   if(!task||!days.length){ alert('할 일 이름과 요일을 선택해주세요'); return; }
   const p=S.projects.find(x=>x.id===pid); if(!p) return;
   const old=p.routinized[idx];
   S.calEvents=S.calEvents.filter(e=>e.rzId!==old.id);
-  p.routinized[idx]=Object.assign({},old,{task,days,time,duration:dur});
+  p.routinized[idx]=Object.assign({},old,{task,days,time,duration:dur,saveAmount:saveAmt});
   const DM={sun:0,mon:1,tue:2,wed:3,thu:4,fri:5,sat:6};
   const now=new Date();
   for(let w=0;w<8;w++){days.forEach(d=>{const t=new Date(now),diff=(DM[d]-now.getDay()+7)%7+w*7;t.setDate(now.getDate()+diff);S.calEvents.push({id:gid(),date:dateStr(t),title:(time?time+' ':'')+task,color:p.color,rzId:old.id,projectId:pid});});}
@@ -2331,6 +2361,63 @@ function delSv(id){const e=S.savings.entries.find(x=>x.id===id);if(!e)return;S.s
 
 // ═══════════ CALENDAR ═══════════
 let calY=new Date().getFullYear(), calM=new Date().getMonth();
+// ═══════════ 캘린더 날짜별 루틴 체크 모달 ═══════════
+function openDayRoutineModal(ds){
+  const old=document.getElementById('day-routine-overlay');
+  if(old)old.remove();
+
+  const rods=routinesForDate(ds);
+  const checks=S.checks[ds]||{};
+  const dt=new Date(ds+'T00:00:00');
+  const dow=DOW_KO[dt.getDay()];
+  const dateLabel=(dt.getMonth()+1)+'월 '+dt.getDate()+'일 ('+dow+')';
+  const done=rods.filter(r=>checks[r.id]).length;
+  const pct=rods.length?Math.round(done/rods.length*100):0;
+
+  var itemsHtml='';
+  if(rods.length===0){
+    itemsHtml='<div style="text-align:center;padding:30px 0;color:var(--t3);font-size:0.9em">이 날 루틴이 없어요</div>';
+  } else {
+    rods.forEach(function(r){
+      const isDone=!!checks[r.id];
+      itemsHtml+='<div onclick="dayRoutineToggle(\''+r.id+'\',\''+ds+'\')" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;margin-bottom:6px;cursor:pointer;background:'+(isDone?'var(--al)':'var(--s2)')+';transition:background .15s">'+
+        '<div style="width:20px;height:20px;border-radius:6px;border:2px solid '+(isDone?'var(--green)':'var(--border2)')+';background:'+(isDone?'var(--green)':'transparent')+';flex-shrink:0;display:flex;align-items:center;justify-content:center">'+
+        (isDone?'<span style="color:#fff;font-size:0.7em">&#10003;</span>':'')+
+        '</div>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">'+
+            '<span style="font-size:0.8em;color:var(--accent);font-family:var(--mono);font-weight:600">'+r.time+'</span>'+
+            '<span style="font-size:0.92em;font-weight:500;'+(isDone?'text-decoration:line-through;color:var(--t3)':'')+'">'+r.task+'</span>'+
+            (r.saveAmount>0?'<span style="font-size:0.72em;background:'+(isDone?'var(--green)':'var(--al)')+';color:'+(isDone?'#fff':'var(--accent)')+';padding:1px 7px;border-radius:99px;font-weight:600">💰 '+money(r.saveAmount)+'</span>':'')+
+          '</div>'+
+          (r.detail?'<div style="font-size:0.78em;color:var(--t3);margin-top:2px">'+r.detail+'</div>':'')+
+        '</div>'+
+      '</div>';
+    });
+  }
+
+  const inner=
+    '<div style="padding:20px 24px 12px;display:flex;align-items:center;justify-content:space-between">'+
+      '<div><div style="font-size:1.1em;font-weight:600">'+dateLabel+'</div>'+
+      (rods.length>0?'<div style="font-size:0.82em;color:var(--t3);margin-top:2px">'+done+'/'+rods.length+' 완료 · '+pct+'%</div>':'')+
+      '</div>'+
+      '<button class="bi" onclick="document.getElementById(\'day-routine-overlay\').remove()">✕</button>'+
+    '</div>'+
+    '<div style="padding:4px 24px 20px;overflow-y:auto;flex:1">'+itemsHtml+'</div>';
+
+  const overlay=document.createElement('div');
+  overlay.id='day-routine-overlay';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:1001;display:flex;align-items:center;justify-content:center;padding:20px';
+  overlay.innerHTML='<div style="background:var(--surface);border-radius:16px;width:100%;max-width:420px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.15)">'+inner+'</div>';
+  overlay.addEventListener('click',function(e){if(e.target===overlay)overlay.remove();});
+  document.body.appendChild(overlay);
+}
+// 모달 안에서 체크 토글 (저축 연동 포함) → 모달 즉시 갱신
+function dayRoutineToggle(rid,ds){
+  toggleCheck(rid,ds);
+  openDayRoutineModal(ds); // 모달 다시 그려서 체크 상태 반영
+}
+
 function renderCalendar(){
   const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const MN_KO=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
@@ -2383,15 +2470,18 @@ function renderCalendar(){
     var ds=cell.y+'-'+String(cell.m+1).padStart(2,'0')+'-'+String(cell.d).padStart(2,'0');
     var isT=ds===ts;
     var evs=evMap[ds]||[];
-    calHtml+='<div class="cal-cell" data-ds="'+ds+'" style="'+
+    calHtml+='<div class="cal-cell" data-ds="'+ds+'" onclick="openDayRoutineModal(\''+ds+'\')" style="cursor:pointer;'+
       'min-height:100px;padding:6px 8px;'+
       'border-right:'+(ci===6?'none':'1px solid var(--border)')+';'+
       'border-bottom:'+(ri===5?'none':'1px solid var(--border)')+';'+
       'background:'+(isT?'var(--accent)15':'transparent')+'">'+
-      '<div style="width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;'+
-        'background:'+(isT?'var(--accent)25':'transparent')+';'+
-        'font-size:0.85em;font-weight:'+(isT?'700':'500')+';margin-bottom:3px;'+
-        'color:'+(isT?'var(--accent)':!cell.cur?'var(--t3)':ci===0?'var(--red)':ci===6?'var(--blue)':'var(--text)')+'">'+cell.d+'</div>';
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">'+
+        '<div style="width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;'+
+          'background:'+(isT?'var(--accent)25':'transparent')+';'+
+          'font-size:0.85em;font-weight:'+(isT?'700':'500')+';'+
+          'color:'+(isT?'var(--accent)':!cell.cur?'var(--t3)':ci===0?'var(--red)':ci===6?'var(--blue)':'var(--text)')+'">'+cell.d+'</div>'+
+        (function(){var rc=routinesForDate(ds);if(!rc.length)return '';var ck=S.checks[ds]||{};var dn=rc.filter(function(rr){return ck[rr.id];}).length;if(dn===0)return '';var allDone=dn===rc.length;return '<span style="font-size:0.62em;font-weight:600;padding:1px 5px;border-radius:99px;background:'+(allDone?'var(--green)':'var(--al)')+';color:'+(allDone?'#fff':'var(--accent)')+'">'+dn+'/'+rc.length+'</span>';})()+
+      '</div>';
     evs.slice(0,3).forEach(function(ev){
       if(ev.isDl) {
         calHtml+='<div style="background:'+(ev.color||'var(--accent)')+'14;color:#555;'+
@@ -2741,8 +2831,20 @@ function syncRzToRoutines(){
           task: entry.task,
           detail: p.name+' 루틴화',
           days: entry.days||[],
+          monthDays: entry.monthDays||[],
+          isMonthly: !!entry.isMonthly,
+          saveAmount: entry.saveAmount||0,
           isRz: true,
           rzProjectId: p.id
+        });
+      } else {
+        // 기존 루틴에 saveAmount 등 최신 정보 반영
+        S.routines.forEach(function(r){
+          if(r.id===entry.id){
+            r.saveAmount=entry.saveAmount||0;
+            r.monthDays=entry.monthDays||[];
+            r.isMonthly=!!entry.isMonthly;
+          }
         });
       }
     });

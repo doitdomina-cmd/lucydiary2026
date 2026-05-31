@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Lucy's Space</title>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Noto+Serif+KR:wght@400;500;600;700&family=Nanum+Pen+Script&family=Gaegu:wght@400;700&family=Montserrat:ital,wght@1,700;1,800&family=Dancing+Script:wght@600;700&family=Sacramento&family=Allura&family=Kaushan+Script&family=Geist+Mono:wght@300;400;500&family=Pretendard:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Noto+Serif+KR:wght@400;500;600;700&family=Nanum+Pen+Script&family=Nanum+Myeongjo:wght@400;700&family=Sunflower:wght@300;500;700&family=Hi+Melody&family=Stylish&family=Gaegu:wght@400;700&family=Montserrat:ital,wght@1,700;1,800&family=Dancing+Script:wght@600;700&family=Sacramento&family=Allura&family=Kaushan+Script&family=Geist+Mono:wght@300;400;500&family=Pretendard:wght@300;400;500;600&display=swap" rel="stylesheet">
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -3016,26 +3016,26 @@ function renderSettings(){
   themeHtml+='</div>';
 
   var fontSlots=[
-    {id:'pretendard',name:'Pretendard',desc:'기본 — 깔끔한 서체',slot:null},
-    {id:'serif',name:'Serif',desc:'세리프 — 클래식한 느낌',slot:null},
-    {id:'notoserif',name:'Noto Serif KR',desc:'한국어 명조체 — 단아한 느낌',slot:null},
-    {id:'custom1',name:cf[0]||'슬롯 1',desc:cf[0]?'등록된 폰트':'TTF/OTF 업로드',slot:0},
-    {id:'custom2',name:cf[1]||'슬롯 2',desc:cf[1]?'등록된 폰트':'TTF/OTF 업로드',slot:1},
+    {id:'pretendard',name:'Pretendard',desc:'기본 — 깔끔한 서체',ff:"'Pretendard',sans-serif"},
+    {id:'serif',name:'Serif',desc:'세리프 — 클래식한 느낌',ff:"'Instrument Serif',Georgia,serif"},
+    {id:'notoserif',name:'Noto Serif KR',desc:'한국어 명조체 — 단아한 느낌',ff:"'Noto Serif KR',serif"},
+    {id:'nanummyeongjo',name:'나눔명조',desc:'고전적인 명조체',ff:"'Nanum Myeongjo',serif"},
+    {id:'nanumpen',name:'나눔손글씨 펜',desc:'손글씨 — 자유로운 느낌',ff:"'Nanum Pen Script',cursive"},
+    {id:'sunflower',name:'해바라기',desc:'부드러운 고딕',ff:"'Sunflower',sans-serif"},
+    {id:'himelody',name:'하이멜로디',desc:'귀여운 손글씨',ff:"'Hi Melody',cursive"},
+    {id:'stylish',name:'스타일리시',desc:'가늘고 모던한 고딕',ff:"'Stylish',sans-serif"}
   ];
   var fontHtml='<div style="display:flex;flex-direction:column;gap:6px">';
   fontSlots.forEach(function(f){
     var isCur=curF===f.id;
-    var isEmpty=f.slot!==null&&!cf[f.slot];
-    fontHtml+='<div style="border:1.5px solid '+(isCur?'var(--accent)':'var(--border)')+';border-radius:10px;padding:10px 14px;background:'+(isCur?'var(--al)':'var(--surface)')+';transition:all .2s">'+
-      '<div style="display:flex;align-items:center;cursor:pointer" onclick="setFont(\''+f.id+'\')">'+
-        '<div style="flex:1"><div style="font-size:0.9em;font-weight:500;color:'+(isEmpty?'var(--t3)':'var(--text)')+'">'+f.name+'</div>'+
-        '<div style="font-size:0.78em;color:var(--t3)">'+f.desc+'</div></div>'+
+    fontHtml+='<div style="border:1.5px solid '+(isCur?'var(--accent)':'var(--border)')+';border-radius:10px;padding:10px 14px;background:'+(isCur?'var(--al)':'var(--surface)')+';transition:all .2s;cursor:pointer" onclick="setFont(\''+f.id+'\')">'+
+      '<div style="display:flex;align-items:center">'+
+        '<div style="flex:1">'+
+          '<div style="font-size:1.05em;font-weight:500;color:var(--text);font-family:'+f.ff+'">건강하고 행복한 자산가</div>'+
+          '<div style="font-size:0.75em;color:var(--t3);margin-top:3px">'+f.name+' · '+f.desc+'</div>'+
+        '</div>'+
         (isCur?'<div style="color:var(--accent);font-weight:700">✓</div>':'')+
       '</div>'+
-      (f.slot!==null?'<div style="margin-top:8px;display:flex;gap:6px">'+
-        '<label class="btn bg bsm" style="cursor:pointer;font-size:0.78em">'+(isEmpty?'📂 업로드':'🔄 교체')+'<input type="file" accept=".ttf,.otf,.woff,.woff2" style="display:none" data-slot="'+f.slot+'" onchange="loadCustomFont(this,parseInt(this.dataset.slot))"></label>'+
-        (!isEmpty?'<button class="btn bg bsm" style="font-size:0.78em;color:var(--red)" data-slot="'+f.slot+'" onclick="clearCustomFont(parseInt(this.dataset.slot))">🗑</button>':'')+
-      '</div>':'')+
     '</div>';
   });
   fontHtml+='</div>';
@@ -3213,9 +3213,9 @@ function applyNavMarkers(){
   var mode=S.navMarker||'dot';
   // 테마별 지정 색 (설정 스와치의 진한 색과 동일)
   var themeAccent={
-    sky:'#86A8AD',sand:'#A39688',lightBeige:'#C0B5A7',lightGray:'#A0ABB5',
-    coral:'#3BB0AA',mint:'#FFD3D5',cream:'#498D60',ocean:'#3576BE',
-    lilac:'#BF406A',peach:'#BDE3C3',charcoal:'#56565E'
+    sky:'#A8D0D6',sand:'#C9BBA8',lightBeige:'#D8CBBA',lightGray:'#BCC6D0',
+    coral:'#C1EBE9',mint:'#F9D0CD',cream:'#DAF9DE',ocean:'#A8C8E8',
+    lilac:'#E49BA6',peach:'#FFD3D5',charcoal:'#B0B0B8'
   };
   var th=S.theme||'sky';
   var accent=themeAccent[th];
@@ -3272,6 +3272,11 @@ function applyTheme(t){
     pretendard:"'Pretendard','Apple SD Gothic Neo',sans-serif",
     serif:"'Instrument Serif',Georgia,serif",
     notoserif:"'Noto Serif KR','Nanum Myeongjo',serif",
+    nanummyeongjo:"'Nanum Myeongjo',serif",
+    nanumpen:"'Nanum Pen Script',cursive",
+    sunflower:"'Sunflower','Pretendard',sans-serif",
+    himelody:"'Hi Melody',cursive",
+    stylish:"'Stylish','Pretendard',sans-serif",
     custom1: S.customFonts&&S.customFonts[0] ? "'UserFont1',sans-serif" : "'Pretendard',sans-serif",
     custom2: S.customFonts&&S.customFonts[1] ? "'UserFont2',sans-serif" : "'Pretendard',sans-serif",
   };

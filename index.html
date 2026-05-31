@@ -193,6 +193,12 @@ html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--t
 .pnav{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:var(--rsm);cursor:pointer;color:var(--t2);font-size:0.9286em;transition:all .15s}
 .pnav:hover,.pnav.on{background:var(--s2);color:var(--text)}
 .pdot{width:8px;height:8px;border-radius:3px;flex-shrink:0}
+.pj-group-hd{display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:var(--rsm);cursor:pointer;color:var(--t2);font-size:0.88em;font-weight:500;transition:background .15s;user-select:none}
+.pj-group-hd:hover{background:var(--s2)}
+.pj-group-hd .pj-arrow{transition:transform .2s;display:inline-block;font-size:1em;color:var(--t3);flex-shrink:0;transform:rotate(90deg)}
+.pj-group-hd.collapsed .pj-arrow{transform:rotate(0deg)}
+.pj-group-body{overflow:hidden;transition:max-height .25s ease}
+.pj-group-body.collapsed{max-height:0!important}
 .sb-ft{padding:12px 8px;border-top:1px solid var(--border)}
 .sb-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:99}
 
@@ -834,7 +840,7 @@ function updateSB(){
         '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(a.emoji?a.emoji+' ':'')+a.name+'</span>'+
         '<span class="pj-arrow">›</span>'+
       '</div>'+
-      '<div class="pj-group-body'+(isCollapsed?' collapsed':'')+'" id="'+gid_+'" style="max-height:'+(isCollapsed?'0':'999px')+'">'+
+      '<div class="pj-group-body'+(isCollapsed?' collapsed':'')+'" id="'+gid_+'" style="max-height:'+(isCollapsed?'0':'none')+'">'+
       ps.map(function(p){
         return '<div class="pnav '+(activePid===p.id?'on':'')+'" onclick="go(\'projects\',\''+p.id+'\')" style="padding-left:20px">'+
           '<div class="pdot" style="background:'+p.color+'"></div>'+
@@ -857,14 +863,21 @@ function updateSB(){
 window._pjGroupCollapsed={};
 function togglePjGroup(aid){
   if(!window._pjGroupCollapsed) window._pjGroupCollapsed={};
-  window._pjGroupCollapsed[aid]=!window._pjGroupCollapsed[aid];
+  const col=!window._pjGroupCollapsed[aid];
+  window._pjGroupCollapsed[aid]=col;
   const hd=document.querySelector('.pj-group-hd[onclick*="'+aid+'"]');
   const body=document.getElementById('pjg-'+aid);
   if(!hd||!body) return;
-  const col=window._pjGroupCollapsed[aid];
   hd.classList.toggle('collapsed',col);
-  body.classList.toggle('collapsed',col);
-  body.style.maxHeight=col?'0':'999px';
+  if(col){
+    body.style.maxHeight=body.scrollHeight+'px';
+    requestAnimationFrame(function(){body.style.maxHeight='0';});
+    body.classList.add('collapsed');
+  } else {
+    body.classList.remove('collapsed');
+    body.style.maxHeight=body.scrollHeight+'px';
+    setTimeout(function(){if(!window._pjGroupCollapsed[aid])body.style.maxHeight='none';},260);
+  }
 }
 
 // ═══════════ ROUTINE CARD ═══════════
@@ -3088,6 +3101,40 @@ function ledgerTxRow(tx){
   '</div>';
 }
 
+// ═══════════ 가계부 캘린더 툴팁 ═══════════
+function _ensureLedgerTip(){
+  var tip=document.getElementById('ledger-cal-tip');
+  if(!tip){
+    tip=document.createElement('div');
+    tip.id='ledger-cal-tip';
+    tip.style.cssText='position:fixed;z-index:99999;pointer-events:none;display:none;background:rgba(40,40,45,0.95);color:#fff;padding:8px 11px;border-radius:8px;font-size:0.8em;line-height:1.5;white-space:pre;box-shadow:0 4px 16px rgba(0,0,0,0.25);max-width:260px';
+    document.body.appendChild(tip);
+  }
+  return tip;
+}
+function showLedgerTip(el,e){
+  var txt=el.getAttribute('data-tip');
+  if(!txt)return;
+  var tip=_ensureLedgerTip();
+  tip.textContent=txt.replace(/&#10;/g,'\n').replace(/&quot;/g,'"');
+  tip.style.display='block';
+  moveLedgerTip(e);
+}
+function moveLedgerTip(e){
+  var tip=document.getElementById('ledger-cal-tip');
+  if(!tip||tip.style.display==='none')return;
+  var x=e.clientX+14, y=e.clientY+14;
+  var tw=tip.offsetWidth, th=tip.offsetHeight;
+  if(x+tw>window.innerWidth-10) x=e.clientX-tw-14;
+  if(y+th>window.innerHeight-10) y=e.clientY-th-14;
+  tip.style.left=x+'px';
+  tip.style.top=y+'px';
+}
+function hideLedgerTip(){
+  var tip=document.getElementById('ledger-cal-tip');
+  if(tip)tip.style.display='none';
+}
+
 function renderLedgerCalendar(){
   const MN=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
   const ts=todStr();
@@ -3158,10 +3205,22 @@ function renderLedgerCalendar(){
     const dow=idx%7;
     const textColor=isT?'var(--accent)':!cell.cur?'var(--t3)':dow===0?'var(--red)':dow===6?'var(--blue)':'var(--text)';
     const hasPending=(di.fixed||[]).some(f=>!f.amount||f.amount==='req_input');
-    html+='<div onclick="openLedgerDayModal(\''+ds+'\')" style="min-height:90px;border-radius:6px;padding:4px 5px;background:'+(isT?'var(--al)':'transparent')+';border:1px solid '+(isT?'var(--accent)':'var(--border)')+';cursor:pointer;transition:background .1s" onmouseover="this.style.background=\'var(--s2)\'" onmouseout="this.style.background=\''+(isT?'var(--al)':'transparent')+'\'">';
+    // 툴팁용 내역 텍스트 생성
+    var tipLines=[];
+    (di.txs||[]).forEach(function(tx){
+      var sign=tx.type==='income'?'+':'-';
+      var label=tx.memo||tx.minorCategory||tx.majorCategory||'';
+      tipLines.push(sign+new Intl.NumberFormat('ko-KR').format(tx.amount)+'  '+label);
+    });
+    (di.fixed||[]).forEach(function(fi){
+      var amt=(!fi.amount||fi.amount==='req_input')?'금액미정':'-'+new Intl.NumberFormat('ko-KR').format(fi.amount);
+      tipLines.push(amt+'  '+(fi.memo||'')+' (고정)');
+    });
+    var tipAttr=tipLines.length>0?' data-tip="'+tipLines.join('&#10;').replace(/"/g,'&quot;')+'"':'';
+    html+='<div class="ledger-cal-cell" onclick="openLedgerDayModal(\''+ds+'\')"'+tipAttr+' style="position:relative;min-height:90px;border-radius:6px;padding:4px 5px;background:'+(isT?'var(--al)':'transparent')+';border:1px solid '+(isT?'var(--accent)':'var(--border)')+';cursor:pointer;transition:background .1s" onmouseover="this.style.background=\'var(--s2)\';showLedgerTip(this,event)" onmousemove="moveLedgerTip(event)" onmouseout="this.style.background=\''+(isT?'var(--al)':'transparent')+'\';hideLedgerTip()">';
     html+='<div style="font-size:0.75em;font-weight:'+(isT?'700':'500')+';color:'+textColor+';text-align:right;margin-bottom:2px">'+cell.d+(hasPending?'<span style="color:var(--accent);margin-left:2px">·</span>':'')+'</div>';
-    if(di.inc>0)html+='<div style="font-size:0.86em;color:var(--green);text-align:right;font-weight:500">+'+new Intl.NumberFormat('ko-KR').format(di.inc)+'</div>';
-    if(di.exp>0)html+='<div style="font-size:0.86em;color:var(--red);text-align:right;font-weight:500">-'+new Intl.NumberFormat('ko-KR').format(di.exp)+'</div>';
+    if(di.inc>0)html+='<div style="text-align:right;margin-bottom:2px"><span style="display:inline-block;font-size:0.78em;color:#fff;background:var(--green);padding:1px 6px;border-radius:99px;font-weight:600">+'+new Intl.NumberFormat('ko-KR').format(di.inc)+'</span></div>';
+    if(di.exp>0)html+='<div style="text-align:right"><span style="display:inline-block;font-size:0.78em;color:#fff;background:var(--red);padding:1px 6px;border-radius:99px;font-weight:600">-'+new Intl.NumberFormat('ko-KR').format(di.exp)+'</span></div>';
     html+='</div>';
   });
   html+='</div></div></div></div>';

@@ -673,7 +673,19 @@ function dowOf(dateS){return new Date(dateS+'T00:00:00').getDay();} // 0=sun..6=
 
 function routinesForDate(ds){
   const dow = DOWS[dowOf(ds)];
-  return S.routines.filter(r => !r.days || r.days.length===0 || r.days.includes(dow));
+  const dt = new Date(ds+'T00:00:00');
+  const dayOfMonth = dt.getDate();
+  const lastDayOfMonth = new Date(dt.getFullYear(), dt.getMonth()+1, 0).getDate();
+  return S.routines.filter(function(r){
+    // 매월 루틴: 선택한 날짜(또는 말일)에만 표시
+    if(r.isMonthly){
+      const mdays = r.monthDays || [];
+      if(mdays.includes('last') && dayOfMonth===lastDayOfMonth) return true;
+      return mdays.includes(dayOfMonth);
+    }
+    // 매주/매일 루틴: 요일로 필터
+    return !r.days || r.days.length===0 || r.days.includes(dow);
+  });
 }
 
 // ═══════════ NAVIGATION ═══════════
@@ -959,10 +971,12 @@ function toggleCheck(rid, ds){
     if(!S.savings.entries)S.savings.entries=[];
     const svId='rzsave-'+rid+'-'+ds; // 루틴+날짜별 고유 ID
     const existIdx=S.savings.entries.findIndex(e=>e.id===svId);
+    // 프로젝트 정보 찾기
+    const proj=r.rzProjectId?(S.projects||[]).find(p=>p.id===r.rzProjectId):null;
     if(nowChecked){
       // 체크 → 저축 입금 (중복 방지)
       if(existIdx<0){
-        S.savings.entries.push({id:svId,amount:r.saveAmount,note:r.task+' (루틴 달성)',date:ds});
+        S.savings.entries.push({id:svId,amount:r.saveAmount,note:r.task+' (루틴 달성)',date:ds,projectId:r.rzProjectId||'',projectName:proj?proj.name:''});
         S.savings.current+=r.saveAmount;
       }
     } else {
@@ -1111,7 +1125,7 @@ function renderToday(){
     '<div>'+deadlinesCard+'</div>'+
     '<div>'+monthlyGoalCard+'</div>'+
     // 3행: 오늘할일(1칸) + 감사일기(1칸)
-    '<div>'+renderTodoList(todayItems,t,'✅ 오늘 할 일')+'</div>'+
+    '<div>'+renderTodoList(todayItems,t,'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:0.85"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>오늘 할 일')+'</div>'+
     '<div>'+diaryCard+'</div>'+
     // 4행: 진행중 프로젝트(2칸)
     (projectsCard?'<div style="grid-column:span 2">'+projectsCard+'</div>':'');
@@ -2349,9 +2363,54 @@ function delDl(id){S.deadlines=S.deadlines.filter(d=>d.id!==id);save();render();
 function renderSavings(){
   const s=S.savings,pct=s.goal?Math.min(100,Math.round(s.current/s.goal*100)):0,rem=Math.max(0,s.goal-s.current);
   const entries=(s.entries||[]).slice().reverse();
+
+  // 프로젝트별 합산
+  const byProject={};
+  const noProject={amount:0,count:0};
+  (s.entries||[]).forEach(function(e){
+    if(e.projectId&&e.projectName){
+      if(!byProject[e.projectId])byProject[e.projectId]={name:e.projectName,amount:0,count:0,color:''};
+      byProject[e.projectId].amount+=e.amount;
+      byProject[e.projectId].count++;
+    } else {
+      noProject.amount+=e.amount;
+      noProject.count++;
+    }
+  });
+  // 프로젝트 색상 매칭
+  Object.keys(byProject).forEach(function(pid){
+    const proj=(S.projects||[]).find(p=>p.id===pid);
+    byProject[pid].color=proj?proj.color:'var(--accent)';
+  });
+
+  var projectCards='';
+  const pids=Object.keys(byProject);
+  if(pids.length>0||noProject.count>0){
+    projectCards='<div class="card" style="margin-bottom:16px"><div class="ct" style="margin-bottom:12px"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:0.85"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>항목별 저축 현황</div>';
+    pids.forEach(function(pid){
+      const g=byProject[pid];
+      projectCards+='<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">'+
+        '<div style="width:9px;height:9px;border-radius:3px;background:'+g.color+';flex-shrink:0"></div>'+
+        '<div style="flex:1"><div style="font-size:0.92em;font-weight:500">'+g.name+'</div>'+
+        '<div style="font-size:0.75em;color:var(--t3)">'+g.count+'회 적립</div></div>'+
+        '<div style="font-family:var(--mono);font-size:1em;font-weight:600;color:var(--green)">'+money(g.amount)+'</div>'+
+      '</div>';
+    });
+    if(noProject.count>0){
+      projectCards+='<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">'+
+        '<div style="width:9px;height:9px;border-radius:3px;background:var(--t3);flex-shrink:0"></div>'+
+        '<div style="flex:1"><div style="font-size:0.92em;font-weight:500">기타 (직접 입력)</div>'+
+        '<div style="font-size:0.75em;color:var(--t3)">'+noProject.count+'건</div></div>'+
+        '<div style="font-family:var(--mono);font-size:1em;font-weight:600;color:var(--green)">'+money(noProject.amount)+'</div>'+
+      '</div>';
+    }
+    projectCards+='</div>';
+  }
+
   return ''+
     '<div class="card" style="margin-bottom:16px"><div style="text-align:center;padding:16px 0 24px"><div style="font-size:1em;color:var(--t3);margin-bottom:8px">현재 저축금액</div><div style="font-family:var(--serif);font-size:2.8571em;letter-spacing:-1px">'+money(s.current)+'</div><div style="font-size:1.1em;color:var(--t2);margin-top:6px">목표: '+money(s.goal)+'</div><div style="margin:20px auto;max-width:400px"><div class="pw" style="height:18px"><div class="pb" style="width:'+pct+'%;background:var(--accent)"></div></div><div class="pl" style="font-size:0.95em;margin-top:6px"><span>'+pct+'% 달성</span><span>'+money(rem)+' 남음</span></div></div></div><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="btn bp" onclick="openSvAdd()">+ 금액 추가</button><button class="btn bg" onclick="openSvGoal()">목표 수정</button></div></div>'+
-    '<div class="card"><div class="ct" style="margin-bottom:12px">💳 저축 내역</div>'+(entries.length===0?'<div class="empty">내역이 없어요</div>':entries.map(e=>'<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><div style="flex:1"><div style="font-size:0.9286em">'+(e.note||'저축')+'</div><div style="font-size:0.7857em;color:var(--t3);font-family:var(--mono)">'+e.date+'</div></div><div style="font-family:var(--mono);font-size:1em;font-weight:500;color:'+(e.amount>=0?'var(--green)':'var(--red)')+'">'+( e.amount>=0?'+':'')+money(e.amount)+'</div><button class="bi" onclick="delSv(\''+e.id+'\')" style="font-size:0.8571em;color:var(--t3);margin-left:8px">✕</button></div>').join(''))+'</div>';
+    projectCards+
+    '<div class="card"><div class="ct" style="margin-bottom:12px">💳 저축 내역</div>'+(entries.length===0?'<div class="empty">내역이 없어요</div>':entries.map(e=>'<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><div style="flex:1"><div style="font-size:0.9286em">'+(e.note||'저축')+(e.projectName?'<span style="font-size:0.72em;color:var(--t3);margin-left:6px">· '+e.projectName+'</span>':'')+'</div><div style="font-size:0.7857em;color:var(--t3);font-family:var(--mono)">'+e.date+'</div></div><div style="font-family:var(--mono);font-size:1em;font-weight:500;color:'+(e.amount>=0?'var(--green)':'var(--red)')+'">'+( e.amount>=0?'+':'')+money(e.amount)+'</div><button class="bi" onclick="delSv(\''+e.id+'\')" style="font-size:0.8571em;color:var(--t3);margin-left:8px">✕</button></div>').join(''))+'</div>';
 }
 function openSvAdd(){openMo('금액 추가','<div class="fg"><label class="fl">금액</label><div style="display:flex;align-items:center;gap:8px"><input type="number" class="inp" id="sv-a" placeholder="예: 50" step="1" style="flex:1"><span style="color:var(--t2);white-space:nowrap;font-size:0.95em">만원</span></div></div><div class="fg"><label class="fl">메모</label><input class="inp" id="sv-n" placeholder="예: 이번 달 월급"></div><div class="fg"><label class="fl">날짜</label><input type="date" class="inp" id="sv-d" value="'+todStr()+'"></div>','<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="saveSv()">저장</button>');}
 function openSvGoal(){openMo('목표 수정','<div class="fg"><label class="fl">목표 금액</label><div style="display:flex;align-items:center;gap:8px"><input type="number" class="inp" id="sv-g" value="'+(S.savings.goal/10000)+'" step="1" style="flex:1"><span style="color:var(--t2);white-space:nowrap;font-size:0.95em">만원</span></div></div>','<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="saveSvG()">저장</button>');}
@@ -2416,6 +2475,10 @@ function openDayRoutineModal(ds){
 function dayRoutineToggle(rid,ds){
   toggleCheck(rid,ds);
   openDayRoutineModal(ds); // 모달 다시 그려서 체크 상태 반영
+}
+// 캘린더 이벤트에서 루틴 직접 체크
+function calRoutineToggle(rid,ds){
+  toggleCheck(rid,ds); // render() 포함됨
 }
 
 function renderCalendar(){
@@ -2488,6 +2551,16 @@ function renderCalendar(){
           'border-left:2px solid '+(ev.color||'var(--accent)')+'60;border-radius:0 4px 4px 0;'+
           'font-size:0.78em;padding:2px 5px;margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:400;line-height:1.4">'+
           '🚨 '+ev.title+'</div>';
+      } else if(ev.rzId) {
+        // 루틴 이벤트: 클릭 시 바로 완료 체크
+        var ckMap=S.checks[ds]||{};
+        var isDone=!!ckMap[ev.rzId];
+        calHtml+='<div onclick="event.stopPropagation();calRoutineToggle(\''+ev.rzId+'\',\''+ds+'\')" style="display:flex;align-items:center;gap:3px;background:'+(ev.color||'var(--accent)')+(isDone?'28':'14')+';color:#555;'+
+          'border-left:2px solid '+(ev.color||'var(--accent)')+(isDone?'':'60')+';border-radius:0 4px 4px 0;'+
+          'font-size:0.78em;padding:2px 5px;margin-bottom:2px;overflow:hidden;white-space:nowrap;font-weight:400;line-height:1.4;cursor:pointer" title="클릭하면 완료 체크">'+
+          '<span style="flex-shrink:0;color:'+(isDone?'var(--green)':'var(--t3)')+';font-weight:700">'+(isDone?'✓':'○')+'</span>'+
+          '<span style="overflow:hidden;text-overflow:ellipsis;'+(isDone?'text-decoration:line-through;color:var(--t3)':'')+'">'+ev.title+'</span>'+
+        '</div>';
       } else {
         calHtml+='<div onclick="event.stopPropagation();openEvDetailModal(\''+ev.id+'\')" style="background:'+(ev.color||'var(--accent)')+'14;color:#555;'+
           'border-left:2px solid '+(ev.color||'var(--accent)')+'60;border-radius:0 4px 4px 0;'+
@@ -3041,7 +3114,8 @@ function renderLedgerDashboard(){
     let inc=0,exp=0;
     (LD.transactions||[]).forEach(function(tx){if(tx.date.slice(0,7)===k){if(tx.type==='income')inc+=tx.amount;else if(tx.type==='expense')exp+=tx.amount;}});
     const isCur=(i===ledgerMonth);
-    monthBars+='<div onclick="ledgerMonth='+i+';render()" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer">';
+    const tipTxt=MN[i]+'  수입 +'+new Intl.NumberFormat('ko-KR').format(inc)+'  지출 -'+new Intl.NumberFormat('ko-KR').format(exp);
+    monthBars+='<div onclick="ledgerMonth='+i+';render()" data-tip="'+tipTxt.replace(/"/g,'&quot;')+'" onmouseover="showLedgerTip(this,event)" onmousemove="moveLedgerTip(event)" onmouseout="hideLedgerTip()" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer">';
     monthBars+='<div style="width:100%;height:60px;display:flex;align-items:flex-end;gap:1px;justify-content:center">';
     monthBars+='<div style="width:44%;background:var(--green);opacity:0.35;border-radius:3px 3px 0 0;height:'+Math.round(inc/maxVal*56)+'px;min-height:'+(inc>0?4:0)+'px"></div>';
     monthBars+='<div style="width:44%;background:'+(isCur?'var(--accent)':'var(--border2)')+';border-radius:3px 3px 0 0;height:'+Math.round(exp/maxVal*56)+'px;min-height:'+(exp>0?4:0)+'px"></div>';
@@ -4110,6 +4184,21 @@ function initApp(){
   applyTheme(S.theme||'sky');  // 저장된 테마 복원
   restoreCustomFont();
   syncRzToRoutines();
+  // 기존 루틴 저축 내역에 프로젝트 정보 보정
+  if(S.savings&&S.savings.entries){
+    S.savings.entries.forEach(function(e){
+      if(e.id&&e.id.indexOf('rzsave-')===0&&!e.projectName){
+        // rzsave-{rid}-{date} 형태에서 rid 추출
+        var parts=e.id.split('-');
+        var rid=parts[1];
+        var r=(S.routines||[]).find(function(x){return x.id===rid;});
+        if(r&&r.rzProjectId){
+          var proj=(S.projects||[]).find(function(p){return p.id===r.rzProjectId;});
+          if(proj){e.projectId=r.rzProjectId;e.projectName=proj.name;}
+        }
+      }
+    });
+  }
   viewDate=todStr();
 
   if(S.projects.length===0){

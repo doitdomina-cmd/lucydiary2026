@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Lucy's Space</title>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Noto+Serif+KR:wght@400;500;600;700&family=Nanum+Pen+Script&family=Gaegu:wght@400;700&family=Montserrat:ital,wght@1,700;1,800&family=Geist+Mono:wght@300;400;500&family=Pretendard:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Noto+Serif+KR:wght@400;500;600;700&family=Nanum+Pen+Script&family=Gaegu:wght@400;700&family=Montserrat:ital,wght@1,700;1,800&family=Dancing+Script:wght@600;700&family=Sacramento&family=Allura&family=Kaushan+Script&family=Geist+Mono:wght@300;400;500&family=Pretendard:wght@300;400;500;600&display=swap" rel="stylesheet">
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -532,7 +532,7 @@ async function loadFromCloud() {
 function chunkData(data) {
   const FIELDS = ['routines','checks','projects','deadlines','savings','notes','calEvents',
     'lifeGoal','theme','customThemeColor','diaryEntries','monthlyGoals','monthlyMemo',
-    'weeklyGoals','weeklyMemo','diaryStickers','font','fontSize','fontWeight','customFonts',
+    'weeklyGoals','weeklyMemo','diaryStickers','font','fontSize','fontWeight','customFonts','logoFont',
     'lifeAreas','todoList','todoListTmr'];
   const chunks = {};
   FIELDS.forEach(f => { if (data[f] !== undefined) chunks[f] = data[f]; });
@@ -2946,9 +2946,29 @@ function renderSettings(){
   });
   fontHtml+='</div>';
 
+  // 로고 글씨체 선택
+  var curLogo=S.logoFont||'montserrat';
+  var logoFonts=[
+    {id:'montserrat',name:'Montserrat',ff:"'Montserrat',sans-serif",italic:true,size:'1.3em'},
+    {id:'dancing',name:'Dancing Script',ff:"'Dancing Script',cursive",italic:false,size:'1.7em'},
+    {id:'sacramento',name:'Sacramento',ff:"'Sacramento',cursive",italic:false,size:'1.8em'},
+    {id:'allura',name:'Allura',ff:"'Allura',cursive",italic:false,size:'2em'},
+    {id:'kaushan',name:'Kaushan Script',ff:"'Kaushan Script',cursive",italic:false,size:'1.5em'}
+  ];
+  var logoFontHtml='<div style="display:flex;flex-direction:column;gap:8px">';
+  logoFonts.forEach(function(lf){
+    var isCur=curLogo===lf.id;
+    logoFontHtml+='<div onclick="setLogoFont(\''+lf.id+'\')" style="display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;border:1.5px solid '+(isCur?'var(--accent)':'var(--border)')+';border-radius:10px;padding:12px 16px;background:'+(isCur?'var(--al)':'var(--surface)')+';transition:all .2s">'+
+      '<span style="font-family:'+lf.ff+';font-size:'+lf.size+';font-style:'+(lf.italic?'italic':'normal')+';font-weight:'+(lf.id==='montserrat'?'800':'400')+';color:var(--text);line-height:1.1">Lucy\'s Space</span>'+
+      '<span style="display:flex;align-items:center;gap:8px;flex-shrink:0"><span style="font-size:0.72em;color:var(--t3)">'+lf.name+'</span>'+(isCur?'<span style="color:var(--accent);font-weight:700">✓</span>':'')+'</span>'+
+    '</div>';
+  });
+  logoFontHtml+='</div>';
+
   return (
     '<div class="card" style="margin-bottom:14px"><div class="ct" style="margin-bottom:14px">🎨 테마 색상</div>'+themeHtml+'</div>'+
     '<div class="card" style="margin-bottom:14px"><div class="ct" style="margin-bottom:14px">✍️ 글씨체</div>'+fontHtml+'</div>'+
+    '<div class="card" style="margin-bottom:14px"><div class="ct" style="margin-bottom:14px">🔤 로고 글씨체 <span style="font-size:0.75em;color:var(--t3);font-weight:400">(Lucy\'s Space)</span></div>'+logoFontHtml+'</div>'+
     '<div class="card" style="margin-bottom:14px"><div class="ct" style="margin-bottom:12px">🔠 글자 크기</div>'+
       '<div style="display:flex;align-items:center;gap:14px;padding:4px 0">'+
         '<span style="font-size:0.78em;color:var(--t3)">A</span>'+
@@ -2976,6 +2996,16 @@ function setTheme(t){S.theme=t;save();applyTheme(t);render();}
 function setFont(f){S.font=f;save();applyTheme(S.theme||'sky');render();}
 
 function setFontWeight(w){S.fontWeight=w;save();applyTheme(S.theme||'sky');render();}
+function setLogoFont(lf){S.logoFont=lf;save();applyTheme(S.theme||'sky');
+  // 필기체는 italic 해제 + 크기 보정
+  var logo=document.querySelector('.logo');
+  if(logo){
+    var script=(lf!=='montserrat');
+    logo.style.fontStyle=script?'normal':'italic';
+    logo.style.fontSize=script?'1.85em':'1.4em';
+  }
+  render();
+}
 function updateFontSizeDisplay(el){var lbl=document.getElementById('fs-label');if(lbl)lbl.textContent=el.value+'px';S.fontSize=parseInt(el.value);save();applyTheme(S.theme||'sky');}
 function loadCustomFont(input, slot){
   if(!input.files||!input.files[0])return;
@@ -3103,6 +3133,25 @@ function applyTheme(t){
   var chosen = fontMap[f] || fontMap.pretendard;
   var root = document.documentElement.style;
   root.setProperty('--sans', chosen);
+
+  // 로고 글씨체 적용
+  var logoFontMap={
+    montserrat:"'Montserrat','Pretendard',sans-serif",
+    dancing:"'Dancing Script',cursive",
+    sacramento:"'Sacramento',cursive",
+    allura:"'Allura',cursive",
+    kaushan:"'Kaushan Script',cursive"
+  };
+  root.setProperty('--logo-font', logoFontMap[S.logoFont||'montserrat']||logoFontMap.montserrat);
+  // 로고 italic/size 보정 (필기체는 italic 해제, 크게)
+  (function(){
+    var lg=document.querySelector('.logo');
+    if(lg){
+      var sc=(S.logoFont&&S.logoFont!=='montserrat');
+      lg.style.fontStyle=sc?'normal':'italic';
+      lg.style.fontSize=sc?'1.95em':'1.4em';
+    }
+  })();
   
   var fs = S.fontSize || 14;
   

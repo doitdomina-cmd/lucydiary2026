@@ -1889,7 +1889,7 @@ function renderPjDetail(pid){
     ((p.routinized||[]).length===0?'<div class="empty">루틴화할 항목을 추가해요</div>':(p.routinized||[]).map((r,i)=>{
       const DL={mon:'월',tue:'화',wed:'수',thu:'목',fri:'금',sat:'토',sun:'일'};
       const days=(r.days||[]).map(d=>DL[d]||d).join(', ');
-      return '<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)"><div style="width:8px;height:8px;border-radius:50%;background:'+p.color+';flex-shrink:0;margin-top:5px"></div><div style="flex:1"><div style="font-size:0.9286em;font-weight:500">'+r.task+'</div><div style="font-size:0.7857em;color:var(--t3);margin-top:2px">'+(r.isMonthly?'매월 '+(r.monthDays||[]).join('·')+'일':'매주 '+(r.days||[]).map(d=>DOW_KO[DOWS.indexOf(d)]).join('·'))+(r.until?' ~ '+r.until:'')+(r.time?' · '+r.time:'')+(r.duration?' · '+r.duration+'분':'')+'</div></div><div style="display:flex;gap:2px"><button class="bi" onclick="openRzEditModal(\''+pid+'\','+i+')" style="font-size:0.8571em">✎</button><button class="bi" onclick="delRz(\''+pid+'\','+i+')" style="font-size:0.8571em;color:var(--red)">✕</button></div></div>';
+      return '<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)"><div style="width:8px;height:8px;border-radius:50%;background:'+p.color+';flex-shrink:0;margin-top:5px"></div><div style="flex:1"><div style="font-size:0.9286em;font-weight:500">'+r.task+'</div><div style="font-size:0.7857em;color:var(--t3);margin-top:2px">'+(r.isMonthly?'매월 '+(r.monthDays||[]).map(function(d){return d==='last'?'말':d;}).join('·')+'일':'매주 '+(r.days||[]).map(d=>DOW_KO[DOWS.indexOf(d)]).join('·'))+(r.until?' ~ '+r.until:'')+(r.time?' · '+r.time:'')+(r.duration?' · '+r.duration+'분':'')+'</div></div><div style="display:flex;gap:2px"><button class="bi" onclick="openRzEditModal(\''+pid+'\','+i+')" style="font-size:0.8571em">✎</button><button class="bi" onclick="delRz(\''+pid+'\','+i+')" style="font-size:0.8571em;color:var(--red)">✕</button></div></div>';
     }).join(''))+
     '</div></div></div>';
 
@@ -2141,8 +2141,9 @@ function openRzModal(pid){
       '</div>'+
       '<div id="rz-month-ui" style="display:none">'+
         '<div style="font-size:0.8em;color:var(--t3);margin-bottom:6px">날짜 선택 (복수 가능)</div>'+
-        '<div style="display:flex;gap:4px;flex-wrap:wrap">'+
-        Array.from({length:31},(_,i)=>'<button type="button" class="daybtn" data-md="'+(i+1)+'" onclick="togMd(this)" style="width:34px;min-width:0;padding:4px 0;font-size:0.82em">'+(i+1)+'</button>').join('')+
+        '<div id="rz-mdays" style="display:flex;gap:5px;flex-wrap:wrap">'+
+        Array.from({length:31},(_,i)=>'<button type="button" class="daybtn" data-md="'+(i+1)+'" onclick="togMd(this)" style="width:36px;height:36px;min-width:0;padding:0;font-size:0.82em;border-radius:8px;display:inline-flex;align-items:center;justify-content:center">'+(i+1)+'</button>').join('')+
+        '<button type="button" class="daybtn" data-md="last" onclick="togMd(this)" style="min-width:0;height:36px;padding:0 12px;font-size:0.82em;border-radius:8px;display:inline-flex;align-items:center;justify-content:center">말일</button>'+
         '</div>'+
       '</div>'+
     '</div>'+
@@ -2188,7 +2189,7 @@ function saveRz(pid){
 
   let days=[], monthDays=[];
   if(isMonthly){
-    monthDays=Array.from(document.querySelectorAll('#rz-mdays [data-md]')).filter(el=>el.dataset.on==='1').map(el=>parseInt(el.dataset.md));
+    monthDays=Array.from(document.querySelectorAll('#rz-mdays [data-md]')).filter(el=>el.dataset.on==='1').map(el=>el.dataset.md==='last'?'last':parseInt(el.dataset.md));
     if(!monthDays.length){alert('날짜를 선택해주세요');return;}
   } else {
     days=DOWS.filter(k=>{const el=document.getElementById('rzd-'+k);return el&&el.dataset.on==='1';});
@@ -2205,10 +2206,13 @@ function saveRz(pid){
   const untilDate=new Date(until+'T00:00:00');
   const now=new Date(); now.setHours(0,0,0,0);
   if(isMonthly){
-    // 매월: 오늘~마감일 사이에 해당 일자가 있으면 등록
+    // 매월: 오늘~마감일 사이에 해당 일자(말일 포함)가 있으면 등록
+    const hasLast=monthDays.includes('last');
     let cur=new Date(now);
     while(cur<=untilDate){
-      if(monthDays.includes(cur.getDate())){
+      const lastDayOfMonth=new Date(cur.getFullYear(),cur.getMonth()+1,0).getDate();
+      const isLastDay=hasLast&&cur.getDate()===lastDayOfMonth;
+      if(monthDays.includes(cur.getDate())||isLastDay){
         S.calEvents.push({id:gid(),date:dateStr(cur),title:(time?time+' ':'')+task,color:p.color,rzId:entry.id,projectId:pid});
       }
       cur.setDate(cur.getDate()+1);

@@ -388,9 +388,10 @@ html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--t
 /* ── DEADLINE ── */
 .dl{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
 .dl-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.dl-grid .dl{padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:transparent;min-width:0;border-bottom:1px solid var(--border)}
+.dl-grid .dl{padding:14px 16px;border:1px solid var(--border);border-radius:12px;background:var(--surface);box-shadow:var(--sh);min-width:0;border-bottom:1px solid var(--border)}
 .dl-grid .dl .dl-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .dl:last-child{border-bottom:none;padding-bottom:0}
+.dl-grid .dl:last-child{padding-bottom:14px}
 .db{min-width:44px;text-align:center;background:var(--s2);border-radius:8px;padding:6px 8px}
 .dm{font-size:0.7143em;color:var(--t3);font-family:var(--mono);text-transform:uppercase}
 .dd{font-size:1.2857em;font-weight:600;font-family:var(--mono);line-height:1}
@@ -2595,12 +2596,12 @@ function renderDeadlines(){
   const over=sorted.filter(d=>{const dd=dLeft(d.date);return dd<0&&dd>=-7;}),up=sorted.filter(d=>dLeft(d.date)>=0);
   let html='<div style="display:flex;justify-content:flex-end;margin-bottom:16px"><button class="btn bp" onclick="openDlModal()">+ 마감 추가</button></div>';
   if(over.length>0){
-    html+='<div class="card" style="border-color:var(--rl)">'+
-      '<div class="ct" style="color:var(--red);margin-bottom:12px">⚠️ 놓친 마감 <span style="font-size:0.8em;color:var(--t3);font-weight:400">(최근 7일)</span></div>'+
+    html+='<div style="margin-bottom:20px">'+
+      '<div class="ct" style="color:var(--red);margin-bottom:10px">⚠️ 놓친 마감 <span style="font-size:0.8em;color:var(--t3);font-weight:400">(최근 7일)</span></div>'+
       '<div class="dl-grid">'+over.map(dlRow).join('')+'</div>'+
     '</div>';
   }
-  html+='<div class="card"><div class="ct" style="margin-bottom:12px">📋 예정 마감</div>'+(up.length===0?'<div class="empty"><div class="ei">🎉</div>예정된 마감이 없어요</div>':'<div class="dl-grid">'+up.map(dlRow).join('')+'</div>')+'</div>';
+  html+='<div><div class="ct" style="margin-bottom:10px">📋 예정 마감</div>'+(up.length===0?'<div class="empty"><div class="ei">🎉</div>예정된 마감이 없어요</div>':'<div class="dl-grid">'+up.map(dlRow).join('')+'</div>')+'</div>';
   return html;
 }
 function dlRow(d){const dd=dLeft(d.date),f=fmtDateObj(d.date),pr=S.projects.find(p=>p.id===d.projectId);return '<div class="dl"><div class="db"><div class="dm">'+f.month+'</div><div class="dd">'+f.day+'</div></div><div style="flex:1;min-width:0"><div style="font-size:0.9643em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+d.title+'</div><div style="font-size:0.8571em;color:var(--t3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(pr?'🗂️ '+pr.name:'')+'</div></div><div style="font-family:var(--mono);font-size:0.8571em;font-weight:600;flex-shrink:0;color:'+(dd<0?'var(--red)':dd===0?'var(--red)':dd<=3?'var(--accent)':'var(--t3)')+'">'+( dd<0?'D+'+Math.abs(dd):dd===0?'오늘':'D-'+dd)+'</div><button class="bi" onclick="delDl(\''+d.id+'\')" style="font-size:0.8571em;color:var(--t3);flex-shrink:0">✕</button></div>';}

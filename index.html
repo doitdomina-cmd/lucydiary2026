@@ -2620,6 +2620,20 @@ function renderSavings(){
     }
   });
 
+  // 프로젝트별 목표 횟수 계산 (저축 루틴이 시작~마감일까지 등록한 캘린더 이벤트 총 수)
+  Object.keys(byProject).forEach(function(pid){
+    const proj=(S.projects||[]).find(p=>p.id===pid);
+    var total=0;
+    if(proj&&proj.routinized){
+      proj.routinized.forEach(function(rz){
+        if(rz.saveAmount>0){
+          total+=(S.calEvents||[]).filter(function(e){return e.rzId===rz.id;}).length;
+        }
+      });
+    }
+    byProject[pid].totalCount=total;
+  });
+
   var projectCards='';
   const pids=Object.keys(byProject);
   if(pids.length>0||noProject.count>0){
@@ -2631,8 +2645,10 @@ function renderSavings(){
     projectCards='<div style="margin-bottom:6px;display:flex;align-items:center;gap:8px;font-size:0.9286em;font-weight:500;color:var(--text)"><svg width="17" height="17" viewBox="0 0 24 24" fill="var(--accent)" style="flex-shrink:0"><path d="M2 6a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z"/></svg>항목별 저축 현황</div>';
     projectCards+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:16px">';
 
-    function svCard(name,amount,count,color){
-      var barPct=Math.round(amount/maxAmt*100);
+    function svCard(name,amount,count,color,totalCount){
+      var hasTarget=totalCount&&totalCount>0;
+      var barPct=hasTarget?Math.min(100,Math.round(count/totalCount*100)):0;
+      var countLabel=hasTarget?(count+' / '+totalCount+'회 적립 ('+barPct+'%)'):(count+'회 적립');
       return '<div class="card" style="margin-bottom:0;padding:16px 18px">'+
         '<div style="display:flex;align-items:center;gap:7px;margin-bottom:10px">'+
           '<div style="width:9px;height:9px;border-radius:3px;background:'+color+';flex-shrink:0"></div>'+
@@ -2640,16 +2656,16 @@ function renderSavings(){
         '</div>'+
         '<div style="font-family:var(--serif);font-size:1.7em;letter-spacing:-0.5px;color:var(--text);line-height:1.1;margin-bottom:8px">'+money(amount)+'</div>'+
         '<div class="pw" style="height:8px;margin-bottom:6px"><div class="pb" style="width:'+barPct+'%;background:'+color+'"></div></div>'+
-        '<div style="font-size:0.75em;color:var(--t3)">'+count+'회 적립</div>'+
+        '<div style="font-size:0.75em;color:var(--t3)">'+countLabel+'</div>'+
       '</div>';
     }
 
     pids.forEach(function(pid){
       const g=byProject[pid];
-      projectCards+=svCard(g.name,g.amount,g.count,g.color);
+      projectCards+=svCard(g.name,g.amount,g.count,g.color,g.totalCount);
     });
     if(noProject.count>0){
-      projectCards+=svCard('기타 (직접 입력)',noProject.amount,noProject.count,'var(--t3)');
+      projectCards+=svCard('기타 (직접 입력)',noProject.amount,noProject.count,'var(--t3)',0);
     }
     projectCards+='</div>';
   }

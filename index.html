@@ -387,6 +387,8 @@ html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--t
 
 /* ── DEADLINE ── */
 .dl{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+.dl-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.dl-grid .dl{padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--s2)}
 .dl:last-child{border-bottom:none;padding-bottom:0}
 .db{min-width:44px;text-align:center;background:var(--s2);border-radius:8px;padding:6px 8px}
 .dm{font-size:0.7143em;color:var(--t3);font-family:var(--mono);text-transform:uppercase}
@@ -501,7 +503,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
   .sb-ov{display:block}
   .hbg{display:flex}
   .content{padding:20px 14px}
-  .g2,.g3,.pj-grid,.la-grid{grid-template-columns:1fr}
+  .g2,.g3,.pj-grid,.la-grid,.dl-grid{grid-template-columns:1fr}
   .topbar{padding:0 14px;display:flex !important}
   .pt{font-size:1.8571em}
   .today-wrap{grid-template-columns:1fr}
@@ -2590,8 +2592,8 @@ function renderDeadlines(){
   const sorted=[...S.deadlines].sort((a,b)=>a.date.localeCompare(b.date));
   const over=sorted.filter(d=>dLeft(d.date)<0),up=sorted.filter(d=>dLeft(d.date)>=0);
   let html='<div style="display:flex;justify-content:flex-end;margin-bottom:16px"><button class="btn bp" onclick="openDlModal()">+ 마감 추가</button></div>';
-  if(over.length>0)html+='<div class="card" style="border-color:var(--rl)"><div class="ct" style="color:var(--red);margin-bottom:12px">⚠️ 지난 마감</div>'+over.map(dlRow).join('')+'</div>';
-  html+='<div class="card"><div class="ct" style="margin-bottom:12px">📋 예정 마감</div>'+(up.length===0?'<div class="empty"><div class="ei">🎉</div>예정된 마감이 없어요</div>':up.map(dlRow).join(''))+'</div>';
+  if(over.length>0)html+='<div class="card" style="border-color:var(--rl)"><div class="ct" style="color:var(--red);margin-bottom:12px">⚠️ 지난 마감</div><div class="dl-grid">'+over.map(dlRow).join('')+'</div></div>';
+  html+='<div class="card"><div class="ct" style="margin-bottom:12px">📋 예정 마감</div>'+(up.length===0?'<div class="empty"><div class="ei">🎉</div>예정된 마감이 없어요</div>':'<div class="dl-grid">'+up.map(dlRow).join('')+'</div>')+'</div>';
   return html;
 }
 function dlRow(d){const dd=dLeft(d.date),f=fmtDateObj(d.date),pr=S.projects.find(p=>p.id===d.projectId);return '<div class="dl"><div class="db"><div class="dm">'+f.month+'</div><div class="dd">'+f.day+'</div></div><div style="flex:1"><div style="font-size:0.9643em">'+d.title+'</div><div style="font-size:0.8571em;color:var(--t3)">'+(pr?'🗂️ '+pr.name:'')+'</div></div><div style="font-family:var(--mono);font-size:0.8571em;font-weight:600;color:'+(dd<0?'var(--red)':dd===0?'var(--red)':dd<=3?'var(--accent)':'var(--t3)')+'">'+( dd<0?'D+'+Math.abs(dd):dd===0?'오늘':'D-'+dd)+'</div><button class="bi" onclick="delDl(\''+d.id+'\')" style="font-size:0.8571em;color:var(--t3)">✕</button></div>';}
@@ -2748,7 +2750,7 @@ function renderSavings(){
   }
 
   return ''+
-    '<div class="card" style="margin-bottom:16px;position:relative"><div style="position:absolute;top:16px;right:16px;display:flex;gap:8px;z-index:1"><button class="btn bp bsm" onclick="openSvAdd()">+ 금액 추가</button><button class="btn bg bsm" onclick="openSvGoal()">목표 수정</button></div><div style="text-align:center;padding:16px 0 24px"><div style="font-size:1em;color:var(--t3);margin-bottom:8px">현재 저축금액</div><div style="font-family:var(--serif);font-size:2.8571em;letter-spacing:-1px">'+money(s.current)+'</div><div style="font-size:1.1em;color:var(--t2);margin-top:6px">목표: '+money(s.goal)+'</div><div style="margin:20px auto;max-width:400px"><div class="pw" style="height:18px"><div class="pb" style="width:'+pct+'%;background:var(--accent)"></div></div><div class="pl" style="font-size:0.95em;margin-top:6px"><span>'+pct+'% 달성</span><span>'+money(rem)+' 남음</span></div></div>'+goalBanner+'</div></div>'+
+    '<div class="card" style="margin-bottom:16px;position:relative"><div style="position:absolute;top:16px;right:16px;display:flex;gap:8px;z-index:1"><button class="btn bp bsm" onclick="openSvAdd()">+ 금액 추가</button><button class="btn bg bsm" onclick="openSvGoal()">목표 수정</button></div><div style="text-align:center;padding:4px 0 16px"><div style="font-family:var(--serif);font-size:2.8571em;letter-spacing:-1px">'+money(s.current)+'</div><div style="font-size:1.1em;color:var(--t2);margin-top:6px">목표: '+money(s.goal)+'</div><div style="margin:20px auto;max-width:400px"><div class="pw" style="height:18px"><div class="pb" style="width:'+pct+'%;background:var(--accent)"></div></div><div class="pl" style="font-size:0.95em;margin-top:6px"><span>'+pct+'% 달성</span><span>'+money(rem)+' 남음</span></div></div>'+goalBanner+'</div></div>'+
     projectCards+
     '<div style="margin-bottom:8px;display:flex;align-items:center;gap:8px;font-size:0.9286em;font-weight:500;color:var(--text)">💳 저축 내역</div>'+histHtml;
 }

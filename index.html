@@ -2711,15 +2711,38 @@ function renderSavings(){
     histHtml+='</div>';
   }
 
+  // 목표 D-day 배너
+  var goalBanner='';
+  if(s.goalName||s.goalDate){
+    var ddTxt='',dateTxt='';
+    if(s.goalDate){
+      var gd=new Date(s.goalDate+'T00:00:00');
+      var td=new Date();td.setHours(0,0,0,0);
+      var diffDays=Math.ceil((gd-td)/(1000*60*60*24));
+      var mm=gd.getMonth()+1,dd=gd.getDate();
+      dateTxt=mm+'월 '+dd+'일까지';
+      ddTxt=diffDays>0?'D-'+diffDays:diffDays===0?'D-DAY':'D+'+Math.abs(diffDays);
+    }
+    goalBanner='<div style="background:var(--al);border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin:0 auto 18px;max-width:440px;text-align:center">'+
+      (dateTxt?'<div style="font-size:0.82em;color:var(--accent);font-weight:600;margin-bottom:3px">'+dateTxt+(ddTxt?' · '+ddTxt:'')+'</div>':'')+
+      (s.goalName?'<div style="font-size:1.05em;font-weight:600;color:var(--text);margin-bottom:4px">'+s.goalName+'</div>':'')+
+      '<div style="font-size:0.88em;color:var(--t2)">'+money(rem)+' 남았습니다</div>'+
+    '</div>';
+  }
+
   return ''+
-    '<div class="card" style="margin-bottom:16px"><div style="text-align:center;padding:16px 0 24px"><div style="font-size:1em;color:var(--t3);margin-bottom:8px">현재 저축금액</div><div style="font-family:var(--serif);font-size:2.8571em;letter-spacing:-1px">'+money(s.current)+'</div><div style="font-size:1.1em;color:var(--t2);margin-top:6px">목표: '+money(s.goal)+'</div><div style="margin:20px auto;max-width:400px"><div class="pw" style="height:18px"><div class="pb" style="width:'+pct+'%;background:var(--accent)"></div></div><div class="pl" style="font-size:0.95em;margin-top:6px"><span>'+pct+'% 달성</span><span>'+money(rem)+' 남음</span></div></div></div><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="btn bp" onclick="openSvAdd()">+ 금액 추가</button><button class="btn bg" onclick="openSvGoal()">목표 수정</button></div></div>'+
+    '<div class="card" style="margin-bottom:16px;position:relative"><div style="position:absolute;top:16px;right:16px;display:flex;gap:8px;z-index:1"><button class="btn bp bsm" onclick="openSvAdd()">+ 금액 추가</button><button class="btn bg bsm" onclick="openSvGoal()">목표 수정</button></div><div style="text-align:center;padding:16px 0 24px"><div style="font-size:1em;color:var(--t3);margin-bottom:8px">현재 저축금액</div><div style="font-family:var(--serif);font-size:2.8571em;letter-spacing:-1px">'+money(s.current)+'</div><div style="font-size:1.1em;color:var(--t2);margin-top:6px">목표: '+money(s.goal)+'</div><div style="margin:20px auto;max-width:400px"><div class="pw" style="height:18px"><div class="pb" style="width:'+pct+'%;background:var(--accent)"></div></div><div class="pl" style="font-size:0.95em;margin-top:6px"><span>'+pct+'% 달성</span><span>'+money(rem)+' 남음</span></div></div>'+goalBanner+'</div></div>'+
     projectCards+
     '<div style="margin-bottom:8px;display:flex;align-items:center;gap:8px;font-size:0.9286em;font-weight:500;color:var(--text)">💳 저축 내역</div>'+histHtml;
 }
 function openSvAdd(){openMo('금액 추가','<div class="fg"><label class="fl">금액</label><div style="display:flex;align-items:center;gap:8px"><input type="number" class="inp" id="sv-a" placeholder="예: 50" step="1" style="flex:1"><span style="color:var(--t2);white-space:nowrap;font-size:0.95em">만원</span></div></div><div class="fg"><label class="fl">메모</label><input class="inp" id="sv-n" placeholder="예: 이번 달 월급"></div><div class="fg"><label class="fl">날짜</label><input type="date" class="inp" id="sv-d" value="'+todStr()+'"></div>','<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="saveSv()">저장</button>');}
-function openSvGoal(){openMo('목표 수정','<div class="fg"><label class="fl">목표 금액</label><div style="display:flex;align-items:center;gap:8px"><input type="number" class="inp" id="sv-g" value="'+(S.savings.goal/10000)+'" step="1" style="flex:1"><span style="color:var(--t2);white-space:nowrap;font-size:0.95em">만원</span></div></div>','<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="saveSvG()">저장</button>');}
+function openSvGoal(){openMo('목표 수정',
+  '<div class="fg"><label class="fl">목표 이름 (선택)</label><input class="inp" id="sv-name" value="'+(S.savings.goalName||'').replace(/"/g,'&quot;')+'" placeholder="예: 5억 자산 만들기"></div>'+
+  '<div class="fg"><label class="fl">목표 금액</label><div style="display:flex;align-items:center;gap:8px"><input type="number" class="inp" id="sv-g" value="'+(S.savings.goal/10000)+'" step="1" style="flex:1"><span style="color:var(--t2);white-space:nowrap;font-size:0.95em">만원</span></div></div>'+
+  '<div class="fg"><label class="fl">목표 날짜 (선택)</label><input type="date" class="inp" id="sv-date" value="'+(S.savings.goalDate||'')+'"></div>',
+  '<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="saveSvG()">저장</button>');}
 function saveSv(){const manwon=parseFloat(document.getElementById('sv-a').value),note=document.getElementById('sv-n').value,date=document.getElementById('sv-d').value;if(!manwon||isNaN(manwon))return;const amt=Math.round(manwon*10000);if(!S.savings.entries)S.savings.entries=[];S.savings.entries.push({id:gid(),amount:amt,note,date});S.savings.current+=amt;save();closeMo();render();}
-function saveSvG(){const g=parseFloat(document.getElementById('sv-g').value);if(!g||isNaN(g))return;S.savings.goal=Math.round(g*10000);save();closeMo();render();}
+function saveSvG(){const g=parseFloat(document.getElementById('sv-g').value);if(!g||isNaN(g))return;S.savings.goal=Math.round(g*10000);S.savings.goalName=document.getElementById('sv-name').value.trim();S.savings.goalDate=document.getElementById('sv-date').value;save();closeMo();render();}
 function delSv(id){const e=S.savings.entries.find(x=>x.id===id);if(!e)return;S.savings.current-=e.amount;S.savings.entries=S.savings.entries.filter(x=>x.id!==id);save();render();}
 
 // ═══════════ 회고 & 통계 ═══════════

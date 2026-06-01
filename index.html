@@ -1649,7 +1649,9 @@ function renderLife(){
     const projs=S.projects.filter(p=>p.lifeAreaId===a.id);
     html+='<div class="la-card" draggable="true" data-aid="'+a.id+'" data-color="'+a.color+'" onclick="laCardClick(event,this.dataset.aid)" style="border-color:'+a.color+'30">';
     html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">';
-    html+='<div style="display:flex;align-items:center;gap:6px"><span style="color:var(--t3);font-size:0.9em;cursor:grab;user-select:none">⠿</span><div style="font-size:1.0714em;font-weight:600;color:var(--text)">'+a.name+'</div></div>';
+    html+='<div style="display:flex;align-items:center;gap:6px"><span style="color:var(--t3);font-size:0.9em;cursor:grab;user-select:none">⠿</span><div style="font-size:1.0714em;font-weight:600;color:var(--text)">'+a.name+'</div>'+
+      (a.dday?(function(){var dl=dLeft(a.dday);var lab=dl>0?'D-'+dl:dl===0?'D-DAY':'D+'+Math.abs(dl);return '<span style="font-size:0.68em;padding:2px 7px;border-radius:99px;background:'+a.color+'18;color:'+a.color+';font-weight:600;font-family:var(--mono)">'+lab+'</span>';})():'')+
+    '</div>';
     html+='<div class="la-btns" style="display:flex;gap:4px;opacity:0;transition:opacity .15s">';
     html+='<button class="bi" data-aid="'+a.id+'" onclick="event.stopPropagation();openAreaModal(this.dataset.aid)" style="color:var(--t3);font-size:1em" title="수정">'+
       '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>'+
@@ -1691,9 +1693,17 @@ function renderGoalSection(){
   const g=S.lifeGoal||{text:'',sub:''};
   const hasGoal=!!(g.text);
   var editBtn='<button class="goal-edit-btn" onclick="openGoalModal()" style="background:transparent;border:1px solid var(--border);color:var(--t3);padding:4px 11px;border-radius:8px;cursor:pointer;font-size:0.8em;font-family:var(--sans);opacity:0;transition:opacity .2s;flex-shrink:0">'+(hasGoal?'✏️ 수정':'+ 작성')+'</button>';
+  var goalDdayHtml='';
+  if(g.dday){
+    var gdl=dLeft(g.dday);
+    var gd=new Date(g.dday+'T00:00:00');
+    var gdLabel=gdl>0?'D-'+gdl:gdl===0?'D-DAY':'D+'+Math.abs(gdl);
+    goalDdayHtml='<div style="font-size:0.82em;color:var(--accent);font-weight:600;margin-top:6px">'+(String(gd.getFullYear()).slice(2))+'년 '+(gd.getMonth()+1)+'월 '+gd.getDate()+'일까지 · '+gdLabel+'</div>';
+  }
   var inner=hasGoal?
     '<div><div style="font-size:1.35em;font-weight:600;color:var(--text);line-height:1.3">'+g.text+'</div>'+
       (g.sub?'<div style="font-size:0.9em;color:var(--t3);margin-top:4px">'+g.sub+'</div>':'')+
+      goalDdayHtml+
     '</div>'
     :'<div style="color:var(--t3);font-size:0.9286em">아직 목표가 없어요. 궁극적인 목표를 적어보세요.</div>';
   return '<div style="margin-bottom:24px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px" '+
@@ -1706,13 +1716,15 @@ function openGoalModal(){
   const g=S.lifeGoal||{text:'',sub:''};
   openMo('궁극적인 목표',
     '<div class="fg"><label class="fl">목표</label><input class="inp" id="gl-t" value="'+g.text+'" placeholder="예: 웹툰 콘티 작가로 독립하기"></div>'+
-    '<div class="fg"><label class="fl">부연 설명 (선택)</label><input class="inp" id="gl-s" value="'+(g.sub||'')+'" placeholder="예: 2027년까지, 월 수익 300만원"></div>',
+    '<div class="fg"><label class="fl">부연 설명 (선택)</label><input class="inp" id="gl-s" value="'+(g.sub||'')+'" placeholder="예: 2027년까지, 월 수익 300만원"></div>'+
+    '<div class="fg"><label class="fl">🎯 목표 날짜 (선택)</label><input type="date" class="inp" id="gl-dday" value="'+(g.dday||'')+'"></div>',
     '<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="saveGoal()">저장</button>');
 }
 function saveGoal(){
   const text=document.getElementById('gl-t').value.trim(),sub=document.getElementById('gl-s').value.trim();
+  const dday=document.getElementById('gl-dday').value||'';
   if(!text)return;
-  S.lifeGoal={text,sub,done:false};
+  S.lifeGoal={text,sub,dday,done:false};
   save();closeMo();render();
 }
 
@@ -1721,18 +1733,22 @@ function openAreaModal(id){
   const a=id?(S.lifeAreas||[]).find(x=>x.id===id):null;
   selAreaC=a?a.color:COLORS[0];
   var areaColorHtml=COLORS.map(function(c){var isOn=(a?c===a.color:c===COLORS[0]);return '<div class="cop '+(isOn?'on':'')+'" style="background:'+c+'" onclick="pickAreaC(this,\''+c+'\')"></div>';}).join('');
+  // 신규 생성 시 상위 목표 날짜를 기본값으로
+  var ddayDefault=a?(a.dday||''):((S.lifeGoal&&S.lifeGoal.dday)||'');
   openMo(a?'영역 수정':'영역 추가',
     '<div class="fg"><label class="fl">이모지</label><input class="inp" id="ar-e" value="'+(a?a.emoji:'')+'" placeholder="🌱" maxlength="2" style="width:70px"></div>'+
     '<div class="fg"><label class="fl">이름</label><input class="inp" id="ar-n" value="'+(a?a.name:'')+'" placeholder="예: 창작, 건강..."></div>'+
+    '<div class="fg"><label class="fl">🎯 디데이 <span style="font-size:0.8em;color:var(--t3);font-weight:400">(상위 목표 날짜 자동 · 수정 가능)</span></label><input type="date" class="inp" id="ar-dday" value="'+ddayDefault+'"></div>'+
     '<div class="fg"><label class="fl">색상</label><div class="cops">'+areaColorHtml+'</div></div>',
     '<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="saveArea(\''+( id||'')+'\')">저장</button>');
 }
 function pickAreaC(el,c){selAreaC=c;document.querySelectorAll('.cop').forEach(e=>e.classList.remove('on'));el.classList.add('on');}
 function saveArea(eid){
   const emoji=document.getElementById('ar-e').value||'📌',name=document.getElementById('ar-n').value.trim();
+  const dday=document.getElementById('ar-dday').value||'';
   if(!name)return;
-  if(eid){S.lifeAreas=(S.lifeAreas||[]).map(a=>a.id===eid?Object.assign({},a,{emoji,name,color:selAreaC}):a);}
-  else{if(!S.lifeAreas)S.lifeAreas=[];S.lifeAreas.push({id:gid(),name,emoji,color:selAreaC});}
+  if(eid){S.lifeAreas=(S.lifeAreas||[]).map(a=>a.id===eid?Object.assign({},a,{emoji,name,color:selAreaC,dday}):a);}
+  else{if(!S.lifeAreas)S.lifeAreas=[];S.lifeAreas.push({id:gid(),name,emoji,color:selAreaC,dday});}
   save();closeMo();render();
 }
 function delArea(id){
@@ -1924,7 +1940,7 @@ function openPjModal(presetAid){
     '<div class="fg"><label class="fl">이름</label><input class="inp" id="pj-n" placeholder="프로젝트 이름"></div>'+
     '<div class="fg"><label class="fl">이모지</label><input class="inp" id="pj-e" placeholder="📁" maxlength="2" style="width:70px"></div>'+
     '<div class="fg"><label class="fl">설명</label><input class="inp" id="pj-d" placeholder="한 줄 설명"></div>'+
-    '<div class="fg"><label class="fl">🎯 프로젝트 디데이</label><input class="inp" type="date" id="pj-dday" style="max-width:180px"></div>'+
+    '<div class="fg"><label class="fl">🎯 프로젝트 디데이 <span style="font-size:0.8em;color:var(--t3);font-weight:400">(라이프 영역 날짜 자동 · 수정 가능)</span></label><input class="inp" type="date" id="pj-dday" value="'+(initArea&&initArea.dday?initArea.dday:'')+'" style="max-width:180px"></div>'+
     '<div class="fg"><label class="fl">🌿 라이프 영역</label><div style="display:flex;gap:6px;flex-wrap:wrap">'+aHtml+'</div></div>'+
     '<div class="fg"><label class="fl">색상 <span style="font-size:0.8em;color:var(--t3);font-weight:400">(영역 선택 시 자동)</span></label><div class="cops" id="pj-cops">'+cops+'</div></div>',
     '<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="savePj()">만들기</button>');
@@ -1939,6 +1955,9 @@ function pickPjA(el,id){
     el.style.background=area.color;el.style.color='#fff';el.style.borderColor=area.color;
     // 색상도 라이프 영역 색상으로 자동 변경
     selPjC=area.color;
+    // 디데이도 영역 날짜로 자동 채움 (영역에 날짜가 있으면)
+    const ddayInput=document.getElementById('pj-dday');
+    if(ddayInput&&area.dday)ddayInput.value=area.dday;
     const cops=document.querySelectorAll('#pj-cops .cop');
     cops.forEach(c=>c.classList.remove('on'));
     let matched=false;

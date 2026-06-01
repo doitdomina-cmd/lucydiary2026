@@ -2591,9 +2591,15 @@ function delLk(pid,i){const p=S.projects.find(x=>x.id===pid);p.links.splice(i,1)
 // ═══════════ DEADLINES ═══════════
 function renderDeadlines(){
   const sorted=[...S.deadlines].sort((a,b)=>a.date.localeCompare(b.date));
-  const over=sorted.filter(d=>dLeft(d.date)<0),up=sorted.filter(d=>dLeft(d.date)>=0);
+  // 지난 마감은 최근 7일 이내만 표시 (그보다 오래된 건 자동 숨김)
+  const over=sorted.filter(d=>{const dd=dLeft(d.date);return dd<0&&dd>=-7;}),up=sorted.filter(d=>dLeft(d.date)>=0);
   let html='<div style="display:flex;justify-content:flex-end;margin-bottom:16px"><button class="btn bp" onclick="openDlModal()">+ 마감 추가</button></div>';
-  if(over.length>0)html+='<div class="card" style="border-color:var(--rl)"><div class="ct" style="color:var(--red);margin-bottom:12px">⚠️ 지난 마감</div><div class="dl-grid">'+over.map(dlRow).join('')+'</div></div>';
+  if(over.length>0){
+    html+='<div class="card" style="border-color:var(--rl)">'+
+      '<div class="ct" style="color:var(--red);margin-bottom:12px">⚠️ 놓친 마감 <span style="font-size:0.8em;color:var(--t3);font-weight:400">(최근 7일)</span></div>'+
+      '<div class="dl-grid">'+over.map(dlRow).join('')+'</div>'+
+    '</div>';
+  }
   html+='<div class="card"><div class="ct" style="margin-bottom:12px">📋 예정 마감</div>'+(up.length===0?'<div class="empty"><div class="ei">🎉</div>예정된 마감이 없어요</div>':'<div class="dl-grid">'+up.map(dlRow).join('')+'</div>')+'</div>';
   return html;
 }

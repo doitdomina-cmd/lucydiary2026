@@ -2079,11 +2079,52 @@ function renderPjDetail(pid){
     '</div>'+
     // 루틴화 일정
     '<div class="card"><div class="ch"><div class="ct"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>루틴화 일정</div><button class="btn bg bsm" onclick="openRzModal(\''+pid+'\')">+ 추가</button></div>'+
-    '<div style="font-size:0.8571em;color:var(--t3);margin-bottom:10px">반복 일정을 캘린더에 8주치 자동 등록해요</div>'+
+    (function(){
+      var rzs=p.routinized||[];
+      if(rzs.length===0)return '<div style="font-size:0.8571em;color:var(--t3);margin-bottom:10px">시작일~마감일까지 캘린더에 자동 등록돼요</div>';
+      var tDone=0,tPast=0,tTotal=0,td=todStr();
+      rzs.forEach(function(r){
+        var evs=(S.calEvents||[]).filter(e=>e.rzId===r.id);
+        tTotal+=evs.length;
+        evs.forEach(function(e){
+          if(S.checks[e.date]&&S.checks[e.date][r.id])tDone++;
+          if(e.date<=td)tPast++;
+        });
+      });
+      var ovPct=tPast>0?Math.round(tDone/tPast*100):0;
+      return '<div style="background:var(--s2);border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:12px">'+
+        '<div style="flex:1;min-width:0"><div style="font-size:0.78em;color:var(--t3);margin-bottom:4px">루틴 달성도 (지금까지)</div>'+
+          '<div class="pw" style="height:7px"><div class="pb" style="width:'+ovPct+'%;background:var(--accent)"></div></div></div>'+
+        '<div style="text-align:right;flex-shrink:0"><div style="font-size:1.1em;font-weight:700;color:var(--accent);font-family:var(--serif)">'+ovPct+'%</div>'+
+          '<div style="font-size:0.7em;color:var(--t3)">'+tDone+'/'+tPast+'회 · 총 '+tTotal+'회</div></div>'+
+      '</div>';
+    })()+
     ((p.routinized||[]).length===0?'<div class="empty">루틴화할 항목을 추가해요</div>':(p.routinized||[]).map((r,i)=>{
       const DL={mon:'월',tue:'화',wed:'수',thu:'목',fri:'금',sat:'토',sun:'일'};
       const days=(r.days||[]).map(d=>DL[d]||d).join(', ');
-      return '<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)"><div style="width:8px;height:8px;border-radius:50%;background:'+p.color+';flex-shrink:0;margin-top:5px"></div><div style="flex:1"><div style="font-size:0.9286em;font-weight:500">'+r.task+'</div><div style="font-size:0.7857em;color:var(--t3);margin-top:2px">'+(r.isMonthly?'매월 '+(r.monthDays||[]).map(function(d){return d==='last'?'말':d;}).join('·')+'일':'매주 '+(r.days||[]).map(d=>DOW_KO[DOWS.indexOf(d)]).join('·'))+(r.until?' ~ '+r.until:'')+(r.time?' · '+r.time:'')+(r.duration?' · '+r.duration+'분':'')+(r.saveAmount>0?' · 💰'+money(r.saveAmount):'')+'</div></div><div style="display:flex;gap:2px"><button class="bi" onclick="openRzEditModal(\''+pid+'\','+i+')" style="font-size:0.8571em">✎</button><button class="bi" onclick="delRz(\''+pid+'\','+i+')" style="font-size:0.8571em;color:var(--red)">✕</button></div></div>';
+      // 성취도: 이 루틴의 캘린더 이벤트 기준 전체/완료 횟수
+      const evs=(S.calEvents||[]).filter(e=>e.rzId===r.id);
+      const totalN=evs.length;
+      const tdStr=todStr();
+      const doneN=evs.filter(e=>S.checks[e.date]&&S.checks[e.date][r.id]).length;
+      const pastN=evs.filter(e=>e.date<=tdStr).length;
+      const rzPct=totalN>0?Math.round(doneN/totalN*100):0;
+      const rzPctPast=pastN>0?Math.round(doneN/pastN*100):0;
+      return '<div style="padding:10px 0;border-bottom:1px solid var(--border)">'+
+        '<div style="display:flex;align-items:flex-start;gap:10px">'+
+          '<div style="width:8px;height:8px;border-radius:50%;background:'+p.color+';flex-shrink:0;margin-top:5px"></div>'+
+          '<div style="flex:1;min-width:0"><div style="font-size:0.9286em;font-weight:500">'+r.task+'</div>'+
+          '<div style="font-size:0.7857em;color:var(--t3);margin-top:2px">'+(r.isMonthly?'매월 '+(r.monthDays||[]).map(function(d){return d==='last'?'말':d;}).join('·')+'일':'매주 '+(r.days||[]).map(d=>DOW_KO[DOWS.indexOf(d)]).join('·'))+(r.until?' ~ '+r.until:'')+(r.time?' · '+r.time:'')+(r.duration?' · '+r.duration+'분':'')+(r.saveAmount>0?' · 💰'+money(r.saveAmount):'')+'</div></div>'+
+          '<div style="display:flex;gap:2px;flex-shrink:0"><button class="bi" onclick="openRzEditModal(\''+pid+'\','+i+')" style="font-size:0.8571em">✎</button><button class="bi" onclick="delRz(\''+pid+'\','+i+')" style="font-size:0.8571em;color:var(--red)">✕</button></div>'+
+        '</div>'+
+        (totalN>0?'<div style="margin-top:8px;padding-left:18px">'+
+          '<div class="pw" style="height:6px"><div class="pb" style="width:'+rzPct+'%;background:'+p.color+'"></div></div>'+
+          '<div style="display:flex;justify-content:space-between;font-size:0.72em;color:var(--t3);margin-top:4px">'+
+            '<span>전체 '+doneN+' / '+totalN+'회 ('+rzPct+'%)</span>'+
+            '<span>'+(pastN>0?'지금까지 '+doneN+'/'+pastN+'회 달성 '+rzPctPast+'%':'아직 시작 전')+'</span>'+
+          '</div>'+
+        '</div>':'')+
+      '</div>';
     }).join(''))+
     '</div></div></div>';
 

@@ -361,6 +361,9 @@ html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--t
 .bg:hover{background:var(--s2);color:var(--text)}
 .bsm{padding:5px 10px;font-size:0.8571em}
 .bi{padding:6px;background:none;border:none;cursor:pointer;color:var(--t3);border-radius:6px;display:inline-flex;transition:all .15s}
+.row-hov .hov-btns{opacity:0;transition:opacity .15s}
+.row-hov:hover .hov-btns{opacity:1}
+@media(hover:none){.row-hov .hov-btns{opacity:1}}
 .bi:hover{background:var(--s2);color:var(--text)}
 
 /* ── INPUT ── */
@@ -1996,7 +1999,13 @@ function openPjEditModal(pid){
     '<div class="fg"><label class="fl">설명</label><input class="inp" id="pje-d" value="'+(p.desc||'')+'" placeholder="한 줄 설명"></div>'+
     '<div class="fg"><label class="fl">🎯 프로젝트 디데이 <span style="color:var(--t3)">(카드에 표시)</span></label><input class="inp" type="date" id="pje-dday" value="'+(p.dday||'')+'"></div>'+
     '<div class="fg"><label class="fl">🌿 라이프 영역</label><div style="display:flex;gap:6px;flex-wrap:wrap">'+aHtml+'</div></div>'+
-    '<div class="fg"><label class="fl">색상</label><div class="cops" id="pje-cops">'+COLORS.map(function(c){return '<div class="cop '+(c===p.color?'on':'')+'" data-c="'+c+'" style="background:'+c+'" onclick="pickPjCEdit(this)"></div>';}).join('')+'<label class="cop" style="background:linear-gradient(135deg,#f0f,#0ff,#ff0);border:2px dashed #ccc;display:flex;align-items:center;justify-content:center;overflow:hidden" title="직접 선택"><input type="color" value="'+p.color+'" style="opacity:0;position:absolute;width:0;height:0" onchange="pickPjCEditColor(this.value);this.parentElement.style.background=this.value"></label></div></div>',
+    '<div class="fg"><label class="fl">색상</label><div class="cops" id="pje-cops">'+COLORS.map(function(c){return '<div class="cop '+(c===p.color?'on':'')+'" data-c="'+c+'" style="background:'+c+'" onclick="pickPjCEdit(this)"></div>';}).join('')+'<label class="cop" style="background:linear-gradient(135deg,#f0f,#0ff,#ff0);border:2px dashed #ccc;display:flex;align-items:center;justify-content:center;overflow:hidden" title="직접 선택"><input type="color" value="'+p.color+'" style="opacity:0;position:absolute;width:0;height:0" onchange="pickPjCEditColor(this.value);this.parentElement.style.background=this.value"></label></div></div>'+
+    '<div class="fg"><label class="fl">📋 표시할 카드 <span style="font-size:0.8em;color:var(--t3);font-weight:400">(태스크·마감일·루틴화는 항상 표시)</span></label>'+
+      (function(){var cv=p.cardVis||{};var opts=[['achieve','루틴 달성도'],['milestone','마일스톤'],['link','링크 바로가기'],['material','학습 자료']];
+        return '<div style="display:flex;flex-direction:column;gap:8px">'+opts.map(function(o){var on=cv[o[0]]!==false;
+          return '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.9em"><input type="checkbox" id="pje-cv-'+o[0]+'" '+(on?'checked':'')+' style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer">'+o[1]+'</label>';
+        }).join('')+'</div>';})()+
+    '</div>',
     '<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" id="pje-save-btn">저장</button>');
   document.getElementById('pje-save-btn').onclick=function(){savePjEdit(pid);};
 }
@@ -2014,9 +2023,15 @@ function savePjEdit(pid){
   const name=document.getElementById('pje-n').value.trim();if(!name)return;
   const emoji=document.getElementById('pje-e').value,desc=document.getElementById('pje-d').value;
   const dday=document.getElementById('pje-dday').value||'';
+  const cardVis={
+    achieve:document.getElementById('pje-cv-achieve').checked,
+    milestone:document.getElementById('pje-cv-milestone').checked,
+    link:document.getElementById('pje-cv-link').checked,
+    material:document.getElementById('pje-cv-material').checked
+  };
   S.projects=S.projects.map(function(p){
     if(p.id!==pid)return p;
-    return Object.assign({},p,{name:name,emoji:emoji,desc:desc,lifeAreaId:selPjA,color:selPjC,dday:dday});
+    return Object.assign({},p,{name:name,emoji:emoji,desc:desc,lifeAreaId:selPjA,color:selPjC,dday:dday,cardVis:cardVis});
   });
   // calEvents 색상도 같이 업데이트
   S.calEvents=S.calEvents.map(function(e){
@@ -2041,7 +2056,7 @@ function renderPjDetail(pid){
       const dd=t.due?dLeft(t.due):null;
       const dueColor=dd===null?'var(--t3)':dd<0?'var(--red)':dd===0?'var(--red)':dd<=3?'var(--accent)':'var(--t3)';
       const dueLabel=dd===null?'':dd<0?'D+'+Math.abs(dd):dd===0?'오늘':'D-'+dd;
-      return '<div class="ci">'+
+      return '<div class="ci row-hov">'+
         '<div class="cb '+(t.done?'on':'')+'" style="'+(t.done?'background:'+p.color+';border-color:'+p.color:'')+'" onclick="togTk(\''+pid+'\','+i+')"></div>'+
         '<div style="flex:1">'+
           '<div class="ck '+(t.done?'done':'')+'">'+t.text+'</div>'+
@@ -2050,8 +2065,10 @@ function renderPjDetail(pid){
             '<span style="font-size:0.75em;font-weight:600;color:'+dueColor+'">'+dueLabel+'</span>'+
           '</div>':'')+
         '</div>'+
+        '<div class="hov-btns" style="display:flex;gap:2px">'+
         '<button class="bi" onclick="openTkEditModal(\''+pid+'\','+i+')" style="font-size:0.8em">✎</button>'+
         '<button class="bi" onclick="delTk(\''+pid+'\','+i+')" style="color:var(--red);font-size:0.8571em">✕</button>'+
+        '</div>'+
       '</div>';
     }).join('')+
     '</div>')+
@@ -2079,106 +2096,115 @@ function renderPjDetail(pid){
     '</div>'+
     // 루틴화 일정
     '<div class="card"><div class="ch"><div class="ct"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>루틴화 일정</div><button class="btn bg bsm" onclick="openRzModal(\''+pid+'\')">+ 추가</button></div>'+
-    (function(){
-      var rzs=p.routinized||[];
-      if(rzs.length===0)return '<div style="font-size:0.8571em;color:var(--t3);margin-bottom:10px">시작일~마감일까지 캘린더에 자동 등록돼요</div>';
-      var tDone=0,tPast=0,tTotal=0,td=todStr();
-      rzs.forEach(function(r){
-        var evs=(S.calEvents||[]).filter(e=>e.rzId===r.id);
-        tTotal+=evs.length;
-        evs.forEach(function(e){
-          if(S.checks[e.date]&&S.checks[e.date][r.id])tDone++;
-          if(e.date<=td)tPast++;
-        });
-      });
-      var ovPct=tPast>0?Math.round(tDone/tPast*100):0;
-      return '<div style="background:var(--s2);border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:12px">'+
-        '<div style="flex:1;min-width:0"><div style="font-size:0.78em;color:var(--t3);margin-bottom:4px">루틴 달성도 (지금까지)</div>'+
-          '<div class="pw" style="height:7px"><div class="pb" style="width:'+ovPct+'%;background:var(--accent)"></div></div></div>'+
-        '<div style="text-align:right;flex-shrink:0"><div style="font-size:1.1em;font-weight:700;color:var(--accent);font-family:var(--serif)">'+ovPct+'%</div>'+
-          '<div style="font-size:0.7em;color:var(--t3)">'+tDone+'/'+tPast+'회 · 총 '+tTotal+'회</div></div>'+
-      '</div>';
-    })()+
+    '<div style="font-size:0.8571em;color:var(--t3);margin-bottom:10px">시작일~마감일까지 캘린더에 자동 등록돼요</div>'+
     ((p.routinized||[]).length===0?'<div class="empty">루틴화할 항목을 추가해요</div>':(p.routinized||[]).map((r,i)=>{
       const DL={mon:'월',tue:'화',wed:'수',thu:'목',fri:'금',sat:'토',sun:'일'};
       const days=(r.days||[]).map(d=>DL[d]||d).join(', ');
-      // 성취도: 이 루틴의 캘린더 이벤트 기준 전체/완료 횟수
-      const evs=(S.calEvents||[]).filter(e=>e.rzId===r.id);
-      const totalN=evs.length;
-      const tdStr=todStr();
-      const doneN=evs.filter(e=>S.checks[e.date]&&S.checks[e.date][r.id]).length;
-      const pastN=evs.filter(e=>e.date<=tdStr).length;
-      const rzPct=totalN>0?Math.round(doneN/totalN*100):0;
-      const rzPctPast=pastN>0?Math.round(doneN/pastN*100):0;
-      return '<div style="padding:10px 0;border-bottom:1px solid var(--border)">'+
-        '<div style="display:flex;align-items:flex-start;gap:10px">'+
-          '<div style="width:8px;height:8px;border-radius:50%;background:'+p.color+';flex-shrink:0;margin-top:5px"></div>'+
-          '<div style="flex:1;min-width:0"><div style="font-size:0.9286em;font-weight:500">'+r.task+'</div>'+
-          '<div style="font-size:0.7857em;color:var(--t3);margin-top:2px">'+(r.isMonthly?'매월 '+(r.monthDays||[]).map(function(d){return d==='last'?'말':d;}).join('·')+'일':'매주 '+(r.days||[]).map(d=>DOW_KO[DOWS.indexOf(d)]).join('·'))+(r.until?' ~ '+r.until:'')+(r.time?' · '+r.time:'')+(r.duration?' · '+r.duration+'분':'')+(r.saveAmount>0?' · 💰'+money(r.saveAmount):'')+'</div></div>'+
-          '<div style="display:flex;gap:2px;flex-shrink:0"><button class="bi" onclick="openRzEditModal(\''+pid+'\','+i+')" style="font-size:0.8571em">✎</button><button class="bi" onclick="delRz(\''+pid+'\','+i+')" style="font-size:0.8571em;color:var(--red)">✕</button></div>'+
-        '</div>'+
-        (totalN>0?'<div style="margin-top:8px;padding-left:18px">'+
-          '<div class="pw" style="height:6px"><div class="pb" style="width:'+rzPct+'%;background:'+p.color+'"></div></div>'+
-          '<div style="display:flex;justify-content:space-between;font-size:0.72em;color:var(--t3);margin-top:4px">'+
-            '<span>전체 '+doneN+' / '+totalN+'회 ('+rzPct+'%)</span>'+
-            '<span>'+(pastN>0?'지금까지 '+doneN+'/'+pastN+'회 달성 '+rzPctPast+'%':'아직 시작 전')+'</span>'+
-          '</div>'+
-        '</div>':'')+
+      return '<div class="row-hov" style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">'+
+        '<div style="width:8px;height:8px;border-radius:50%;background:'+p.color+';flex-shrink:0;margin-top:5px"></div>'+
+        '<div style="flex:1;min-width:0"><div style="font-size:0.9286em;font-weight:500">'+r.task+'</div>'+
+        '<div style="font-size:0.7857em;color:var(--t3);margin-top:2px">'+(r.isMonthly?'매월 '+(r.monthDays||[]).map(function(d){return d==='last'?'말':d;}).join('·')+'일':'매주 '+(r.days||[]).map(d=>DOW_KO[DOWS.indexOf(d)]).join('·'))+(r.until?' ~ '+r.until:'')+(r.time?' · '+r.time:'')+(r.duration?' · '+r.duration+'분':'')+(r.saveAmount>0?' · 💰'+money(r.saveAmount):'')+'</div></div>'+
+        '<div class="hov-btns" style="display:flex;gap:2px;flex-shrink:0"><button class="bi" onclick="openRzEditModal(\''+pid+'\','+i+')" style="font-size:0.8571em">✎</button><button class="bi" onclick="delRz(\''+pid+'\','+i+')" style="font-size:0.8571em;color:var(--red)">✕</button></div>'+
       '</div>';
     }).join(''))+
     '</div></div></div>';
 
-  // 마일스톤 + 링크(왼쪽) / 학습자료(오른쪽)
-  html+='<div class="g2" style="margin-top:0">';
-  // 왼쪽: 마일스톤 + 링크
-  html+='<div>'+
-    '<div class="card" style="margin-bottom:16px"><div class="ch"><div class="ct"><svg width="17" height="17" viewBox="0 0 24 24" fill="var(--accent)" style="flex-shrink:0"><path d="M5 2a1 1 0 0 0-1 1v19a1 1 0 0 0 2 0v-7h13a1 1 0 0 0 .8-1.6L17.2 9l2.6-3.4A1 1 0 0 0 19 4H6V3a1 1 0 0 0-1-1z"/></svg>마일스톤</div><button class="btn bg bsm" onclick="openMsModal(\''+pid+'\')">+ 추가</button></div>'+
-    (ms.length===0?'<div class="empty">마일스톤 없음</div>':ms.map((m,i)=>'<div class="msi"><div class="mss '+(m.done?'on':'')+'" onclick="togMs(\''+pid+'\','+i+')"></div><div style="flex:1"><div style="font-size:0.9286em;'+(m.done?'text-decoration:line-through;color:var(--t3)':'')+'">'+m.text+'</div>'+(m.date?'<div style="font-size:0.7857em;color:var(--t3);font-family:var(--mono)">'+m.date+'</div>':'')+'</div><button class="bi" onclick="delMs(\''+pid+'\','+i+')" style="font-size:0.8571em;color:var(--red)">✕</button></div>').join(''))+
-    '</div>'+
-    '<div class="card"><div class="ch"><div class="ct"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>링크 바로가기</div><button class="btn bg bsm" onclick="openLkModal(\''+pid+'\')">+ 추가</button></div>'+
-    ((p.links||[]).length===0?'<div class="empty">자주 쓰는 링크를 추가해요</div>':(p.links||[]).map((lk,i)=>'<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)"><div style="font-size:1.2857em">'+(lk.emoji||'🔗')+'</div><div style="flex:1;overflow:hidden"><div style="font-size:0.9286em;font-weight:500">'+lk.label+'</div><div style="font-size:0.7857em;color:var(--t3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+lk.url+'</div></div><a href="'+lk.url+'" target="_blank" class="btn bg bsm" style="flex-shrink:0">열기 →</a><button class="bi" onclick="delLk(\''+pid+'\','+i+')" style="font-size:0.8571em;color:var(--t3)">✕</button></div>').join(''))+
-    '</div></div>';
-  // 오른쪽: 📚 학습 자료
-  const materials=p.materials||[];
-  html+='<div class="card"><div class="ch"><div class="ct"><svg width="17" height="17" viewBox="0 0 24 24" fill="var(--accent)" style="flex-shrink:0"><path d="M6.5 2A2.5 2.5 0 0 0 4 4.5v15A2.5 2.5 0 0 0 6.5 22H20a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1zm0 15H19v3H6.5a1 1 0 0 1 0-2z" fill-opacity="0.9"/></svg>학습 자료</div><button class="btn bp bsm" onclick="openMatModal(\''+pid+'\')">+ 추가</button></div>';
-  if(materials.length===0){
-    html+='<div class="empty">PDF, 책 등 학습 자료를 등록해요</div>';
-  } else {
-    materials.forEach(function(m,i){
-      const pct=m.total>0?Math.min(100,Math.round((m.current||0)/m.total*100)):0;
-      html+='<div style="padding:12px 0;border-bottom:1px solid var(--border)">';
-      html+='<div style="display:flex;align-items:flex-start;gap:10px">';
-      html+='<div style="font-size:1.4em;flex-shrink:0">'+( m.type==='pdf'?'📄':'📖')+'</div>';
-      html+='<div style="flex:1;min-width:0">';
-      html+='<div style="font-size:0.9286em;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+m.title+'</div>';
-      if(m.total>0){
-        html+='<div style="display:flex;align-items:center;gap:8px;margin:6px 0 4px">';
-        html+='<div style="flex:1;background:var(--s3);border-radius:99px;height:6px;overflow:hidden"><div style="width:'+pct+'%;height:100%;background:'+p.color+';border-radius:99px;transition:width .4s"></div></div>';
-        html+='<span style="font-size:0.78em;color:var(--t2);white-space:nowrap;font-weight:500">'+pct+'% ('+(m.current||0)+'/'+m.total+(m.unit||'p')+')</span>';
-        html+='</div>';
-        // 진도 빠른 입력
-        html+='<div style="display:flex;align-items:center;gap:6px;margin-top:4px">';
-        html+='<span style="font-size:0.78em;color:var(--t3)">현재 진도</span>';
-        html+='<input type="number" value="'+(m.current||0)+'" min="0" max="'+m.total+'" style="width:64px;font-size:0.82em;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--s2);color:var(--text);text-align:center" onchange="updateMatProgress(\''+pid+'\','+i+',this.value)">';
-        html+='<span style="font-size:0.78em;color:var(--t3)">/ '+m.total+(m.unit||'p')+'</span>';
-        html+='</div>';
-      }
-      if(m.memo){
-        html+='<div style="font-size:0.78em;color:var(--t3);margin-top:4px;white-space:pre-wrap">'+m.memo+'</div>';
-      }
-      html+='</div>';
-      html+='<div style="display:flex;gap:2px;flex-shrink:0">';
-      html+='<button class="bi" onclick="openMatEditModal(\''+pid+'\','+i+')" style="font-size:0.8em">✎</button>';
-      html+='<button class="bi" onclick="delMat(\''+pid+'\','+i+')" style="font-size:0.8em;color:var(--red)">✕</button>';
-      html+='</div>';
-      html+='</div></div>';
+  // 카드 표시 설정 (기본: 모두 표시)
+  const cv=p.cardVis||{};
+  const showAchieve=cv.achieve!==false, showMs=cv.milestone!==false, showLink=cv.link!==false, showMat=cv.material!==false;
+
+  // 루틴 달성도 카드 HTML
+  var achieveHtml='';
+  if(showAchieve){
+    var rzs2=p.routinized||[];
+    var aDone=0,aPast=0,aTotal=0,atd=todStr();
+    var perRoutine=rzs2.map(function(r){
+      var evs=(S.calEvents||[]).filter(e=>e.rzId===r.id);
+      var tot=evs.length, dn=evs.filter(e=>S.checks[e.date]&&S.checks[e.date][r.id]).length, pst=evs.filter(e=>e.date<=atd).length;
+      aTotal+=tot; aDone+=dn; aPast+=pst;
+      return {task:r.task,tot:tot,dn:dn,pst:pst,save:r.saveAmount||0};
     });
+    var ovPct=aPast>0?Math.round(aDone/aPast*100):0;
+    achieveHtml='<div class="card" style="margin-bottom:16px"><div class="ct" style="margin-bottom:12px"><svg width="17" height="17" viewBox="0 0 24 24" fill="var(--accent)" style="flex-shrink:0"><path d="M3 13h2v8H3zm4-6h2v14H7zm4-4h2v18h-2zm4 8h2v10h-2zm4-3h2v13h-2z"/></svg>루틴 달성도</div>'+
+      (rzs2.length===0?'<div class="empty">루틴을 등록하면 달성도가 표시돼요</div>':
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--s2);border-radius:10px;padding:12px 16px;margin-bottom:12px">'+
+        '<div style="flex:1;min-width:0"><div style="font-size:0.8em;color:var(--t3);margin-bottom:5px">전체 달성도 (지금까지 해야 한 것 기준)</div>'+
+          '<div class="pw" style="height:8px"><div class="pb" style="width:'+ovPct+'%;background:var(--accent)"></div></div></div>'+
+        '<div style="text-align:right;flex-shrink:0"><div style="font-size:1.4em;font-weight:700;color:var(--accent);font-family:var(--serif);line-height:1">'+ovPct+'%</div>'+
+          '<div style="font-size:0.7em;color:var(--t3);margin-top:2px">'+aDone+'/'+aPast+'회 · 총 '+aTotal+'회</div></div>'+
+      '</div>'+
+      perRoutine.map(function(pr2){
+        var pct=pr2.tot>0?Math.round(pr2.dn/pr2.tot*100):0;
+        var pctPast=pr2.pst>0?Math.round(pr2.dn/pr2.pst*100):0;
+        return '<div style="padding:8px 0;border-bottom:1px solid var(--border)">'+
+          '<div style="display:flex;justify-content:space-between;font-size:0.86em;font-weight:500;margin-bottom:5px"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+pr2.task+'</span><span style="color:var(--accent);flex-shrink:0;margin-left:8px">'+pctPast+'%</span></div>'+
+          '<div class="pw" style="height:5px"><div class="pb" style="width:'+pct+'%;background:'+p.color+'"></div></div>'+
+          '<div style="display:flex;justify-content:space-between;font-size:0.7em;color:var(--t3);margin-top:3px"><span>전체 '+pr2.dn+'/'+pr2.tot+'회</span><span>'+(pr2.pst>0?'지금까지 '+pr2.dn+'/'+pr2.pst+'회':'시작 전')+'</span></div>'+
+        '</div>';
+      }).join(''))+
+    '</div>';
   }
-  html+='</div></div>';  // 학습자료 카드 + g2 닫기
-  html+='<div class="card"><div class="ct" style="margin-bottom:12px"><svg width="17" height="17" viewBox="0 0 24 24" fill="var(--accent)" style="flex-shrink:0"><path d="M4 4h7a1 1 0 0 1 0 2H5v13h13v-6a1 1 0 0 1 2 0v7a1 1 0 0 1-1 1H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" fill-opacity="0.55"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>프로젝트 노트</div><textarea class="ta" style="min-height:120px" placeholder="메모, 아이디어..." onchange="savePjN(\''+pid+'\',this.value)">'+(p.notes||'')+'</textarea></div>';
+
+  // 마일스톤 + 링크(왼쪽) / 학습자료(오른쪽)
+  html+=achieveHtml;
+  var leftCards='', rightCards='';
+  if(showMs){
+    leftCards+='<div class="card" style="margin-bottom:16px"><div class="ch"><div class="ct"><svg width="17" height="17" viewBox="0 0 24 24" fill="var(--accent)" style="flex-shrink:0"><path d="M5 2a1 1 0 0 0-1 1v19a1 1 0 0 0 2 0v-7h13a1 1 0 0 0 .8-1.6L17.2 9l2.6-3.4A1 1 0 0 0 19 4H6V3a1 1 0 0 0-1-1z"/></svg>마일스톤</div><button class="btn bg bsm" onclick="openMsModal(\''+pid+'\')">+ 추가</button></div>'+
+    (ms.length===0?'<div class="empty">마일스톤 없음</div>':ms.map((m,i)=>'<div class="msi row-hov"><div class="mss '+(m.done?'on':'')+'" onclick="togMs(\''+pid+'\','+i+')"></div><div style="flex:1"><div style="font-size:0.9286em;'+(m.done?'text-decoration:line-through;color:var(--t3)':'')+'">'+m.text+'</div>'+(m.date?'<div style="font-size:0.7857em;color:var(--t3);font-family:var(--mono)">'+m.date+'</div>':'')+'</div><button class="bi hov-btns" onclick="delMs(\''+pid+'\','+i+')" style="font-size:0.8571em;color:var(--red)">✕</button></div>').join(''))+
+    '</div>';
+  }
+  if(showLink){
+    leftCards+='<div class="card"><div class="ch"><div class="ct"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>링크 바로가기</div><button class="btn bg bsm" onclick="openLkModal(\''+pid+'\')">+ 추가</button></div>'+
+    ((p.links||[]).length===0?'<div class="empty">자주 쓰는 링크를 추가해요</div>':(p.links||[]).map((lk,i)=>'<div class="row-hov" style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)"><div style="font-size:1.2857em">'+(lk.emoji||'🔗')+'</div><div style="flex:1;overflow:hidden"><div style="font-size:0.9286em;font-weight:500">'+lk.label+'</div><div style="font-size:0.7857em;color:var(--t3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+lk.url+'</div></div><a href="'+lk.url+'" target="_blank" class="btn bg bsm" style="flex-shrink:0">열기 →</a><button class="bi hov-btns" onclick="delLk(\''+pid+'\','+i+')" style="font-size:0.8571em;color:var(--t3)">✕</button></div>').join(''))+
+    '</div>';
+  }
+  // 오른쪽: 학습 자료
+  const materials=p.materials||[];
+  if(showMat){
+    rightCards+='<div class="card"><div class="ch"><div class="ct"><svg width="17" height="17" viewBox="0 0 24 24" fill="var(--accent)" style="flex-shrink:0"><path d="M6.5 2A2.5 2.5 0 0 0 4 4.5v15A2.5 2.5 0 0 0 6.5 22H20a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1zm0 15H19v3H6.5a1 1 0 0 1 0-2z" fill-opacity="0.9"/></svg>학습 자료</div><button class="btn bp bsm" onclick="openMatModal(\''+pid+'\')">+ 추가</button></div>';
+    if(materials.length===0){
+      rightCards+='<div class="empty">PDF, 책 등 학습 자료를 등록해요</div>';
+    } else {
+      rightCards+=(function(){var h='';materials.forEach(function(m,i){
+        const pct=m.total>0?Math.min(100,Math.round((m.current||0)/m.total*100)):0;
+        h+='<div class="row-hov" style="padding:12px 0;border-bottom:1px solid var(--border)">';
+        h+='<div style="display:flex;align-items:flex-start;gap:10px">';
+        h+='<div style="font-size:1.4em;flex-shrink:0">'+( m.type==='pdf'?'📄':'📖')+'</div>';
+        h+='<div style="flex:1;min-width:0">';
+        h+='<div style="font-size:0.9286em;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+m.title+'</div>';
+        if(m.total>0){
+          h+='<div style="display:flex;align-items:center;gap:8px;margin:6px 0 4px">';
+          h+='<div style="flex:1;background:var(--s3);border-radius:99px;height:6px;overflow:hidden"><div style="width:'+pct+'%;height:100%;background:'+p.color+';border-radius:99px;transition:width .4s"></div></div>';
+          h+='<span style="font-size:0.78em;color:var(--t2);white-space:nowrap;font-weight:500">'+pct+'% ('+(m.current||0)+'/'+m.total+(m.unit||'p')+')</span>';
+          h+='</div>';
+          h+='<div style="display:flex;align-items:center;gap:6px;margin-top:4px">';
+          h+='<span style="font-size:0.78em;color:var(--t3)">현재 진도</span>';
+          h+='<input type="number" value="'+(m.current||0)+'" min="0" max="'+m.total+'" style="width:64px;font-size:0.82em;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--s2);color:var(--text);text-align:center" onchange="updateMatProgress(\''+pid+'\','+i+',this.value)">';
+          h+='<span style="font-size:0.78em;color:var(--t3)">/ '+m.total+(m.unit||'p')+'</span>';
+          h+='</div>';
+        }
+        if(m.memo){h+='<div style="font-size:0.78em;color:var(--t3);margin-top:4px;white-space:pre-wrap">'+m.memo+'</div>';}
+        h+='</div>';
+        h+='<div class="hov-btns" style="display:flex;gap:2px;flex-shrink:0">';
+        h+='<button class="bi" onclick="openMatEditModal(\''+pid+'\','+i+')" style="font-size:0.8em">✎</button>';
+        h+='<button class="bi" onclick="delMat(\''+pid+'\','+i+')" style="font-size:0.8em;color:var(--red)">✕</button>';
+        h+='</div>';
+        h+='</div></div>';
+      });return h;})();
+    }
+    rightCards+='</div>';
+  }
+  // 프로젝트 노트 (항상 표시)
+  rightCards+='<div class="card" style="margin-top:16px"><div class="ct" style="margin-bottom:12px"><svg width="17" height="17" viewBox="0 0 24 24" fill="var(--accent)" style="flex-shrink:0"><path d="M4 4h7a1 1 0 0 1 0 2H5v13h13v-6a1 1 0 0 1 2 0v7a1 1 0 0 1-1 1H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" fill-opacity="0.55"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>프로젝트 노트</div><textarea class="ta" style="min-height:120px" placeholder="메모, 아이디어..." onchange="savePjN(\''+pid+'\',this.value)">'+(p.notes||'')+'</textarea></div>';
+  // g2 그리드는 양쪽에 내용이 있을 때만
+  if(leftCards||rightCards){
+    html+='<div class="g2" style="margin-top:0">'+
+      (leftCards?'<div>'+leftCards+'</div>':'<div></div>')+
+      (rightCards?'<div>'+rightCards+'</div>':'<div></div>')+
+    '</div>';
+  }
   return html;
 }
-
 function togTk(pid,i){const p=S.projects.find(x=>x.id===pid);if(!p||!p.tasks[i])return;p.tasks[i].done=!p.tasks[i].done;save();render();}
 function delTk(pid,i){
   const p=S.projects.find(x=>x.id===pid);

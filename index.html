@@ -2314,6 +2314,9 @@ function openRzModal(pid){
         '</div>'+
       '</div>'+
     '</div>'+
+    '<div class="fg"><label class="fl">시작일 <span style="color:var(--t3);font-weight:400">(이 날부터 등록)</span></label>'+
+      '<input type="date" class="inp" id="rz-start" value="'+dateStr(new Date())+'">'+
+    '</div>'+
     '<div class="fg"><label class="fl">등록 마감일 <span style="color:var(--t3);font-weight:400">(이 날까지 자동 등록)</span></label>'+
       '<input type="date" class="inp" id="rz-until" value="'+ddayVal+'">'+
     '</div>'+
@@ -2352,10 +2355,13 @@ function saveRz(pid){
   const saveAmtEl=document.getElementById('rz-save');
   const saveAmt=saveAmtEl&&saveAmtEl.value?Math.round(parseFloat(saveAmtEl.value)*10000):0;
   const until=document.getElementById('rz-until').value;
+  const startEl=document.getElementById('rz-start');
+  const startVal=startEl&&startEl.value?startEl.value:dateStr(new Date());
   const isMonthly=(document.getElementById('rz-mode-month')&&document.getElementById('rz-mode-month').dataset.on==='1');
 
   if(!task){alert('할 일 이름을 입력해주세요');return;}
   if(!until){alert('등록 마감일을 선택해주세요');return;}
+  if(startVal>until){alert('시작일이 마감일보다 늦을 수 없어요');return;}
 
   let days=[], monthDays=[];
   if(isMonthly){
@@ -2367,14 +2373,14 @@ function saveRz(pid){
   }
 
   const p=S.projects.find(x=>x.id===pid);if(!p.routinized)p.routinized=[];
-  const entry={id:gid(),task,days:isMonthly?[]:days,monthDays:isMonthly?monthDays:[],isMonthly:!!isMonthly,time,duration:dur,projectId:pid,until,saveAmount:saveAmt};
+  const entry={id:gid(),task,days:isMonthly?[]:days,monthDays:isMonthly?monthDays:[],isMonthly:!!isMonthly,time,duration:dur,projectId:pid,until,startDate:startVal,saveAmount:saveAmt};
   p.routinized.push(entry);
   S.routines.push({id:entry.id,time:time||'00:00',task,detail:p.name+' 루틴화',days:isMonthly?[]:days,monthDays:isMonthly?monthDays:[],isMonthly:!!isMonthly,isRz:true,rzProjectId:pid,saveAmount:saveAmt});
   S.routines.sort((a,b)=>a.time.localeCompare(b.time));
 
-  // 캘린더 등록: 오늘 ~ 마감일까지
+  // 캘린더 등록: 시작일 ~ 마감일까지
   const untilDate=new Date(until+'T00:00:00');
-  const now=new Date(); now.setHours(0,0,0,0);
+  const now=new Date(startVal+'T00:00:00'); now.setHours(0,0,0,0);
   if(isMonthly){
     // 매월: 오늘~마감일 사이에 해당 일자(말일 포함)가 있으면 등록
     const hasLast=monthDays.includes('last');

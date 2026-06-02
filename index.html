@@ -266,7 +266,7 @@ html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--t
 
 /* ── SIDEBAR ── */
 .sb{width:var(--sw);min-width:var(--sw);background:var(--s2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;z-index:100;transition:transform .3s}
-.sb-head{height:52px;box-sizing:border-box;padding:0 16px;display:flex;align-items:center;justify-content:center;border-bottom:1px solid var(--border);background:var(--accent);background:color-mix(in srgb, var(--accent) 72%, white);overflow:hidden}
+.sb-head{height:48px;box-sizing:border-box;padding:0 16px;display:flex;align-items:center;justify-content:center;border-bottom:1px solid var(--border);background:var(--accent);background:color-mix(in srgb, var(--accent) 72%, white);overflow:hidden}
 .logo{font-family:var(--logo-font);font-size:1.4em;display:flex;align-items:center;justify-content:center;gap:7px;letter-spacing:-0.3px;font-weight:800;font-style:italic;color:#fff;line-height:1;white-space:nowrap}
 .logo-dot{width:8px;height:8px;background:var(--accent);border-radius:50%}
 .logo-sub{font-size:0.7857em;color:var(--t3);font-family:var(--mono);margin-top:2px}
@@ -403,8 +403,8 @@ html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--t
 
 /* ── DEADLINE ── */
 .dl{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
-.dl-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.dl-grid .dl{padding:14px 16px;border:1px solid var(--border);border-radius:12px;background:var(--surface);box-shadow:var(--sh);min-width:0;border-bottom:1px solid var(--border)}
+.dl-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding-bottom:6px}
+.dl-grid .dl{padding:14px 16px;border:1px solid var(--border);border-radius:12px;background:var(--surface);box-shadow:var(--sh);min-width:0}
 .dl-grid .dl .dl-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .dl:last-child{border-bottom:none;padding-bottom:0}
 .dl-grid .dl:last-child{padding-bottom:14px}
@@ -843,7 +843,7 @@ function go(p, pid, _fromPopstate){
   const tbTitle=document.getElementById('tb-title');
   const topbar=document.querySelector('.topbar');
   const isMobile=window.innerWidth<=768;
-  const hideTopbarPages=['ledger','calendar','diary','deadlines'];
+  const hideTopbarPages=['ledger','today','calendar','diary','deadlines'];
 
   // 모바일에서는 항상 탑바 표시, 데스크탑에서만 hideTopbarPages 적용
   if(!isMobile && hideTopbarPages.includes(p)){
@@ -873,7 +873,8 @@ function go(p, pid, _fromPopstate){
     if(tbDate){
       tbDate.style.fontFamily='';
       if(p==='today'){
-        tbDate.innerHTML='<span style="font-family:var(--mono);font-size:1em;color:var(--t3)">'+todLabel()+'</span> <span class="'+(window._tdEditMode?'':'hov-btns')+'"><button class="btn '+(window._tdEditMode?'bp':'bg')+' bsm" onclick="toggleTdLayoutEdit()" style="font-family:var(--sans);margin-left:8px">'+(window._tdEditMode?'✓ 편집 완료':'⚙ 레이아웃')+'</button></span>';
+        tbDate.innerHTML='';
+        tbDate.textContent=todLabel();
       } else {
         tbDate.innerHTML='';
         tbDate.textContent=todLabel();
@@ -1028,7 +1029,7 @@ function updateSB(){
 }
 
 window._pjGroupCollapsed={};
-window._pjBoxCollapsed=true;
+window._pjBoxCollapsed=false;
 function togglePjBox(){
   const wrap=document.getElementById('pj-nav-sec');
   if(!wrap)return;
@@ -1212,11 +1213,13 @@ function renderToday(){
   }
 
 
+  var layoutBtn='<span class="'+(isTdEdit?'':'hov-btns')+'" style="margin-left:auto;flex-shrink:0"><button class="btn '+(isTdEdit?'bp':'bg')+' bsm" onclick="toggleTdLayoutEdit()">'+(isTdEdit?'✓ 편집 완료':'⚙ 레이아웃')+'</button></span>';
+
   var goalBar=(S.lifeGoal&&S.lifeGoal.text)
-    ? '<div style="padding:0 0 16px;margin-top:-14px;border-bottom:1px solid var(--border);margin-bottom:20px;display:flex;align-items:center;gap:8px">'+
+    ? '<div class="row-hov" style="padding:0 0 16px;margin-top:-14px;border-bottom:1px solid var(--border);margin-bottom:20px;display:flex;align-items:center;gap:8px">'+
     '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>'+
-    '<span style="font-family:var(--hand);font-size:1.5em;color:var(--text);letter-spacing:0.3px;line-height:1.2">'+S.lifeGoal.text+'</span></div>'
-    : '';
+    '<span style="font-family:var(--hand);font-size:1.5em;color:var(--text);letter-spacing:0.3px;line-height:1.2">'+S.lifeGoal.text+'</span>'+layoutBtn+'</div>'
+    : '<div class="row-hov" style="display:flex;justify-content:flex-end;margin-bottom:16px">'+layoutBtn+'</div>';
 
   var entry=(S.diaryEntries||{})[t]||{};
 
@@ -4072,7 +4075,7 @@ function _ensureLedgerTip(){
   if(!tip){
     tip=document.createElement('div');
     tip.id='ledger-cal-tip';
-    tip.style.cssText='position:fixed;z-index:99999;pointer-events:none;display:none;background:rgba(40,40,45,0.95);color:#fff;padding:8px 11px;border-radius:8px;font-size:0.8em;line-height:1.5;white-space:pre;box-shadow:0 4px 16px rgba(0,0,0,0.25);max-width:260px';
+    tip.style.cssText='position:fixed;z-index:99999;pointer-events:none;display:none;background:var(--surface);color:var(--text);padding:10px 13px;border-radius:10px;font-size:0.82em;line-height:1.6;white-space:pre;box-shadow:0 4px 16px rgba(0,0,0,0.12);border:1px solid var(--border);max-width:280px';
     document.body.appendChild(tip);
   }
   return tip;

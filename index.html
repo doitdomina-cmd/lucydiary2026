@@ -310,6 +310,8 @@ html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--t
 /* ── MAIN ── */
 .main{flex:1;overflow:hidden;display:flex;flex-direction:column}
 .topbar{height:48px;background:var(--s2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:12px;flex-shrink:0}
+.topbar .hov-btns{opacity:0;transition:opacity .15s}
+.topbar:hover .hov-btns{opacity:1}
 .tb-title{font-size:1em;font-weight:500}
 .tb-date{font-family:var(--mono);font-size:0.7857em;color:var(--t3);margin-left:auto}
 .hbg{display:none;background:none;border:none;cursor:pointer;color:var(--text);font-size:1.2857em;padding:4px}
@@ -322,7 +324,7 @@ html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--t
 .pt{font-family:var(--serif);font-size:2.2857em;font-weight:300;letter-spacing:-.5px;line-height:1.2}
 .ps{font-size:0.9286em;color:var(--t3);margin-top:6px}
 @keyframes fi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-.pc{animation:fi .22s ease}
+.pc{animation:fi .22s ease;max-width:1600px;margin:0 auto}
 
 /* ── CARDS ── */
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:20px;margin-bottom:16px;box-shadow:var(--sh)}
@@ -841,7 +843,7 @@ function go(p, pid, _fromPopstate){
   const tbTitle=document.getElementById('tb-title');
   const topbar=document.querySelector('.topbar');
   const isMobile=window.innerWidth<=768;
-  const hideTopbarPages=['ledger','today','calendar','diary','deadlines'];
+  const hideTopbarPages=['ledger','calendar','diary','deadlines'];
 
   // 모바일에서는 항상 탑바 표시, 데스크탑에서만 hideTopbarPages 적용
   if(!isMobile && hideTopbarPages.includes(p)){
@@ -863,16 +865,19 @@ function go(p, pid, _fromPopstate){
     tbTitle.innerHTML=colorDot+proj.name+areaBadge;
     // 날짜 자리에 수정 버튼
     if(tbDate){
-      tbDate.innerHTML='<button class="btn bg bsm" onclick="openPjEditModal(\''+pid+'\')" style="font-family:var(--sans)">✏️ 수정</button>';
+      tbDate.innerHTML='<span class="'+(window._pjEditMode?'':'hov-btns')+'"><button class="btn bg bsm" onclick="openPjEditModal(\''+pid+'\')" style="font-family:var(--sans)">✏️ 수정</button><button class="btn '+(window._pjEditMode?'bp':'bg')+' bsm" onclick="togglePjLayoutEdit(\''+pid+'\')" style="font-family:var(--sans)">'+(window._pjEditMode?'✓ 편집 완료':'⚙ 레이아웃')+'</button></span>';
       tbDate.style.fontFamily='var(--sans)';
     }
   } else {
     tbTitle.textContent=titles[p]||'';
-    // 날짜 복원
     if(tbDate){
-      tbDate.innerHTML='';
       tbDate.style.fontFamily='';
-      tbDate.textContent=todLabel();
+      if(p==='today'){
+        tbDate.innerHTML='<span style="font-family:var(--mono);font-size:1em;color:var(--t3)">'+todLabel()+'</span> <span class="'+(window._tdEditMode?'':'hov-btns')+'"><button class="btn '+(window._tdEditMode?'bp':'bg')+' bsm" onclick="toggleTdLayoutEdit()" style="font-family:var(--sans);margin-left:8px">'+(window._tdEditMode?'✓ 편집 완료':'⚙ 레이아웃')+'</button></span>';
+      } else {
+        tbDate.innerHTML='';
+        tbDate.textContent=todLabel();
+      }
     }
   }
   render(); closeSB();
@@ -1270,8 +1275,6 @@ function renderToday(){
   var tdVis=S.todayCardVis||{};
   var isTdEdit=!!window._tdEditMode;
 
-  var editBtn='<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn '+(isTdEdit?'bp':'bg')+' bsm" onclick="toggleTdLayoutEdit()">'+(isTdEdit?'✓ 편집 완료':'⚙ 레이아웃')+'</button></div>';
-
   var rightGrid='';
   tl.forEach(function(slot){
     var h=TCB[slot.id];
@@ -1287,7 +1290,7 @@ function renderToday(){
     '</div>';
   });
 
-  return goalBar+editBtn+
+  return goalBar+
     '<div class="today-wrap">'+
     '<div>'+routineCard(viewDate)+'</div>'+
     '<div class="pj-layout'+(isTdEdit?' pj-editing':'')+'">'+rightGrid+'</div></div>';
@@ -2156,11 +2159,8 @@ function renderPjDetail(pid){
   // 표시 여부 필터
   var hidden={achieve:cv.achieve===false,milestone:cv.milestone===false,link:cv.link===false,material:cv.material===false};
 
-  // 편집 모드 버튼
-  var editBtn='<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button class="btn '+(isEdit?'bp':'bg')+' bsm" onclick="togglePjLayoutEdit(\''+pid+'\')">'+(isEdit?'✓ 편집 완료':'⚙ 레이아웃 편집')+'</button></div>';
-
-  // 카드 렌더링
-  var html=editBtn+'<div class="pj-layout'+(isEdit?' pj-editing':'')+'" id="pj-layout-grid">';
+  // 카드 렌더링 (편집 버튼은 topbar에)
+  var html='<div class="pj-layout'+(isEdit?' pj-editing':'')+'" id="pj-layout-grid">';
   layout.forEach(function(slot){
     if(!CB[slot.id])return;
     if(hidden[slot.id]&&!isEdit)return;

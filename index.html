@@ -408,6 +408,7 @@ html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--t
 .dl-grid .dl .dl-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .dl:last-child{border-bottom:none;padding-bottom:0}
 .dl-grid .dl:last-child{padding-bottom:14px}
+.dl-done-scroll::-webkit-scrollbar{width:0;display:none}
 .db{min-width:44px;text-align:center;background:var(--s2);border-radius:8px;padding:6px 8px}
 .dm{font-size:0.7143em;color:var(--t3);font-family:var(--mono);text-transform:uppercase}
 .dd{font-size:1.2857em;font-weight:600;font-family:var(--mono);line-height:1}
@@ -2697,8 +2698,9 @@ function delLk(pid,i){const p=S.projects.find(x=>x.id===pid);p.links.splice(i,1)
 // ═══════════ DEADLINES ═══════════
 function renderDeadlines(){
   const sorted=[...S.deadlines].sort((a,b)=>a.date.localeCompare(b.date));
-  // 지난 마감은 최근 7일 이내만 표시 (그보다 오래된 건 자동 숨김)
-  const over=sorted.filter(d=>{const dd=dLeft(d.date);return dd<0&&dd>=-7;}),up=sorted.filter(d=>dLeft(d.date)>=0);
+  // 지난 마감은 최근 7일 이내 + 미완료만 표시
+  const over=sorted.filter(d=>{const dd=dLeft(d.date);return dd<0&&dd>=-7&&!d.done;}),up=sorted.filter(d=>dLeft(d.date)>=0&&!d.done);
+  const doneList=sorted.filter(d=>d.done&&dLeft(d.date)>=-30);
   let html='<div style="display:flex;justify-content:flex-end;margin-bottom:16px"><button class="btn bp" onclick="openDlModal()">+ 마감 추가</button></div>';
   if(over.length>0){
     html+='<div style="margin-bottom:20px">'+
@@ -2707,9 +2709,17 @@ function renderDeadlines(){
     '</div>';
   }
   html+='<div><div class="ct" style="margin-bottom:10px">📋 예정 마감</div>'+(up.length===0?'<div class="empty"><div class="ei">🎉</div>예정된 마감이 없어요</div>':'<div class="dl-grid">'+up.map(dlRow).join('')+'</div>')+'</div>';
+  if(doneList.length>0){
+    html+='<div class="card" style="margin-top:20px;padding:16px 18px">'+
+      '<div class="ct" style="margin-bottom:10px;color:var(--t3)">✓ 완료한 마감 <span style="font-size:0.8em;font-weight:400">(최근 한 달 · '+doneList.length+'개)</span></div>'+
+      '<div style="max-height:200px;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none" class="dl-done-scroll">'+
+        '<div class="dl-grid" style="opacity:0.6">'+doneList.map(dlRow).join('')+'</div>'+
+      '</div></div>';
+  }
   return html;
 }
-function dlRow(d){const dd=dLeft(d.date),f=fmtDateObj(d.date),pr=S.projects.find(p=>p.id===d.projectId);return '<div class="dl"><div class="db"><div class="dm">'+f.month+'</div><div class="dd">'+f.day+'</div></div><div style="flex:1;min-width:0"><div style="font-size:0.9643em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+d.title+'</div><div style="font-size:0.8571em;color:var(--t3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(pr?'🗂️ '+pr.name:'')+'</div></div><div style="font-family:var(--mono);font-size:0.8571em;font-weight:600;flex-shrink:0;color:'+(dd<0?'var(--red)':dd===0?'var(--red)':dd<=3?'var(--accent)':'var(--t3)')+'">'+( dd<0?'D+'+Math.abs(dd):dd===0?'오늘':'D-'+dd)+'</div><button class="bi" onclick="delDl(\''+d.id+'\')" style="font-size:0.8571em;color:var(--t3);flex-shrink:0">✕</button></div>';}
+function dlRow(d){const dd=dLeft(d.date),f=fmtDateObj(d.date),pr=S.projects.find(p=>p.id===d.projectId);return '<div class="dl row-hov"><div onclick="togDlDone(\''+d.id+'\')" style="width:18px;height:18px;border-radius:50%;border:1.5px solid '+(d.done?'var(--green)':'var(--border2)')+';background:'+(d.done?'var(--green)':'transparent')+';cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center">'+(d.done?'<span style="color:#fff;font-size:0.55em">✓</span>':'')+'</div><div class="db"><div class="dm">'+f.month+'</div><div class="dd">'+f.day+'</div></div><div style="flex:1;min-width:0"><div style="font-size:0.9643em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'+(d.done?'text-decoration:line-through;color:var(--t3)':'')+'">'+d.title+'</div><div style="font-size:0.8571em;color:var(--t3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(pr?'🗂️ '+pr.name:'')+'</div></div><div style="font-family:var(--mono);font-size:0.8571em;font-weight:600;flex-shrink:0;color:'+(dd<0?'var(--red)':dd===0?'var(--red)':dd<=3?'var(--accent)':'var(--t3)')+'">'+( dd<0?'D+'+Math.abs(dd):dd===0?'오늘':'D-'+dd)+'</div><button class="bi hov-btns" onclick="delDl(\''+d.id+'\')" style="font-size:0.8571em;color:var(--t3);flex-shrink:0">✕</button></div>';}
+function togDlDone(id){var d=S.deadlines.find(x=>x.id===id);if(d){d.done=!d.done;save();render();}}
 function openDlModal(prefPid){
   openMo('마감 추가',
     '<div class="fg"><label class="fl">제목</label><input class="inp" id="dl-t" placeholder="마감 제목"></div>'+

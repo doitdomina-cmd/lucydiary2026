@@ -2163,8 +2163,8 @@
                     }
 
                     localStorage.setItem('theme_v6', activeTheme);
-                    localStorage.setItem('RoyaltyData_v6_Backup', jsonStr);
                     if (!isNodeEnvironment && typeof window.cloudSave === 'function') window.cloudSave(dataToSave);
+                    try { localStorage.setItem('RoyaltyData_v6_Backup', jsonStr); } catch(e) { /* 용량 초과 시 무시 — 파일/클라우드가 주 저장소 */ }
                     const bgMain = document.documentElement.style.getPropertyValue('--bg-main');
                     if(bgMain) localStorage.setItem('bg_main_v6', bgMain);
 
@@ -6430,9 +6430,19 @@
 
             function applyAndRender(parsed){ hydrateFromParsed(parsed); try { setTheme(activeTheme); } catch(e){} try { updateUI(); } catch(e){} }
             function closeOverlay(){ const o = document.getElementById('cloudOverlay'); if (o) o.remove(); }
+            function cloudPayload(dataObj){
+                // 클라우드엔 표지 이미지(coverImage) 제외 → 용량 대폭 축소 (표지는 PC 로컬에만 보관)
+                const clone = Object.assign({}, dataObj);
+                if (Array.isArray(clone.masterWorks)) {
+                    clone.masterWorks = clone.masterWorks.map(w => { const c = Object.assign({}, w); delete c.coverImage; return c; });
+                }
+                return JSON.stringify(clone);
+            }
             function cloudSaveNow(dataToSave){
                 if (!window.__cloudDocRef) return;
-                window.__cloudDocRef.set({ payload: JSON.stringify(dataToSave), _savedAt: Date.now() }).catch(e => console.error('\uD074\uB77C\uC6B0\uB4DC \uC800\uC7A5 \uC2E4\uD328', e));
+                const payload = cloudPayload(dataToSave);
+                if (payload.length > 1000000) { console.error('클라우드 저장 보류: 데이터가 1MB를 초과 (' + payload.length + ')'); return; }
+                window.__cloudDocRef.set({ payload: payload, _savedAt: Date.now() }).catch(e => console.error('\uD074\uB77C\uC6B0\uB4DC \uC800\uC7A5 \uC2E4\uD328', e));
             }
             window.cloudSave = function(dataToSave){
                 if (!cloudReady || !window.__cloudDocRef) return;

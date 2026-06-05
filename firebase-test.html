@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Firebase 연결 확인</title>
+<style>
+  body { font-family: -apple-system, "Segoe UI", "Malgun Gothic", sans-serif; background:#f5f7fa; margin:0; padding:24px; color:#334155; }
+  .card { max-width:440px; margin:40px auto; background:#fff; border-radius:20px; padding:28px; box-shadow:0 10px 40px rgba(0,0,0,.06); }
+  h1 { font-size:18px; margin:0 0 6px; }
+  p.sub { color:#94a3b8; font-size:13px; margin:0 0 20px; }
+  button { border:none; border-radius:12px; padding:12px 18px; font-size:15px; font-weight:700; cursor:pointer; width:100%; margin-top:8px; }
+  .btn-google { background:#fff; color:#3c4043; border:1px solid #dadce0; }
+  .btn-out { background:#f1f5f9; color:#64748b; }
+  .row { display:flex; align-items:center; gap:8px; }
+  .status { margin-top:18px; padding:14px; border-radius:12px; font-size:14px; line-height:1.6; word-break:break-all; }
+  .ok { background:#ecfdf5; color:#047857; }
+  .err { background:#fef2f2; color:#b91c1c; }
+  .info { background:#f8fafc; color:#475569; }
+  .label { font-size:12px; color:#94a3b8; }
+  code { background:#f1f5f9; padding:1px 6px; border-radius:6px; font-size:13px; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>🔌 Firebase 연결 확인</h1>
+    <p class="sub">writer-routine 프로젝트 · 구글 로그인 + Firestore 읽기/쓰기 테스트</p>
+
+    <div id="loggedOut">
+      <button class="btn-google" id="loginBtn">구글로 로그인</button>
+    </div>
+
+    <div id="loggedIn" style="display:none;">
+      <div class="status info">
+        <div class="label">로그인 계정</div>
+        <div id="who" style="font-weight:700;"></div>
+        <div class="label" style="margin-top:8px;">내 uid</div>
+        <div id="uid"></div>
+      </div>
+      <button class="btn-out" id="logoutBtn">로그아웃</button>
+    </div>
+
+    <div id="status" class="status info" style="margin-top:18px;">대기 중…</div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCYWsMUSAaxnnTNoNjxw8YfZThv9-5mHak",
+      authDomain: "writer-routine.firebaseapp.com",
+      projectId: "writer-routine"
+    };
+
+    const statusEl = document.getElementById('status');
+    function setStatus(msg, kind) {
+      statusEl.className = 'status ' + (kind || 'info');
+      statusEl.innerHTML = msg;
+    }
+
+    let auth, db, provider;
+    try {
+      firebase.initializeApp(firebaseConfig);
+      auth = firebase.auth();
+      db = firebase.firestore();
+      provider = new firebase.auth.GoogleAuthProvider();
+    } catch (e) {
+      setStatus('초기화 실패: ' + e.message, 'err');
+    }
+
+    document.getElementById('loginBtn').onclick = () => {
+      setStatus('구글 로그인 창으로 이동 중…', 'info');
+      auth.signInWithRedirect(provider);
+    };
+    document.getElementById('logoutBtn').onclick = () => auth.signOut();
+
+    // 리다이렉트로 돌아온 결과의 에러를 잡기 위함
+    auth.getRedirectResult().catch(e => {
+      setStatus('로그인 오류: ' + e.code + '<br>' + e.message, 'err');
+    });
+
+    auth.onAuthStateChanged(async (user) => {
+      if (!user) {
+        document.getElementById('loggedIn').style.display = 'none';
+        document.getElementById('loggedOut').style.display = 'block';
+        setStatus('로그인하면 Firestore 읽기/쓰기를 자동으로 테스트합니다.', 'info');
+        return;
+      }
+      document.getElementById('loggedOut').style.display = 'none';
+      document.getElementById('loggedIn').style.display = 'block';
+      document.getElementById('who').textContent = user.displayName + ' (' + user.email + ')';
+      document.getElementById('uid').textContent = user.uid;
+
+      // Firestore 쓰기 → 읽기 왕복 테스트 (본인 경로)
+      setStatus('Firestore에 테스트 데이터 쓰는 중…', 'info');
+      try {
+        const ref = db.collection('users').doc(user.uid).collection('appdata').doc('connTest');
+        const payload = { msg: '연결 성공', at: new Date().toLocaleString('ko-KR') };
+        await ref.set(payload);
+        const snap = await ref.get();
+        const d = snap.data();
+        setStatus(
+          '✅ 전부 성공!<br>' +
+          '· 구글 로그인 OK<br>' +
+          '· Firestore 쓰기 OK<br>' +
+          '· Firestore 읽기 OK → <code>' + d.msg + '</code> (' + d.at + ')<br><br>' +
+          '이제 이 위에 전체 앱을 얹으면 됩니다.',
+          'ok'
+        );
+      } catch (e) {
+        setStatus(
+          '⚠️ 로그인은 됐는데 Firestore 접근이 막혔어요.<br>' +
+          '오류: ' + e.code + '<br>' + e.message + '<br><br>' +
+          '→ 보안 규칙에 <code>users/{uid}</code> 허용 규칙을 추가했는지 확인해 주세요.',
+          'err'
+        );
+      }
+    });
+  </script>
+</body>
+</html>

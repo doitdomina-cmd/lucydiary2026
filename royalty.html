@@ -2217,8 +2217,8 @@
         try {
             let fileData = null;
             if (isNodeEnvironment) {
-                if (fs.existsSync(targetFilePath)) fileData = fs.readFileSync(targetFilePath, 'utf-8');
-                else if (fs.existsSync(dataFilePath)) fileData = fs.readFileSync(dataFilePath, 'utf-8');
+                if (fs.existsSync(dataFilePath)) fileData = fs.readFileSync(dataFilePath, 'utf-8');
+                else if (fs.existsSync(targetFilePath)) fileData = fs.readFileSync(targetFilePath, 'utf-8');
             }
             if (!fileData) fileData = localStorage.getItem('RoyaltyData_v6_Backup');
 
@@ -3078,6 +3078,15 @@
                                 try { updateDashboardStats(); } catch(e) {}
                             }, 100);
                         } catch(e) { console.log('file-data-changed error:', e); }
+                    });
+                    // 클라우드(폰/아이패드)에서 변경된 데이터가 도착하면 전체 갱신
+                    ipcRenderer.on('cloud-data-updated', (e, data) => {
+                        try {
+                            if (!data) return;
+                            hydrateFromParsed(data);
+                            try { setTheme(activeTheme); } catch(e) {}
+                            try { updateUI(); } catch(e) {}
+                        } catch(e) { console.log('cloud-data-updated error:', e); }
                     });
                 }
             } catch(e) { console.log('Widget IPC setup error:', e); }
@@ -6425,8 +6434,18 @@
             document.body.appendChild(overlay);
             const setMsg = (t) => { const m = document.getElementById('cloudMsg'); if (m) m.textContent = t; };
 
-            document.getElementById('cloudLoginBtn').onclick = () => { setMsg('\uAD6C\uAE00 \uB85C\uADF8\uC778\uC73C\uB85C \uC774\uB3D9 \uC911...'); auth.signInWithRedirect(provider); };
-            auth.getRedirectResult().catch(e => setMsg('\uB85C\uADF8\uC778 \uC624\uB958: ' + e.message));
+            document.getElementById('cloudLoginBtn').onclick = () => {
+                setMsg('\uAD6C\uAE00 \uB85C\uADF8\uC778 \uCC3D \uC5EC\uB294 \uC911...');
+                auth.signInWithPopup(provider).catch(e => {
+                    // \uD31D\uC5C5\uC774 \uB9C9\uD790 \uACBD\uC6B0\uB9CC \uB9AC\uB2E4\uC774\uB809\uD2B8\uB85C \uD3F4\uBC31
+                    if (e && (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment')) {
+                        auth.signInWithRedirect(provider);
+                    } else {
+                        setMsg('\uB85C\uADF8\uC778 \uC624\uB958: ' + e.message);
+                    }
+                });
+            };
+            auth.getRedirectResult().catch(function(){});  // \uB9AC\uB2E4\uC774\uB809\uD2B8 \uC794\uC5EC \uCC98\uB9AC(\uD3F4\uBC31\uC6A9)
 
             function applyAndRender(parsed){ hydrateFromParsed(parsed); try { setTheme(activeTheme); } catch(e){} try { updateUI(); } catch(e){} }
             function closeOverlay(){ const o = document.getElementById('cloudOverlay'); if (o) o.remove(); }

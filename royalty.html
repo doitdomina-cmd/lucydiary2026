@@ -3503,6 +3503,8 @@
                 const wtPending = document.getElementById('new-work-pending-webtoon');
                 if (wtDate) wtDate.value = w.publishDate || '';
                 if (wtPending) wtPending.checked = w.isPending || false;
+                const wtContract = document.getElementById('new-work-contract-date');
+                if (wtContract) wtContract.value = w.contractDate || '';
             }
             const advAmt = document.getElementById('new-work-advance-amount');
             const advDt  = document.getElementById('new-work-advance-date');
@@ -3566,6 +3568,7 @@
             const volumes = parseInt(document.getElementById('new-work-volumes').value) || 1;
             const advanceAmount = document.getElementById('new-work-advance-amount')?.value.trim() || '';
             const advanceDate   = document.getElementById('new-work-advance-date')?.value.trim() || '';
+            const contractDate  = isWebtoon ? (document.getElementById('new-work-contract-date')?.value || '') : '';
 
             if (editId) {
                 const w = masterWorks.find(x => x.id === editId); if (!w) return;
@@ -3578,6 +3581,7 @@
                 w.volumes = volumes;
                 w.advanceAmount = advanceAmount ? Number(advanceAmount) : '';
                 w.advanceDate   = advanceDate;
+                w.contractDate  = contractDate;
                 editingWorkId = null;
                 // 완고 입고일 변경 시 기존 자동 스케줄 갱신
                 syncManuscriptTaskSchedule(w, oldManuscriptDate, manuscriptDate);
@@ -3586,7 +3590,7 @@
                     const originalWork = masterWorks.find(w => w.title === title && !w.genre.includes('웹툰'));
                     if (originalWork) originalWork.hasWebtoon = true;
                 }
-                const newWork = { id: Date.now().toString(), genre, title, publisher: publisher || '-', studio: studio || '-', rate, rs, webtoonRate, goalNoSpace, goalWithSpace, manuscriptDate, publishDate: date, isPending, volumes, advanceAmount: advanceAmount ? Number(advanceAmount) : '', advanceDate };
+                const newWork = { id: Date.now().toString(), genre, title, publisher: publisher || '-', studio: studio || '-', rate, rs, webtoonRate, goalNoSpace, goalWithSpace, manuscriptDate, publishDate: date, isPending, volumes, advanceAmount: advanceAmount ? Number(advanceAmount) : '', advanceDate, contractDate };
                 masterWorks.push(newWork);
                 // 신규 등록 시 완고 입고일이 있으면 자동 스케줄 생성
                 if (manuscriptDate) syncManuscriptTaskSchedule(newWork, '', manuscriptDate);
@@ -3628,7 +3632,16 @@
                     if (a.isPending !== b.isPending) return a.isPending ? 1 : -1; // 출간예정은 뒤로
                     return a.title.localeCompare(b.title, 'ko');
                 }
-                const dateA = a.isPending ? '9999-12-31' : a.publishDate, dateB = b.isPending ? '9999-12-31' : b.publishDate; if (dateA !== dateB) return (dateA < dateB) ? -1 : (dateA > dateB ? 1 : 0); return a.title.localeCompare(b.title, 'ko');
+                if (currentGenreTab === '웹툰') {
+                    // 1) 출간일 순(없으면 뒤로) > 2) 계약일 순 > 3) 제목
+                    const dA = (a.isPending || !a.publishDate) ? '9999-12-31' : a.publishDate;
+                    const dB = (b.isPending || !b.publishDate) ? '9999-12-31' : b.publishDate;
+                    if (dA !== dB) return dA < dB ? -1 : 1;
+                    const cA = a.contractDate || '9999-12-31', cB = b.contractDate || '9999-12-31';
+                    if (cA !== cB) return cA < cB ? -1 : 1;
+                    return a.title.localeCompare(b.title, 'ko');
+                }
+                const dateA = (a.isPending || !a.publishDate) ? '9999-12-31' : a.publishDate, dateB = (b.isPending || !b.publishDate) ? '9999-12-31' : b.publishDate; if (dateA !== dateB) return (dateA < dateB) ? -1 : (dateA > dateB ? 1 : 0); return a.title.localeCompare(b.title, 'ko');
             });
             const getStickyHeader = () => { if (currentYear === 'total') return `<th class="sticky-col text-left pl-6">${currentGenreTab === '종합' ? '장르 구분' : '작품 정보'}</th>`; return `<th class="sticky-col text-left pl-6"><div class="flex items-center gap-2"><span class="bg-slate-600 text-white text-sm px-2.5 py-0.5 rounded-md font-bold font-mono shadow-sm tracking-tight">${currentYear}</span><span class="text-slate-600">${currentGenreTab === '종합' ? '장르 구분' : '작품 정보'}</span></div></th>`; };
             if (currentYear === 'total') {
@@ -3663,7 +3676,7 @@
                         const advHtml = advAmt ? `<span style="color:#16a34a;font-size:12px;font-weight:400;margin-left:auto;padding-left:6px;white-space:nowrap;flex-shrink:0;">선인세 ${advAmt}</span>` : '';
                         const wSales = calculateGrossSales(wCumulative, w.rate); totalSalesAll += wSales;
                         const salesCell = showSalesCol ? `<td class="text-right pr-2 text-slate-500 text-sm" style="background:#fafafa;">${currencySymbol}${formatCurrency(wSales)}</td>` : '';
-                        html += `<tr><td class="sticky-col pl-6" style="min-width:156px;overflow:hidden;"><div class="font-bold text-slate-700 text-sm truncate w-full mb-1" title="${w.title}">${w.title}</div><div class="text-[11px] text-slate-400 flex items-center">${w.publisher} | ${dateDisplay}${advHtml}</div></td><td class="text-center font-bold text-[0.85rem] grand-total-cell" style="background:#f1f5f9; border-color:#e2e8f0;">${currencySymbol}${formatCurrency(wCumulative)}</td>${salesCell}` + years.map(y => `<td class="text-right pr-2 text-slate-600 text-sm">${currencySymbol}${formatCurrency(wYearly[y])}</td>`).join('') + `</tr>`;
+                        html += `<tr><td class="sticky-col pl-6" style="min-width:156px;overflow:hidden;"><div class="font-bold text-slate-700 text-sm truncate w-full mb-1" title="${w.title}">${w.title}</div><div class="text-[11px] text-slate-400 flex items-center">${(currentGenreTab === '웹툰' ? (w.studio || '-') : w.publisher)} | ${dateDisplay}${advHtml}</div></td><td class="text-center font-bold text-[0.85rem] grand-total-cell" style="background:#f1f5f9; border-color:#e2e8f0;">${currencySymbol}${formatCurrency(wCumulative)}</td>${salesCell}` + years.map(y => `<td class="text-right pr-2 text-slate-600 text-sm">${currencySymbol}${formatCurrency(wYearly[y])}</td>`).join('') + `</tr>`;
                     });
                     const salesFootTotal = showSalesCol ? `<td class="text-right pr-2 font-bold grand-total-cell">${currencySymbol}${formatCurrency(totalSalesAll)}</td>` : '';
                     html += `</tbody><tfoot><tr class="bg-slate-100/50"><td class="sticky-col text-center font-bold text-slate-600 text-sm" style="width:156px;min-width:156px;">총합</td><td class="text-center font-bold grand-total-cell">${currencySymbol}${formatCurrency(totalCumulative)}</td>${salesFootTotal}` + years.map(y => `<td class="text-right pr-2 font-bold grand-total-cell">${currencySymbol}${formatCurrency(totalYearly[y])}</td>`).join('') + `</tr></tfoot></table></div>`;
@@ -3693,7 +3706,7 @@
                         const dateDisplay = w.isPending ? '<span style="color:var(--primary);font-weight:400;"> 출간 예정</span>' : w.publishDate;
                         const advAmt2 = w.advanceAmount ? Number(w.advanceAmount).toLocaleString()+'만원' : '';
                         const advHtml2 = advAmt2 ? `<span style="color:#16a34a;font-size:12px;font-weight:400;margin-left:auto;padding-left:6px;white-space:nowrap;flex-shrink:0;">선인세 ${advAmt2}</span>` : '';
-                        html += `<tr><td class="sticky-col pl-6"><div class="font-bold text-slate-700 text-sm truncate w-[240px] mb-1">${w.title}</div><div class="text-[11px] text-slate-400 flex items-center">${w.publisher} | ${dateDisplay}${advHtml2}</div></td>`; 
+                        html += `<tr><td class="sticky-col pl-6"><div class="font-bold text-slate-700 text-sm truncate w-[240px] mb-1">${w.title}</div><div class="text-[11px] text-slate-400 flex items-center">${(currentGenreTab === '웹툰' ? (w.studio || '-') : w.publisher)} | ${dateDisplay}${advHtml2}</div></td>`; 
                         months.forEach(m => {
                             const val = (monthlyData[m] || {})[w.id] || 0;
                             html += `<td><input type="text" class="cell-input" value="₩ ${formatCurrency(val)}" ${readonlyAttr} onchange="updateRoyalty('${m}', '${w.id}', this.value)" onfocus="this.value = this.value.replace(/[^0-9]/g, ''); this.select();" onblur="this.value = '₩ ' + formatCurrency(this.value.replace(/[^0-9]/g, ''))"></td>`;

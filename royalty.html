@@ -3739,7 +3739,7 @@
             tabsContainer.innerHTML = tabs.map(t => `<button onclick="switchLibraryTab('${t}')" class="px-3 py-1.5 text-xs font-bold rounded-lg transition-all mb-1 ${currentLibraryTab === t ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-400 hover:bg-slate-50'}">${t}</button>`).join('');
             container.innerHTML = ""; let worksToShow = currentLibraryTab === '전체' ? [...masterWorks] : masterWorks.filter(w => w.genre === currentLibraryTab);
             const sortOrder = ['BL 장편', '현로 장편', '현로 초단', 'BL 초단', '웹툰'];
-            worksToShow.sort((a,b) => { const idxA = sortOrder.indexOf(a.genre), idxB = sortOrder.indexOf(b.genre); const valA = idxA === -1 ? 999 : idxA, valB = idxB === -1 ? 999 : idxB; if (valA !== valB) return valA - valB; const dateA = a.isPending ? '9999-12-31' : a.publishDate, dateB = b.isPending ? '9999-12-31' : b.publishDate; if (dateA < dateB) return -1; if (dateA > dateB) return 1; return 0; });
+            worksToShow.sort((a,b) => { const idxA = sortOrder.indexOf(a.genre), idxB = sortOrder.indexOf(b.genre); const valA = idxA === -1 ? 999 : idxA, valB = idxB === -1 ? 999 : idxB; if (valA !== valB) return valA - valB; const dateA = (a.isPending || !a.publishDate) ? '9999-12-31' : a.publishDate, dateB = (b.isPending || !b.publishDate) ? '9999-12-31' : b.publishDate; if (dateA !== dateB) return dateA < dateB ? -1 : 1; if (a.genre && a.genre.includes('웹툰')) { const cA = a.contractDate || '9999-12-31', cB = b.contractDate || '9999-12-31'; if (cA !== cB) return cA < cB ? -1 : 1; } return a.title.localeCompare(b.title, 'ko'); });
             if (badge) {
                 badge.innerText = worksToShow.length;
                 // 웹툰 제외 전체 권수 = 본편 volumes + 외전 수

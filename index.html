@@ -1498,6 +1498,7 @@ function delWeeklyGoal(wk,i){i=parseInt(i);if(!S.weeklyGoals[wk])return;S.weekly
 // ═══════════ DIARY ═══════════
 let diaryY=new Date().getFullYear(), diaryM=new Date().getMonth();
 const MOODS=[{v:'😄',l:'최고'},{v:'🙂',l:'좋음'},{v:'😐',l:'보통'},{v:'😢',l:'슬픔'},{v:'😤',l:'화남'},{v:'🥱',l:'피곤'}];
+const MOOD_COLORS={'😄':'#F5C842','🙂':'#8BBF88','😐':'#B6AE9F','😢':'#61C0BF','😤':'#E07070','🥱':'#B2B0E8'};
 const MN_D=['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 function renderDiary(){
@@ -3172,8 +3173,18 @@ function renderInsights(){
     html+='<button class="btn bg bsm" onclick="insightHeatYear--;render()">‹</button>';
     html+='<span style="font-size:0.85em;font-family:var(--mono)">'+Y+'</span>';
     html+='<button class="btn bg bsm" onclick="insightHeatYear++;render()">›</button>';
+    html+='<button class="btn bp bsm" onclick="openYearReview('+Y+')">🎁 결산</button>';
     html+='</div></div>';
-    html+='<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px">';
+    html+='<div id="heat-scroll" style="overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px">';
+    // 올해를 보고 있으면 현재 주 위치로 자동 스크롤
+    if(Y===new Date().getFullYear()){
+      var curWeekIdx=Math.floor((startOffset+Math.round((new Date(today+'T00:00:00')-jan1)/86400000))/7);
+      setTimeout(function(){
+        var sc=document.getElementById('heat-scroll');
+        if(!sc||sc.scrollWidth<=sc.clientWidth)return;
+        sc.scrollLeft=Math.max(0,curWeekIdx*14-sc.clientWidth*0.6);
+      },0);
+    }
     html+='<div style="min-width:'+(Math.ceil((startOffset+totalDays)/7)*14+10)+'px">';
     html+='<div style="position:relative;height:14px;margin-bottom:2px">'+monthLabels+'</div>';
     html+='<div style="display:grid;grid-template-rows:repeat(7,11px);grid-auto-flow:column;grid-auto-columns:11px;gap:3px">'+cellsHtml+'</div>';
@@ -3215,7 +3226,7 @@ function renderInsights(){
       var w=Math.round(c/maxCnt*100);
       html+='<div style="display:flex;align-items:center;gap:8px;padding:4px 0">'+
         '<span style="width:24px;text-align:center">'+m.v+'</span>'+
-        '<div class="pw" style="flex:1;height:8px"><div class="pb" style="width:'+w+'%;background:var(--accent)"></div></div>'+
+        '<div class="pw" style="flex:1;height:8px"><div class="pb" style="width:'+w+'%;background:'+(MOOD_COLORS[m.v]||'var(--accent)')+'"></div></div>'+
         '<span style="font-size:0.75em;color:var(--t3);font-family:var(--mono);width:36px;text-align:right">'+c+'일</span></div>';
     });
     html+='</div>';
@@ -3298,6 +3309,122 @@ function renderInsights(){
   html+='</div>';
 
   return html;
+}
+
+// ═══════════ 연말 결산 ═══════════
+function openYearReview(Y){
+  var pfx=Y+'-';
+  // ── 일기 ──
+  var diaryDays=0, totalChars=0, dist={}, longest={ds:'',len:0};
+  var monthCnt=Array(12).fill(0);
+  Object.keys(S.diaryEntries||{}).forEach(function(ds){
+    if(ds.slice(0,5)!==pfx)return;
+    var e=S.diaryEntries[ds];if(!e)return;
+    var has=!!(e.text||e.title||e.mood);
+    if(!has)return;
+    diaryDays++;
+    monthCnt[parseInt(ds.slice(5,7))-1]++;
+    var len=(e.text||'').length;
+    totalChars+=len;
+    if(len>longest.len)longest={ds:ds,len:len};
+    if(e.mood)dist[e.mood]=(dist[e.mood]||0)+1;
+  });
+  var topMood='', topMoodCnt=0;
+  Object.keys(dist).forEach(function(m){if(dist[m]>topMoodCnt){topMood=m;topMoodCnt=dist[m];}});
+  // ── 루틴 ──
+  var today=todStr();
+  var rtSum=0,rtDays=0,perfectDays=0,bestStreak=0,curStreak=0;
+  var rtStats={};
+  var endDs=(Y===new Date().getFullYear())?today:Y+'-12-31';
+  for(var ds=Y+'-01-01';ds<=endDs;ds=addDays(ds,1)){
+    var rods=routinesForDate(ds),ck=S.checks[ds]||{};
+    if(rods.length===0){continue;}
+    var dn=rods.filter(r=>ck[r.id]).length;
+    var p=Math.round(dn/rods.length*100);
+    rtDays++;rtSum+=p;
+    if(p===100){perfectDays++;curStreak++;if(curStreak>bestStreak)bestStreak=curStreak;}
+    else curStreak=0;
+    rods.forEach(function(r){
+      if(!rtStats[r.id])rtStats[r.id]={task:r.task,done:0,total:0};
+      rtStats[r.id].total++;if(ck[r.id])rtStats[r.id].done++;
+    });
+  }
+  var rtAvg=rtDays?Math.round(rtSum/rtDays):0;
+  var bestRt=null;
+  Object.values(rtStats).forEach(function(s){
+    if(s.total<10)return;
+    s.rate=Math.round(s.done/s.total*100);
+    if(!bestRt||s.rate>bestRt.rate)bestRt=s;
+  });
+  // ── 저축 / 가계부 / 마감 ──
+  var yearSv=(S.savings&&S.savings.entries||[]).filter(function(e){return e.date&&e.date.slice(0,5)===pfx;}).reduce(function(s,e){return s+e.amount;},0);
+  var yInc=0,yExp=0;
+  (LD.transactions||[]).forEach(function(tx){
+    if(tx.date.slice(0,5)!==pfx)return;
+    if(tx.type==='income')yInc+=tx.amount;else if(tx.type==='expense')yExp+=tx.amount;
+  });
+  var dlDone=(S.deadlines||[]).filter(function(d){return d.done&&d.date&&d.date.slice(0,5)===pfx;}).length;
+
+  // ════ HTML ════
+  function tile(emoji,label,val,sub){
+    return '<div style="background:var(--s2);border-radius:12px;padding:14px 12px;text-align:center">'+
+      '<div style="font-size:1.3em;margin-bottom:4px">'+emoji+'</div>'+
+      '<div style="font-family:var(--serif);font-size:1.25em;line-height:1.2;color:var(--text)">'+val+'</div>'+
+      '<div style="font-size:0.7em;color:var(--t3);margin-top:3px">'+label+(sub?'<br>'+sub:'')+'</div></div>';
+  }
+  var body='<div style="text-align:center;margin-bottom:16px">'+
+    '<div style="font-family:var(--serif);font-size:1.5em;color:var(--accent)">'+Y+'년의 루시</div>'+
+    '<div style="font-size:0.78em;color:var(--t3);margin-top:2px">'+(Y===new Date().getFullYear()?'오늘까지의 기록이에요':'1년간의 기록이에요')+'</div></div>';
+
+  body+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">';
+  body+=tile('✍️','일기 쓴 날',diaryDays+'<span style="font-size:0.55em;color:var(--t3)">일</span>',totalChars>0?'총 '+totalChars.toLocaleString()+'자':'');
+  body+=tile(topMood||'🌱','가장 많았던 기분',topMood?topMoodCnt+'<span style="font-size:0.55em;color:var(--t3)">일</span>':'-','');
+  body+=tile('🔥','최장 연속 달성',bestStreak+'<span style="font-size:0.55em;color:var(--t3)">일</span>','100% 달성 '+perfectDays+'일');
+  body+=tile('📈','루틴 연 평균',rtAvg+'<span style="font-size:0.55em;color:var(--t3)">%</span>','');
+  body+=tile('💰','올해 모은 돈',money(yearSv),'');
+  body+=tile('✅','끝낸 마감',dlDone+'<span style="font-size:0.55em;color:var(--t3)">개</span>','');
+  body+='</div>';
+
+  // 월별 일기 미니 차트
+  var maxM=Math.max(1,...monthCnt);
+  body+='<div style="margin-bottom:14px"><div style="font-size:0.78em;color:var(--t2);margin-bottom:6px">월별 일기</div>';
+  body+='<div style="display:flex;gap:4px;align-items:flex-end;height:50px">';
+  monthCnt.forEach(function(c,i){
+    var h=Math.round(c/maxM*40);
+    body+='<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><div title="'+(i+1)+'월 '+c+'일" style="width:70%;background:var(--accent);opacity:'+(c>0?1:0.15)+';border-radius:3px 3px 0 0;height:'+Math.max(h,3)+'px"></div><div style="font-size:0.6em;color:var(--t3)">'+(i+1)+'</div></div>';
+  });
+  body+='</div></div>';
+
+  // 기분 분포 (색상)
+  var distKeys=Object.keys(dist);
+  if(distKeys.length>0){
+    var maxD=Math.max.apply(null,Object.values(dist));
+    body+='<div style="margin-bottom:14px"><div style="font-size:0.78em;color:var(--t2);margin-bottom:6px">올해의 기분</div>';
+    MOODS.forEach(function(m){
+      var c=dist[m.v]||0;if(c===0)return;
+      body+='<div style="display:flex;align-items:center;gap:8px;padding:3px 0">'+
+        '<span style="width:22px;text-align:center;font-size:0.95em">'+m.v+'</span>'+
+        '<div class="pw" style="flex:1;height:8px"><div class="pb" style="width:'+Math.round(c/maxD*100)+'%;background:'+(MOOD_COLORS[m.v]||'var(--accent)')+'"></div></div>'+
+        '<span style="font-size:0.72em;color:var(--t3);font-family:var(--mono);width:34px;text-align:right">'+c+'일</span></div>';
+    });
+    body+='</div>';
+  }
+
+  // 하이라이트
+  var highlights=[];
+  if(bestRt)highlights.push('제일 잘 지킨 루틴은 <b>「'+bestRt.task+'」</b> ('+bestRt.rate+'%)');
+  if(longest.len>0)highlights.push('가장 길게 쓴 일기는 <b>'+longest.ds+'</b> ('+longest.len.toLocaleString()+'자)');
+  if(yInc>0||yExp>0)highlights.push('올해 수입 <b style="color:var(--green)">'+money(yInc)+'</b> · 지출 <b style="color:var(--red)">'+money(yExp)+'</b>');
+  if(highlights.length>0){
+    body+='<div style="padding:12px 14px;background:var(--al);border-radius:12px;font-size:0.85em;line-height:1.8">';
+    highlights.forEach(function(h){body+='<div>· '+h+'</div>';});
+    body+='</div>';
+  }
+  if(diaryDays===0&&rtSum===0&&yearSv===0&&yInc===0&&yExp===0&&dlDone===0){
+    body+='<div class="empty">'+Y+'년 기록이 아직 없어요</div>';
+  }
+
+  openMo('🎁 '+Y+'년 결산',body,'<button class="btn bg" onclick="closeMo()">닫기</button>');
 }
 
 // ═══════════ CALENDAR ═══════════

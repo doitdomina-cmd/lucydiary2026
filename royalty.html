@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <title>Royalty Manager Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -309,6 +310,13 @@
             .modal-content { padding: 20px; width: 92%; }
             main .p-3 { padding: 0.6rem; }
         }
+        @media print {
+            aside, #sidebar-toggle, #sidebar-backdrop, #save-status, .no-print { display: none !important; }
+            main { padding: 0 !important; margin: 0 !important; }
+            .tab-content:not(.active) { display: none !important; }
+            body { background: #fff !important; }
+            .glass-card { box-shadow: none !important; border: 1px solid #e2e8f0 !important; }
+        }
     </style>
 </head>
 <body class="theme-mint">
@@ -342,6 +350,9 @@
                 </button>
                 <button onclick="switchTab('works')" id="nav-works" class="nav-btn w-full flex items-center px-3 py-2.5 rounded-xl transition-all my-1.5">
                     <div class="w-7 text-center"><i class="fa-solid fa-book-open"></i></div><span>작품 등록</span>
+                </button>
+                <button onclick="switchTab('tax')" id="nav-tax" class="nav-btn w-full flex items-center px-3 py-2.5 rounded-xl transition-all my-1.5">
+                    <div class="w-7 text-center"><i class="fa-solid fa-receipt"></i></div><span>세무·목표</span>
                 </button>
 
                 <div class="text-[9px] font-bold text-white/40 px-3 mt-4 mb-1 uppercase tracking-widest">Writing</div>
@@ -896,6 +907,11 @@
                             <div id="publish-year-view-body" class="grid grid-cols-4 gap-4"></div>
                         </div>
                     </div>
+                </div>
+
+                <!-- 세무·목표 탭 -->
+                <div id="tab-tax" class="tab-content space-y-6 pb-20">
+                    <div id="tax-panel"></div>
                 </div>
 
                 <!-- 상세 기록 입력 탭 -->
@@ -2033,7 +2049,8 @@
         }
 
         // 기존 데이터 구조
-        let masterWorks = [], monthlyData = {}, years = [2024, 2025, 2026], publisherData = {}, analysisData = {}, publisherSortOrder = [], genreList = [], editingGenreIndex = null, genreBadgeOpacity = 0.25, isSheetLocked = false, contacts = [], penNames = [], submissions = [], webtoonSubs = {}, webtoonSubOrder = [];
+        let masterWorks = [], monthlyData = {}, years = [2024, 2025, 2026], publisherData = {}, analysisData = {}, publisherSortOrder = [], genreList = [], editingGenreIndex = null, genreBadgeOpacity = 0.25, isSheetLocked = false, contacts = [], penNames = [], submissions = [], webtoonSubs = {}, webtoonSubOrder = [], incomeGoals = {}, taxSettings = {};
+        let taxViewYear = new Date().getFullYear();
         let widgetSettingsData = {
             bgHex: '#ffffff', opacity: 0.92,
             textHex: '#1e1e28', textOpacity: 0.92,
@@ -2156,7 +2173,7 @@
                         masterWorks, monthlyData, years, publisherData, analysisData, 
                         publisherSortOrder, genreList, genreBadgeOpacity, tableFontSettings, crosshairSettings,
                         writeSchedules, taskSchedules, contacts, penNames, widgetSettingsData, writeCardSettings, taskCardSettings,
-                        writerWorks, writerDailyData, writerGlobalDailyGoal, submissions, webtoonSubs, webtoonSubOrder
+                        writerWorks, writerDailyData, writerGlobalDailyGoal, submissions, webtoonSubs, webtoonSubOrder, incomeGoals, taxSettings
                     };
                     const jsonStr = JSON.stringify(dataToSave, null, 2);
 
@@ -2216,6 +2233,8 @@
             submissions = parsed.submissions || [];
             webtoonSubs = parsed.webtoonSubs || {};
             webtoonSubOrder = parsed.webtoonSubOrder || [];
+            incomeGoals = parsed.incomeGoals || {};
+            taxSettings = parsed.taxSettings || {};
             if (parsed.widgetSettingsData) widgetSettingsData = parsed.widgetSettingsData;
             if (parsed.writeCardSettings) Object.assign(writeCardSettings, parsed.writeCardSettings);
             if (parsed.taskCardSettings) Object.assign(taskCardSettings, parsed.taskCardSettings);
@@ -2580,6 +2599,8 @@
                         if(data.taskSchedules) taskSchedules = data.taskSchedules;
                         if(data.contacts) contacts = data.contacts;
                         if(data.penNames) penNames = data.penNames;
+                        if(data.incomeGoals) incomeGoals = data.incomeGoals;
+                        if(data.taxSettings) taxSettings = data.taxSettings;
                         if(data.submissions) submissions = data.submissions;
                         if(data.widgetSettingsData) widgetSettingsData = data.widgetSettingsData;
 
@@ -2635,6 +2656,7 @@
             if (activeId === 'tab-library') renderVisualLibrary(); 
             if (activeId === 'tab-publishers') renderPublisherTab();
             if (activeId === 'tab-settlements') renderSettlementSchedule();
+            if (activeId === 'tab-tax') renderTaxGoalTab();
             if (activeId === 'tab-write') { renderWriteCalendarFilters(); renderWriteCalendar(); }
             if (activeId === 'tab-task') { renderTaskCalendarFilters(); renderTaskCalendar(); }
             if (activeId === 'tab-daily') { writerViewDate = new Date(); writerRenderDaily(); }
@@ -4849,6 +4871,152 @@
             } container.innerHTML = html; document.getElementById('yearly-total-display').innerText = `₩ ${formatCurrency(yearlyTotal)}`;
         }
         function changeSettlementYear(d) { settlementViewYear += d; renderSettlementSchedule(); }
+
+        // ════════════ 세무 · 목표 ════════════
+        let taxEstSaveTimer = null;
+        function taxFmt(n){ return formatCurrency(Math.round(n||0)); }
+        function getYearNet(year){
+            let net = 0;
+            Object.entries(monthlyData).forEach(([mKey, d]) => {
+                if (mKey.split('-')[0] !== String(year)) return;
+                Object.entries(d).forEach(([wId, v]) => { if (masterWorks.find(w => w.id === wId)) net += Number(v) || 0; });
+            });
+            return net;
+        }
+        function taxBracket(base){
+            base = Math.max(0, base);
+            if (base <= 14000000) return base*0.06;
+            if (base <= 50000000) return base*0.15 - 1260000;
+            if (base <= 88000000) return base*0.24 - 5760000;
+            if (base <= 150000000) return base*0.35 - 15440000;
+            if (base <= 300000000) return base*0.38 - 19940000;
+            if (base <= 500000000) return base*0.40 - 25940000;
+            if (base <= 1000000000) return base*0.42 - 35940000;
+            return base*0.45 - 65940000;
+        }
+        function changeTaxYear(d){ taxViewYear += d; renderTaxGoalTab(); }
+        function setIncomeGoal(val){
+            const g = Number(String(val).replace(/[^0-9]/g,'')) || 0;
+            incomeGoals[taxViewYear] = g;
+            const net = getYearNet(taxViewYear);
+            const pct = g > 0 ? Math.min(Math.round(net/g*100), 999) : 0;
+            const bar = document.getElementById('tax-goal-bar'); if (bar) bar.style.width = Math.min(pct,100) + '%';
+            const lbl = document.getElementById('tax-goal-label'); if (lbl) lbl.innerHTML = `순수익 <b class="text-slate-700">₩ ${taxFmt(net)}</b> / 목표 ₩ ${taxFmt(g)} <span class="text-emerald-600 font-bold">(${pct}%)</span>`;
+            clearTimeout(taxEstSaveTimer); taxEstSaveTimer = setTimeout(()=>save(true), 600);
+        }
+        function recomputeTaxEstimate(){
+            const er = Math.min(Math.max(Number(document.getElementById('tax-exp-rate')?.value)||0,0),100);
+            const ded = Number(String(document.getElementById('tax-deduction')?.value||'').replace(/[^0-9]/g,''))||0;
+            taxSettings.expenseRate = er; taxSettings.deduction = ded;
+            const net = getYearNet(taxViewYear); const gross = Math.round(net/0.967);
+            const income = Math.round(gross * (1 - er/100));
+            const base = Math.max(income - ded, 0);
+            const calc = Math.round(taxBracket(base));
+            const prepaid = Math.round(gross * 0.03);
+            const due = calc - prepaid;
+            const local = Math.round(calc * 0.1);
+            const set = (id,v)=>{ const el=document.getElementById(id); if(el) el.innerHTML = v; };
+            set('tax-r-income', '₩ ' + taxFmt(income));
+            set('tax-r-base', '₩ ' + taxFmt(base));
+            set('tax-r-calc', '₩ ' + taxFmt(calc));
+            set('tax-r-prepaid', '₩ ' + taxFmt(prepaid));
+            set('tax-r-due', due >= 0 ? `<span class="text-rose-600">납부 ₩ ${taxFmt(due)}</span>` : `<span class="text-emerald-600">환급 ₩ ${taxFmt(-due)}</span>`);
+            set('tax-r-local', '₩ ' + taxFmt(local));
+            clearTimeout(taxEstSaveTimer); taxEstSaveTimer = setTimeout(()=>save(true), 600);
+        }
+        function renderTaxGoalTab(){
+            const panel = document.getElementById('tax-panel'); if (!panel) return;
+            const net = getYearNet(taxViewYear); const gross = Math.round(net/0.967); const withhold = gross - net;
+            const goal = incomeGoals[taxViewYear] || 0;
+            const pct = goal > 0 ? Math.min(Math.round(net/goal*100), 999) : 0;
+            const er = (taxSettings.expenseRate !== undefined && taxSettings.expenseRate !== null) ? taxSettings.expenseRate : '';
+            const ded = (taxSettings.deduction !== undefined && taxSettings.deduction !== null) ? taxSettings.deduction : 1500000;
+            const yearsAll = [...new Set(Object.keys(monthlyData).map(k=>k.split('-')[0]))].filter(Boolean).sort();
+            const rows = yearsAll.map(y => { const n=getYearNet(y); const g=Math.round(n/0.967); return `<tr class="border-b border-slate-50"><td class="py-2 px-3 font-bold ${String(y)===String(taxViewYear)?'text-emerald-600':'text-slate-600'}">${y}년</td><td class="py-2 px-3 text-right text-slate-700">₩ ${taxFmt(g)}</td><td class="py-2 px-3 text-right text-slate-500">₩ ${taxFmt(n)}</td><td class="py-2 px-3 text-right text-slate-500">₩ ${taxFmt(g-n)}</td></tr>`; }).join('') || `<tr><td colspan="4" class="py-3 text-center text-slate-400 text-xs">데이터 없음</td></tr>`;
+            panel.innerHTML = `
+            <div class="flex items-center justify-between flex-wrap gap-3 no-print">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-receipt text-emerald-500"></i> 세무 · 목표</h2>
+                    <p class="text-xs text-slate-400 mt-1">연도별 총수입 · 원천징수 · 종합소득세 예상 (5월 신고용)</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                        <button onclick="changeTaxYear(-1)" class="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-white rounded-md text-xs"><i class="fa-solid fa-chevron-left"></i></button>
+                        <span class="text-sm font-bold text-slate-700 px-2">${taxViewYear}</span>
+                        <button onclick="changeTaxYear(1)" class="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-white rounded-md text-xs"><i class="fa-solid fa-chevron-right"></i></button>
+                    </div>
+                    <button onclick="exportTaxExcel()" class="px-3 py-2 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200 hover:bg-emerald-100 transition-all"><i class="fa-solid fa-file-excel mr-1"></i> 엑셀</button>
+                    <button onclick="exportTaxPDF()" class="px-3 py-2 rounded-lg bg-rose-50 text-rose-600 text-xs font-bold border border-rose-200 hover:bg-rose-100 transition-all"><i class="fa-solid fa-file-pdf mr-1"></i> PDF</button>
+                </div>
+            </div>
+            <div class="glass-card p-6">
+                <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+                    <h3 class="text-sm font-bold text-slate-500 flex items-center gap-2"><i class="fa-solid fa-bullseye text-amber-500"></i> ${taxViewYear} 수익 목표</h3>
+                    <div class="flex items-center gap-2 no-print">
+                        <span class="text-xs text-slate-400">목표액</span>
+                        <input id="tax-goal-input" type="text" value="${goal? taxFmt(goal):''}" oninput="setIncomeGoal(this.value)" placeholder="예: 100,000,000" class="w-40 p-2 bg-slate-50 rounded-lg border border-slate-200 text-sm text-right outline-none focus:ring-2 focus:ring-amber-100">
+                        <span class="text-xs text-slate-400">원</span>
+                    </div>
+                </div>
+                <div class="w-full h-4 bg-slate-100 rounded-full overflow-hidden">
+                    <div id="tax-goal-bar" class="h-full rounded-full transition-all" style="width:${Math.min(pct,100)}%; background:linear-gradient(90deg,#fcd34d,#10b981)"></div>
+                </div>
+                <div id="tax-goal-label" class="text-xs text-slate-500 mt-2">순수익 <b class="text-slate-700">₩ ${taxFmt(net)}</b> / 목표 ₩ ${taxFmt(goal)} <span class="text-emerald-600 font-bold">(${pct}%)</span></div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="glass-card p-5"><p class="text-[11px] font-bold text-slate-400 uppercase">세전 총수입</p><p class="text-xs text-slate-400 mb-2">${taxViewYear} · 원천징수 전</p><p class="text-2xl font-black text-slate-700">₩ ${taxFmt(gross)}</p></div>
+                <div class="glass-card p-5"><p class="text-[11px] font-bold text-slate-400 uppercase">세후 실수령</p><p class="text-xs text-slate-400 mb-2">실제 입금액</p><p class="text-2xl font-black text-emerald-600">₩ ${taxFmt(net)}</p></div>
+                <div class="glass-card p-5"><p class="text-[11px] font-bold text-slate-400 uppercase">원천징수 (3.3%)</p><p class="text-xs text-slate-400 mb-2">기납부 · 소득세3%+지방0.3%</p><p class="text-2xl font-black text-rose-500">₩ ${taxFmt(withhold)}</p></div>
+            </div>
+            <div class="glass-card p-6">
+                <h3 class="text-sm font-bold text-slate-500 flex items-center gap-2 mb-4"><i class="fa-solid fa-calculator text-blue-500"></i> ${taxViewYear} 종합소득세 예상 <span class="text-[11px] text-slate-400 font-normal">(대략)</span></h3>
+                <div class="flex flex-wrap gap-4 mb-4 no-print">
+                    <div><label class="text-xs text-slate-400 block mb-1">필요경비율 (%)</label><input id="tax-exp-rate" type="number" value="${er}" oninput="recomputeTaxEstimate()" placeholder="예: 58.7" class="w-32 p-2 bg-slate-50 rounded-lg border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-blue-100"></div>
+                    <div><label class="text-xs text-slate-400 block mb-1">종합소득공제 (원)</label><input id="tax-deduction" type="text" value="${ded? taxFmt(ded):''}" oninput="recomputeTaxEstimate()" placeholder="예: 1,500,000" class="w-40 p-2 bg-slate-50 rounded-lg border border-slate-200 text-sm text-right outline-none focus:ring-2 focus:ring-blue-100"></div>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                    <div class="bg-slate-50 rounded-xl p-3"><p class="text-[11px] text-slate-400 mb-1">사업소득금액</p><p id="tax-r-income" class="font-bold text-slate-700">₩ 0</p></div>
+                    <div class="bg-slate-50 rounded-xl p-3"><p class="text-[11px] text-slate-400 mb-1">과세표준</p><p id="tax-r-base" class="font-bold text-slate-700">₩ 0</p></div>
+                    <div class="bg-slate-50 rounded-xl p-3"><p class="text-[11px] text-slate-400 mb-1">산출세액</p><p id="tax-r-calc" class="font-bold text-slate-700">₩ 0</p></div>
+                    <div class="bg-slate-50 rounded-xl p-3"><p class="text-[11px] text-slate-400 mb-1">기납부(원천 3%)</p><p id="tax-r-prepaid" class="font-bold text-slate-700">₩ 0</p></div>
+                    <div class="bg-blue-50 rounded-xl p-3 col-span-2 md:col-span-1"><p class="text-[11px] text-slate-400 mb-1">예상 납부/환급</p><p id="tax-r-due" class="font-bold text-slate-700">₩ 0</p></div>
+                    <div class="bg-slate-50 rounded-xl p-3"><p class="text-[11px] text-slate-400 mb-1">지방소득세(참고)</p><p id="tax-r-local" class="font-bold text-slate-700">₩ 0</p></div>
+                </div>
+                <p class="text-[11px] text-slate-400 mt-4 leading-relaxed">※ 현행 종합소득세 누진세율 기준의 <b>대략적 추정치</b>예요. 필요경비율(단순/기준경비율 또는 실제 경비)과 소득공제를 직접 넣어야 정확해요. 실제 신고는 홈택스·세무사로 꼭 확인하세요. (참고용이며 세무 자문이 아니에요.)</p>
+            </div>
+            <div class="glass-card p-6">
+                <h3 class="text-sm font-bold text-slate-500 flex items-center gap-2 mb-3"><i class="fa-solid fa-table-list"></i> 연도별 요약</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="text-slate-400 text-xs border-b border-slate-100"><tr><th class="py-2 px-3 text-left">연도</th><th class="py-2 px-3 text-right">세전 총수입</th><th class="py-2 px-3 text-right">세후 실수령</th><th class="py-2 px-3 text-right">원천징수(3.3%)</th></tr></thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>
+            </div>`;
+            recomputeTaxEstimate();
+        }
+        function exportTaxExcel(){
+            if (typeof XLSX === 'undefined'){ alert('엑셀 라이브러리를 불러오지 못했어요. 인터넷 연결을 확인한 뒤 다시 시도해주세요.'); return; }
+            try {
+                const wb = XLSX.utils.book_new();
+                const yearsAll = [...new Set(Object.keys(monthlyData).map(k=>k.split('-')[0]))].filter(Boolean).sort();
+                const sum = [['연도','세전 총수입','세후 실수령','원천징수(3.3%)']];
+                yearsAll.forEach(y=>{ const n=getYearNet(y); const g=Math.round(n/0.967); sum.push([y+'년', g, Math.round(n), g-Math.round(n)]); });
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sum), '연간 요약');
+                const det = [['연-월','작품','장르','출판사','세후 실수령','세전','원천징수(3.3%)']];
+                Object.keys(monthlyData).sort().forEach(mKey=>{
+                    Object.entries(monthlyData[mKey]).forEach(([wId,v])=>{
+                        const w = masterWorks.find(x=>x.id===wId); const net=Number(v)||0; if(!w || !net) return;
+                        const gross=Math.round(net/0.967);
+                        det.push([mKey, w.title, w.genre, w.publisher, Math.round(net), gross, gross-Math.round(net)]);
+                    });
+                });
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(det), '월별 상세');
+                const today = new Date().toISOString().slice(0,10);
+                XLSX.writeFile(wb, `정산_요약_${today}.xlsx`);
+            } catch(e){ console.error(e); alert('엑셀 내보내기 중 오류가 났어요.'); }
+        }
+        function exportTaxPDF(){ window.print(); }
         function changeChartYear(delta) { chartViewYear += delta; updateDashboardStats(); }
         function changeDashYear(delta) { dashYearOffset += delta; updateDashboardStats(); }
         function changeDashMonth(delta) { dashMonthOffset += delta; updateDashboardStats(); }

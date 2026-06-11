@@ -4907,7 +4907,9 @@
         function recomputeTaxEstimate(){
             const er = Math.min(Math.max(Number(document.getElementById('tax-exp-rate')?.value)||0,0),100);
             const ded = Number(String(document.getElementById('tax-deduction')?.value||'').replace(/[^0-9]/g,''))||0;
-            taxSettings.expenseRate = er; taxSettings.deduction = ded;
+            taxSettings[taxViewYear] = taxSettings[taxViewYear] || {};
+            taxSettings[taxViewYear].expenseRate = er;
+            taxSettings[taxViewYear].deduction = ded;
             const net = getYearNet(taxViewYear); const gross = Math.round(net/0.967);
             const income = Math.round(gross * (1 - er/100));
             const base = Math.max(income - ded, 0);
@@ -4929,8 +4931,9 @@
             const net = getYearNet(taxViewYear); const gross = Math.round(net/0.967); const withhold = gross - net;
             const goal = incomeGoals[taxViewYear] || 0;
             const pct = goal > 0 ? Math.min(Math.round(net/goal*100), 999) : 0;
-            const er = (taxSettings.expenseRate !== undefined && taxSettings.expenseRate !== null) ? taxSettings.expenseRate : '';
-            const ded = (taxSettings.deduction !== undefined && taxSettings.deduction !== null) ? taxSettings.deduction : 1500000;
+            const yrSetting = taxSettings[taxViewYear] || {};
+            const er = (yrSetting.expenseRate !== undefined && yrSetting.expenseRate !== null) ? yrSetting.expenseRate : '';
+            const ded = (yrSetting.deduction !== undefined && yrSetting.deduction !== null) ? yrSetting.deduction : 1500000;
             const yearsAll = [...new Set(Object.keys(monthlyData).map(k=>k.split('-')[0]))].filter(Boolean).sort();
             const rows = yearsAll.map(y => { const n=getYearNet(y); const g=Math.round(n/0.967); return `<tr class="border-b border-slate-50"><td class="py-2 px-3 font-bold ${String(y)===String(taxViewYear)?'text-emerald-600':'text-slate-600'}">${y}년</td><td class="py-2 px-3 text-right text-slate-700">₩ ${taxFmt(g)}</td><td class="py-2 px-3 text-right text-slate-500">₩ ${taxFmt(n)}</td><td class="py-2 px-3 text-right text-slate-500">₩ ${taxFmt(g-n)}</td></tr>`; }).join('') || `<tr><td colspan="4" class="py-3 text-center text-slate-400 text-xs">데이터 없음</td></tr>`;
             panel.innerHTML = `

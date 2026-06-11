@@ -295,14 +295,21 @@
         /* 캘린더 드래그 효과 */
         .cal-drag-over { background-color: #f1f5f9 !important; border-color: var(--primary) !important; border-width: 2px !important; }
 
+        #sidebar-toggle { display: none; }
+        #sidebar-backdrop { display: none; }
         @media (max-width: 1024px) {
-            aside { transform: translateX(-100%); width: 0; }
-            main { margin-left: 0; width: 100%; }
+            aside { transform: translateX(-100%); width: 15.3rem; }
+            body.sidebar-open aside { transform: translateX(0); }
+            main { margin-left: 0; padding-left: 0; width: 100%; }
+            #sidebar-toggle { display: flex; }
+            body.sidebar-open #sidebar-backdrop { display: block; }
         }
     </style>
 </head>
 <body class="theme-mint">
     <div class="flex">
+        <button id="sidebar-toggle" onclick="toggleSidebar()" class="fixed top-3 left-3 z-[60] w-11 h-11 rounded-xl bg-white/95 shadow-lg border border-slate-200 items-center justify-center text-slate-700" aria-label="메뉴 열기/닫기"><i class="fa-solid fa-bars text-lg"></i></button>
+        <div id="sidebar-backdrop" onclick="toggleSidebar()" class="fixed inset-0 bg-black/40 z-40"></div>
         <aside id="sidebar" class="flex flex-col">
             <div class="p-8 pb-4">
                 <h1 class="text-3xl font-black italic tracking-tighter flex items-center gap-2 text-white">
@@ -2611,7 +2618,10 @@
             document.getElementById(`tab-${tabName}`).classList.add('active'); 
             window.scrollTo(0, 0); 
             updateUI(); 
+            closeSidebarMobile();
         }
+        function toggleSidebar() { document.body.classList.toggle('sidebar-open'); }
+        function closeSidebarMobile() { if (window.matchMedia('(max-width: 1024px)').matches) document.body.classList.remove('sidebar-open'); }
 
         function updateUI() {
             updateDashboardStats(); updatePublisherDatalist(); updateGenreSelectOptions(); updateStudioDatalist(); updateTitleDatalist(); 
@@ -3067,6 +3077,9 @@
                     // 미니창 등 외부에서 파일 변경 시 writerDailyData 갱신
                     ipcRenderer.on('file-data-changed', () => {
                         try {
+                            // 입력칸에 타이핑 중이면 무시 (자기 저장 에코로 표가 다시 그려져 포커스 튀는 것 방지)
+                            const ae = document.activeElement;
+                            if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
                             // 미니창은 로컬(dataFilePath)에 저장하므로 항상 로컬 파일 읽기
                             const filePath = dataFilePath;
                             if (!filePath || !fs.existsSync(filePath)) return;
@@ -3080,13 +3093,22 @@
                         } catch(e) { console.log('file-data-changed error:', e); }
                     });
                     // 클라우드(폰/아이패드)에서 변경된 데이터가 도착하면 전체 갱신
+                    const applyCloudUpdate = () => {
+                        const data = window.__pendingCloudData;
+                        if (!data) return;
+                        const ae = document.activeElement;
+                        if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) {
+                            clearTimeout(window.__cloudApplyTimer);
+                            window.__cloudApplyTimer = setTimeout(applyCloudUpdate, 1200); // 입력 끝날 때까지 보류 후 반영
+                            return;
+                        }
+                        window.__pendingCloudData = null;
+                        hydrateFromParsed(data);
+                        try { setTheme(activeTheme); } catch(e) {}
+                        try { updateUI(); } catch(e) {}
+                    };
                     ipcRenderer.on('cloud-data-updated', (e, data) => {
-                        try {
-                            if (!data) return;
-                            hydrateFromParsed(data);
-                            try { setTheme(activeTheme); } catch(e) {}
-                            try { updateUI(); } catch(e) {}
-                        } catch(e) { console.log('cloud-data-updated error:', e); }
+                        try { if (!data) return; window.__pendingCloudData = data; applyCloudUpdate(); } catch(e) { console.log('cloud-data-updated error:', e); }
                     });
                 }
             } catch(e) { console.log('Widget IPC setup error:', e); }
@@ -5709,17 +5731,53 @@
             }
             return sum;
         }
+        // 하루 작품별 글자수 분해 (도넛 조각/호버용)
+        function writerGetDayWorkBreakdown(dateStr) {
+            const worksObj = writerDailyData[dateStr]?.works; const out = [];
+            if (worksObj) for (const sk in worksObj) {
+                const chars = Object.values(worksObj[sk]?.hours || {}).reduce((a,b)=>a+(b.diff||0), 0);
+                if (chars <= 0) continue;
+                let title = sk, color = null;
+                if (sk.includes('::')) { const [wId,exId]=sk.split('::'); const w=masterWorks.find(x=>x.id===wId); const ex=w?.extras?.find(e=>e.id===exId); title = w ? (w.title + (ex?` [${ex.name}]`:'')) : sk; if(w) color=getGenreColor(w.genre); }
+                else { const w=masterWorks.find(x=>x.id===sk); title = w ? w.title : sk; if(w) color=getGenreColor(w.genre); }
+                out.push({ title, chars, color });
+            }
+            out.sort((a,b)=>b.chars-a.chars);
+            return out;
+        }
+        function showWriterDayTip(e, ds) {
+            const tip = document.getElementById('pay-tooltip'); const content = document.getElementById('pay-tooltip-content'); if(!tip||!content) return;
+            const bd = writerGetDayWorkBreakdown(ds); if (!bd.length) { hideWriterDayTip(); return; }
+            const total = bd.reduce((a,b)=>a+b.chars,0);
+            content.innerHTML = `<div class="text-xs font-bold text-slate-700 mb-1.5">${ds} · 총 ${total.toLocaleString()}자</div>` +
+                bd.map(b=>`<div class="flex items-center justify-between gap-3 text-[11px] py-0.5"><span class="flex items-center gap-1.5 truncate" style="min-width:0"><span class="w-2 h-2 rounded-full inline-block shrink-0" style="background:${b.color||'#87ada1'}"></span><span class="truncate text-slate-600">${b.title}</span></span><span class="font-bold text-slate-700 shrink-0">${b.chars.toLocaleString()}자</span></div>`).join('');
+            tip.classList.remove('hidden');
+            const tw = 224, th = tip.offsetHeight || 120;
+            let left = e.clientX + 14, top = e.clientY + 14;
+            if (left + tw > window.innerWidth - 8) left = e.clientX - tw - 14;
+            if (top + th > window.innerHeight - 8) top = e.clientY - th - 14;
+            tip.style.left = Math.max(8,left)+'px'; tip.style.top = Math.max(8,top)+'px';
+        }
+        function hideWriterDayTip() { const tip = document.getElementById('pay-tooltip'); if(tip) tip.classList.add('hidden'); }
         function writerGetYYYYMMDD(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
         function writerGetKoreanDate(d) { return `${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일`; }
 
-        function writerCreateDoughnut(canvasId, current, goal, color) {
+        function writerCreateDoughnut(canvasId, current, goal, color, breakdown) {
             const canvas = document.getElementById(canvasId); if (!canvas) return;
             const existing = Chart.getChart(canvas); if (existing) try { existing.destroy(); } catch(e) {}
-            const per = Math.min((current/(goal||1))*100, 100);
+            let data, bg;
+            if (breakdown && breakdown.length) {
+                const remaining = Math.max((goal||0) - current, 0);
+                data = breakdown.map(b=>b.chars); bg = breakdown.map(b=> b.color || color);
+                if (remaining > 0) { data.push(remaining); bg.push('#e2e8f0'); }
+            } else {
+                const per = Math.min((current/(goal||1))*100, 100);
+                data = [per, 100-per]; bg = [color, '#e2e8f0'];
+            }
             new Chart(canvas, {
                 type: 'doughnut',
-                data: { datasets: [{ data: [per, 100-per], backgroundColor: [color, '#e2e8f0'], borderWidth: 0 }] },
-                options: { cutout: '70%', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { enabled: false } }, animation: false }
+                data: { datasets: [{ data, backgroundColor: bg, borderWidth: 0 }] },
+                options: { cutout: '68%', responsive: true, maintainAspectRatio: false, layout: { padding: 2 }, plugins: { legend: { display: false }, tooltip: { enabled: false } }, animation: false }
             });
         }
 
@@ -6376,10 +6434,10 @@
                 const todayBadge = isToday ? `<span class="absolute right-1.5 top-1.5 text-[10px] font-black text-emerald-600 tracking-wider">TODAY</span>` : '';
 
                 const chartId = `w-cal-chart-${ds}`;
-                if (dayTotal > 0) chartIds.push({ id: chartId, dayTotal, faded });
+                if (dayTotal > 0) chartIds.push({ id: chartId, dayTotal, faded, ds });
 
                 const chartHtml = dayTotal > 0
-                    ? `<div class="flex flex-col items-center mt-1">
+                    ? `<div class="flex flex-col items-center mt-1" onmousemove="showWriterDayTip(event,'${ds}')" onmouseleave="hideWriterDayTip()">
                            <div class="relative w-10 h-10"><canvas id="${chartId}"></canvas></div>
                            <div class="text-[10px] font-bold mt-1" style="color:${primary}">${dayTotal.toLocaleString()}자</div>
                            ${writerDailyData[ds]?.time>0?`<div class="text-[9px] text-slate-400">${writerDailyData[ds].time}분</div>`:''}
@@ -6411,7 +6469,7 @@
             // 도넛 차트 그리기 (DOM 렌더 후)
             setTimeout(() => {
                 const themePrimary = getComputedStyle(document.body).getPropertyValue('--primary').trim() || '#87ada1';
-                chartIds.forEach(c => writerCreateDoughnut(c.id, c.dayTotal, writerGlobalDailyGoal, c.faded ? '#cbd5e0' : themePrimary));
+                chartIds.forEach(c => writerCreateDoughnut(c.id, c.dayTotal, writerGlobalDailyGoal, c.faded ? '#cbd5e0' : themePrimary, c.faded ? null : writerGetDayWorkBreakdown(c.ds)));
             }, 0);
         }
         // ════════════════════════════════════════════════════════

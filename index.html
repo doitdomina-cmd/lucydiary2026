@@ -2769,6 +2769,8 @@ function renderDeadlines(){
   const sorted=[...S.deadlines].sort((a,b)=>a.date.localeCompare(b.date));
   // 지난 마감은 최근 7일 이내 + 미완료만 표시
   const over=sorted.filter(d=>{const dd=dLeft(d.date);return dd<0&&dd>=-7&&!d.done;}),up=sorted.filter(d=>dLeft(d.date)>=0&&!d.done);
+  // 7일 넘게 지났는데 아직도 미완료인 마감 (방치된 항목 — 완료/삭제하기 전까진 여기서 계속 보임)
+  const stale=sorted.filter(d=>{const dd=dLeft(d.date);return dd<-7&&!d.done;});
   const doneList=sorted.filter(d=>d.done&&dLeft(d.date)>=-30);
   let html='<div style="display:flex;justify-content:flex-end;margin-bottom:16px"><button class="btn bp" onclick="openDlModal()">+ 마감 추가</button></div>';
   if(over.length>0){
@@ -2778,9 +2780,19 @@ function renderDeadlines(){
     '</div>';
   }
   html+='<div><div class="ct" style="margin-bottom:10px">📋 예정 마감</div>'+(up.length===0?'<div class="empty"><div class="ei">🎉</div>예정된 마감이 없어요</div>':'<div class="dl-grid">'+up.map(dlRow).join('')+'</div>')+'</div>';
+  if(stale.length>0){
+    var dlStaleOpen=!!window._dlStaleOpen;
+    html+='<div class="card" style="margin-top:20px;padding:14px 18px;border-color:var(--red)">'+
+      '<div onclick="window._dlStaleOpen=!window._dlStaleOpen;render()" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none">'+
+        '<div class="ct" style="margin-bottom:0;color:var(--red)">🚨 7일 넘게 방치된 마감 <span style="font-size:0.8em;font-weight:400;color:var(--t3)">('+stale.length+'개 · 완료 처리하거나 ✕로 정리해주세요)</span></div>'+
+        '<span style="color:var(--t3);font-size:0.85em;transition:transform .2s;transform:rotate('+(dlStaleOpen?'180':'0')+'deg)">▾</span>'+
+      '</div>'+
+      (dlStaleOpen?'<div class="dl-grid" style="margin-top:12px">'+stale.map(dlRow).join('')+'</div>':'')+
+    '</div>';
+  }
   if(doneList.length>0){
     var dlDoneOpen=!!window._dlDoneOpen;
-    html+='<div class="card" style="margin-top:60px;padding:14px 18px">'+
+    html+='<div class="card" style="margin-top:'+(stale.length>0?'16':'60')+'px;padding:14px 18px">'+
       '<div onclick="window._dlDoneOpen=!window._dlDoneOpen;render()" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none">'+
         '<div class="ct" style="margin-bottom:0;color:var(--t3)">✓ 완료한 마감 <span style="font-size:0.8em;font-weight:400">(최근 한 달 · '+doneList.length+'개)</span></div>'+
         '<span style="color:var(--t3);font-size:0.85em;transition:transform .2s;transform:rotate('+(dlDoneOpen?'180':'0')+'deg)">▾</span>'+

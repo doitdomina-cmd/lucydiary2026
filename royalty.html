@@ -124,8 +124,8 @@
             border-radius: 20px;
             box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05);
             border: 1px solid rgba(0,0,0,0.08); 
-            overflow-x: auto; 
-            max-height: none; 
+            overflow: auto; 
+            max-height: calc(100vh - 230px);
             position: relative;
             -webkit-overflow-scrolling: touch;
         }
@@ -146,6 +146,15 @@
             position: sticky; left: 0; background: inherit; z-index: 10; 
             border-right: 2px solid #e2e8f0 !important; box-shadow: 2px 0 5px rgba(0,0,0,0.02);
         }
+        /* 좌상단 모서리(작품 정보 헤더): 가로·세로 동시 고정이라 가장 위로 */
+        .sheet-table thead th.sticky-col { z-index: 60; }
+        /* tfoot 월별 총합 행도 하단에 고정 */
+        .sheet-table tfoot td {
+            position: sticky; bottom: 0; z-index: 40;
+            background: #f1f5f9;
+            box-shadow: 0 -1px 2px rgba(0,0,0,0.03);
+        }
+        .sheet-table tfoot td.sticky-col { z-index: 55; }
         
         .cell-input {
             width: 100%; height: 100%; border: 1px solid transparent; background: transparent;
@@ -190,6 +199,24 @@
 
         .draggable-row { cursor: move; }
         .draggable-row.dragging { opacity: 0.5; background: #f8fafc; }
+
+        /* 집필/스케줄 박스 선택 */
+        .cal-select-box {
+            position: fixed;
+            z-index: 9999;
+            border: 1.5px solid var(--primary, #87ada1);
+            background: rgba(135, 173, 161, 0.15);
+            border-radius: 4px;
+            pointer-events: none;
+        }
+        .cal-selected {
+            outline: 2px solid var(--primary, #87ada1) !important;
+            outline-offset: 1px;
+            box-shadow: 0 0 0 3px rgba(135, 173, 161, 0.25) !important;
+        }
+        /* 카드 순서 변경 시 삽입 위치 표시선 */
+        .cal-drop-before { box-shadow: 0 -3px 0 -1px var(--primary, #87ada1) !important; }
+        .cal-drop-after  { box-shadow: 0 3px 0 -1px var(--primary, #87ada1) !important; }
 
         .stat-card {
             background: white; border-radius: 20px; padding: 1.5rem;
@@ -2241,6 +2268,11 @@
             if (parsed.writerWorks) writerWorks = parsed.writerWorks;
             if (parsed.writerDailyData) writerDailyData = parsed.writerDailyData;
             if (parsed.writerGlobalDailyGoal) writerGlobalDailyGoal = parsed.writerGlobalDailyGoal;
+
+            // 과거에 작품을 삭제했을 때 남아버린 집필/스케줄 일정 정리 (작품이 하나라도 있을 때만)
+            if (Array.isArray(masterWorks) && masterWorks.length > 0) {
+                try { purgeOrphanSchedules(); } catch(e) {}
+            }
         }
 
         try {
@@ -2552,6 +2584,7 @@
                 if (taskSchedules[date].length === 0) delete taskSchedules[date];
             });
             masterWorks = masterWorks.filter(w => w.id !== id);
+            purgeOrphanSchedules();
             save(); updateUI(); renderPublishCal();
         }
 
@@ -2565,6 +2598,7 @@
                 if (taskSchedules[ex.manuscriptDate].length === 0) delete taskSchedules[ex.manuscriptDate];
             }
             w.extras = w.extras.filter(e => e.id !== extraId);
+            purgeOrphanSchedules();
             save(); updateUI(); renderPublishCal();
         }
 
@@ -3348,6 +3382,7 @@
             const ex = w.extras.find(e => e.id === extraId);
             if (ex?.manuscriptDate) syncExtraManuscriptTask(w, ex, ex.manuscriptDate, '');
             w.extras = w.extras.filter(e => e.id !== extraId);
+            purgeOrphanSchedules();
             save(); renderExtrasList();
         }
 
@@ -3676,7 +3711,10 @@
                     const pa = ia === -1 ? order.length : ia, pb = ib === -1 ? order.length : ib;
                     if (pa !== pb) return pa - pb;
                     if (pa === order.length) { const pc = (a.publisher || '').localeCompare(b.publisher || '', 'ko'); if (pc !== 0) return pc; }
-                    if (a.isPending !== b.isPending) return a.isPending ? 1 : -1; // 출간예정은 뒤로
+                    // 같은 출판사 안에서는 출간날짜 순 (출간예정/날짜없음은 뒤로, 동일하면 제목순)
+                    const dA = (a.isPending || !a.publishDate) ? '9999-12-31' : a.publishDate;
+                    const dB = (b.isPending || !b.publishDate) ? '9999-12-31' : b.publishDate;
+                    if (dA !== dB) return dA.localeCompare(dB);
                     return a.title.localeCompare(b.title, 'ko');
                 }
                 if (currentGenreTab === '웹툰') {
@@ -3877,6 +3915,7 @@
                     if (taskSchedules[date].length === 0) delete taskSchedules[date];
                 });
                 masterWorks = masterWorks.filter(w => w.id !== id); 
+                purgeOrphanSchedules();   // 집필 관리 글자수 등 작품과 연결된 일정도 함께 제거
                 save(); updateUI(); 
             } 
         }
@@ -5375,6 +5414,71 @@
             };
         }
 
+        // 삭제된 작품/외전을 참조하는 일정(집필 관리 글자수·스케줄)이 남아있지 않도록 정리한다.
+        // 작품을 삭제했는데 집필 관리에 글자수/목표 합계가 계속 남는 문제를 막아준다.
+        function isScheduleWorkValid(workId) {
+            if (!workId) return false;
+            const r = resolveWorkItem(workId);
+            if (!r.work) return false;                       // 본편(또는 외전의 부모 작품)이 삭제됨
+            if (String(workId).includes('::') && !r.extra) return false; // 외전 자체가 삭제됨
+            return true;
+        }
+        function purgeOrphanSchedules() {
+            let changed = false;
+            const validWorkIds = new Set(masterWorks.map(w => w.id));
+
+            // 집필 관리 일정
+            Object.keys(writeSchedules).forEach(date => {
+                const before = writeSchedules[date].length;
+                writeSchedules[date] = writeSchedules[date].filter(s => isScheduleWorkValid(s.workId));
+                if (writeSchedules[date].length !== before) changed = true;
+                if (writeSchedules[date].length === 0) delete writeSchedules[date];
+            });
+            // 스케줄(Task) 관리 일정
+            Object.keys(taskSchedules).forEach(date => {
+                const before = taskSchedules[date].length;
+                taskSchedules[date] = taskSchedules[date].filter(t => {
+                    if (!isScheduleWorkValid(t.workId)) return false;
+                    // 외전 자동 태스크는 workId가 부모 작품이라 따로 외전 존재 여부를 확인
+                    if (t.extraId) {
+                        const w = resolveWorkItem(t.workId).work;
+                        if (!w?.extras?.some(e => e.id === t.extraId)) return false;
+                    }
+                    return true;
+                });
+                if (taskSchedules[date].length !== before) changed = true;
+                if (taskSchedules[date].length === 0) delete taskSchedules[date];
+            });
+
+            // 웹툰 투고 이력 - 삭제된 작품의 키 제거
+            Object.keys(webtoonSubs).forEach(wid => {
+                if (!validWorkIds.has(wid)) {
+                    delete webtoonSubs[wid];
+                    changed = true;
+                }
+            });
+            webtoonSubOrder = webtoonSubOrder.filter(wid => validWorkIds.has(wid));
+
+            // 집필 기록(writerDailyData) - 삭제된 작품/외전의 workKey 제거
+            Object.keys(writerDailyData).forEach(date => {
+                const worksObj = writerDailyData[date]?.works;
+                if (!worksObj) return;
+                Object.keys(worksObj).forEach(wk => {
+                    // wk는 'workId' 또는 'workId::extraId' 형식
+                    if (!isScheduleWorkValid(wk)) {
+                        delete worksObj[wk];
+                        changed = true;
+                    }
+                });
+                // works가 완전히 비었으면 날짜 키 자체도 제거
+                if (Object.keys(worksObj).length === 0) {
+                    delete writerDailyData[date];
+                }
+            });
+
+            return changed;
+        }
+
         function renderWriteCalendar() {
             document.getElementById('write-cal-title').innerText = `${writeCalDate.getFullYear()}년 ${writeCalDate.getMonth() + 1}월`;
             
@@ -5500,7 +5604,7 @@
                     
                 let deleteBtn = `<button type="button" onclick="event.stopPropagation(); quickDeleteWrite('${s.id}', '${s.date}')" class="opacity-0 group-hover/block:opacity-100 text-slate-300 hover:text-rose-500 transition-opacity mt-0.5 ml-1 shrink-0 px-1" title="일정 삭제"><i class="fa-solid fa-trash-can"></i></button>`;
 
-                return `<div class="border border-slate-200 border-l-4 p-1 rounded-lg relative group/block shadow-sm hover:shadow-md transition-all cursor-move" style="border-left-color: ${color}; ${cardBg} ${cardFontStyle}" draggable="true" ondragstart="handleWriteDragStart(event, '${s.id}', '${s.date}')" onclick="event.stopPropagation(); openWriteEditModal('${s.id}', '${s.date}')" oncontextmenu="duplicateWriteSchedule(event, '${s.id}', '${s.date}')">
+                return `<div class="cal-selectable border border-slate-200 border-l-4 p-1 rounded-lg relative group/block shadow-sm hover:shadow-md transition-all cursor-move" data-cal="write" data-block-id="${s.id}" data-block-date="${s.date}" style="border-left-color: ${color}; ${cardBg} ${cardFontStyle}" draggable="true" ondragstart="handleWriteDragStart(event, '${s.id}', '${s.date}')" ondragover="handleCardDragOver(event, this)" ondragleave="handleCardDragLeave(event, this)" ondrop="handleWriteCardDrop(event, this, '${s.id}', '${s.date}')" onclick="event.stopPropagation(); openWriteEditModal('${s.id}', '${s.date}')" oncontextmenu="duplicateWriteSchedule(event, '${s.id}', '${s.date}')">
                     <div class="flex items-start">
                         <div class="flex-1 min-w-0 pl-0.5">
                             ${content}
@@ -5512,11 +5616,13 @@
                 // 그날 등록된 집필 블록의 goal 합산만 (실제 기록 사용 안 함)
                 return daySchedules.reduce((total, s) => {
                     if (s.isCorrection || s.isSynopsis || s.isOther) return total;
+                    if (!isScheduleWorkValid(s.workId)) return total;   // 삭제된 작품의 글자수는 합산 제외
                     return total + (Number(s.goal) || 0);
                 }, 0);
             });
 
             document.getElementById('write-calendar-body').innerHTML = html;
+            if (typeof window.clearCalSelection === 'function') window.clearCalSelection();
 
             // 이번달 목표 합계 업데이트
             try {
@@ -5527,6 +5633,7 @@
                     if (!dateStr.startsWith(moStr)) return;
                     schedules.forEach(s => {
                         if (!s.isCorrection && !s.isSynopsis && !s.isOther) {
+                            if (!isScheduleWorkValid(s.workId)) return;   // 삭제된 작품의 글자수는 합계 제외
                             monthGoalSum += Number(s.goal) || 0;
                         }
                     });
@@ -5566,7 +5673,7 @@
 
                 const taskCardStyle = `font-family:'Pretendard','Apple SD Gothic Neo',sans-serif; font-size:${taskCardSettings.fontSize}px; background:${t.isCompleted ? '#f1f5f9' : taskCardSettings.colorDefault};`;
 
-                return `<div class="border border-slate-200 border-l-4 p-1 rounded-lg relative group/block shadow-sm hover:shadow-md transition-all cursor-move" style="border-left-color: ${catColor}; ${taskCardStyle}" draggable="true" ondragstart="handleTaskDragStart(event, '${t.id}', '${t.date}')" onclick="event.stopPropagation(); openTaskEditModal('${t.id}', '${t.date}')" oncontextmenu="duplicateTaskSchedule(event, '${t.id}', '${t.date}')">
+                return `<div class="cal-selectable border border-slate-200 border-l-4 p-1 rounded-lg relative group/block shadow-sm hover:shadow-md transition-all cursor-move" data-cal="task" data-block-id="${t.id}" data-block-date="${t.date}" style="border-left-color: ${catColor}; ${taskCardStyle}" draggable="true" ondragstart="handleTaskDragStart(event, '${t.id}', '${t.date}')" ondragover="handleCardDragOver(event, this)" ondragleave="handleCardDragLeave(event, this)" ondrop="handleTaskCardDrop(event, this, '${t.id}', '${t.date}')" onclick="event.stopPropagation(); openTaskEditModal('${t.id}', '${t.date}')" oncontextmenu="duplicateTaskSchedule(event, '${t.id}', '${t.date}')">
                     <div class="flex items-start">
                         ${completeIcon}
                         <div class="flex-1 min-w-0 ml-0.5">
@@ -5578,6 +5685,7 @@
             }, 'openTaskModal', dragEvents);
 
             document.getElementById('task-calendar-body').innerHTML = html;
+            if (typeof window.clearCalSelection === 'function') window.clearCalSelection();
         }
 
 
@@ -5618,6 +5726,131 @@
             taskSchedules[dateStr] = taskSchedules[dateStr].filter(t => t.id !== id);
             if(taskSchedules[dateStr].length === 0) delete taskSchedules[dateStr];
             save(); renderTaskCalendar();
+        }
+
+        // 🟢 [NEW] 빈 공간 드래그로 박스(러버밴드) 선택 → Del/Backspace로 일괄 삭제
+        // 집필 관리(write) / 스케줄 관리(task) 두 캘린더 모두 지원
+        const calSelection = { cal: null, ids: new Set() };
+        (function initCalBoxSelection() {
+            let active = false;        // 박스 드래그 중인지
+            let startX = 0, startY = 0;
+            let boxEl = null;
+            let containerEl = null;    // 드래그가 시작된 캘린더 body
+            let whichCal = null;       // 'write' | 'task'
+
+            function clearSelection() {
+                document.querySelectorAll('.cal-selected').forEach(el => el.classList.remove('cal-selected'));
+                calSelection.cal = null;
+                calSelection.ids.clear();
+            }
+            // 외부(렌더 등)에서 선택 해제할 수 있게 노출
+            window.clearCalSelection = clearSelection;
+
+            function getContainerInfo(target) {
+                const writeBody = document.getElementById('write-calendar-body');
+                const taskBody = document.getElementById('task-calendar-body');
+                if (writeBody && writeBody.contains(target)) return { el: writeBody, cal: 'write' };
+                if (taskBody && taskBody.contains(target)) return { el: taskBody, cal: 'task' };
+                return null;
+            }
+
+            document.addEventListener('mousedown', (e) => {
+                if (e.button !== 0) return;                          // 좌클릭만
+                // 카드/버튼 위에서 시작하면 무시 → 기존 날짜이동 드래그/클릭 유지
+                if (e.target.closest('.cal-selectable')) return;
+                if (e.target.closest('button, a, input, select, textarea')) return;
+
+                const info = getContainerInfo(e.target);
+                if (!info) return;                                   // 캘린더 밖이면 무시
+
+                containerEl = info.el;
+                whichCal = info.cal;
+                startX = e.clientX; startY = e.clientY;
+                active = true;
+                // 다른 캘린더에서 하던 선택은 비움
+                clearSelection();
+
+                boxEl = document.createElement('div');
+                boxEl.className = 'cal-select-box';
+                document.body.appendChild(boxEl);
+                updateBox(e.clientX, e.clientY);
+                e.preventDefault();
+            });
+
+            function updateBox(curX, curY) {
+                const left = Math.min(startX, curX), top = Math.min(startY, curY);
+                const w = Math.abs(curX - startX), h = Math.abs(curY - startY);
+                boxEl.style.left = left + 'px';
+                boxEl.style.top = top + 'px';
+                boxEl.style.width = w + 'px';
+                boxEl.style.height = h + 'px';
+                return { left, top, right: left + w, bottom: top + h };
+            }
+
+            document.addEventListener('mousemove', (e) => {
+                if (!active || !boxEl) return;
+                const box = updateBox(e.clientX, e.clientY);
+
+                // 같은 캘린더의 카드들과 겹침 판정
+                calSelection.cal = whichCal;
+                calSelection.ids.clear();
+                containerEl.querySelectorAll('.cal-selectable').forEach(card => {
+                    const r = card.getBoundingClientRect();
+                    const overlap = !(r.right < box.left || r.left > box.right || r.bottom < box.top || r.top > box.bottom);
+                    if (overlap) {
+                        card.classList.add('cal-selected');
+                        calSelection.ids.add(card.dataset.blockId + '|' + card.dataset.blockDate);
+                    } else {
+                        card.classList.remove('cal-selected');
+                    }
+                });
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (!active) return;
+                active = false;
+                if (boxEl) { boxEl.remove(); boxEl = null; }
+                // 선택이 하나도 없으면 상태 비움
+                if (calSelection.ids.size === 0) clearSelection();
+            });
+
+            // Del / Backspace → 선택된 카드 일괄 삭제 (확인창 없음)
+            document.addEventListener('keydown', (e) => {
+                if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+                if (calSelection.ids.size === 0) return;
+                // 입력 중이면(모달 등) 무시
+                const ae = document.activeElement;
+                if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
+
+                e.preventDefault();
+                deleteSelectedCalBlocks();
+            });
+        })();
+
+        function deleteSelectedCalBlocks() {
+            if (calSelection.ids.size === 0) return;
+            const cal = calSelection.cal;
+            const store = cal === 'write' ? writeSchedules : taskSchedules;
+
+            const count = calSelection.ids.size;
+            const label = cal === 'write' ? '집필' : '스케줄';
+            if (!confirm(`선택한 ${label} 일정 ${count}개를 삭제하시겠습니까?`)) return;
+
+            calSelection.ids.forEach(key => {
+                const sep = key.lastIndexOf('|');
+                const id = key.slice(0, sep);
+                const date = key.slice(sep + 1);
+                if (store[date]) {
+                    store[date] = store[date].filter(item => item.id !== id);
+                    if (store[date].length === 0) delete store[date];
+                }
+            });
+
+            calSelection.ids.clear();
+            calSelection.cal = null;
+            save();
+            if (cal === 'write') renderWriteCalendar();
+            else renderTaskCalendar();
         }
 
         // 🟢 [NEW] 집필 관리 모달 기능
@@ -5874,6 +6107,67 @@
                     
                     if(!taskSchedules[targetDate]) taskSchedules[targetDate] = [];
                     taskSchedules[targetDate].push(item);
+                    save(); renderTaskCalendar();
+                }
+            } catch(err) {}
+        }
+
+        // 🟢 [NEW] 카드 위에 드롭 → 같은/다른 날짜 안에서 순서 변경
+        // 카드의 위쪽 절반에 놓으면 그 카드 앞, 아래쪽 절반이면 뒤에 삽입
+        function handleCardDragOver(e, cardEl) {
+            e.preventDefault();
+            e.stopPropagation();           // 셀(cell)의 dragover로 전파 방지
+            e.dataTransfer.dropEffect = 'move';
+            const r = cardEl.getBoundingClientRect();
+            const after = e.clientY > r.top + r.height / 2;
+            cardEl.classList.remove('cal-drop-before', 'cal-drop-after');
+            cardEl.classList.add(after ? 'cal-drop-after' : 'cal-drop-before');
+        }
+        function handleCardDragLeave(e, cardEl) {
+            cardEl.classList.remove('cal-drop-before', 'cal-drop-after');
+        }
+
+        // store(writeSchedules/taskSchedules)에서 항목을 targetDate의 특정 위치로 이동
+        function moveScheduleItem(store, data, targetDate, targetId, insertAfter) {
+            const fromIdx = store[data.originDate]?.findIndex(x => x.id === data.id);
+            if (fromIdx === undefined || fromIdx < 0) return false;
+            if (data.id === targetId) return false;   // 자기 자신 위에 놓음
+
+            const item = store[data.originDate].splice(fromIdx, 1)[0];
+            item.date = targetDate;
+            if (store[data.originDate].length === 0 && data.originDate !== targetDate) {
+                delete store[data.originDate];
+            }
+            if (!store[targetDate]) store[targetDate] = [];
+
+            // 기준 카드의 현재 위치를 다시 찾아 그 앞/뒤에 삽입
+            let targetIdx = store[targetDate].findIndex(x => x.id === targetId);
+            if (targetIdx < 0) { store[targetDate].push(item); return true; }
+            if (insertAfter) targetIdx += 1;
+            store[targetDate].splice(targetIdx, 0, item);
+            return true;
+        }
+
+        function handleWriteCardDrop(e, cardEl, targetId, targetDate) {
+            e.preventDefault(); e.stopPropagation();
+            const insertAfter = cardEl.classList.contains('cal-drop-after');
+            cardEl.classList.remove('cal-drop-before', 'cal-drop-after');
+            try {
+                const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+                if (data.type !== 'write') return;
+                if (moveScheduleItem(writeSchedules, data, targetDate, targetId, insertAfter)) {
+                    save(); renderWriteCalendar();
+                }
+            } catch(err) {}
+        }
+        function handleTaskCardDrop(e, cardEl, targetId, targetDate) {
+            e.preventDefault(); e.stopPropagation();
+            const insertAfter = cardEl.classList.contains('cal-drop-after');
+            cardEl.classList.remove('cal-drop-before', 'cal-drop-after');
+            try {
+                const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+                if (data.type !== 'task') return;
+                if (moveScheduleItem(taskSchedules, data, targetDate, targetId, insertAfter)) {
                     save(); renderTaskCalendar();
                 }
             } catch(err) {}

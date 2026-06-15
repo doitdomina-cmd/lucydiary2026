@@ -3605,8 +3605,24 @@ function renderCalendar(){
     var dlEvs=cellEvs.filter(function(e){return e.isDl;});
     var otherEvs=cellEvs.filter(function(e){return !e.isDl;});
     var evs=dlEvs.concat(routineEvs,otherEvs);
-    calHtml+='<div class="cal-cell" data-ds="'+ds+'" onclick="openDayRoutineModal(\''+ds+'\')" style="cursor:pointer;'+
-      'min-height:128px;padding:6px 8px;'+
+    // 호버 툴팁: 그 날의 전체 일정 (마감 → 루틴 → 일반 일정 순)
+    var tipLines=[];
+    var ckMap=S.checks[ds]||{};
+    dlEvs.forEach(function(d){
+      var dd=dLeft(d.date);
+      var ddTxt=d.done?'완료':(dd<0?'D+'+Math.abs(dd):dd===0?'오늘':'D-'+dd);
+      tipLines.push((d.done?'✓':'🚨')+' '+d.title+' ('+ddTxt+')');
+    });
+    rodsCell.forEach(function(r){
+      var rDone=!!ckMap[r.id];
+      tipLines.push((rDone?'✓':'○')+' '+(r.time||'00:00')+' '+r.task);
+    });
+    (evMap[ds]||[]).filter(function(e){return !e.isDl;}).forEach(function(e){
+      tipLines.push('• '+(e.title||''));
+    });
+    var tipAttr=tipLines.length>0?' data-tip="'+(cell.d+'일&#10;'+tipLines.join('&#10;')).replace(/"/g,'&quot;')+'"':'';
+    calHtml+='<div class="cal-cell" data-ds="'+ds+'"'+tipAttr+' onclick="openDayRoutineModal(\''+ds+'\')" onmouseover="showLedgerTip(this,event)" onmousemove="moveLedgerTip(event)" onmouseout="hideLedgerTip()" style="cursor:pointer;'+
+      'min-height:100px;padding:6px 8px;'+
       'border-right:'+(ci===6?'none':'1px solid var(--border)')+';'+
       'border-bottom:'+(ri===5?'none':'1px solid var(--border)')+';'+
       'background:'+(isT?'var(--accent)15':'transparent')+'">'+
@@ -3617,7 +3633,7 @@ function renderCalendar(){
           'color:'+(isT?'var(--accent)':!cell.cur?'var(--t3)':ci===0?'var(--red)':ci===6?'var(--blue)':'var(--text)')+'">'+cell.d+'</div>'+
         (function(){var rc=rodsCell;if(!rc.length)return '';var ck=S.checks[ds]||{};var dn=rc.filter(function(rr){return ck[rr.id];}).length;if(dn===0)return '';var allDone=dn===rc.length;return '<span style="font-size:0.62em;font-weight:600;padding:1px 5px;border-radius:99px;background:'+(allDone?'var(--green)':'var(--al)')+';color:'+(allDone?'#fff':'var(--accent)')+'">'+dn+'/'+rc.length+'</span>';})()+
       '</div>';
-    evs.slice(0,4).forEach(function(ev){
+    evs.slice(0,3).forEach(function(ev){
       if(ev.isDl) {
         var dlDone=!!ev.done;
         calHtml+='<div onclick="event.stopPropagation();calDlToggle(\''+ev.id+'\')" style="display:flex;align-items:center;gap:3px;background:'+(ev.color||'var(--accent)')+(dlDone?'28':'14')+';color:#555;'+
@@ -3643,7 +3659,7 @@ function renderCalendar(){
           ev.title+'</div>';
       }
     });
-    if(evs.length>4) calHtml+='<div style="font-size:0.65em;color:var(--t3);text-align:right">+'+(evs.length-4)+'</div>';
+    if(evs.length>3) calHtml+='<div style="font-size:0.65em;color:var(--t3);text-align:right">+'+(evs.length-3)+'</div>';
     calHtml+='</div>';
   }
   calHtml+='</div></div></div>'; // grid close + min-width wrapper + scroll wrapper

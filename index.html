@@ -804,6 +804,11 @@ function routinesForDate(ds){
   const dayOfMonth = dt.getDate();
   const lastDayOfMonth = new Date(dt.getFullYear(), dt.getMonth()+1, 0).getDate();
   return S.routines.filter(function(r){
+    // 루틴화(프로젝트 연동) 항목은 시작일~등록 마감일 범위 안에서만 표시
+    if(r.isRz){
+      if(r.startDate && ds<r.startDate) return false;
+      if(r.until && ds>r.until) return false;
+    }
     // 매월 루틴: 선택한 날짜(또는 말일)에만 표시
     if(r.isMonthly){
       const mdays = r.monthDays || [];
@@ -2530,14 +2535,18 @@ function openRzModal(pid){
         '</div>'+
       '</div>'+
     '</div>'+
-    '<div class="fg"><label class="fl">시작일 <span style="color:var(--t3);font-weight:400">(이 날부터 등록)</span></label>'+
-      '<input type="date" class="inp" id="rz-start" value="'+dateStr(new Date())+'">'+
+    '<div class="fg" style="display:flex;gap:10px">'+
+      '<div style="flex:1"><label class="fl">시작일 <span style="color:var(--t3);font-weight:400">(이 날부터)</span></label>'+
+        '<input type="date" class="inp" id="rz-start" value="'+dateStr(new Date())+'">'+
+      '</div>'+
+      '<div style="flex:1"><label class="fl">등록 마감일 <span style="color:var(--t3);font-weight:400">(이 날까지)</span></label>'+
+        '<input type="date" class="inp" id="rz-until" value="'+ddayVal+'">'+
+      '</div>'+
     '</div>'+
-    '<div class="fg"><label class="fl">등록 마감일 <span style="color:var(--t3);font-weight:400">(이 날까지 자동 등록)</span></label>'+
-      '<input type="date" class="inp" id="rz-until" value="'+ddayVal+'">'+
+    '<div class="fg" style="display:flex;gap:10px">'+
+      '<div style="flex:1"><label class="fl">시간 (선택)</label><input type="time" class="inp" id="rz-ti"></div>'+
+      '<div style="flex:1"><label class="fl">소요 시간 (분, 선택)</label><input type="number" class="inp" id="rz-du" placeholder="예: 60" min="5" step="5"></div>'+
     '</div>'+
-    '<div class="fg"><label class="fl">시간 (선택)</label><input type="time" class="inp" id="rz-ti"></div>'+
-    '<div class="fg"><label class="fl">소요 시간 (분, 선택)</label><input type="number" class="inp" id="rz-du" placeholder="예: 60" min="5" step="5"></div>'+
     '<div class="fg"><label class="fl">💰 저축 금액 (선택) <span style="color:var(--t3);font-weight:400">- 체크 시 저축 목표에 자동 입금</span></label><div style="display:flex;align-items:center;gap:8px"><input type="number" class="inp" id="rz-save" placeholder="예: 1000" step="1" style="flex:1"><span style="color:var(--t2);white-space:nowrap;font-size:0.95em">만원</span></div></div>',
     '<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="saveRz(\''+pid+'\')">추가 + 캘린더 등록</button>');
 }
@@ -2595,7 +2604,7 @@ function saveRz(pid){
   const p=S.projects.find(x=>x.id===pid);if(!p.routinized)p.routinized=[];
   const entry={id:gid(),task,days:isMonthly?[]:days,monthDays:isMonthly?monthDays:[],isMonthly:!!isMonthly,time,duration:dur,projectId:pid,until,startDate:startVal,saveAmount:saveAmt};
   p.routinized.push(entry);
-  S.routines.push({id:entry.id,time:time||'',task,detail:p.name+' 루틴화',days:isMonthly?[]:days,monthDays:isMonthly?monthDays:[],isMonthly:!!isMonthly,isRz:true,rzProjectId:pid,saveAmount:saveAmt});
+  S.routines.push({id:entry.id,time:time||'',task,detail:p.name+' 루틴화',days:isMonthly?[]:days,monthDays:isMonthly?monthDays:[],isMonthly:!!isMonthly,isRz:true,rzProjectId:pid,saveAmount:saveAmt,startDate:startVal,until});
   S.routines.sort((a,b)=>a.time.localeCompare(b.time));
 
   // 캘린더 등록: 시작일 ~ 마감일까지
@@ -2659,12 +2668,16 @@ function openRzEditModal(pid, idx){
         '</div>'+
       '</div>'+
     '</div>'+
-    '<div class="fg"><label class="fl">시작일 <span style="color:var(--t3);font-weight:400">(이 날부터 등록)</span></label>'+
-      '<input type="date" class="inp" id="rze-start" value="'+(r.startDate||dateStr(new Date()))+'"></div>'+
-    '<div class="fg"><label class="fl">등록 마감일 <span style="color:var(--t3);font-weight:400">(이 날까지 자동 등록)</span></label>'+
-      '<input type="date" class="inp" id="rze-until" value="'+(r.until||'')+'"></div>'+
-    '<div class="fg"><label class="fl">시간 (선택)</label><input type="time" class="inp" id="rze-ti" value="'+(r.time||'')+'"></div>'+
-    '<div class="fg"><label class="fl">소요 시간 (분, 선택)</label><input type="number" class="inp" id="rze-du" value="'+(r.duration||'')+'" placeholder="예: 60" min="5" step="5"></div>'+
+    '<div class="fg" style="display:flex;gap:10px">'+
+      '<div style="flex:1"><label class="fl">시작일 <span style="color:var(--t3);font-weight:400">(이 날부터)</span></label>'+
+        '<input type="date" class="inp" id="rze-start" value="'+(r.startDate||dateStr(new Date()))+'"></div>'+
+      '<div style="flex:1"><label class="fl">등록 마감일 <span style="color:var(--t3);font-weight:400">(이 날까지)</span></label>'+
+        '<input type="date" class="inp" id="rze-until" value="'+(r.until||'')+'"></div>'+
+    '</div>'+
+    '<div class="fg" style="display:flex;gap:10px">'+
+      '<div style="flex:1"><label class="fl">시간 (선택)</label><input type="time" class="inp" id="rze-ti" value="'+(r.time||'')+'"></div>'+
+      '<div style="flex:1"><label class="fl">소요 시간 (분, 선택)</label><input type="number" class="inp" id="rze-du" value="'+(r.duration||'')+'" placeholder="예: 60" min="5" step="5"></div>'+
+    '</div>'+
     '<div class="fg"><label class="fl">💰 저축 금액 (선택)</label><div style="display:flex;align-items:center;gap:8px"><input type="number" class="inp" id="rze-saveamt" value="'+(r.saveAmount?r.saveAmount/10000:'')+'" placeholder="예: 1000" step="1" style="flex:1"><span style="color:var(--t2);white-space:nowrap;font-size:0.95em">만원</span></div></div>',
     '<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" id="rze-save">저장</button>');
   document.getElementById('rze-save').onclick=function(){ saveRzEdit(pid, idx); };
@@ -4139,6 +4152,8 @@ function syncRzToRoutines(){
           monthDays: entry.monthDays||[],
           isMonthly: !!entry.isMonthly,
           saveAmount: entry.saveAmount||0,
+          startDate: entry.startDate||'',
+          until: entry.until||'',
           isRz: true,
           rzProjectId: p.id
         });
@@ -4153,6 +4168,8 @@ function syncRzToRoutines(){
             r.monthDays=entry.monthDays||[];
             r.isMonthly=!!entry.isMonthly;
             r.saveAmount=entry.saveAmount||0;
+            r.startDate=entry.startDate||'';
+            r.until=entry.until||'';
           }
         });
       }

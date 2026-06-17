@@ -1072,7 +1072,7 @@ function routineCard(ds){
         '<div class="rc-dot '+(isDone?'done':'')+'"></div>'+
         '<div style="flex:1">'+
           '<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">'+
-            '<div class="rc-time">'+r.time+'</div>'+
+            (r.time?'<div class="rc-time">'+r.time+'</div>':'')+
             '<div class="rc-task '+(isDone?'done':'')+'">'+r.task+'</div>'+
             (r.saveAmount>0?'<span style="font-size:0.72em;background:'+(isDone?'var(--green)':'var(--al)')+';color:'+(isDone?'#fff':'var(--accent)')+';padding:1px 7px;border-radius:99px;font-weight:600;white-space:nowrap">💰 '+money(r.saveAmount)+'</span>':'')+
           '</div>'+
@@ -1384,10 +1384,10 @@ function renderRoutinePage(){
 
   function renderRoutineRow(r,i){
     const dayLabels=r.isMonthly?('매월 '+(r.monthDays||[]).map(function(d){return d==='last'?'말':d;}).join('·')+'일'):((!r.days||r.days.length===0)?'매일':r.days.map(d=>DOW_KO[DOWS.indexOf(d)]).join('·'));
-    const isCur=r.time<=nowT&&(i===S.routines.length-1||S.routines[i+1].time>nowT);
+    const isCur=!!r.time&&r.time<=nowT&&(i===S.routines.length-1||!S.routines[i+1].time||S.routines[i+1].time>nowT);
     return '<div class="ci" style="'+(isCur?'border-left:2px solid var(--accent);padding-left:8px;background:var(--al);border-radius:0 6px 6px 0':'')+'">'+
       '<div style="flex:1">'+
-        '<div style="display:flex;align-items:center;gap:8px"><span style="font-size:0.8571em;color:var(--rc-header);font-weight:600;font-family:var(--mono)">'+r.time+'</span>'+
+        '<div style="display:flex;align-items:center;gap:8px">'+(r.time?'<span style="font-size:0.8571em;color:var(--rc-header);font-weight:600;font-family:var(--mono)">'+r.time+'</span>':'')+
         '<span style="font-size:0.9643em;font-weight:500">'+r.task+'</span>'+
         '<span style="font-size:0.7857em;padding:2px 7px;border-radius:99px;background:var(--s2);color:var(--t2)">'+dayLabels+'</span></div>'+
         (r.detail?'<div style="font-size:0.8571em;color:var(--t3);margin-top:2px;padding-left:0">'+r.detail+'</div>':'')+
@@ -1424,7 +1424,7 @@ function previewDow(dowIdx){
   if(matched.length===0){html='<div class="empty" style="padding:12px">이 요일 루틴이 없어요</div>';}
   else{
     html='<div style="display:flex;flex-direction:column;gap:4px">';
-    matched.forEach(r=>{html+='<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)"><span style="font-size:0.7857em;color:var(--rc-header);font-weight:600;font-family:var(--mono);min-width:40px">'+r.time+'</span><span style="font-size:0.9286em">'+r.task+'</span></div>';});
+    matched.forEach(r=>{html+='<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)">'+(r.time?'<span style="font-size:0.7857em;color:var(--rc-header);font-weight:600;font-family:var(--mono);min-width:40px">'+r.time+'</span>':'')+'<span style="font-size:0.9286em">'+r.task+'</span></div>';});
     html+='</div>';
   }
   document.getElementById('dow-preview').innerHTML=html;
@@ -1436,7 +1436,7 @@ function openRModal(idx){
   const selDays=new Set(r.days||[]);
   const dowOpts=DOWS.map((k,i)=>'<button type="button" class="daybtn" id="rd-'+k+'" onclick="togRDay(this,\''+k+'\')" style="'+(selDays.has(k)?'background:var(--rc-header);color:#fff;border-color:var(--rc-header)':'')+'">'+DOW_KO[i]+'요일</button>').join('');
   openMo(idx!==undefined?'루틴 수정':'루틴 추가',
-    '<div class="fg"><label class="fl">시간</label><input type="time" class="inp" id="r-time" value="'+r.time+'"></div>'+
+    '<div class="fg"><label class="fl">시간 <span style="color:var(--t3);font-weight:400">(선택)</span></label><input type="time" class="inp" id="r-time" value="'+(r.time||'')+'"></div>'+
     '<div class="fg"><label class="fl">이름</label><input class="inp" id="r-task" value="'+r.task+'" placeholder="루틴 이름"></div>'+
     '<div class="fg"><label class="fl">상세 설명</label><input class="inp" id="r-detail" value="'+(r.detail||'')+'" placeholder="상세 설명 (선택)"></div>'+
     '<div class="fg"><label class="fl">반복 요일 <span style="color:var(--t3)">(선택 없으면 매일)</span></label>'+
@@ -2595,7 +2595,7 @@ function saveRz(pid){
   const p=S.projects.find(x=>x.id===pid);if(!p.routinized)p.routinized=[];
   const entry={id:gid(),task,days:isMonthly?[]:days,monthDays:isMonthly?monthDays:[],isMonthly:!!isMonthly,time,duration:dur,projectId:pid,until,startDate:startVal,saveAmount:saveAmt};
   p.routinized.push(entry);
-  S.routines.push({id:entry.id,time:time||'00:00',task,detail:p.name+' 루틴화',days:isMonthly?[]:days,monthDays:isMonthly?monthDays:[],isMonthly:!!isMonthly,isRz:true,rzProjectId:pid,saveAmount:saveAmt});
+  S.routines.push({id:entry.id,time:time||'',task,detail:p.name+' 루틴화',days:isMonthly?[]:days,monthDays:isMonthly?monthDays:[],isMonthly:!!isMonthly,isRz:true,rzProjectId:pid,saveAmount:saveAmt});
   S.routines.sort((a,b)=>a.time.localeCompare(b.time));
 
   // 캘린더 등록: 시작일 ~ 마감일까지
@@ -3492,7 +3492,7 @@ function openDayRoutineModal(ds){
         '</div>'+
         '<div style="flex:1;min-width:0">'+
           '<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">'+
-            '<span style="font-size:0.8em;color:var(--accent);font-family:var(--mono);font-weight:600">'+r.time+'</span>'+
+            (r.time?'<span style="font-size:0.8em;color:var(--accent);font-family:var(--mono);font-weight:600">'+r.time+'</span>':'')+
             '<span style="font-size:0.92em;font-weight:500;'+(isDone?'text-decoration:line-through;color:var(--t3)':'')+'">'+r.task+'</span>'+
             (r.saveAmount>0?'<span style="font-size:0.72em;background:'+(isDone?'var(--green)':'var(--al)')+';color:'+(isDone?'#fff':'var(--accent)')+';padding:1px 7px;border-radius:99px;font-weight:600">💰 '+money(r.saveAmount)+'</span>':'')+
           '</div>'+
@@ -3622,7 +3622,7 @@ function renderCalendar(){
     var rodsCell=routinesForDate(ds).filter(function(r){return r.isRz;});
     var routineEvs=rodsCell.map(function(r){
       var pr=r.rzProjectId?S.projects.find(p=>p.id===r.rzProjectId):null;
-      return {isRzCell:true,rid:r.id,title:(r.time||'00:00')+' '+r.task,color:pr?pr.color:'var(--accent)'};
+      return {isRzCell:true,rid:r.id,title:(r.time?r.time+' ':'')+r.task,color:pr?pr.color:'var(--accent)'};
     });
     var cellEvs=evMap[ds]||[];
     var dlEvs=cellEvs.filter(function(e){return e.isDl;});
@@ -3638,7 +3638,7 @@ function renderCalendar(){
     });
     rodsCell.forEach(function(r){
       var rDone=!!ckMap[r.id];
-      tipLines.push((rDone?'✓':'○')+' '+(r.time||'00:00')+' '+r.task);
+      tipLines.push((rDone?'✓':'○')+' '+(r.time?r.time+' ':'')+r.task);
     });
     (evMap[ds]||[]).filter(function(e){return !e.isDl;}).forEach(function(e){
       tipLines.push('• '+(e.title||''));
@@ -4132,7 +4132,7 @@ function syncRzToRoutines(){
       if(!exists){
         S.routines.push({
           id: entry.id,
-          time: entry.time||'00:00',
+          time: entry.time||'',
           task: entry.task,
           detail: p.name+' 루틴화',
           days: entry.days||[],
@@ -4146,7 +4146,7 @@ function syncRzToRoutines(){
         // 기존 루틴에 최신 정보 전체 반영
         S.routines.forEach(function(r){
           if(r.id===entry.id){
-            r.time=entry.time||'00:00';
+            r.time=entry.time||'';
             r.task=entry.task;
             r.detail=p.name+' 루틴화';
             r.days=entry.days||[];

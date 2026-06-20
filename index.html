@@ -567,6 +567,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <div class="sb-sec">
       <div class="sb-lbl">관리</div>
       <button class="nav" id="nav-life" onclick="go('life')"><span class="nav-ic" data-color="#8BBF88"></span>나의 라이프</button>
+      <button class="nav" id="nav-overview" onclick="go('overview')"><span class="nav-ic" data-color="#7EB8D4"></span>목표 요약</button>
       <button class="nav" id="nav-projects" onclick="go('projects')"><span class="nav-ic" data-color="#F5C490"></span>프로젝트</button>
       <button class="nav" id="nav-routine" onclick="go('routine')"><span class="nav-ic" data-color="#E8A87C"></span>루틴 설정</button>
       <button class="nav" id="nav-savings" onclick="go('savings')"><span class="nav-ic" data-color="#A8C5A0"></span>저축 목표</button>
@@ -850,7 +851,7 @@ let activePid = null;
 let pjFilter = '';
 let viewDate = todStr();
 
-const titles = {today:'Today',diary:'Thanks Diary',calendar:'Monthly',routine:'루틴 설정',life:'나의 라이프',projects:'프로젝트',deadlines:'마감 관리',savings:'저축 목표',settings:'설정',ledger:'가계부',insights:'회고 & 통계'};
+const titles = {today:'Today',diary:'Thanks Diary',calendar:'Monthly',routine:'루틴 설정',life:'나의 라이프',overview:'목표 요약',projects:'프로젝트',deadlines:'마감 관리',savings:'저축 목표',settings:'설정',ledger:'가계부',insights:'회고 & 통계'};
 
 function go(p, pid, _fromPopstate){
   page=p; activePid=pid||null; if(p!=='projects') pjFilter='';
@@ -933,7 +934,7 @@ function render(){
   else if(page==='projects') div.innerHTML=activePid?renderPjDetail(activePid):renderProjects();
   else if(page==='deadlines') div.innerHTML=renderDeadlines();
   else if(page==='savings') div.innerHTML=renderSavings();
-  else if(page==='insights') div.innerHTML=renderInsights();
+  else if(page==='overview') div.innerHTML=renderOverview();
   else if(page==='settings') div.innerHTML=renderSettings();
   else if(page==='ledger') div.innerHTML=renderLedger();
   el.innerHTML=''; el.appendChild(div);
@@ -3061,9 +3062,319 @@ function saveWeeklyMemo(wkOrVal,val2){
 }
 let insightHeatYear=new Date().getFullYear();
 let insightHeatMode='routine'; // 'routine' | 'diary'
+function renderOverview(){
+  const today=todStr();
+  let html='<div style="display:flex;justify-content:flex-end;margin-bottom:16px">'+
+    '<button class="btn bp" onclick="printOverview()" style="display:flex;align-items:center;gap:6px">'+
+      '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>'+
+      '보고서 인쇄'+
+    '</button>'+
+  '</div>';
+
+  // 라이프 목표가 없는 경우
+  const areas=(S.lifeAreas||[]).filter(a=>a.name);
+  // 프로젝트를 라이프 영역별로 그룹핑
+  const pjByArea={};
+  const pjNoArea=[];
+  (S.projects||[]).forEach(function(p){
+    if(p.lifeAreaId){
+      if(!pjByArea[p.lifeAreaId]) pjByArea[p.lifeAreaId]=[];
+      pjByArea[p.lifeAreaId].push(p);
+    } else {
+      pjNoArea.push(p);
+    }
+  });
+
+  function rzLabel(rz){
+    if(rz.isMonthly) return '매월 '+(rz.monthDays||[]).map(function(d){return d==='last'?'말':d;}).join('·')+'일';
+    if(!rz.days||rz.days.length===0) return '매일';
+    return '매주 '+rz.days.map(function(d){return DOW_KO[DOWS.indexOf(d)];}).join('·');
+  }
+
+  function renderPjBlock(p){
+    const dls=(S.deadlines||[]).filter(function(d){return d.projectId===p.id&&d.date&&!d.done&&dLeft(d.date)>=0;}).sort(function(a,b){return a.date.localeCompare(b.date);});
+    const rzs=(p.routinized||[]);
+    const tasks=(p.tasks||[]).filter(function(t){return !t.done;});
+
+    var inner='';
+
+    // 마감일
+    if(dls.length>0){
+      inner+='<div style="margin:10px 0 6px;display:flex;align-items:center;gap:6px;font-size:0.8em;color:var(--t3);font-weight:600;letter-spacing:0.03em">'+
+        '<span style="width:16px;height:1px;background:var(--border);display:inline-block;vertical-align:middle"></span>마감일'+
+        '<span style="flex:1;height:1px;background:var(--border);display:inline-block;vertical-align:middle"></span></div>';
+      dls.forEach(function(d){
+        var dd=dLeft(d.date),f=fmtDateObj(d.date);
+        var urgentColor=dd<=7?'var(--red)':dd<=30?'var(--accent)':'var(--t2)';
+        inner+='<div style="display:flex;align-items:center;gap:10px;padding:6px 0 6px 4px;border-bottom:1px solid var(--border)">'+
+          '<div style="display:flex;flex-direction:column;align-items:center;background:var(--s2);border-radius:8px;padding:4px 8px;min-width:42px;flex-shrink:0">'+
+            '<span style="font-size:0.65em;color:var(--t3);font-weight:600;text-transform:uppercase">'+f.month+'</span>'+
+            '<span style="font-size:1.1em;font-weight:700;color:var(--text);line-height:1.1">'+f.day+'</span>'+
+          '</div>'+
+          '<div style="flex:1;min-width:0">'+
+            '<div style="font-size:0.9286em;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+d.title+'</div>'+
+          '</div>'+
+          '<div style="font-family:var(--mono);font-size:0.8em;font-weight:600;color:'+urgentColor+';flex-shrink:0">'+(dd===0?'오늘':'D-'+dd)+'</div>'+
+        '</div>';
+      });
+    }
+
+    // 루틴화 일정
+    if(rzs.length>0){
+      inner+='<div style="margin:10px 0 6px;display:flex;align-items:center;gap:6px;font-size:0.8em;color:var(--t3);font-weight:600;letter-spacing:0.03em">'+
+        '<span style="width:16px;height:1px;background:var(--border);display:inline-block;vertical-align:middle"></span>루틴화 일정'+
+        '<span style="flex:1;height:1px;background:var(--border);display:inline-block;vertical-align:middle"></span></div>';
+      rzs.forEach(function(rz){
+        var until=rz.until?('~ '+rz.until):'';
+        inner+='<div style="display:flex;align-items:center;gap:10px;padding:6px 0 6px 4px;border-bottom:1px solid var(--border)">'+
+          '<div style="width:8px;height:8px;border-radius:50%;background:'+p.color+';flex-shrink:0"></div>'+
+          '<div style="flex:1;min-width:0">'+
+            '<div style="font-size:0.9286em;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+rz.task+'</div>'+
+            '<div style="font-size:0.78em;color:var(--t3);margin-top:1px">'+rzLabel(rz)+(until?' · '+until:'')+(rz.saveAmount>0?' · 💰'+money(rz.saveAmount)+'만원':'')+'</div>'+
+          '</div>'+
+        '</div>';
+      });
+    }
+
+    // 미완료 태스크
+    if(tasks.length>0){
+      inner+='<div style="margin:10px 0 6px;display:flex;align-items:center;gap:6px;font-size:0.8em;color:var(--t3);font-weight:600;letter-spacing:0.03em">'+
+        '<span style="width:16px;height:1px;background:var(--border);display:inline-block;vertical-align:middle"></span>태스크'+
+        '<span style="flex:1;height:1px;background:var(--border);display:inline-block;vertical-align:middle"></span></div>';
+      tasks.forEach(function(t){
+        inner+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0 5px 4px;border-bottom:1px solid var(--border)">'+
+          '<div style="width:14px;height:14px;border:1.5px solid var(--border);border-radius:3px;flex-shrink:0"></div>'+
+          '<div style="font-size:0.9286em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">'+t.text+'</div>'+
+          (t.dueDate?'<div style="font-size:0.78em;color:var(--t3);flex-shrink:0">'+t.dueDate.slice(5)+'</div>':'')+
+        '</div>';
+      });
+    }
+
+    if(!inner) inner='<div style="font-size:0.85em;color:var(--t3);padding:8px 4px">마감일·루틴·태스크가 없어요</div>';
+
+    var progress=0;
+    var total=(p.tasks||[]).length;
+    var done=(p.tasks||[]).filter(function(t){return t.done;}).length;
+    if(total>0) progress=Math.round(done/total*100);
+
+    return '<div style="margin-bottom:14px;border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--surface)">'+
+      // 프로젝트 헤더
+      '<div style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--surface);cursor:pointer" onclick="go(\'projects\',\''+p.id+'\')">'+
+        '<div style="width:10px;height:10px;border-radius:3px;background:'+p.color+';flex-shrink:0"></div>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-size:0.9643em;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+p.name+'</div>'+
+          (total>0?'<div style="font-size:0.78em;color:var(--t3);margin-top:1px">태스크 '+done+'/'+total+' ('+progress+'%)</div>':'')+
+        '</div>'+
+        (total>0?'<div style="width:36px;height:36px;flex-shrink:0"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" fill="none" stroke="var(--border)" stroke-width="3"/><circle cx="18" cy="18" r="15" fill="none" stroke="'+p.color+'" stroke-width="3" stroke-dasharray="'+Math.round(2*Math.PI*15*progress/100)+' '+(Math.round(2*Math.PI*15))+'" stroke-dashoffset="'+Math.round(2*Math.PI*15/4)+'" stroke-linecap="round"/></svg></div>':'')+
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--t3)" stroke-width="2" style="flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>'+
+      '</div>'+
+      // 세부 내용
+      '<div style="padding:0 16px 12px;border-top:1px solid var(--border)">'+inner+'</div>'+
+    '</div>';
+  }
+
+  // 1. 라이프 영역별 그룹
+  if(areas.length===0 && (S.projects||[]).length===0){
+    html+='<div class="empty"><div class="ei">🗺️</div>라이프 목표와 프로젝트를 먼저 추가해보세요</div>';
+    return html;
+  }
+
+  // 라이프 목표 있는 영역
+  areas.forEach(function(area){
+    var pjs=pjByArea[area.id]||[];
+    html+=
+      // 라이프 영역 헤더
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;margin-top:8px">'+
+        '<div style="width:34px;height:34px;border-radius:10px;background:'+area.color+'20;display:flex;align-items:center;justify-content:center;font-size:1.2em;flex-shrink:0">'+area.emoji+'</div>'+
+        '<div>'+
+          '<div style="font-size:1em;font-weight:700;color:var(--text)">'+area.name+'</div>'+
+          '<div style="font-size:0.78em;color:var(--t3)">프로젝트 '+pjs.length+'개</div>'+
+        '</div>'+
+        '<div style="flex:1;height:2px;background:linear-gradient(to right,'+area.color+'40,transparent);border-radius:2px;margin-left:4px"></div>'+
+      '</div>';
+
+    if(pjs.length===0){
+      html+='<div style="font-size:0.85em;color:var(--t3);padding:8px 12px;margin-bottom:16px;background:var(--s2);border-radius:10px">이 영역에 연결된 프로젝트가 없어요</div>';
+    } else {
+      html+='<div style="margin-bottom:20px">';
+      pjs.forEach(function(p){ html+=renderPjBlock(p); });
+      html+='</div>';
+    }
+  });
+
+  // 라이프 영역 미지정 프로젝트
+  if(pjNoArea.length>0){
+    html+=
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;margin-top:4px">'+
+        '<div style="width:34px;height:34px;border-radius:10px;background:var(--s2);display:flex;align-items:center;justify-content:center;font-size:1.2em;flex-shrink:0">📁</div>'+
+        '<div>'+
+          '<div style="font-size:1em;font-weight:700;color:var(--text)">영역 미지정</div>'+
+          '<div style="font-size:0.78em;color:var(--t3)">프로젝트 '+pjNoArea.length+'개</div>'+
+        '</div>'+
+        '<div style="flex:1;height:2px;background:linear-gradient(to right,var(--border),transparent);border-radius:2px;margin-left:4px"></div>'+
+      '</div>'+
+      '<div style="margin-bottom:20px">';
+    pjNoArea.forEach(function(p){ html+=renderPjBlock(p); });
+    html+='</div>';
+  }
+
+  return html;
+}
+
+function printOverview(){
+  const today=todStr();
+  const yr=new Date().getFullYear();
+  const areas=(S.lifeAreas||[]).filter(a=>a.name);
+  const pjByArea={}, pjNoArea=[];
+  (S.projects||[]).forEach(function(p){
+    if(p.lifeAreaId){ if(!pjByArea[p.lifeAreaId]) pjByArea[p.lifeAreaId]=[]; pjByArea[p.lifeAreaId].push(p); }
+    else { pjNoArea.push(p); }
+  });
+
+  function rzLabel(rz){
+    if(rz.isMonthly) return '매월 '+(rz.monthDays||[]).map(function(d){return d==='last'?'말':d;}).join('·')+'일';
+    if(!rz.days||rz.days.length===0) return '매일';
+    return '매주 '+rz.days.map(function(d){return DOW_KO[DOWS.indexOf(d)];}).join('·');
+  }
+
+
+  let sectionsHtml='';
+  // 라이프 영역별
+  areas.forEach(function(area){
+    var pjs=pjByArea[area.id]||[];
+    sectionsHtml+='<div class="area-section">'+
+      '<div class="area-header">'+
+        '<span class="area-emoji">'+area.emoji+'</span>'+
+        '<span class="area-name">'+area.name+'</span>'+
+      '</div>'+
+      (pjs.length===0
+        ? '<p class="empty-note">이 영역에 연결된 프로젝트가 없어요</p>'
+        : pjs.map(buildPjSection).join(''))+
+    '</div>';
+  });
+  if(pjNoArea.length>0){
+    sectionsHtml+='<div class="area-section">'+
+      '<div class="area-header"><span class="area-emoji">📁</span><span class="area-name">기타</span></div>'+
+      pjNoArea.map(buildPjSection).join('')+
+    '</div>';
+  }
+
+  const lifeGoal=S.lifeGoal||{};
+  const goalTitle=lifeGoal.text||'';
+  const goalSub=lifeGoal.sub||'';
+  const goalDday=lifeGoal.dday||'';
+  const goalAmt=(S.savings&&S.savings.goal>0)?money(S.savings.goal):'';
+
+  function buildPjSection(p){
+    const dls=(S.deadlines||[]).filter(function(d){return d.projectId===p.id&&d.date&&!d.done&&dLeft(d.date)>=0;}).sort(function(a,b){return a.date.localeCompare(b.date);});
+    const rzs=p.routinized||[];
+    let rows='';
+    dls.forEach(function(d){
+      var dd=dLeft(d.date);
+      rows+='<tr><td class="type-cell"><span class="badge badge-dl">마감</span></td><td class="title-cell">'+d.title+'</td><td class="meta-cell">'+d.date.slice(5).replace('-','/')+'</td><td class="dday-cell">'+(dd===0?'오늘':'D-'+dd)+'</td></tr>';
+    });
+    rzs.forEach(function(rz){
+      var label=rzLabel(rz);
+      var until=rz.until?rz.until.slice(0,7):'';
+      rows+='<tr><td class="type-cell"><span class="badge badge-rz">루틴</span></td><td class="title-cell">'+rz.task+'</td><td class="meta-cell">'+label+(until?' ~ '+until:'')+'</td><td class="dday-cell">'+(rz.saveAmount>0?Number(rz.saveAmount).toLocaleString()+'만원':'')+'</td></tr>';
+    });
+    if(!rows) rows='<tr><td colspan="4" style="color:#aaa;font-size:11px;padding:6px 8px">등록된 항목이 없어요</td></tr>';
+    return '<div class="pj-block">'+
+      '<div class="pj-header">'+
+        '<span class="pj-dot" style="background:'+p.color+'"></span>'+
+        '<span class="pj-name">'+p.name+'</span>'+
+        (p.dday?'<span class="pj-dday">목표 '+p.dday+'</span>':'')+
+      '</div>'+
+      '<table class="pj-table"><tbody>'+rows+'</tbody></table>'+
+    '</div>';
+  }
+
+  const printHtml=`<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8">
+<title>${yr} 목표 계획서</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600;700&family=Noto+Sans+KR:wght@300;400;500;600&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'Noto Sans KR',sans-serif;color:#1a1a1a;background:#fff;font-size:12px;line-height:1.6;}
+  .page{max-width:720px;margin:0 auto;padding:48px 40px;}
+  /* 헤더 */
+  .report-header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2.5px solid #1a1a1a;padding-bottom:14px;margin-bottom:32px;}
+  .report-title{font-family:'Noto Serif KR',serif;font-size:26px;font-weight:700;letter-spacing:-0.5px;color:#1a1a1a;}
+  .report-year{font-family:'Noto Serif KR',serif;font-size:42px;font-weight:700;color:#1a1a1a;line-height:1;}
+  .report-meta{text-align:right;color:#666;font-size:11px;line-height:1.8;}
+  /* 라이프 목표 배너 */
+  .life-goal-banner{border:1.5px solid #1a1a1a;border-radius:6px;padding:14px 20px;margin-bottom:28px;display:flex;align-items:center;gap:16px;background:#fafaf8;}
+  .life-goal-label{font-size:10px;font-weight:600;color:#888;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:3px;}
+  .life-goal-text{font-family:'Noto Serif KR',serif;font-size:15px;font-weight:700;}
+  .life-goal-amount{font-family:'Noto Serif KR',serif;font-size:20px;font-weight:700;color:#1a1a1a;padding:0 20px;border-left:1px solid #ddd;border-right:1px solid #ddd;}
+  .life-goal-date{color:#666;font-size:11px;}
+  /* 영역 */
+  .area-section{margin-bottom:28px;break-inside:avoid;}
+  .area-header{display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:6px;border-bottom:1.5px solid #1a1a1a;}
+  .area-emoji{font-size:15px;}
+  .area-name{font-family:'Noto Serif KR',serif;font-size:14px;font-weight:700;letter-spacing:-0.3px;}
+  /* 프로젝트 */
+  .pj-block{margin-bottom:14px;break-inside:avoid;}
+  .pj-header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#f5f5f2;border-radius:4px 4px 0 0;}
+  .pj-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0;}
+  .pj-name{font-weight:600;font-size:12.5px;flex:1;}
+  .pj-dday{font-size:10.5px;color:#555;}
+  /* 테이블 */
+  .pj-table{width:100%;border-collapse:collapse;border:1px solid #e8e8e8;border-top:none;}
+  .pj-table td{padding:6px 10px;border-bottom:1px solid #efefef;vertical-align:middle;}
+  .pj-table tr:last-child td{border-bottom:none;}
+  .type-cell{width:62px;font-size:10.5px;color:#777;white-space:nowrap;}
+  .title-cell{font-weight:500;font-size:12px;}
+  .meta-cell{width:160px;font-size:10.5px;color:#666;}
+  .dday-cell{width:70px;font-size:10.5px;color:#555;text-align:right;font-weight:600;}
+  .badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:9.5px;font-weight:600;letter-spacing:0.03em;}
+  .badge-dl{background:#fde8e8;color:#c0392b;}
+  .badge-rz{background:#e8f4fd;color:#2980b9;}
+  .empty-note{font-size:10.5px;color:#aaa;padding:6px 0;margin-bottom:8px;}
+  /* 푸터 */
+  .report-footer{margin-top:40px;padding-top:12px;border-top:1px solid #ddd;display:flex;justify-content:space-between;font-size:10px;color:#aaa;}
+  .sign-line{width:140px;border-bottom:1px solid #999;margin-top:24px;}
+  .sign-label{font-size:10px;color:#999;margin-top:4px;}
+  @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}.page{padding:32px 28px;}}
+</style>
+</head><body>
+<div class="page">
+  <div class="report-header">
+    <div>
+      <div class="report-title">나의 목표 계획서</div>
+      <div style="font-size:11px;color:#888;margin-top:4px">작성일 ${today}</div>
+    </div>
+    <div class="report-year">${yr}</div>
+  </div>
+  ${goalTitle?`<div class="life-goal-banner">
+    <div style="flex:1"><div class="life-goal-label">인생 목표</div><div class="life-goal-text">${goalTitle}</div>${goalSub?`<div style="font-size:11px;color:#888;margin-top:2px">${goalSub}</div>`:''}</div>
+    ${goalAmt?`<div class="life-goal-amount">${goalAmt}</div>`:''}
+    ${goalDday?`<div><div class="life-goal-label">목표 기간</div><div class="life-goal-date">${goalDday}까지</div></div>`:''}
+  </div>`:''}
+  ${sectionsHtml}
+  <div class="report-footer">
+    <div>
+      <div class="sign-line"></div>
+      <div class="sign-label">서명</div>
+    </div>
+    <div style="text-align:right;line-height:2">
+      <div>Lucy's Space</div>
+      <div>${today} 기준</div>
+    </div>
+  </div>
+</div>
+</body></html>`;
+
+  const w=window.open('','_blank','width=800,height=900');
+  w.document.write(printHtml);
+  w.document.close();
+  w.focus();
+  setTimeout(function(){ w.print(); }, 600);
+}
+
+
 function renderInsights(){
   const today=todStr();
-  // ── 1) 최근 30일 루틴 달성률 ──
   let cells30=[];
   for(let i=29;i>=0;i--){
     const ds=addDays(today,-i);

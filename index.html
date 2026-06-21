@@ -3430,10 +3430,10 @@ ${existingFontLinks}
 
 // ════ 건강 관리 ════
 function renderHealth(){
-  if(!S.health) S.health={schedules:[],records:[],memo:'',inbody:[],tab:'sched'};
+  if(!S.health) S.health={schedules:[],records:[],memo:'',inbody:[],tab:'summary'};
   const H=S.health;
   if(!H.inbody) H.inbody=[];
-  if(!H.tab) H.tab='summary';
+  if(!H.tab||H.tab==='sched') H.tab='summary';
   const tab=H.tab;
 
   // ── 탭 헤더 ──
@@ -3458,7 +3458,7 @@ function renderHealth(){
     const latest=ibs[ibs.length-1];
     if(latest){
       html+='<div class="card" style="margin-bottom:14px">'+
-        '<div class="ct" style="margin-bottom:12px"><span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;background:#E8A0A0;border-radius:4px;margin-right:6px;flex-shrink:0"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"><path d="M12 21s-7.5-4.7-10-9.3C.4 8.5 1.5 5 4.7 4.2c2-.5 3.8.4 4.8 1.9l.5.8.5-.8c1-1.5 2.8-2.4 4.8-1.9C22.5 5 23.6 8.5 22 11.7 19.5 16.3 12 21 12 21z"/></svg></span>최근 인바디 <span style="font-size:0.75em;color:var(--t3);font-weight:400">'+latest.date+(latest.timing?' · '+latest.timing:'')+'</span></div>'+
+        '<div class="ct" style="margin-bottom:12px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M3 20h18M5 20V12M9 20V8M13 20V4M17 20V10M21 20V14"/></svg>최근 인바디 <span style="font-size:0.75em;color:var(--t3);font-weight:400">'+latest.date+(latest.timing?' · '+latest.timing:'')+'</span></div>'+
         '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;text-align:center">'+
           (latest.weight?'<div style="background:var(--s2);border-radius:10px;padding:10px 6px"><div style="font-size:0.72em;color:var(--t3);margin-bottom:4px">체중</div><div style="font-family:var(--serif);font-size:1.5em;font-weight:700;color:var(--text)">'+latest.weight+'</div><div style="font-size:0.72em;color:var(--t3)">kg</div></div>':'')+
           (latest.muscle?'<div style="background:var(--s2);border-radius:10px;padding:10px 6px"><div style="font-size:0.72em;color:var(--t3);margin-bottom:4px">골격근량</div><div style="font-family:var(--serif);font-size:1.5em;font-weight:700;color:var(--text)">'+latest.muscle+'</div><div style="font-size:0.72em;color:var(--t3)">kg</div></div>':'')+
@@ -3471,7 +3471,7 @@ function renderHealth(){
     // ── 건강 상태 관리 ──
     const conds=(H.conditions||[]);
     html+='<div class="card" style="margin-bottom:14px">'+
-      '<div class="ch"><div class="ct"><span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;background:#E8A0A0;border-radius:4px;margin-right:6px;flex-shrink:0"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"><path d="M12 21s-7.5-4.7-10-9.3C.4 8.5 1.5 5 4.7 4.2c2-.5 3.8.4 4.8 1.9l.5.8.5-.8c1-1.5 2.8-2.4 4.8-1.9C22.5 5 23.6 8.5 22 11.7 19.5 16.3 12 21 12 21z"/></svg></span>건강 상태 관리</div><button class="btn bp bsm" onclick="openCondModal()">+ 추가</button></div>';
+      '<div class="ch"><div class="ct"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M12 21s-7.5-4.7-10-9.3C.4 8.5 1.5 5 4.7 4.2c2-.5 3.8.4 4.8 1.9l.5.8.5-.8c1-1.5 2.8-2.4 4.8-1.9C22.5 5 23.6 8.5 22 11.7 19.5 16.3 12 21 12 21z"/></svg>건강 상태 관리</div><button class="btn bp bsm" onclick="openCondModal()">+ 추가</button></div>';
     if(conds.length===0){
       html+='<div style="font-size:0.85em;color:var(--t3);padding:8px 0">관리 중인 건강 상태가 없어요</div>';
     } else {
@@ -3486,16 +3486,16 @@ function renderHealth(){
         // 이 상태와 연결된 다음 검진 예정
         var relSched=(H.schedules||[]).filter(s=>s.conditionId===c.id&&!s.done&&dLeft(s.date)>=0).sort((a,b)=>a.date.localeCompare(b.date))[0];
         var cp=condPalette[ci%condPalette.length];
-        html+='<div style="padding:10px 0;border-bottom:1px solid var(--border)" onmouseenter="this.querySelector(\'.cond-hover-btns\').style.opacity=\'1\'" onmouseleave="this.querySelector(\'.cond-hover-btns\').style.opacity=\'0\'">'+
-          '<div style="display:flex;align-items:flex-start;gap:8px">'+
+        html+='<div style="padding:7px 0;border-bottom:1px solid var(--border)" onmouseenter="this.querySelector(\'.cond-hover-btns\').style.opacity=\'1\'" onmouseleave="this.querySelector(\'.cond-hover-btns\').style.opacity=\'0\'">'+
+          '<div style="display:flex;align-items:center;gap:8px">'+
             '<div style="flex:1">'+
-              '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
-                '<span style="font-size:0.875em;font-weight:700;padding:4px 11px;background:'+cp.bg+';color:'+cp.color+';display:inline-flex;align-items:center;line-height:1.4">'+c.name+'</span>'+
+              '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'+
+                '<span style="font-size:0.8em;font-weight:600;padding:2px 8px;background:'+cp.bg+';color:'+cp.color+';display:inline-flex;align-items:center;line-height:1.5">'+c.name+'</span>'+
                 (c.category?'<span style="font-size:0.72em;padding:1px 7px;border-radius:99px;background:var(--s2);color:var(--t3)">'+c.category+'</span>':'')+
-                (c.diagDate?'<span style="font-size:0.75em;color:var(--t3)">진단 '+c.diagDate+'</span>':'')+
+                (c.diagDate?'<span style="font-size:0.72em;color:var(--t3)">진단 '+c.diagDate+'</span>':'')+
               '</div>'+
-              (latestHist?'<div style="font-size:0.82em;color:var(--t3);margin-top:3px">최근: '+latestHist.date+' · '+latestHist.detail+'</div>':'')+
-              (relSched?'<div style="font-size:0.82em;color:var(--accent);margin-top:2px">📅 다음 예정: '+relSched.title+' ('+relSched.date+')</div>':'')+
+              (latestHist?'<div style="font-size:0.78em;color:var(--t3);margin-top:2px">최근: '+latestHist.date+' · '+latestHist.detail+'</div>':'')+
+              (relSched?'<div style="font-size:0.78em;color:var(--accent);margin-top:1px">📅 다음 예정: '+relSched.title+' ('+relSched.date+')</div>':'')+
             '</div>'+
             '<div class="cond-hover-btns" style="display:flex;gap:4px;flex-shrink:0;opacity:0;transition:opacity .15s">'+
               '<button class="bi" onclick="openCondHistModal(\''+c.id+'\')" style="font-size:0.8em;color:var(--accent)" title="기록 추가">+기록</button>'+
@@ -3521,7 +3521,7 @@ function renderHealth(){
     html+='</div>';
     const nextSched=(H.schedules||[]).filter(s=>!s.done&&dLeft(s.date)>=0).sort((a,b)=>a.date.localeCompare(b.date));
     html+='<div class="card" style="margin-bottom:14px">'+
-      '<div class="ch"><div class="ct"><span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;background:#E8A0A0;border-radius:4px;margin-right:6px;flex-shrink:0"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"><path d="M12 21s-7.5-4.7-10-9.3C.4 8.5 1.5 5 4.7 4.2c2-.5 3.8.4 4.8 1.9l.5.8.5-.8c1-1.5 2.8-2.4 4.8-1.9C22.5 5 23.6 8.5 22 11.7 19.5 16.3 12 21 12 21z"/></svg></span>검진 예정</div>'+
+      '<div class="ch"><div class="ct"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>검진 예정</div>'+
         '<button class="btn bp bsm" onclick="openHealthSchedModal()">+ 추가</button>'+
       '</div>';
     if(nextSched.length===0){
@@ -3545,7 +3545,7 @@ function renderHealth(){
               (condName?'<span style="padding:1px 7px;border:1px solid var(--border);border-radius:6px">'+condName+'</span>':'')+
             '</div>'+
           '</div>'+
-          '<div style="font-family:var(--mono);font-size:2.5em;font-weight:800;color:'+uc+';flex-shrink:0;line-height:1">D-'+dd+'</div>'+
+          '<div style="font-family:var(--mono);font-size:1.3em;font-weight:800;color:'+uc+';flex-shrink:0;line-height:1">D-'+dd+'</div>'+
           '<div class="sched-hover-btns" style="display:flex;gap:4px;flex-shrink:0;opacity:0;transition:opacity .15s">'+
             '<button class="bi" onclick="editHealthSched(\''+s.id+'\')" style="font-size:0.8em" title="수정">✎</button>'+
             '<button class="bi" onclick="delHealthSched(\''+s.id+'\')" style="font-size:0.8em;color:var(--red)" title="삭제">✕</button>'+
@@ -3815,7 +3815,7 @@ function renderHealth(){
 }
 
 function setHealthTab(t){
-  if(!S.health) S.health={schedules:[],records:[],memo:'',inbody:[],tab:'sched'};
+  if(!S.health) S.health={schedules:[],records:[],memo:'',inbody:[],tab:'summary'};
   S.health.tab=t;
   render();
 }

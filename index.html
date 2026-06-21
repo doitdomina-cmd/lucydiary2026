@@ -3479,21 +3479,21 @@ function renderHealth(){
         var latestHist=(c.history||[]).slice().sort((a,b)=>b.date.localeCompare(a.date))[0];
         // 이 상태와 연결된 다음 검진 예정
         var relSched=(H.schedules||[]).filter(s=>s.conditionId===c.id&&!s.done&&dLeft(s.date)>=0).sort((a,b)=>a.date.localeCompare(b.date))[0];
-        html+='<div style="padding:10px 0;border-bottom:1px solid var(--border)">'+
+        html+='<div style="padding:10px 0;border-bottom:1px solid var(--border)" onmouseenter="this.querySelector(\'.cond-hover-btns\').style.opacity=\'1\'" onmouseleave="this.querySelector(\'.cond-hover-btns\').style.opacity=\'0\'">'+
           '<div style="display:flex;align-items:flex-start;gap:8px">'+
             '<div style="flex:1">'+
               '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
-                '<span style="font-size:0.9643em;font-weight:700;padding:3px 10px;border:1.5px solid var(--accent);border-radius:7px;color:var(--text)">'+c.name+'</span>'+
+                '<span style="font-size:0.9643em;font-weight:700;padding:3px 10px;background:var(--s2);color:var(--text)">'+c.name+'</span>'+
                 (c.category?'<span style="font-size:0.72em;padding:1px 7px;border-radius:99px;background:var(--s2);color:var(--t3)">'+c.category+'</span>':'')+
                 (c.diagDate?'<span style="font-size:0.75em;color:var(--t3)">진단 '+c.diagDate+'</span>':'')+
               '</div>'+
               (latestHist?'<div style="font-size:0.82em;color:var(--t3);margin-top:3px">최근: '+latestHist.date+' · '+latestHist.detail+'</div>':'')+
               (relSched?'<div style="font-size:0.82em;color:var(--accent);margin-top:2px">📅 다음 예정: '+relSched.title+' ('+relSched.date+')</div>':'')+
             '</div>'+
-            '<div style="display:flex;gap:4px;flex-shrink:0">'+
+            '<div class="cond-hover-btns" style="display:flex;gap:4px;flex-shrink:0;opacity:0;transition:opacity .15s">'+
               '<button class="bi" onclick="openCondHistModal(\''+c.id+'\')" style="font-size:0.8em;color:var(--accent)" title="기록 추가">+기록</button>'+
-              '<button class="bi" onclick="openCondModal(\''+c.id+'\')" style="font-size:0.8em">✎</button>'+
-              '<button class="bi" onclick="delCond(\''+c.id+'\')" style="font-size:0.8em;color:var(--red)">✕</button>'+
+              '<button class="bi" onclick="openCondModal(\''+c.id+'\')" style="font-size:0.8em" title="수정">✎</button>'+
+              '<button class="bi" onclick="delCond(\''+c.id+'\')" style="font-size:0.8em;color:var(--red)" title="삭제">✕</button>'+
             '</div>'+
           '</div>'+
           // 이력 펼치기
@@ -3515,10 +3515,7 @@ function renderHealth(){
     const nextSched=(H.schedules||[]).filter(s=>!s.done&&dLeft(s.date)>=0).sort((a,b)=>a.date.localeCompare(b.date));
     html+='<div class="card" style="margin-bottom:14px">'+
       '<div class="ch"><div class="ct">🏥 검진 예정</div>'+
-        '<div style="display:flex;gap:6px">'+
-          '<button class="btn bg bsm" onclick="setHealthTab(\'sched\')" style="font-size:0.78em">관리</button>'+
-          '<button class="btn bp bsm" onclick="openHealthSchedModal()">+ 추가</button>'+
-        '</div>'+
+        '<button class="btn bp bsm" onclick="openHealthSchedModal()">+ 추가</button>'+
       '</div>';
     if(nextSched.length===0){
       html+='<div style="font-size:0.85em;color:var(--t3);padding:8px 0">예정된 검진이 없어요</div>';
@@ -3528,7 +3525,7 @@ function renderHealth(){
         var yr=s.date.slice(0,4);
         var condName=s.conditionId?((S.health.conditions||[]).find(function(c){return c.id===s.conditionId;})||{}).name:'';
         var uc=dd<=7?'var(--red)':dd<=30?'var(--accent)':'var(--t2)';
-        html+='<div style="display:flex;align-items:flex-start;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">'+
+        html+='<div class="sched-row" style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);position:relative" onmouseenter="this.querySelector(\'.sched-hover-btns\').style.opacity=\'1\'" onmouseleave="this.querySelector(\'.sched-hover-btns\').style.opacity=\'0\'">'+
           '<div style="background:var(--s2);border-radius:8px;padding:3px 7px;flex-shrink:0;text-align:center;min-width:42px">'+
             '<div style="font-size:0.6em;color:var(--t3);font-weight:600">'+yr+'</div>'+
             '<div style="font-size:0.65em;color:var(--t3);font-weight:600;text-transform:uppercase">'+f.month+'</div>'+
@@ -3541,7 +3538,11 @@ function renderHealth(){
               (condName?'<span style="padding:1px 7px;border:1px solid var(--border);border-radius:6px">'+condName+'</span>':'')+
             '</div>'+
           '</div>'+
-          '<div style="font-size:0.82em;font-weight:700;color:'+uc+';flex-shrink:0">D-'+dd+'</div>'+
+          '<div style="font-family:var(--mono);font-size:2.5em;font-weight:800;color:'+uc+';flex-shrink:0;line-height:1">D-'+dd+'</div>'+
+          '<div class="sched-hover-btns" style="display:flex;gap:4px;flex-shrink:0;opacity:0;transition:opacity .15s">'+
+            '<button class="bi" onclick="editHealthSched(\''+s.id+'\')" style="font-size:0.8em" title="수정">✎</button>'+
+            '<button class="bi" onclick="delHealthSched(\''+s.id+'\')" style="font-size:0.8em;color:var(--red)" title="삭제">✕</button>'+
+          '</div>'+
         '</div>';
       });
     }
@@ -4732,6 +4733,12 @@ function renderCalendar(){
     evMap[e.date].push(Object.assign({},e,{color:pr?pr.color:(e.color||'var(--accent)')}));
   });
   (S.deadlines||[]).forEach(dl=>{if(!dl.date)return;if(!evMap[dl.date])evMap[dl.date]=[];const pr=S.projects.find(p=>p.id===dl.projectId);evMap[dl.date].push(Object.assign({},dl,{isDl:true,color:pr?pr.color:'#C14A3C'}));});
+  // 검진 예정 달력에 표시
+  ((S.health&&S.health.schedules)||[]).filter(s=>!s.done).forEach(s=>{
+    if(!s.date)return;
+    if(!evMap[s.date])evMap[s.date]=[];
+    evMap[s.date].push({id:s.id,title:'🏥 '+s.title,isHealthSched:true,color:'#4A7C6F'});
+  });
 
   var calHtml='<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><div style="min-width:560px">'+
     '<div style="display:grid;grid-template-columns:repeat(7,1fr);border-bottom:1px solid var(--border)">';
@@ -4752,9 +4759,10 @@ function renderCalendar(){
     });
     var cellEvs=evMap[ds]||[];
     var dlEvs=cellEvs.filter(function(e){return e.isDl;});
-    var otherEvs=cellEvs.filter(function(e){return !e.isDl;});
-    var evs=dlEvs.concat(routineEvs,otherEvs);
-    // 호버 툴팁: 그 날의 전체 일정 (마감 → 루틴 → 일반 일정 순)
+    var healthEvs=cellEvs.filter(function(e){return e.isHealthSched;});
+    var otherEvs=cellEvs.filter(function(e){return !e.isDl&&!e.isHealthSched;});
+    var evs=dlEvs.concat(healthEvs,routineEvs,otherEvs);
+    // 호버 툴팁: 그 날의 전체 일정 (마감 → 검진 → 루틴 → 일반 일정 순)
     var tipLines=[];
     var ckMap=S.checks[ds]||{};
     dlEvs.forEach(function(d){
@@ -4762,11 +4770,14 @@ function renderCalendar(){
       var ddTxt=d.done?'완료':(dd<0?'D+'+Math.abs(dd):dd===0?'오늘':'D-'+dd);
       tipLines.push((d.done?'✓':'🚨')+' '+d.title+' ('+ddTxt+')');
     });
+    healthEvs.forEach(function(e){
+      tipLines.push(e.title);
+    });
     rodsCell.forEach(function(r){
       var rDone=!!ckMap[r.id];
       tipLines.push((rDone?'✓':'○')+' '+(r.time?r.time+' ':'')+r.task);
     });
-    (evMap[ds]||[]).filter(function(e){return !e.isDl;}).forEach(function(e){
+    (evMap[ds]||[]).filter(function(e){return !e.isDl&&!e.isHealthSched;}).forEach(function(e){
       tipLines.push('• '+(e.title||''));
     });
     var tipAttr=tipLines.length>0?' data-tip="'+(cell.d+'일&#10;'+tipLines.join('&#10;')).replace(/"/g,'&quot;')+'"':'';
@@ -4804,6 +4815,11 @@ function renderCalendar(){
           '<span style="flex-shrink:0;color:'+(isDone?'var(--green)':'var(--t3)')+';font-weight:700">'+(isDone?'✓':'○')+'</span>'+
           '<span style="overflow:hidden;text-overflow:ellipsis;'+(isDone?'text-decoration:line-through;color:var(--t3)':'')+'">'+ev.title+'</span>'+
         '</div>';
+      } else if(ev.isHealthSched) {
+        calHtml+='<div style="background:#4A7C6F14;color:#555;'+
+          'border-left:2px solid #4A7C6F90;border-radius:0 4px 4px 0;'+
+          'font-size:0.78em;padding:2px 5px;margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:400;line-height:1.4">'+
+          ev.title+'</div>';
       } else {
         calHtml+='<div onclick="event.stopPropagation();openEvDetailModal(\''+ev.id+'\')" style="background:'+(ev.color||'var(--accent)')+'14;color:#555;'+
           'border-left:2px solid '+(ev.color||'var(--accent)')+'60;border-radius:0 4px 4px 0;'+

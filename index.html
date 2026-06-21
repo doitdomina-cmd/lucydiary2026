@@ -3437,11 +3437,17 @@ function renderHealth(){
   const tab=H.tab;
 
   // ── 탭 헤더 ──
-  const tabs=[{k:'summary',l:'💊 건강 요약'},{k:'inbody',l:'📊 인바디'},{k:'records',l:'📋 검진 기록'},{k:'memo',l:'📝 메모'}];
+  const tabIco={
+    summary:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>',
+    inbody:'<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-2px;margin-right:4px"><rect x="3.5" y="12" width="3.4" height="8" rx="0.8"/><rect x="10.3" y="6.5" width="3.4" height="13.5" rx="0.8"/><rect x="17.1" y="2.5" width="3.4" height="17.5" rx="0.8"/></svg>',
+    records:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M9 4h6a1 1 0 0 1 1 1v1h1a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h1V5a1 1 0 0 1 1-1z"/><rect x="8.5" y="2.5" width="7" height="3.5" rx="1"/><path d="M9 12h6M9 16h4"/></svg>',
+    memo:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M3.5 20.5l1-4 12-12a1.6 1.6 0 0 1 2.3 0l0.7 0.7a1.6 1.6 0 0 1 0 2.3l-12 12z"/><path d="M14 6l4 4"/></svg>'
+  };
+  const tabs=[{k:'summary',l:'건강 요약'},{k:'inbody',l:'인바디'},{k:'records',l:'검진 기록'},{k:'memo',l:'메모'}];
   let html='<div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">';
   tabs.forEach(function(t){
     var on=tab===t.k;
-    html+='<button class="btn '+(on?'bp':'bg')+' bsm" onclick="setHealthTab(\''+t.k+'\')" style="flex:1;min-width:0">'+t.l+'</button>';
+    html+='<button class="btn '+(on?'bp':'bg')+' bsm" onclick="setHealthTab(\''+t.k+'\')" style="flex:1;min-width:0">'+tabIco[t.k]+t.l+'</button>';
   });
   html+='</div>';
 
@@ -3477,7 +3483,7 @@ function renderHealth(){
           '<div style="display:flex;align-items:flex-start;gap:8px">'+
             '<div style="flex:1">'+
               '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
-                '<span style="font-size:0.9643em;font-weight:600">'+c.name+'</span>'+
+                '<span style="font-size:0.9643em;font-weight:700;padding:3px 10px;border:1.5px solid var(--accent);border-radius:7px;color:var(--text)">'+c.name+'</span>'+
                 (c.category?'<span style="font-size:0.72em;padding:1px 7px;border-radius:99px;background:var(--s2);color:var(--t3)">'+c.category+'</span>':'')+
                 (c.diagDate?'<span style="font-size:0.75em;color:var(--t3)">진단 '+c.diagDate+'</span>':'')+
               '</div>'+
@@ -3518,18 +3524,23 @@ function renderHealth(){
       html+='<div style="font-size:0.85em;color:var(--t3);padding:8px 0">예정된 검진이 없어요</div>';
     } else {
       nextSched.slice(0,3).forEach(function(s){
-        var dd=dLeft(s.date);
+        var dd=dLeft(s.date),f=fmtDateObj(s.date);
+        var yr=s.date.slice(0,4);
         var condName=s.conditionId?((S.health.conditions||[]).find(function(c){return c.id===s.conditionId;})||{}).name:'';
         var uc=dd<=7?'var(--red)':dd<=30?'var(--accent)':'var(--t2)';
-        html+='<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">'+
+        html+='<div style="display:flex;align-items:flex-start;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">'+
+          '<div style="background:var(--s2);border-radius:8px;padding:3px 7px;flex-shrink:0;text-align:center;min-width:42px">'+
+            '<div style="font-size:0.6em;color:var(--t3);font-weight:600">'+yr+'</div>'+
+            '<div style="font-size:0.65em;color:var(--t3);font-weight:600;text-transform:uppercase">'+f.month+'</div>'+
+            '<div style="font-size:1.1em;font-weight:700;color:var(--text);line-height:1.1">'+f.day+'</div>'+
+          '</div>'+
           '<div style="flex:1;min-width:0">'+
             '<div style="font-size:0.9286em">'+s.title+'</div>'+
-            '<div style="font-size:0.78em;color:var(--t3);display:flex;gap:6px;flex-wrap:wrap">'+
-              (s.hospital?'<span>🏥 '+s.hospital+'</span>':'')+
-              (condName?'<span>🩺 '+condName+'</span>':'')+
+            '<div style="font-size:0.78em;color:var(--t3);margin-top:3px;display:flex;flex-wrap:wrap;gap:5px">'+
+              (s.hospital?'<span style="padding:1px 7px;border:1px solid var(--border);border-radius:6px">'+s.hospital+'</span>':'')+
+              (condName?'<span style="padding:1px 7px;border:1px solid var(--border);border-radius:6px">'+condName+'</span>':'')+
             '</div>'+
           '</div>'+
-          '<div style="font-size:0.82em;color:var(--t3);flex-shrink:0">'+s.date.slice(5).replace('-','/')+'</div>'+
           '<div style="font-size:0.82em;font-weight:700;color:'+uc+';flex-shrink:0">D-'+dd+'</div>'+
         '</div>';
       });
@@ -3601,9 +3612,9 @@ function renderHealth(){
           '</div>'+
           '<div style="flex:1;min-width:0">'+
             '<div style="font-size:0.9643em;font-weight:600">'+s.title+'</div>'+
-            '<div style="font-size:0.8em;color:var(--t3);margin-top:3px;display:flex;flex-wrap:wrap;gap:6px">'+
-              (s.hospital?'<span>🏥 '+s.hospital+'</span>':'')+
-              (condName?'<span>🩺 '+condName+'</span>':'')+
+            '<div style="font-size:0.8em;color:var(--t3);margin-top:3px;display:flex;flex-wrap:wrap;gap:5px">'+
+              (s.hospital?'<span style="padding:1px 7px;border:1px solid var(--border);border-radius:6px">'+s.hospital+'</span>':'')+
+              (condName?'<span style="padding:1px 7px;border:1px solid var(--border);border-radius:6px">'+condName+'</span>':'')+
               (s.memo?'<span>'+s.memo+'</span>':'')+
             '</div>'+
           '</div>'+

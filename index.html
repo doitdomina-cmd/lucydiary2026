@@ -3458,7 +3458,7 @@ function renderHealth(){
     const latest=ibs[ibs.length-1];
     if(latest){
       html+='<div class="card" style="margin-bottom:14px">'+
-        '<div class="ct" style="margin-bottom:12px">📊 최근 인바디 <span style="font-size:0.75em;color:var(--t3);font-weight:400">'+latest.date+(latest.timing?' · '+latest.timing:'')+'</span></div>'+
+        '<div class="ct" style="margin-bottom:12px"><span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;background:#E8A0A0;border-radius:4px;margin-right:6px;flex-shrink:0"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"><path d="M12 21s-7.5-4.7-10-9.3C.4 8.5 1.5 5 4.7 4.2c2-.5 3.8.4 4.8 1.9l.5.8.5-.8c1-1.5 2.8-2.4 4.8-1.9C22.5 5 23.6 8.5 22 11.7 19.5 16.3 12 21 12 21z"/></svg></span>최근 인바디 <span style="font-size:0.75em;color:var(--t3);font-weight:400">'+latest.date+(latest.timing?' · '+latest.timing:'')+'</span></div>'+
         '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;text-align:center">'+
           (latest.weight?'<div style="background:var(--s2);border-radius:10px;padding:10px 6px"><div style="font-size:0.72em;color:var(--t3);margin-bottom:4px">체중</div><div style="font-family:var(--serif);font-size:1.5em;font-weight:700;color:var(--text)">'+latest.weight+'</div><div style="font-size:0.72em;color:var(--t3)">kg</div></div>':'')+
           (latest.muscle?'<div style="background:var(--s2);border-radius:10px;padding:10px 6px"><div style="font-size:0.72em;color:var(--t3);margin-bottom:4px">골격근량</div><div style="font-family:var(--serif);font-size:1.5em;font-weight:700;color:var(--text)">'+latest.muscle+'</div><div style="font-size:0.72em;color:var(--t3)">kg</div></div>':'')+
@@ -3471,19 +3471,26 @@ function renderHealth(){
     // ── 건강 상태 관리 ──
     const conds=(H.conditions||[]);
     html+='<div class="card" style="margin-bottom:14px">'+
-      '<div class="ch"><div class="ct">🩺 건강 상태 관리</div><button class="btn bp bsm" onclick="openCondModal()">+ 추가</button></div>';
+      '<div class="ch"><div class="ct"><span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;background:#E8A0A0;border-radius:4px;margin-right:6px;flex-shrink:0"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"><path d="M12 21s-7.5-4.7-10-9.3C.4 8.5 1.5 5 4.7 4.2c2-.5 3.8.4 4.8 1.9l.5.8.5-.8c1-1.5 2.8-2.4 4.8-1.9C22.5 5 23.6 8.5 22 11.7 19.5 16.3 12 21 12 21z"/></svg></span>건강 상태 관리</div><button class="btn bp bsm" onclick="openCondModal()">+ 추가</button></div>';
     if(conds.length===0){
       html+='<div style="font-size:0.85em;color:var(--t3);padding:8px 0">관리 중인 건강 상태가 없어요</div>';
     } else {
-      conds.forEach(function(c){
+      var condPalette=[
+        {bg:'#EEF2FF',color:'#4356C8'},{bg:'#FFF0F6',color:'#C2407A'},
+        {bg:'#F0FDF4',color:'#2D8653'},{bg:'#FFF7ED',color:'#C17C3C'},
+        {bg:'#F5F0FF',color:'#7C3AC1'},{bg:'#FFF0F0',color:'#C14A3C'},
+        {bg:'#F0FFFE',color:'#2A8C8A'},{bg:'#FFFBEB',color:'#B07D1A'}
+      ];
+      conds.forEach(function(c,ci){
         var latestHist=(c.history||[]).slice().sort((a,b)=>b.date.localeCompare(a.date))[0];
         // 이 상태와 연결된 다음 검진 예정
         var relSched=(H.schedules||[]).filter(s=>s.conditionId===c.id&&!s.done&&dLeft(s.date)>=0).sort((a,b)=>a.date.localeCompare(b.date))[0];
+        var cp=condPalette[ci%condPalette.length];
         html+='<div style="padding:10px 0;border-bottom:1px solid var(--border)" onmouseenter="this.querySelector(\'.cond-hover-btns\').style.opacity=\'1\'" onmouseleave="this.querySelector(\'.cond-hover-btns\').style.opacity=\'0\'">'+
           '<div style="display:flex;align-items:flex-start;gap:8px">'+
             '<div style="flex:1">'+
               '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
-                '<span style="font-size:0.9643em;font-weight:700;padding:3px 10px;background:var(--s2);color:var(--text)">'+c.name+'</span>'+
+                '<span style="font-size:0.875em;font-weight:700;padding:4px 11px;background:'+cp.bg+';color:'+cp.color+';display:inline-flex;align-items:center;line-height:1.4">'+c.name+'</span>'+
                 (c.category?'<span style="font-size:0.72em;padding:1px 7px;border-radius:99px;background:var(--s2);color:var(--t3)">'+c.category+'</span>':'')+
                 (c.diagDate?'<span style="font-size:0.75em;color:var(--t3)">진단 '+c.diagDate+'</span>':'')+
               '</div>'+
@@ -3514,7 +3521,7 @@ function renderHealth(){
     html+='</div>';
     const nextSched=(H.schedules||[]).filter(s=>!s.done&&dLeft(s.date)>=0).sort((a,b)=>a.date.localeCompare(b.date));
     html+='<div class="card" style="margin-bottom:14px">'+
-      '<div class="ch"><div class="ct">🏥 검진 예정</div>'+
+      '<div class="ch"><div class="ct"><span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;background:#E8A0A0;border-radius:4px;margin-right:6px;flex-shrink:0"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"><path d="M12 21s-7.5-4.7-10-9.3C.4 8.5 1.5 5 4.7 4.2c2-.5 3.8.4 4.8 1.9l.5.8.5-.8c1-1.5 2.8-2.4 4.8-1.9C22.5 5 23.6 8.5 22 11.7 19.5 16.3 12 21 12 21z"/></svg></span>검진 예정</div>'+
         '<button class="btn bp bsm" onclick="openHealthSchedModal()">+ 추가</button>'+
       '</div>';
     if(nextSched.length===0){
@@ -4737,7 +4744,7 @@ function renderCalendar(){
   ((S.health&&S.health.schedules)||[]).filter(s=>!s.done).forEach(s=>{
     if(!s.date)return;
     if(!evMap[s.date])evMap[s.date]=[];
-    evMap[s.date].push({id:s.id,title:'🏥 '+s.title,isHealthSched:true,color:'#4A7C6F'});
+    evMap[s.date].push({id:s.id,title:s.title,isHealthSched:true,color:'#E8A0A0'});
   });
 
   var calHtml='<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><div style="min-width:560px">'+
@@ -4816,10 +4823,12 @@ function renderCalendar(){
           '<span style="overflow:hidden;text-overflow:ellipsis;'+(isDone?'text-decoration:line-through;color:var(--t3)':'')+'">'+ev.title+'</span>'+
         '</div>';
       } else if(ev.isHealthSched) {
-        calHtml+='<div style="background:#4A7C6F14;color:#555;'+
-          'border-left:2px solid #4A7C6F90;border-radius:0 4px 4px 0;'+
-          'font-size:0.78em;padding:2px 5px;margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:400;line-height:1.4">'+
-          ev.title+'</div>';
+        calHtml+='<div style="background:#E8A0A015;color:#555;'+
+          'border-left:2px solid #E8A0A090;border-radius:0 4px 4px 0;'+
+          'font-size:0.78em;padding:2px 5px;margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:400;line-height:1.4;display:flex;align-items:center;gap:3px">'+
+          '<span style="display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;background:#E8A0A0;border-radius:2px;flex-shrink:0"><svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linejoin="round"><path d="M12 21s-7.5-4.7-10-9.3C.4 8.5 1.5 5 4.7 4.2c2-.5 3.8.4 4.8 1.9l.5.8.5-.8c1-1.5 2.8-2.4 4.8-1.9C22.5 5 23.6 8.5 22 11.7 19.5 16.3 12 21 12 21z"/></svg></span>'+
+          '<span style="overflow:hidden;text-overflow:ellipsis">'+ev.title+'</span>'+
+        '</div>';
       } else {
         calHtml+='<div onclick="event.stopPropagation();openEvDetailModal(\''+ev.id+'\')" style="background:'+(ev.color||'var(--accent)')+'14;color:#555;'+
           'border-left:2px solid '+(ev.color||'var(--accent)')+'60;border-radius:0 4px 4px 0;'+

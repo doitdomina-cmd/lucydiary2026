@@ -802,11 +802,14 @@ let S = {
     {id:'la6',name:'마인드',emoji:'🧘',color:'#3C7C7C'},
   ],
   health: {
-    schedules: [],  // [{id, title, date, memo, done}]
-    records: [],    // [{id, date, title, memo, files:[{name,data,type}]}]
+    schedules: [],   // [{id, title, date, memo, done, conditionId}]
+    records: [],     // [{id, date, title, abnormal, normal, action, files, conditionIds:[]}]
     memo: '',
-    inbody: [],     // [{id,date,weight,muscle,fat,bmi,note}]
-    tab: 'sched'    // 현재 탭: sched | inbody | records | memo
+    memos: [],       // [{id, title, content}]
+    inbody: [],      // [{id,date,weight,muscle,fat,bmi,height,timing,note}]
+    height: '',
+    tab: 'summary',
+    conditions: [], // [{id, name, category, diagDate, note, history:[{id,date,detail}]}]
   },
 };
 
@@ -928,7 +931,28 @@ function openMo(t,b,f){
   document.getElementById('mo-f').innerHTML=f;
   document.getElementById('mo').classList.add('open');
 }
-function closeMo(){document.getElementById('mo').classList.remove('open');}
+// 건강 관리 모달 전용 - 저장/취소 버튼이 헤더 오른쪽에
+function openHealthMo(t,b,f){
+  document.getElementById('mo-t').textContent=t;
+  document.getElementById('mo-b').innerHTML=b;
+  // 헤더 오른쪽 버튼 영역 교체
+  var mh=document.querySelector('.mh');
+  var existBtns=mh.querySelector('.mo-hbtns');
+  if(existBtns) existBtns.remove();
+  var btnWrap=document.createElement('div');
+  btnWrap.className='mo-hbtns';
+  btnWrap.style.cssText='display:flex;gap:6px;align-items:center;margin-left:auto;margin-right:8px';
+  btnWrap.innerHTML=f;
+  mh.insertBefore(btnWrap, mh.querySelector('.bi'));
+  document.getElementById('mo-f').innerHTML='';
+  document.getElementById('mo').classList.add('open');
+}
+function closeMo(){
+  var mh=document.querySelector('.mh');
+  var existBtns=mh&&mh.querySelector('.mo-hbtns');
+  if(existBtns) existBtns.remove();
+  document.getElementById('mo').classList.remove('open');
+}
 function moOut(e){if(e.target===document.getElementById('mo'))closeMo();}
 
 // ═══════════ RENDER ═══════════
@@ -3438,7 +3462,50 @@ function renderHealth(){
       '</div>';
     }
 
-    // 다음 검진 예정
+    // ── 건강 상태 관리 ──
+    const conds=(H.conditions||[]);
+    html+='<div class="card" style="margin-bottom:14px">'+
+      '<div class="ch"><div class="ct">🩺 건강 상태 관리</div><button class="btn bp bsm" onclick="openCondModal()">+ 추가</button></div>';
+    if(conds.length===0){
+      html+='<div style="font-size:0.85em;color:var(--t3);padding:8px 0">관리 중인 건강 상태가 없어요</div>';
+    } else {
+      conds.forEach(function(c){
+        var latestHist=(c.history||[]).slice().sort((a,b)=>b.date.localeCompare(a.date))[0];
+        // 이 상태와 연결된 다음 검진 예정
+        var relSched=(H.schedules||[]).filter(s=>s.conditionId===c.id&&!s.done&&dLeft(s.date)>=0).sort((a,b)=>a.date.localeCompare(b.date))[0];
+        html+='<div style="padding:10px 0;border-bottom:1px solid var(--border)">'+
+          '<div style="display:flex;align-items:flex-start;gap:8px">'+
+            '<div style="flex:1">'+
+              '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
+                '<span style="font-size:0.9643em;font-weight:600">'+c.name+'</span>'+
+                (c.category?'<span style="font-size:0.72em;padding:1px 7px;border-radius:99px;background:var(--s2);color:var(--t3)">'+c.category+'</span>':'')+
+                (c.diagDate?'<span style="font-size:0.75em;color:var(--t3)">진단 '+c.diagDate+'</span>':'')+
+              '</div>'+
+              (latestHist?'<div style="font-size:0.82em;color:var(--t3);margin-top:3px">최근: '+latestHist.date+' · '+latestHist.detail+'</div>':'')+
+              (relSched?'<div style="font-size:0.82em;color:var(--accent);margin-top:2px">📅 다음 예정: '+relSched.title+' ('+relSched.date+')</div>':'')+
+            '</div>'+
+            '<div style="display:flex;gap:4px;flex-shrink:0">'+
+              '<button class="bi" onclick="openCondHistModal(\''+c.id+'\')" style="font-size:0.8em;color:var(--accent)" title="기록 추가">+기록</button>'+
+              '<button class="bi" onclick="openCondModal(\''+c.id+'\')" style="font-size:0.8em">✎</button>'+
+              '<button class="bi" onclick="delCond(\''+c.id+'\')" style="font-size:0.8em;color:var(--red)">✕</button>'+
+            '</div>'+
+          '</div>'+
+          // 이력 펼치기
+          ((c.history&&c.history.length)?
+            '<details style="margin-top:6px"><summary style="font-size:0.78em;color:var(--t3);cursor:pointer">기록 '+c.history.length+'개 보기</summary>'+
+            '<div style="margin-top:6px">'+
+              (c.history||[]).slice().sort((a,b)=>b.date.localeCompare(a.date)).map(function(h){
+                return '<div style="display:flex;gap:8px;padding:4px 0;font-size:0.8em;border-bottom:1px solid var(--border)">'+
+                  '<span style="color:var(--t3);flex-shrink:0">'+h.date+'</span>'+
+                  '<span style="color:var(--t2)">'+h.detail+'</span>'+
+                  '<button class="bi" onclick="delCondHist(\''+c.id+'\',\''+h.id+'\')" style="font-size:0.75em;color:var(--t3);margin-left:auto">✕</button>'+
+                '</div>';
+              }).join('')+
+            '</div></details>':'')+
+        '</div>';
+      });
+    }
+    html+='</div>';
     const nextSched=(H.schedules||[]).filter(s=>!s.done&&dLeft(s.date)>=0).sort((a,b)=>a.date.localeCompare(b.date));
     html+='<div class="card" style="margin-bottom:14px">'+
       '<div class="ch"><div class="ct">🏥 검진 예정</div>'+
@@ -3523,7 +3590,11 @@ function renderHealth(){
           '</div>'+
           '<div style="flex:1;min-width:0">'+
             '<div style="font-size:0.9643em;font-weight:600">'+s.title+'</div>'+
-            (s.memo?'<div style="font-size:0.8em;color:var(--t3);margin-top:2px">'+s.memo+'</div>':'')+
+            ((s.hospital||s.conditionId)?'<div style="font-size:0.8em;color:var(--t3);margin-top:2px">'+
+              (s.hospital?'🏥 '+s.hospital:'')+(s.hospital&&s.conditionId?' · ':'')+
+              (s.conditionId&&(S.health.conditions||[]).find(function(c){return c.id===s.conditionId;})?
+                '🩺 '+S.health.conditions.find(function(c){return c.id===s.conditionId;}).name:'')+'</div>':'')+
+            (s.memo?'<div style="font-size:0.8em;color:var(--t3)">'+s.memo+'</div>':'')+
           '</div>'+
           '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">'+
             '<div style="font-family:var(--mono);font-size:0.85em;font-weight:700;color:'+uc+'">'+ddLabel+'</div>'+
@@ -3724,7 +3795,7 @@ function openInbodyModal(id){
   if(!S.health) S.health={schedules:[],records:[],memo:'',inbody:[],tab:'inbody'};
   const r=id?(S.health.inbody||[]).find(x=>x.id===id):{};
   const savedHeight=S.health.height||'';
-  openMo((id?'인바디 수정':'인바디 기록 추가'),
+  openHealthMo((id?'인바디 수정':'인바디 기록 추가'),
     '<div class="fg"><label class="fl">측정일</label><input type="date" class="inp" id="ib-d" value="'+(r.date||todStr())+'"></div>'+
     '<div class="fg"><label class="fl">측정 시간대</label>'+
       '<div style="display:flex;gap:6px">'+
@@ -3801,31 +3872,113 @@ function delInbody(id){
 
 
 function openHealthSchedModal(id){
-  if(!S.health) S.health={schedules:[],records:[],memo:''};
-  const s=id?S.health.schedules.find(x=>x.id===id):{};
-  openMo((id?'검진 예정 수정':'검진 예정 추가'),
-    '<div class="fg"><label class="fl">검진 이름</label><input class="inp" id="hs-t" placeholder="" value="'+(s.title||'')+'"></div>'+
-    '<div class="fg"><label class="fl">예정일</label><input type="date" class="inp" id="hs-d" value="'+(s.date||todStr())+'"></div>'+
-    '<div class="fg"><label class="fl">메모 (선택)</label><input class="inp" id="hs-m" placeholder="" value="'+(s.memo||'')+'"></div>',
-    '<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="saveHealthSched('+(id?'\''+id+'\'':'null')+')">저장</button>'
+  if(!S.health) S.health={schedules:[],records:[],memo:'',inbody:[],tab:'summary',conditions:[],memos:[],height:''};
+  const s=id?(S.health.schedules||[]).find(x=>x.id===id):{};
+  const conds=(S.health.conditions||[]);
+  const condSelect=conds.length?
+    '<div class="fg"><label class="fl">연관 건강 상태 (선택)</label>'+
+    '<select class="inp sel" id="hs-cid">'+
+    '<option value="">-- 선택 안 함 --</option>'+
+    conds.map(function(c){return '<option value="'+c.id+'"'+(s.conditionId===c.id?' selected':'')+'>'+c.name+'</option>';}).join('')+
+    '</select></div>':'';
+  openHealthMo((id?'검진 예정 수정':'검진 예정 추가'),
+    '<div class="fg"><label class="fl">검진 이름</label><input class="inp" id="hs-t" value="'+(s.title||'')+'"></div>'+
+    '<div class="fg" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
+      '<div><label class="fl">예정일</label><input type="date" class="inp" id="hs-d" value="'+(s.date||todStr())+'"></div>'+
+      '<div><label class="fl">병원</label><input class="inp" id="hs-hosp" value="'+(s.hospital||'')+'"></div>'+
+    '</div>'+
+    condSelect+
+    '<div class="fg"><label class="fl">메모</label><input class="inp" id="hs-m" value="'+(s.memo||'')+'"></div>',
+    '<button class="btn bg bsm" onclick="closeMo()">취소</button><button class="btn bp bsm" onclick="saveHealthSched('+(id?'\''+id+'\'':'null')+')">저장</button>'
   );
 }
 function saveHealthSched(id){
-  const t=document.getElementById('hs-t').value.trim(),d=document.getElementById('hs-d').value,m=document.getElementById('hs-m').value.trim();
+  const t=document.getElementById('hs-t').value.trim();
+  const d=document.getElementById('hs-d').value;
+  const m=document.getElementById('hs-m').value.trim();
+  const hosp=(document.getElementById('hs-hosp')||{}).value||'';
+  const cidEl=document.getElementById('hs-cid');
+  const cid=cidEl?cidEl.value:'';
   if(!t||!d){alert('검진 이름과 날짜를 입력해주세요');return;}
-  if(!S.health) S.health={schedules:[],records:[],memo:''};
-  if(id){const s=S.health.schedules.find(x=>x.id===id);if(s){s.title=t;s.date=d;s.memo=m;}}
-  else S.health.schedules.push({id:gid(),title:t,date:d,memo:m,done:false});
+  if(!S.health) S.health={schedules:[],records:[],memo:'',inbody:[],tab:'summary',conditions:[],memos:[],height:''};
+  if(id){
+    const s=S.health.schedules.find(x=>x.id===id);
+    if(s){s.title=t;s.date=d;s.memo=m;s.hospital=hosp;s.conditionId=cid;}
+  } else {
+    S.health.schedules.push({id:gid(),title:t,date:d,memo:m,hospital:hosp,conditionId:cid,done:false});
+  }
   save();closeMo();render();
 }
 function editHealthSched(id){openHealthSchedModal(id);}
 function completeHealthSched(id){if(!S.health)return;const s=S.health.schedules.find(x=>x.id===id);if(s){s.done=true;save();render();}}
 function delHealthSched(id){if(!S.health)return;S.health.schedules=S.health.schedules.filter(x=>x.id!==id);save();render();}
 
+// ── 건강 상태 관리 ──
+function openCondModal(id){
+  if(!S.health) S.health={schedules:[],records:[],memo:'',inbody:[],tab:'summary',conditions:[],memos:[],height:''};
+  if(!S.health.conditions) S.health.conditions=[];
+  const c=id?S.health.conditions.find(x=>x.id===id):{};
+  const cats=['부인과','소화기','심혈관','근골격','내분비','기타'];
+  openHealthMo((id?'건강 상태 수정':'건강 상태 추가'),
+    '<div class="fg"><label class="fl">병명 / 상태</label><input class="inp" id="co-n" value="'+(c.name||'')+'"></div>'+
+    '<div class="fg" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
+      '<div><label class="fl">분류</label>'+
+        '<select class="inp sel" id="co-cat">'+cats.map(function(ct){return '<option'+(c.category===ct?' selected':'')+'>'+ct+'</option>';}).join('')+'</select>'+
+      '</div>'+
+      '<div><label class="fl">진단일</label><input type="date" class="inp" id="co-date" value="'+(c.diagDate||'')+'"></div>'+
+    '</div>'+
+    '<div class="fg"><label class="fl">메모</label><textarea class="ta" id="co-note" rows="2">'+(c.note||'')+'</textarea></div>',
+    '<button class="btn bg bsm" onclick="closeMo()">취소</button><button class="btn bp bsm" onclick="saveCond('+(id?'\''+id+'\'':'null')+')">저장</button>'
+  );
+}
+function saveCond(id){
+  const n=document.getElementById('co-n').value.trim();
+  const cat=document.getElementById('co-cat').value;
+  const dt=document.getElementById('co-date').value;
+  const note=document.getElementById('co-note').value.trim();
+  if(!n){alert('병명을 입력해주세요');return;}
+  if(!S.health.conditions) S.health.conditions=[];
+  if(id){
+    const c=S.health.conditions.find(x=>x.id===id);
+    if(c){c.name=n;c.category=cat;c.diagDate=dt;c.note=note;}
+  } else {
+    S.health.conditions.push({id:gid(),name:n,category:cat,diagDate:dt,note:note,history:[]});
+  }
+  save();closeMo();render();
+}
+function delCond(id){
+  if(!S.health||!S.health.conditions) return;
+  S.health.conditions=S.health.conditions.filter(x=>x.id!==id);
+  save();render();
+}
+function openCondHistModal(condId){
+  openHealthMo('기록 추가',
+    '<div class="fg"><label class="fl">날짜</label><input type="date" class="inp" id="ch-d" value="'+todStr()+'"></div>'+
+    '<div class="fg"><label class="fl">내용 (크기, 소견, 증상 등)</label><textarea class="ta" id="ch-detail" rows="3"></textarea></div>',
+    '<button class="btn bg bsm" onclick="closeMo()">취소</button><button class="btn bp bsm" onclick="saveCondHist(\''+condId+'\')">저장</button>'
+  );
+}
+function saveCondHist(condId){
+  const d=document.getElementById('ch-d').value;
+  const detail=document.getElementById('ch-detail').value.trim();
+  if(!d||!detail){alert('날짜와 내용을 입력해주세요');return;}
+  const c=(S.health.conditions||[]).find(x=>x.id===condId);
+  if(!c) return;
+  if(!c.history) c.history=[];
+  c.history.push({id:gid(),date:d,detail:detail});
+  save();closeMo();render();
+}
+function delCondHist(condId, histId){
+  const c=(S.health.conditions||[]).find(x=>x.id===condId);
+  if(!c||!c.history) return;
+  c.history=c.history.filter(x=>x.id!==histId);
+  save();render();
+}
+
 function openHealthRecModal(id){
   if(!S.health) S.health={schedules:[],records:[],memo:''};
   const r=id?S.health.records.find(x=>x.id===id):{};
-  openMo((id?'검진 기록 수정':'검진 기록 추가'),
+  openHealthMo((id?'검진 기록 수정':'검진 기록 추가'),
     '<div class="fg"><label class="fl">검진 이름</label><input class="inp" id="hr-t" placeholder="" value="'+(r.title||'')+'"></div>'+
     '<div class="fg"><label class="fl">날짜</label><input type="date" class="inp" id="hr-d" value="'+(r.date||todStr())+'"></div>'+
     '<div class="fg"><label class="fl" style="color:var(--red)">⚠️ 이상 소견</label><textarea class="ta" id="hr-abnormal" rows="3" placeholder="">'+(r.abnormal||r.memo||'')+'</textarea></div>'+
@@ -3929,7 +4082,7 @@ function openHealthMemoModal(id){
   if(!S.health) S.health={schedules:[],records:[],memo:'',memos:[]};
   if(!S.health.memos) S.health.memos=[];
   const m=id?S.health.memos.find(x=>x.id===id):{};
-  openMo((id?'메모 수정':'건강 메모 추가'),
+  openHealthMo((id?'메모 수정':'건강 메모 추가'),
     '<div class="fg"><label class="fl">제목</label><input class="inp" id="hm-t" value="'+(m.title||'')+'"></div>'+
     '<div class="fg"><label class="fl">내용</label><textarea class="ta" id="hm-c" rows="5" style="resize:vertical">'+(m.content||'')+'</textarea></div>',
     '<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="saveHealthMemoCard('+(id?'\''+id+'\'':'null')+')">저장</button>'

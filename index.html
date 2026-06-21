@@ -562,6 +562,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <button class="nav" id="nav-diary" onclick="go('diary')"><span class="nav-ic" data-color="#B2B0E8"></span>Thanks Diary</button>
       <button class="nav" id="nav-deadlines" onclick="go('deadlines')"><span class="nav-ic" data-color="#E07070"></span>마감 관리</button>
       <button class="nav" id="nav-ledger" onclick="go('ledger')"><span class="nav-ic" data-color="#7CB9A8"></span>가계부</button>
+      <button class="nav" id="nav-health" onclick="go('health')"><span class="nav-ic" data-color="#E8A0A0"></span>건강 관리</button>
       <button class="nav" id="nav-insights" onclick="go('insights')"><span class="nav-ic" data-color="#B89BD9"></span>회고 & 통계</button>
     </div>
     <div class="sb-sec">
@@ -800,6 +801,13 @@ let S = {
     {id:'la5',name:'관계',emoji:'🤝',color:'#7C4A6F'},
     {id:'la6',name:'마인드',emoji:'🧘',color:'#3C7C7C'},
   ],
+  health: {
+    schedules: [],  // [{id, title, date, memo, done}]
+    records: [],    // [{id, date, title, memo, files:[{name,data,type}]}]
+    memo: '',
+    inbody: [],     // [{id,date,weight,muscle,fat,bmi,note}]
+    tab: 'sched'    // 현재 탭: sched | inbody | records | memo
+  },
 };
 
 function load(){try{const d=localStorage.getItem(KEY);if(d)S=Object.assign({},S,JSON.parse(d));}catch(e){}}
@@ -853,7 +861,7 @@ let activePid = null;
 let pjFilter = '';
 let viewDate = todStr();
 
-const titles = {today:'Today',diary:'Thanks Diary',calendar:'Monthly',routine:'루틴 설정',life:'나의 라이프',overview:'목표 요약',projects:'프로젝트',deadlines:'마감 관리',savings:'저축 목표',settings:'설정',ledger:'가계부',insights:'회고 & 통계'};
+const titles = {today:'Today',diary:'Thanks Diary',calendar:'Monthly',routine:'루틴 설정',life:'나의 라이프',overview:'목표 요약',projects:'프로젝트',deadlines:'마감 관리',savings:'저축 목표',health:'건강 관리',settings:'설정',ledger:'가계부',insights:'회고 & 통계'};
 
 function go(p, pid, _fromPopstate){
   page=p; activePid=pid||null; if(p!=='projects') pjFilter='';
@@ -936,9 +944,11 @@ function render(){
   else if(page==='projects') div.innerHTML=activePid?renderPjDetail(activePid):renderProjects();
   else if(page==='deadlines') div.innerHTML=renderDeadlines();
   else if(page==='savings') div.innerHTML=renderSavings();
+  else if(page==='health') div.innerHTML=renderHealth();
   else if(page==='overview') div.innerHTML=renderOverview();
   else if(page==='settings') div.innerHTML=renderSettings();
   else if(page==='ledger') div.innerHTML=renderLedger();
+  else if(page==='insights') div.innerHTML=renderInsights();
   el.innerHTML=''; el.appendChild(div);
   updateSB();
   
@@ -3394,6 +3404,348 @@ ${existingFontLinks}
 }
 
 
+// ════ 건강 관리 ════
+function renderHealth(){
+  if(!S.health) S.health={schedules:[],records:[],memo:'',inbody:[],tab:'sched'};
+  const H=S.health;
+  if(!H.inbody) H.inbody=[];
+  if(!H.tab) H.tab='sched';
+  const tab=H.tab;
+
+  // ── 탭 헤더 ──
+  const tabs=[{k:'sched',l:'🏥 검진 예정'},{k:'inbody',l:'📊 인바디'},{k:'records',l:'📋 기록'},{k:'memo',l:'📝 메모'}];
+  let html='<div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">';
+  tabs.forEach(function(t){
+    var on=tab===t.k;
+    html+='<button class="btn '+(on?'bp':'bg')+' bsm" onclick="setHealthTab(\''+t.k+'\')" style="flex:1;min-width:0">'+t.l+'</button>';
+  });
+  html+='</div>';
+
+  // ══ 탭 1: 검진 예정 ══
+  if(tab==='sched'){
+    html+='<div class="card" style="margin-bottom:16px">';
+    html+='<div class="ch"><div class="ct">🏥 검진 예정</div><button class="btn bp bsm" onclick="openHealthSchedModal()">+ 추가</button></div>';
+    const upcoming=(H.schedules||[]).filter(s=>!s.done).sort((a,b)=>a.date.localeCompare(b.date));
+    const doneList=(H.schedules||[]).filter(s=>s.done);
+    if(upcoming.length===0){
+      html+='<div class="empty" style="padding:14px 0">예정된 검진이 없어요</div>';
+    } else {
+      upcoming.forEach(function(s){
+        var dd=dLeft(s.date),f=fmtDateObj(s.date);
+        var uc=dd<0?'var(--t3)':dd===0?'var(--red)':dd<=30?'var(--accent)':'var(--t2)';
+        var ddLabel=dd<0?'지남':dd===0?'오늘':'D-'+dd;
+        html+='<div class="ci" style="align-items:flex-start">'+
+          '<div style="display:flex;flex-direction:column;align-items:center;background:var(--s2);border-radius:8px;padding:5px 10px;flex-shrink:0;min-width:46px;text-align:center">'+
+            '<div style="font-size:0.65em;color:var(--t3);font-weight:600;text-transform:uppercase">'+f.month+'</div>'+
+            '<div style="font-size:1.15em;font-weight:700;color:var(--text)">'+f.day+'</div>'+
+          '</div>'+
+          '<div style="flex:1;min-width:0">'+
+            '<div style="font-size:0.9643em;font-weight:600">'+s.title+'</div>'+
+            (s.memo?'<div style="font-size:0.8em;color:var(--t3);margin-top:2px">'+s.memo+'</div>':'')+
+          '</div>'+
+          '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">'+
+            '<div style="font-family:var(--mono);font-size:0.85em;font-weight:700;color:'+uc+'">'+ddLabel+'</div>'+
+            '<div style="display:flex;gap:4px">'+
+              '<button class="bi" onclick="completeHealthSched(\''+s.id+'\')" title="완료" style="font-size:0.8em;color:var(--accent)">✓</button>'+
+              '<button class="bi" onclick="editHealthSched(\''+s.id+'\')" style="font-size:0.8em">✎</button>'+
+              '<button class="bi" onclick="delHealthSched(\''+s.id+'\')" style="font-size:0.8em;color:var(--red)">✕</button>'+
+            '</div>'+
+          '</div>'+
+        '</div>';
+      });
+    }
+    if(doneList.length>0){
+      html+='<details style="margin-top:8px"><summary style="font-size:0.82em;color:var(--t3);cursor:pointer;padding:4px 0">✓ 완료한 검진 ('+doneList.length+'개)</summary>';
+      doneList.forEach(function(s){
+        html+='<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);opacity:0.6">'+
+          '<div style="font-size:0.85em;color:var(--t3);flex-shrink:0">'+s.date.slice(5).replace('-','/')+'</div>'+
+          '<div style="flex:1;font-size:0.9em;text-decoration:line-through;color:var(--t3)">'+s.title+'</div>'+
+          '<button class="bi" onclick="delHealthSched(\''+s.id+'\')" style="font-size:0.78em;color:var(--t3)">✕</button>'+
+        '</div>';
+      });
+      html+='</details>';
+    }
+    html+='</div>';
+  }
+
+  // ══ 탭 2: 인바디 ══
+  else if(tab==='inbody'){
+    html+='<div class="card" style="margin-bottom:16px">';
+    html+='<div class="ch"><div class="ct">📊 인바디 기록</div><button class="btn bp bsm" onclick="openInbodyModal()">+ 기록 추가</button></div>';
+
+    const ibs=(H.inbody||[]).slice().sort((a,b)=>a.date.localeCompare(b.date));
+
+    if(ibs.length===0){
+      html+='<div class="empty" style="padding:14px 0">인바디 측정 결과를 입력해보세요</div>';
+    } else {
+      // ── 그래프 (체중, 골격근량, 체지방률) ──
+      const METRICS=[
+        {key:'weight',label:'체중',unit:'kg',color:'#7EB8A0'},
+        {key:'muscle',label:'골격근량',unit:'kg',color:'#7898D8'},
+        {key:'fat',label:'체지방률',unit:'%',color:'#E8A87C'},
+      ];
+
+      METRICS.forEach(function(m){
+        var vals=ibs.filter(function(r){return r[m.key]!=null&&r[m.key]!=='';}).map(function(r){return {date:r.date,val:parseFloat(r[m.key])};});
+        if(vals.length<1) return;
+
+        var minV=Math.min.apply(null,vals.map(function(v){return v.val;}));
+        var maxV=Math.max.apply(null,vals.map(function(v){return v.val;}));
+        var pad=(maxV-minV)*0.3||1;
+        var lo=minV-pad, hi=maxV+pad;
+        var W=320,H_=120,PL=40,PR=12,PT=10,PB=24;
+        var iW=W-PL-PR, iH=H_-PT-PB;
+        var latest=vals[vals.length-1];
+
+        function xPos(i){return PL+iW*(vals.length===1?0.5:i/(vals.length-1));}
+        function yPos(v){return PT+iH*(1-(v-lo)/(hi-lo));}
+
+        // 그리드 라인
+        var gridLines='';
+        var steps=3;
+        for(var g=0;g<=steps;g++){
+          var gv=lo+(hi-lo)*g/steps;
+          var gy=yPos(gv);
+          gridLines+='<line x1="'+PL+'" y1="'+gy+'" x2="'+(W-PR)+'" y2="'+gy+'" stroke="var(--border)" stroke-width="1" stroke-dasharray="3,3"/>';
+          gridLines+='<text x="'+(PL-4)+'" y="'+(gy+4)+'" font-size="9" fill="var(--t3)" text-anchor="end">'+gv.toFixed(1)+'</text>';
+        }
+
+        // 라인 & 점
+        var pts=vals.map(function(v,i){return xPos(i)+','+yPos(v.val);}).join(' ');
+        var polyline=vals.length>1?'<polyline points="'+pts+'" fill="none" stroke="'+m.color+'" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>':'';
+
+        var dots=vals.map(function(v,i){
+          var isLast=i===vals.length-1;
+          return '<circle cx="'+xPos(i)+'" cy="'+yPos(v.val)+'" r="'+(isLast?5:3.5)+'" fill="'+(isLast?m.color:'var(--surface)')+'" stroke="'+m.color+'" stroke-width="2"/>'+
+            (isLast?'<text x="'+xPos(i)+'" y="'+(yPos(v.val)-8)+'" font-size="10" font-weight="600" fill="'+m.color+'" text-anchor="middle">'+v.val+'</text>':'');
+        }).join('');
+
+        // 날짜 라벨 (최대 4개)
+        var step=Math.ceil(vals.length/4);
+        var xLabels='';
+        vals.forEach(function(v,i){
+          if(i%step===0||i===vals.length-1){
+            xLabels+='<text x="'+xPos(i)+'" y="'+(H_-4)+'" font-size="9" fill="var(--t3)" text-anchor="middle">'+v.date.slice(5).replace('-','/')+'</text>';
+          }
+        });
+
+        html+=
+          '<div style="margin-bottom:14px">'+
+            '<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px">'+
+              '<span style="font-size:0.82em;font-weight:600;color:var(--t3)">'+m.label+'</span>'+
+              '<span style="font-family:var(--serif);font-size:1.4em;font-weight:700;color:var(--text)">'+latest.val+'</span>'+
+              '<span style="font-size:0.8em;color:var(--t3)">'+m.unit+'</span>'+
+            '</div>'+
+            '<svg viewBox="0 0 '+W+' '+H_+'" style="width:100%;max-width:'+W+'px;overflow:visible">'+
+              gridLines+polyline+dots+xLabels+
+            '</svg>'+
+          '</div>';
+      });
+
+      // ── 기록 목록 ──
+      html+='<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:10px">'+
+        '<div style="font-size:0.78em;color:var(--t3);font-weight:600;margin-bottom:8px">측정 기록</div>';
+      ibs.slice().reverse().forEach(function(r){
+        html+='<div class="row-hov" style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">'+
+          '<div style="font-size:0.82em;color:var(--t3);flex-shrink:0;min-width:46px">'+r.date.slice(5).replace('-','/')+'</div>'+
+          '<div style="flex:1;display:flex;gap:12px;flex-wrap:wrap">'+
+            (r.weight?'<span style="font-size:0.875em"><span style="color:var(--t3);font-size:0.85em">체중</span> <b>'+r.weight+'</b>kg</span>':'')+
+            (r.muscle?'<span style="font-size:0.875em"><span style="color:var(--t3);font-size:0.85em">골격근</span> <b>'+r.muscle+'</b>kg</span>':'')+
+            (r.fat?'<span style="font-size:0.875em"><span style="color:var(--t3);font-size:0.85em">체지방</span> <b>'+r.fat+'</b>%</span>':'')+
+            (r.bmi?'<span style="font-size:0.875em"><span style="color:var(--t3);font-size:0.85em">BMI</span> <b>'+r.bmi+'</b></span>':'')+
+          '</div>'+
+          '<div style="display:flex;gap:4px;flex-shrink:0">'+
+            '<button class="bi hov-btns" onclick="editInbody(\''+r.id+'\')" style="font-size:0.8em">✎</button>'+
+            '<button class="bi hov-btns" onclick="delInbody(\''+r.id+'\')" style="font-size:0.8em;color:var(--red)">✕</button>'+
+          '</div>'+
+        '</div>';
+      });
+      html+='</div>';
+    }
+    html+='</div>';
+  }
+
+  // ══ 탭 3: 검진 기록 ══
+  else if(tab==='records'){
+    html+='<div class="card" style="margin-bottom:16px">';
+    html+='<div class="ch"><div class="ct">📋 검진 기록</div><button class="btn bp bsm" onclick="openHealthRecModal()">+ 기록 추가</button></div>';
+    const recs=(H.records||[]).slice().sort((a,b)=>b.date.localeCompare(a.date));
+    if(recs.length===0){
+      html+='<div class="empty" style="padding:14px 0">검진 기록을 추가해보세요</div>';
+    } else {
+      recs.forEach(function(r){
+        html+='<div class="row-hov" style="padding:10px 0;border-bottom:1px solid var(--border)">'+
+          '<div style="display:flex;align-items:flex-start;gap:10px">'+
+            '<div style="background:var(--s2);border-radius:8px;padding:4px 10px;flex-shrink:0;text-align:center;min-width:44px">'+
+              '<div style="font-size:0.65em;color:var(--t3);font-weight:600;text-transform:uppercase">'+fmtDateObj(r.date).month+'</div>'+
+              '<div style="font-size:1.1em;font-weight:700;color:var(--text)">'+fmtDateObj(r.date).day+'</div>'+
+            '</div>'+
+            '<div style="flex:1;min-width:0">'+
+              '<div style="font-size:0.9643em;font-weight:600">'+r.title+'</div>'+
+              (r.memo?'<div style="font-size:0.82em;color:var(--t3);margin-top:3px;white-space:pre-wrap">'+r.memo+'</div>':'')+
+              ((r.files&&r.files.length)?'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">'+
+                r.files.map(function(f,fi){
+                  if(f.type&&f.type.startsWith('image/')) return '<img src="'+f.data+'" onclick="openHealthFile(\''+r.id+'\','+fi+')" style="width:60px;height:60px;object-fit:cover;border-radius:6px;cursor:pointer;border:1px solid var(--border)">';
+                  return '<a href="'+f.data+'" download="'+f.name+'" style="display:flex;align-items:center;gap:4px;font-size:0.8em;color:var(--accent);padding:4px 8px;border:1px solid var(--border);border-radius:6px;text-decoration:none">📄 '+f.name+'</a>';
+                }).join('')+'</div>':'')+
+            '</div>'+
+            '<div class="hov-btns" style="display:flex;gap:4px;flex-shrink:0">'+
+              '<button class="bi" onclick="editHealthRec(\''+r.id+'\')" style="font-size:0.8em">✎</button>'+
+              '<button class="bi" onclick="delHealthRec(\''+r.id+'\')" style="font-size:0.8em;color:var(--red)">✕</button>'+
+            '</div>'+
+          '</div>'+
+        '</div>';
+      });
+    }
+    html+='</div>';
+  }
+
+  // ══ 탭 4: 건강 메모 ══
+  else if(tab==='memo'){
+    html+='<div class="card">'+
+      '<div class="ct" style="margin-bottom:10px">📝 건강 메모</div>'+
+      '<textarea class="ta" id="health-memo" rows="8" placeholder="복용 중인 약, 알레르기, 주치의 연락처, 특이사항 등 자유롭게 적어두세요" oninput="saveHealthMemo(this.value)" style="width:100%;resize:vertical">'+((H.memo||'').replace(/</g,'&lt;'))+'</textarea>'+
+    '</div>';
+  }
+
+  return html;
+}
+
+function setHealthTab(t){
+  if(!S.health) S.health={schedules:[],records:[],memo:'',inbody:[],tab:'sched'};
+  S.health.tab=t;
+  render();
+}
+
+// ── 인바디 모달 ──
+function openInbodyModal(id){
+  if(!S.health) S.health={schedules:[],records:[],memo:'',inbody:[],tab:'inbody'};
+  const r=id?(S.health.inbody||[]).find(x=>x.id===id):{};
+  openMo((id?'인바디 수정':'인바디 기록 추가'),
+    '<div class="fg"><label class="fl">측정일</label><input type="date" class="inp" id="ib-d" value="'+(r.date||todStr())+'"></div>'+
+    '<div class="fg" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
+      '<div><label class="fl">체중 (kg)</label><input type="number" class="inp" id="ib-w" step="0.1" placeholder="예: 62.5" value="'+(r.weight||'')+'"></div>'+
+      '<div><label class="fl">골격근량 (kg)</label><input type="number" class="inp" id="ib-m" step="0.1" placeholder="예: 24.9" value="'+(r.muscle||'')+'"></div>'+
+      '<div><label class="fl">체지방률 (%)</label><input type="number" class="inp" id="ib-f" step="0.1" placeholder="예: 37.2" value="'+(r.fat||'')+'"></div>'+
+      '<div><label class="fl">BMI</label><input type="number" class="inp" id="ib-b" step="0.1" placeholder="예: 24.4" value="'+(r.bmi||'')+'"></div>'+
+    '</div>'+
+    '<div class="fg"><label class="fl">메모 (선택)</label><input class="inp" id="ib-n" placeholder="예: 식후 측정, 운동 후" value="'+(r.note||'')+'"></div>',
+    '<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="saveInbody('+(id?'\''+id+'\'':'null')+')">저장</button>'
+  );
+}
+function saveInbody(id){
+  const d=document.getElementById('ib-d').value;
+  const w=document.getElementById('ib-w').value;
+  const m=document.getElementById('ib-m').value;
+  const f=document.getElementById('ib-f').value;
+  const b=document.getElementById('ib-b').value;
+  const n=document.getElementById('ib-n').value.trim();
+  if(!d){alert('측정일을 입력해주세요');return;}
+  if(!S.health) S.health={schedules:[],records:[],memo:'',inbody:[],tab:'inbody'};
+  if(!S.health.inbody) S.health.inbody=[];
+  const entry={id:id||gid(),date:d,weight:w||'',muscle:m||'',fat:f||'',bmi:b||'',note:n};
+  if(id){
+    var idx=S.health.inbody.findIndex(x=>x.id===id);
+    if(idx>=0) S.health.inbody[idx]=entry;
+  } else {
+    S.health.inbody.push(entry);
+  }
+  save();closeMo();render();
+}
+function editInbody(id){openInbodyModal(id);}
+function delInbody(id){
+  if(!S.health||!S.health.inbody) return;
+  S.health.inbody=S.health.inbody.filter(x=>x.id!==id);
+  save();render();
+}
+
+
+
+function openHealthSchedModal(id){
+  if(!S.health) S.health={schedules:[],records:[],memo:''};
+  const s=id?S.health.schedules.find(x=>x.id===id):{};
+  openMo((id?'검진 예정 수정':'검진 예정 추가'),
+    '<div class="fg"><label class="fl">검진 이름</label><input class="inp" id="hs-t" placeholder="예: 건강검진, 자궁경부암 검진" value="'+(s.title||'')+'"></div>'+
+    '<div class="fg"><label class="fl">예정일</label><input type="date" class="inp" id="hs-d" value="'+(s.date||todStr())+'"></div>'+
+    '<div class="fg"><label class="fl">메모 (선택)</label><input class="inp" id="hs-m" placeholder="예: 서울아산병원, 공복 필요" value="'+(s.memo||'')+'"></div>',
+    '<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="saveHealthSched('+(id?'\''+id+'\'':'null')+')">저장</button>'
+  );
+}
+function saveHealthSched(id){
+  const t=document.getElementById('hs-t').value.trim(),d=document.getElementById('hs-d').value,m=document.getElementById('hs-m').value.trim();
+  if(!t||!d){alert('검진 이름과 날짜를 입력해주세요');return;}
+  if(!S.health) S.health={schedules:[],records:[],memo:''};
+  if(id){const s=S.health.schedules.find(x=>x.id===id);if(s){s.title=t;s.date=d;s.memo=m;}}
+  else S.health.schedules.push({id:gid(),title:t,date:d,memo:m,done:false});
+  save();closeMo();render();
+}
+function editHealthSched(id){openHealthSchedModal(id);}
+function completeHealthSched(id){if(!S.health)return;const s=S.health.schedules.find(x=>x.id===id);if(s){s.done=true;save();render();}}
+function delHealthSched(id){if(!S.health)return;S.health.schedules=S.health.schedules.filter(x=>x.id!==id);save();render();}
+
+function openHealthRecModal(id){
+  if(!S.health) S.health={schedules:[],records:[],memo:''};
+  const r=id?S.health.records.find(x=>x.id===id):{};
+  openMo((id?'검진 기록 수정':'검진 기록 추가'),
+    '<div class="fg"><label class="fl">검진 이름</label><input class="inp" id="hr-t" placeholder="예: 건강검진 결과, 자궁초음파" value="'+(r.title||'')+'"></div>'+
+    '<div class="fg"><label class="fl">날짜</label><input type="date" class="inp" id="hr-d" value="'+(r.date||todStr())+'"></div>'+
+    '<div class="fg"><label class="fl">메모</label><textarea class="ta" id="hr-m" rows="3" placeholder="검진 결과, 소견, 다음 예약 일정 등">'+(r.memo||'')+'</textarea></div>'+
+    '<div class="fg"><label class="fl">파일 첨부 (이미지/PDF)</label>'+
+      '<label class="btn bg bsm" style="cursor:pointer;display:inline-flex;align-items:center;gap:5px">📎 파일 선택<input type="file" id="hr-f" multiple accept="image/*,.pdf" style="display:none" onchange="previewHealthFiles(this)"></label>'+
+      '<div id="hr-preview" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px"></div></div>',
+    '<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="saveHealthRec('+(id?'\''+id+'\'':'null')+')">저장</button>'
+  );
+  window._hrFiles=r.files?r.files.slice():[];
+  if(r.files&&r.files.length){
+    setTimeout(function(){
+      var prev=document.getElementById('hr-preview');if(!prev)return;
+      prev.innerHTML=r.files.map(function(f,i){
+        return '<div style="position:relative">'+(f.type&&f.type.startsWith('image/')?'<img src="'+f.data+'" style="width:56px;height:56px;object-fit:cover;border-radius:6px;border:1px solid var(--border)">':'<div style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:0.78em">📄 '+f.name+'</div>')+'<button onclick="removeHrFile('+i+')" style="position:absolute;top:-6px;right:-6px;background:var(--red);color:#fff;border:none;border-radius:50%;width:16px;height:16px;font-size:9px;cursor:pointer;padding:0">✕</button></div>';
+      }).join('');
+    },100);
+  }
+}
+function previewHealthFiles(input){
+  Array.from(input.files).forEach(function(file){
+    const reader=new FileReader();
+    reader.onload=function(e){
+      window._hrFiles=window._hrFiles||[];
+      window._hrFiles.push({name:file.name,type:file.type,data:e.target.result});
+      var prev=document.getElementById('hr-preview');if(!prev)return;
+      prev.innerHTML=(window._hrFiles||[]).map(function(f,i){
+        return '<div style="position:relative">'+(f.type&&f.type.startsWith('image/')?'<img src="'+f.data+'" style="width:56px;height:56px;object-fit:cover;border-radius:6px;border:1px solid var(--border)">':'<div style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:0.78em">📄 '+f.name+'</div>')+'<button onclick="removeHrFile('+i+')" style="position:absolute;top:-6px;right:-6px;background:var(--red);color:#fff;border:none;border-radius:50%;width:16px;height:16px;font-size:9px;cursor:pointer;padding:0">✕</button></div>';
+      }).join('');
+    };
+    reader.readAsDataURL(file);
+  });
+}
+function removeHrFile(i){
+  if(window._hrFiles) window._hrFiles.splice(i,1);
+  var prev=document.getElementById('hr-preview');if(!prev)return;
+  prev.innerHTML=(window._hrFiles||[]).map(function(f,idx){
+    return '<div style="position:relative">'+(f.type&&f.type.startsWith('image/')?'<img src="'+f.data+'" style="width:56px;height:56px;object-fit:cover;border-radius:6px;border:1px solid var(--border)">':'<div style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:0.78em">📄 '+f.name+'</div>')+'<button onclick="removeHrFile('+idx+')" style="position:absolute;top:-6px;right:-6px;background:var(--red);color:#fff;border:none;border-radius:50%;width:16px;height:16px;font-size:9px;cursor:pointer;padding:0">✕</button></div>';
+  }).join('');
+}
+function saveHealthRec(id){
+  const t=document.getElementById('hr-t').value.trim(),d=document.getElementById('hr-d').value,m=document.getElementById('hr-m').value.trim();
+  if(!t||!d){alert('이름과 날짜를 입력해주세요');return;}
+  if(!S.health) S.health={schedules:[],records:[],memo:''};
+  const files=window._hrFiles||[];
+  if(id){const r=S.health.records.find(x=>x.id===id);if(r){r.title=t;r.date=d;r.memo=m;r.files=files;}}
+  else S.health.records.push({id:gid(),title:t,date:d,memo:m,files:files});
+  window._hrFiles=[];save();closeMo();render();
+}
+function editHealthRec(id){openHealthRecModal(id);}
+function delHealthRec(id){if(!S.health)return;S.health.records=S.health.records.filter(x=>x.id!==id);save();render();}
+function openHealthFile(recId,fi){
+  const r=(S.health.records||[]).find(x=>x.id===recId);if(!r||!r.files[fi])return;
+  const f=r.files[fi],w=window.open('','_blank');
+  if(f.type&&f.type.startsWith('image/')){w.document.write('<html><body style="margin:0;background:#000;display:flex;justify-content:center"><img src="'+f.data+'" style="max-width:100%"></body></html>');}
+  else{w.document.write('<html><body style="margin:0"><iframe src="'+f.data+'" style="width:100vw;height:100vh;border:none"></iframe></body></html>');}
+}
+function saveHealthMemo(v){if(!S.health)S.health={schedules:[],records:[],memo:''};S.health.memo=v;save();}
+
+// ════ 회고 & 통계 ════
 function renderInsights(){
   const today=todStr();
   let cells30=[];

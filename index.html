@@ -3409,11 +3409,11 @@ function renderHealth(){
   if(!S.health) S.health={schedules:[],records:[],memo:'',inbody:[],tab:'sched'};
   const H=S.health;
   if(!H.inbody) H.inbody=[];
-  if(!H.tab) H.tab='sched';
+  if(!H.tab) H.tab='summary';
   const tab=H.tab;
 
   // ── 탭 헤더 ──
-  const tabs=[{k:'sched',l:'🏥 검진 예정'},{k:'inbody',l:'📊 인바디'},{k:'records',l:'📋 기록'},{k:'memo',l:'📝 메모'}];
+  const tabs=[{k:'summary',l:'💊 건강 요약'},{k:'inbody',l:'📊 인바디'},{k:'records',l:'📋 검진 기록'},{k:'memo',l:'📝 메모'}];
   let html='<div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">';
   tabs.forEach(function(t){
     var on=tab===t.k;
@@ -3421,10 +3421,79 @@ function renderHealth(){
   });
   html+='</div>';
 
-  // ══ 탭 1: 검진 예정 ══
-  if(tab==='sched'){
+  // ══ 탭 0: 건강 요약 ══
+  if(tab==='summary'){
+    // 최신 인바디 수치
+    const ibs=(H.inbody||[]).slice().sort((a,b)=>a.date.localeCompare(b.date));
+    const latest=ibs[ibs.length-1];
+    if(latest){
+      html+='<div class="card" style="margin-bottom:14px">'+
+        '<div class="ct" style="margin-bottom:12px">📊 최근 인바디 <span style="font-size:0.75em;color:var(--t3);font-weight:400">'+latest.date+(latest.timing?' · '+latest.timing:'')+'</span></div>'+
+        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;text-align:center">'+
+          (latest.weight?'<div style="background:var(--s2);border-radius:10px;padding:10px 6px"><div style="font-size:0.72em;color:var(--t3);margin-bottom:4px">체중</div><div style="font-family:var(--serif);font-size:1.5em;font-weight:700;color:var(--text)">'+latest.weight+'</div><div style="font-size:0.72em;color:var(--t3)">kg</div></div>':'')+
+          (latest.muscle?'<div style="background:var(--s2);border-radius:10px;padding:10px 6px"><div style="font-size:0.72em;color:var(--t3);margin-bottom:4px">골격근량</div><div style="font-family:var(--serif);font-size:1.5em;font-weight:700;color:var(--text)">'+latest.muscle+'</div><div style="font-size:0.72em;color:var(--t3)">kg</div></div>':'')+
+          (latest.fat?'<div style="background:var(--s2);border-radius:10px;padding:10px 6px"><div style="font-size:0.72em;color:var(--t3);margin-bottom:4px">체지방률</div><div style="font-family:var(--serif);font-size:1.5em;font-weight:700;color:var(--text)">'+latest.fat+'</div><div style="font-size:0.72em;color:var(--t3)">%</div></div>':'')+
+        '</div>'+
+        (latest.bmi?'<div style="text-align:center;margin-top:8px;font-size:0.82em;color:var(--t3)">BMI <b style="color:var(--text)">'+latest.bmi+'</b></div>':'')+
+      '</div>';
+    }
+
+    // 다음 검진 예정
+    const nextSched=(H.schedules||[]).filter(s=>!s.done&&dLeft(s.date)>=0).sort((a,b)=>a.date.localeCompare(b.date));
+    html+='<div class="card" style="margin-bottom:14px">'+
+      '<div class="ch"><div class="ct">🏥 검진 예정</div>'+
+        '<div style="display:flex;gap:6px">'+
+          '<button class="btn bg bsm" onclick="setHealthTab(\'sched\')" style="font-size:0.78em">관리</button>'+
+          '<button class="btn bp bsm" onclick="openHealthSchedModal()">+ 추가</button>'+
+        '</div>'+
+      '</div>';
+    if(nextSched.length===0){
+      html+='<div style="font-size:0.85em;color:var(--t3);padding:8px 0">예정된 검진이 없어요</div>';
+    } else {
+      nextSched.slice(0,3).forEach(function(s){
+        var dd=dLeft(s.date);
+        html+='<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">'+
+          '<div style="flex:1;font-size:0.9286em">'+s.title+'</div>'+
+          '<div style="font-size:0.82em;color:var(--t3)">'+s.date.slice(5).replace('-','/')+'</div>'+
+          '<div style="font-size:0.82em;font-weight:700;color:'+(dd<=30?'var(--accent)':'var(--t2)')+'">D-'+dd+'</div>'+
+        '</div>';
+      });
+    }
+    html+='</div>';
+
+    // 최신 검진 기록 소견
+    const recs=(H.records||[]).slice().sort((a,b)=>b.date.localeCompare(a.date));
+    if(recs.length>0){
+      html+='<div class="card" style="margin-bottom:14px">'+
+        '<div class="ch"><div class="ct">📋 최근 검진 기록</div></div>';
+      recs.slice(0,3).forEach(function(r){
+        html+='<div style="padding:8px 0;border-bottom:1px solid var(--border)">'+
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">'+
+            '<div style="font-size:0.85em;font-weight:600">'+r.title+'</div>'+
+            '<div style="font-size:0.78em;color:var(--t3)">'+r.date+'</div>'+
+          '</div>'+
+          (r.memo?'<div style="font-size:0.82em;color:var(--t3);white-space:pre-wrap;line-clamp:3;-webkit-line-clamp:3;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical">'+r.memo+'</div>':'')+
+        '</div>';
+      });
+      html+='</div>';
+    }
+
+    // 건강 메모 (있으면 미리보기)
+    if(H.memo&&H.memo.trim()){
+      html+='<div class="card">'+
+        '<div class="ct" style="margin-bottom:8px">📝 건강 메모</div>'+
+        '<div style="font-size:0.875em;color:var(--t2);white-space:pre-wrap">'+H.memo+'</div>'+
+      '</div>';
+    }
+
+    if(!latest&&!nextSched.length&&!recs.length&&!H.memo){
+      html+='<div class="empty"><div class="ei">🏥</div>건강 검진 기록과 인바디를 추가하면 여기에 요약이 나와요</div>';
+    }
+  }
+
+  // ══ 검진 예정 탭 (건강 요약의 "검진 예정 추가" 버튼에서 진입) ══
+  else if(tab==='sched'){
     html+='<div class="card" style="margin-bottom:16px">';
-    html+='<div class="ch"><div class="ct">🏥 검진 예정</div><button class="btn bp bsm" onclick="openHealthSchedModal()">+ 추가</button></div>';
     const upcoming=(H.schedules||[]).filter(s=>!s.done).sort((a,b)=>a.date.localeCompare(b.date));
     const doneList=(H.schedules||[]).filter(s=>s.done);
     if(upcoming.length===0){
@@ -3547,7 +3616,7 @@ function renderHealth(){
         '<div style="font-size:0.78em;color:var(--t3);font-weight:600;margin-bottom:8px">측정 기록</div>';
       ibs.slice().reverse().forEach(function(r){
         html+='<div class="row-hov" style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">'+
-          '<div style="font-size:0.82em;color:var(--t3);flex-shrink:0;min-width:46px">'+r.date.slice(5).replace('-','/')+'</div>'+
+          '<div style="font-size:0.82em;color:var(--t3);flex-shrink:0;min-width:46px">'+r.date.slice(5).replace('-','/')+(r.timing?'<br><span style="font-size:0.85em">'+r.timing+'</span>':'')+'</div>'+
           '<div style="flex:1;display:flex;gap:12px;flex-wrap:wrap">'+
             (r.weight?'<span style="font-size:0.875em"><span style="color:var(--t3);font-size:0.85em">체중</span> <b>'+r.weight+'</b>kg</span>':'')+
             (r.muscle?'<span style="font-size:0.875em"><span style="color:var(--t3);font-size:0.85em">골격근</span> <b>'+r.muscle+'</b>kg</span>':'')+
@@ -3623,15 +3692,34 @@ function openInbodyModal(id){
   const r=id?(S.health.inbody||[]).find(x=>x.id===id):{};
   openMo((id?'인바디 수정':'인바디 기록 추가'),
     '<div class="fg"><label class="fl">측정일</label><input type="date" class="inp" id="ib-d" value="'+(r.date||todStr())+'"></div>'+
+    '<div class="fg"><label class="fl">측정 시간대</label>'+
+      '<div style="display:flex;gap:6px">'+
+        ['아침 공복','낮 식후','자기 전'].map(function(t){
+          var sel=(r.timing||'')=== t;
+          return '<button type="button" class="btn '+(sel?'bp':'bg')+' bsm" id="ib-t-'+t+'" onclick="selectIbTiming(\''+t+'\')" style="flex:1">'+t+'</button>';
+        }).join('')+
+      '</div>'+
+      '<input type="hidden" id="ib-timing" value="'+(r.timing||'')+'">'+
+    '</div>'+
     '<div class="fg" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
       '<div><label class="fl">체중 (kg)</label><input type="number" class="inp" id="ib-w" step="0.1" placeholder="예: 62.5" value="'+(r.weight||'')+'"></div>'+
       '<div><label class="fl">골격근량 (kg)</label><input type="number" class="inp" id="ib-m" step="0.1" placeholder="예: 24.9" value="'+(r.muscle||'')+'"></div>'+
       '<div><label class="fl">체지방률 (%)</label><input type="number" class="inp" id="ib-f" step="0.1" placeholder="예: 37.2" value="'+(r.fat||'')+'"></div>'+
       '<div><label class="fl">BMI</label><input type="number" class="inp" id="ib-b" step="0.1" placeholder="예: 24.4" value="'+(r.bmi||'')+'"></div>'+
     '</div>'+
-    '<div class="fg"><label class="fl">메모 (선택)</label><input class="inp" id="ib-n" placeholder="예: 식후 측정, 운동 후" value="'+(r.note||'')+'"></div>',
+    '<div class="fg"><label class="fl">메모 (선택)</label><input class="inp" id="ib-n" placeholder="예: 운동 전, 생리 직후" value="'+(r.note||'')+'"></div>',
     '<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="saveInbody('+(id?'\''+id+'\'':'null')+')">저장</button>'
   );
+}
+
+function selectIbTiming(t){
+  document.getElementById('ib-timing').value=t;
+  ['아침 공복','낮 식후','자기 전'].forEach(function(opt){
+    var btn=document.getElementById('ib-t-'+opt);
+    if(!btn)return;
+    btn.className='btn '+(opt===t?'bp':'bg')+' bsm';
+    btn.style.flex='1';
+  });
 }
 function saveInbody(id){
   const d=document.getElementById('ib-d').value;
@@ -3640,10 +3728,11 @@ function saveInbody(id){
   const f=document.getElementById('ib-f').value;
   const b=document.getElementById('ib-b').value;
   const n=document.getElementById('ib-n').value.trim();
+  const timing=document.getElementById('ib-timing').value;
   if(!d){alert('측정일을 입력해주세요');return;}
   if(!S.health) S.health={schedules:[],records:[],memo:'',inbody:[],tab:'inbody'};
   if(!S.health.inbody) S.health.inbody=[];
-  const entry={id:id||gid(),date:d,weight:w||'',muscle:m||'',fat:f||'',bmi:b||'',note:n};
+  const entry={id:id||gid(),date:d,weight:w||'',muscle:m||'',fat:f||'',bmi:b||'',note:n,timing:timing};
   if(id){
     var idx=S.health.inbody.findIndex(x=>x.id===id);
     if(idx>=0) S.health.inbody[idx]=entry;
@@ -3705,26 +3794,60 @@ function openHealthRecModal(id){
     },100);
   }
 }
-function previewHealthFiles(input){
-  Array.from(input.files).forEach(function(file){
-    const reader=new FileReader();
-    reader.onload=function(e){
-      window._hrFiles=window._hrFiles||[];
-      window._hrFiles.push({name:file.name,type:file.type,data:e.target.result});
-      var prev=document.getElementById('hr-preview');if(!prev)return;
-      prev.innerHTML=(window._hrFiles||[]).map(function(f,i){
-        return '<div style="position:relative">'+(f.type&&f.type.startsWith('image/')?'<img src="'+f.data+'" style="width:56px;height:56px;object-fit:cover;border-radius:6px;border:1px solid var(--border)">':'<div style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:0.78em">📄 '+f.name+'</div>')+'<button onclick="removeHrFile('+i+')" style="position:absolute;top:-6px;right:-6px;background:var(--red);color:#fff;border:none;border-radius:50%;width:16px;height:16px;font-size:9px;cursor:pointer;padding:0">✕</button></div>';
-      }).join('');
+// 이미지를 canvas로 리사이즈·압축해서 base64 반환 (용량 초과 방지)
+function compressImage(file, maxW, maxH, quality){
+  return new Promise(function(resolve){
+    if(!file.type.startsWith('image/')){
+      const reader=new FileReader();
+      reader.onload=function(e){resolve({name:file.name,type:file.type,data:e.target.result});};
+      reader.readAsDataURL(file);
+      return;
+    }
+    const img=new Image();
+    const url=URL.createObjectURL(file);
+    img.onload=function(){
+      var w=img.width,h=img.height;
+      if(w>maxW){h=Math.round(h*maxW/w);w=maxW;}
+      if(h>maxH){w=Math.round(w*maxH/h);h=maxH;}
+      const canvas=document.createElement('canvas');
+      canvas.width=w;canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      URL.revokeObjectURL(url);
+      resolve({name:file.name,type:'image/jpeg',data:canvas.toDataURL('image/jpeg',quality||0.7)});
     };
-    reader.readAsDataURL(file);
+    img.onerror=function(){resolve(null);};
+    img.src=url;
   });
 }
+
+function previewHealthFiles(input){
+  var files=Array.from(input.files);
+  // 병렬 압축 후 순서 유지
+  Promise.all(files.map(function(file){
+    return compressImage(file, 1200, 1200, 0.72);
+  })).then(function(results){
+    window._hrFiles=window._hrFiles||[];
+    results.forEach(function(r){if(r) window._hrFiles.push(r);});
+    refreshHrPreview();
+  });
+}
+
+function refreshHrPreview(){
+  var prev=document.getElementById('hr-preview');if(!prev)return;
+  prev.innerHTML=(window._hrFiles||[]).map(function(f,i){
+    return '<div style="position:relative">'+
+      (f.type&&f.type.startsWith('image/')?
+        '<img src="'+f.data+'" style="width:56px;height:56px;object-fit:cover;border-radius:6px;border:1px solid var(--border)">':
+        '<div style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:0.78em">📄 '+f.name+'</div>')+
+      '<button onclick="removeHrFile('+i+')" style="position:absolute;top:-6px;right:-6px;background:var(--red);color:#fff;border:none;border-radius:50%;width:16px;height:16px;font-size:9px;cursor:pointer;padding:0">✕</button>'+
+    '</div>';
+  }).join('');
+}
+
+
 function removeHrFile(i){
   if(window._hrFiles) window._hrFiles.splice(i,1);
-  var prev=document.getElementById('hr-preview');if(!prev)return;
-  prev.innerHTML=(window._hrFiles||[]).map(function(f,idx){
-    return '<div style="position:relative">'+(f.type&&f.type.startsWith('image/')?'<img src="'+f.data+'" style="width:56px;height:56px;object-fit:cover;border-radius:6px;border:1px solid var(--border)">':'<div style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:0.78em">📄 '+f.name+'</div>')+'<button onclick="removeHrFile('+idx+')" style="position:absolute;top:-6px;right:-6px;background:var(--red);color:#fff;border:none;border-radius:50%;width:16px;height:16px;font-size:9px;cursor:pointer;padding:0">✕</button></div>';
-  }).join('');
+  refreshHrPreview();
 }
 function saveHealthRec(id){
   const t=document.getElementById('hr-t').value.trim(),d=document.getElementById('hr-d').value,m=document.getElementById('hr-m').value.trim();

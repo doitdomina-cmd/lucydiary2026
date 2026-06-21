@@ -3578,6 +3578,47 @@ function renderHealth(){
       html+='</div>';
     }
 
+    // 영양제 식품 정리
+    const suppSlots=[
+      {key:'morning_empty', label:'기상 직후'},
+      {key:'morning_meal',  label:'아침 식사 후'},
+      {key:'lunch',         label:'점심 식사 후'},
+      {key:'dinner',        label:'저녁 식사 후'},
+      {key:'bedtime',       label:'취침 전'}
+    ];
+    const supps=H.supplements||{};
+    html+='<div class="card" style="margin-bottom:14px">'+
+      '<div class="ch" style="margin-bottom:12px"><div class="ct" style="gap:5px">'+
+        '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6l1 4H8L9 3z"/><rect x="5" y="7" width="14" height="14" rx="2"/><path d="M12 11v6M9 14h6"/></svg>'+
+        '식품 정리</div></div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+    suppSlots.forEach(function(slot,si){
+      var items=supps[slot.key]||[];
+      var isLast=(si===suppSlots.length-1);
+      html+='<div style="background:var(--s2);border-radius:8px;padding:10px 12px'+(isLast?';grid-column:1/-1':'')+'">'+ 
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'+
+          '<div style="font-size:0.78em;font-weight:600;color:var(--t2)">'+slot.label+'</div>'+
+          '<button class="bi" onclick="openSuppModal(\''+slot.key+'\',\''+slot.label+'\')" style="font-size:0.78em;color:var(--accent)">+ 추가</button>'+
+        '</div>'+
+        (items.length===0
+          ? '<div style="font-size:0.75em;color:var(--t3)">없음</div>'
+          : items.map(function(it){
+              return '<div style="display:flex;align-items:center;justify-content:space-between;padding:3px 0;position:relative" '+
+                'onmouseenter="this.querySelector(\'.supp-tip\').style.opacity=\'1\'" '+
+                'onmouseleave="this.querySelector(\'.supp-tip\').style.opacity=\'0\'">'+
+                '<span style="font-size:0.8em;color:var(--text)">'+it.name+'</span>'+
+                '<div style="display:flex;align-items:center;gap:6px">'+
+                  '<span style="font-size:0.75em;font-weight:600;color:var(--accent)">×'+it.count+'</span>'+
+                  '<button class="bi" onclick="delSupp(\''+slot.key+'\',\''+it.id+'\')" style="font-size:0.72em;color:var(--t3)">✕</button>'+
+                '</div>'+
+                (it.effect?'<div class="supp-tip" style="position:absolute;right:0;top:100%;z-index:10;background:var(--text);color:#fff;font-size:0.72em;padding:4px 8px;border-radius:6px;white-space:nowrap;opacity:0;transition:opacity .15s;pointer-events:none;margin-top:2px">'+it.effect+'</div>':'')+
+              '</div>';
+            }).join(''))+
+      '</div>';
+    });
+    // 5번째 슬롯(취침 전)이 홀수라 2컬럼 그리드에서 혼자 남을 때 full width
+    html+='</div></div>';
+
     // 건강 메모 카드 (있으면 미리보기)
     const memos=H.memos||[];
     if(memos.length>0){
@@ -3593,7 +3634,7 @@ function renderHealth(){
       html+='</div></div>';
     }
 
-    if(!latest&&!nextSched.length&&!recs.length&&(!H.memos||!H.memos.length)){
+    if(!latest&&!nextSched.length&&!recs.length&&(!H.memos||!H.memos.length)&&(!H.supplements||Object.keys(H.supplements).length===0)){
       html+='<div class="empty"><div class="ei">🏥</div>건강 검진 기록과 인바디를 추가하면 여기에 요약이 나와요</div>';
     }
   }
@@ -3814,6 +3855,31 @@ function renderHealth(){
   return html;
 }
 
+function openSuppModal(slotKey, slotLabel){
+  if(!S.health) S.health={schedules:[],records:[],memo:'',inbody:[],tab:'summary'};
+  openHealthMo(slotLabel+' 영양제 추가',
+    '<div class="fg"><label class="fl">이름</label><input class="inp" id="supp-name" placeholder="예: 비타민D"></div>'+
+    '<div class="fg"><label class="fl">갯수</label><input class="inp" id="supp-count" type="number" min="1" value="1" style="max-width:80px"></div>'+
+    '<div class="fg"><label class="fl">효능 <span style="font-size:0.8em;color:var(--t3)">(마우스 오버 시 표시)</span></label><input class="inp" id="supp-effect" placeholder="예: 면역력 강화, 뼈 건강"></div>',
+    '<button class="btn bg" onclick="closeMo()">취소</button>'+
+    '<button class="btn bp" onclick="saveSuppItem(\''+slotKey+'\')">추가</button>'
+  );
+}
+function saveSuppItem(slotKey){
+  var name=document.getElementById('supp-name').value.trim();
+  var count=parseInt(document.getElementById('supp-count').value)||1;
+  var effect=document.getElementById('supp-effect').value.trim();
+  if(!name){alert('이름을 입력해주세요');return;}
+  if(!S.health.supplements) S.health.supplements={};
+  if(!S.health.supplements[slotKey]) S.health.supplements[slotKey]=[];
+  S.health.supplements[slotKey].push({id:gid(),name:name,count:count,effect:effect});
+  save();closeMo();render();
+}
+function delSupp(slotKey,id){
+  if(!S.health||!S.health.supplements||!S.health.supplements[slotKey])return;
+  S.health.supplements[slotKey]=S.health.supplements[slotKey].filter(x=>x.id!==id);
+  save();render();
+}
 function setHealthTab(t){
   if(!S.health) S.health={schedules:[],records:[],memo:'',inbody:[],tab:'summary'};
   S.health.tab=t;

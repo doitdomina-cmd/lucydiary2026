@@ -3467,14 +3467,19 @@ function renderHealth(){
       html+='<div class="card" style="margin-bottom:14px">'+
         '<div class="ch"><div class="ct">📋 최근 검진 기록</div></div>';
       recs.slice(0,3).forEach(function(r){
-        html+='<div style="padding:8px 0;border-bottom:1px solid var(--border)">'+
-          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'+
-            '<div style="font-size:0.88em;font-weight:600">'+r.title+'</div>'+
-            '<div style="font-size:0.75em;color:var(--t3)">'+r.date+'</div>'+
+        var rid='hrec-sum-'+r.id;
+        html+='<details id="'+rid+'" style="padding:8px 0;border-bottom:1px solid var(--border)">'+
+          '<summary style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px">'+
+            '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--t3)" stroke-width="1.5" style="flex-shrink:0;transition:transform .2s" class="sum-arrow"><polyline points="2,3 5,7 8,3"/></svg>'+
+            '<span style="font-size:0.88em;font-weight:600;flex:1">'+r.title+'</span>'+
+            '<span style="font-size:0.75em;color:var(--t3)">'+r.date+'</span>'+
+          '</summary>'+
+          '<div style="padding:8px 0 2px 18px">'+
+            (r.abnormal?'<div style="margin-bottom:6px"><span style="font-size:0.72em;font-weight:600;color:var(--red);background:#fde8e8;padding:1px 6px;border-radius:4px">⚠️ 이상 소견</span><div style="font-size:0.82em;color:var(--t2);margin-top:3px;white-space:pre-wrap">'+r.abnormal+'</div></div>':(!r.abnormal&&!r.normal&&!r.action&&r.memo?'<div style="font-size:0.82em;color:var(--t3);white-space:pre-wrap">'+r.memo+'</div>':''))+
+            (r.normal?'<div style="margin-bottom:6px"><span style="font-size:0.72em;font-weight:600;color:#2d8653;background:#e6f4ec;padding:1px 6px;border-radius:4px">✅ 정상 범위</span><div style="font-size:0.82em;color:var(--t2);margin-top:3px;white-space:pre-wrap">'+r.normal+'</div></div>':'')+
+            (r.action?'<div style="margin-bottom:6px"><span style="font-size:0.72em;font-weight:600;color:var(--accent);background:var(--al);padding:1px 6px;border-radius:4px">📌 추후 조치</span><div style="font-size:0.82em;color:var(--t2);margin-top:3px;white-space:pre-wrap">'+r.action+'</div></div>':'')+
           '</div>'+
-          (r.abnormal?'<div style="font-size:0.8em;color:var(--t2);margin-bottom:2px"><span style="color:var(--red);font-weight:600">⚠️</span> '+r.abnormal.split('\n').slice(0,2).join(' / ')+(r.abnormal.split('\n').length>2?' …':'')+'</div>':(!r.abnormal&&!r.normal&&!r.action&&r.memo?'<div style="font-size:0.8em;color:var(--t3)">'+r.memo.slice(0,60)+(r.memo.length>60?'…':'')+'</div>':''))+
-          (r.action?'<div style="font-size:0.8em;color:var(--accent)">📌 '+r.action.split('\n')[0]+'</div>':'')+
-        '</div>';
+        '</details>';
       });
       html+='</div>';
     }
@@ -3678,7 +3683,7 @@ function renderHealth(){
   else if(tab==='memo'){
     html+='<div class="card">'+
       '<div class="ct" style="margin-bottom:10px">📝 건강 메모</div>'+
-      '<textarea class="ta" id="health-memo" rows="8" placeholder="복용 중인 약, 알레르기, 주치의 연락처, 특이사항 등 자유롭게 적어두세요" oninput="saveHealthMemo(this.value)" style="width:100%;resize:vertical">'+((H.memo||'').replace(/</g,'&lt;'))+'</textarea>'+
+      '<textarea class="ta" id="health-memo" rows="8" placeholder="" oninput="saveHealthMemo(this.value)" style="width:100%;resize:vertical">'+((H.memo||'').replace(/</g,'&lt;'))+'</textarea>'+
     '</div>';
   }
 
@@ -3712,7 +3717,7 @@ function openInbodyModal(id){
       '<div><label class="fl">체지방률 (%)</label><input type="number" class="inp" id="ib-f" step="0.1" placeholder="예: 37.2" value="'+(r.fat||'')+'"></div>'+
       '<div><label class="fl">BMI</label><input type="number" class="inp" id="ib-b" step="0.1" placeholder="예: 24.4" value="'+(r.bmi||'')+'"></div>'+
     '</div>'+
-    '<div class="fg"><label class="fl">메모 (선택)</label><input class="inp" id="ib-n" placeholder="예: 운동 전, 생리 직후" value="'+(r.note||'')+'"></div>',
+    '<div class="fg"><label class="fl">메모 (선택)</label><input class="inp" id="ib-n" placeholder="" value="'+(r.note||'')+'"></div>',
     '<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="saveInbody('+(id?'\''+id+'\'':'null')+')">저장</button>'
   );
 }
@@ -3759,9 +3764,9 @@ function openHealthSchedModal(id){
   if(!S.health) S.health={schedules:[],records:[],memo:''};
   const s=id?S.health.schedules.find(x=>x.id===id):{};
   openMo((id?'검진 예정 수정':'검진 예정 추가'),
-    '<div class="fg"><label class="fl">검진 이름</label><input class="inp" id="hs-t" placeholder="예: 건강검진, 자궁경부암 검진" value="'+(s.title||'')+'"></div>'+
+    '<div class="fg"><label class="fl">검진 이름</label><input class="inp" id="hs-t" placeholder="" value="'+(s.title||'')+'"></div>'+
     '<div class="fg"><label class="fl">예정일</label><input type="date" class="inp" id="hs-d" value="'+(s.date||todStr())+'"></div>'+
-    '<div class="fg"><label class="fl">메모 (선택)</label><input class="inp" id="hs-m" placeholder="예: 서울아산병원, 공복 필요" value="'+(s.memo||'')+'"></div>',
+    '<div class="fg"><label class="fl">메모 (선택)</label><input class="inp" id="hs-m" placeholder="" value="'+(s.memo||'')+'"></div>',
     '<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="saveHealthSched('+(id?'\''+id+'\'':'null')+')">저장</button>'
   );
 }
@@ -3781,11 +3786,11 @@ function openHealthRecModal(id){
   if(!S.health) S.health={schedules:[],records:[],memo:''};
   const r=id?S.health.records.find(x=>x.id===id):{};
   openMo((id?'검진 기록 수정':'검진 기록 추가'),
-    '<div class="fg"><label class="fl">검진 이름</label><input class="inp" id="hr-t" placeholder="예: 건강검진 결과, 자궁초음파" value="'+(r.title||'')+'"></div>'+
+    '<div class="fg"><label class="fl">검진 이름</label><input class="inp" id="hr-t" placeholder="" value="'+(r.title||'')+'"></div>'+
     '<div class="fg"><label class="fl">날짜</label><input type="date" class="inp" id="hr-d" value="'+(r.date||todStr())+'"></div>'+
-    '<div class="fg"><label class="fl" style="color:var(--red)">⚠️ 이상 소견</label><textarea class="ta" id="hr-abnormal" rows="3" placeholder="이상이 발견된 항목들을 적어요&#10;예: CPK 높음 (281), 자궁 근종, 역류성 식도염">'+(r.abnormal||r.memo||'')+'</textarea></div>'+
-    '<div class="fg"><label class="fl" style="color:#2d8653">✅ 정상 범위</label><textarea class="ta" id="hr-normal" rows="2" placeholder="정상으로 확인된 항목들&#10;예: 혈당 정상, 갑상선 정상, 콜레스테롤 정상">'+(r.normal||'')+'</textarea></div>'+
-    '<div class="fg"><label class="fl" style="color:var(--accent)">📌 추후 조치</label><textarea class="ta" id="hr-action" rows="2" placeholder="앞으로 해야 할 것들&#10;예: 대장내시경 재검사, 부인과 진료, 소화기내과 진료">'+(r.action||'')+'</textarea></div>'+
+    '<div class="fg"><label class="fl" style="color:var(--red)">⚠️ 이상 소견</label><textarea class="ta" id="hr-abnormal" rows="3" placeholder="">'+(r.abnormal||r.memo||'')+'</textarea></div>'+
+    '<div class="fg"><label class="fl" style="color:#2d8653">✅ 정상 범위</label><textarea class="ta" id="hr-normal" rows="2" placeholder="">'+(r.normal||'')+'</textarea></div>'+
+    '<div class="fg"><label class="fl" style="color:var(--accent)">📌 추후 조치</label><textarea class="ta" id="hr-action" rows="2" placeholder="">'+(r.action||'')+'</textarea></div>'+
     '<div class="fg"><label class="fl">파일 첨부 (이미지/PDF)</label>'+
       '<label class="btn bg bsm" style="cursor:pointer;display:inline-flex;align-items:center;gap:5px">📎 파일 선택<input type="file" id="hr-f" multiple accept="image/*,.pdf" style="display:none" onchange="previewHealthFiles(this)"></label>'+
       '<div id="hr-preview" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px"></div></div>',

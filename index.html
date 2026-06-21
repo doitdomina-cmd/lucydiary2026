@@ -3468,9 +3468,9 @@ function renderHealth(){
         '<div class="ch"><div class="ct">📋 최근 검진 기록</div></div>';
       recs.slice(0,3).forEach(function(r){
         var rid='hrec-sum-'+r.id;
-        html+='<details id="'+rid+'" style="padding:8px 0;border-bottom:1px solid var(--border)">'+
+        html+='<details id="'+rid+'" open style="padding:8px 0;border-bottom:1px solid var(--border)">'+
           '<summary style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px">'+
-            '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--t3)" stroke-width="1.5" style="flex-shrink:0;transition:transform .2s" class="sum-arrow"><polyline points="2,3 5,7 8,3"/></svg>'+
+            '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--t3)" stroke-width="1.5" style="flex-shrink:0"><polyline points="2,3 5,7 8,3"/></svg>'+
             '<span style="font-size:0.88em;font-weight:600;flex:1">'+r.title+'</span>'+
             '<span style="font-size:0.75em;color:var(--t3)">'+r.date+'</span>'+
           '</summary>'+
@@ -3484,15 +3484,22 @@ function renderHealth(){
       html+='</div>';
     }
 
-    // 건강 메모 (있으면 미리보기)
-    if(H.memo&&H.memo.trim()){
+    // 건강 메모 카드 (있으면 미리보기)
+    const memos=H.memos||[];
+    if(memos.length>0){
       html+='<div class="card">'+
-        '<div class="ct" style="margin-bottom:8px">📝 건강 메모</div>'+
-        '<div style="font-size:0.875em;color:var(--t2);white-space:pre-wrap">'+H.memo+'</div>'+
-      '</div>';
+        '<div class="ct" style="margin-bottom:10px">📝 건강 메모</div>'+
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+      memos.slice(0,4).forEach(function(memo){
+        html+='<div style="background:var(--s2);border-radius:8px;padding:10px 12px">'+
+          '<div style="font-size:0.8em;font-weight:600;margin-bottom:4px">'+memo.title+'</div>'+
+          '<div style="font-size:0.78em;color:var(--t3);white-space:pre-wrap;line-height:1.4">'+memo.content+'</div>'+
+        '</div>';
+      });
+      html+='</div></div>';
     }
 
-    if(!latest&&!nextSched.length&&!recs.length&&!H.memo){
+    if(!latest&&!nextSched.length&&!recs.length&&(!H.memos||!H.memos.length)){
       html+='<div class="empty"><div class="ei">🏥</div>건강 검진 기록과 인바디를 추가하면 여기에 요약이 나와요</div>';
     }
   }
@@ -3681,10 +3688,26 @@ function renderHealth(){
 
   // ══ 탭 4: 건강 메모 ══
   else if(tab==='memo'){
-    html+='<div class="card">'+
-      '<div class="ct" style="margin-bottom:10px">📝 건강 메모</div>'+
-      '<textarea class="ta" id="health-memo" rows="8" placeholder="" oninput="saveHealthMemo(this.value)" style="width:100%;resize:vertical">'+((H.memo||'').replace(/</g,'&lt;'))+'</textarea>'+
-    '</div>';
+    const memos=H.memos||[];
+    html+='<div class="ch" style="margin-bottom:12px"><div class="ct">📝 건강 메모</div><button class="btn bp bsm" onclick="openHealthMemoModal()">+ 추가</button></div>';
+    if(memos.length===0){
+      html+='<div class="empty"><div class="ei">📝</div>복용 중인 약, 알레르기, 주치의 연락처 등을 카드로 저장해보세요</div>';
+    } else {
+      html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+      memos.forEach(function(memo){
+        html+='<div class="card" style="margin-bottom:0;padding:12px 14px">'+
+          '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;margin-bottom:6px">'+
+            '<div style="font-size:0.85em;font-weight:600;color:var(--text)">'+memo.title+'</div>'+
+            '<div style="display:flex;gap:2px;flex-shrink:0">'+
+              '<button class="bi" onclick="openHealthMemoModal(\''+memo.id+'\')" style="font-size:0.78em">✎</button>'+
+              '<button class="bi" onclick="delHealthMemo(\''+memo.id+'\')" style="font-size:0.78em;color:var(--red)">✕</button>'+
+            '</div>'+
+          '</div>'+
+          '<div style="font-size:0.82em;color:var(--t2);white-space:pre-wrap;line-height:1.5">'+memo.content+'</div>'+
+        '</div>';
+      });
+      html+='</div>';
+    }
   }
 
   return html;
@@ -3700,6 +3723,7 @@ function setHealthTab(t){
 function openInbodyModal(id){
   if(!S.health) S.health={schedules:[],records:[],memo:'',inbody:[],tab:'inbody'};
   const r=id?(S.health.inbody||[]).find(x=>x.id===id):{};
+  const savedHeight=S.health.height||'';
   openMo((id?'인바디 수정':'인바디 기록 추가'),
     '<div class="fg"><label class="fl">측정일</label><input type="date" class="inp" id="ib-d" value="'+(r.date||todStr())+'"></div>'+
     '<div class="fg"><label class="fl">측정 시간대</label>'+
@@ -3712,14 +3736,27 @@ function openInbodyModal(id){
       '<input type="hidden" id="ib-timing" value="'+(r.timing||'')+'">'+
     '</div>'+
     '<div class="fg" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
-      '<div><label class="fl">체중 (kg)</label><input type="number" class="inp" id="ib-w" step="0.1" placeholder="예: 62.5" value="'+(r.weight||'')+'"></div>'+
-      '<div><label class="fl">골격근량 (kg)</label><input type="number" class="inp" id="ib-m" step="0.1" placeholder="예: 24.9" value="'+(r.muscle||'')+'"></div>'+
-      '<div><label class="fl">체지방률 (%)</label><input type="number" class="inp" id="ib-f" step="0.1" placeholder="예: 37.2" value="'+(r.fat||'')+'"></div>'+
-      '<div><label class="fl">BMI</label><input type="number" class="inp" id="ib-b" step="0.1" placeholder="예: 24.4" value="'+(r.bmi||'')+'"></div>'+
+      '<div><label class="fl">체중 (kg)</label><input type="number" class="inp" id="ib-w" step="0.1" value="'+(r.weight||'')+'" oninput="calcBmi()"></div>'+
+      '<div><label class="fl">골격근량 (kg)</label><input type="number" class="inp" id="ib-m" step="0.1" value="'+(r.muscle||'')+'"></div>'+
+      '<div><label class="fl">체지방률 (%)</label><input type="number" class="inp" id="ib-f" step="0.1" value="'+(r.fat||'')+'"></div>'+
+      '<div><label class="fl">키 (cm)<span style="font-size:0.82em;color:var(--t3);margin-left:4px">저장됨</span></label>'+
+        '<input type="number" class="inp" id="ib-h" step="0.1" value="'+(r.height||savedHeight)+'" oninput="calcBmi()">'+
+      '</div>'+
     '</div>'+
-    '<div class="fg"><label class="fl">메모 (선택)</label><input class="inp" id="ib-n" placeholder="" value="'+(r.note||'')+'"></div>',
+    '<div class="fg"><label class="fl">BMI <span style="font-size:0.82em;color:var(--t3)">자동 계산</span></label>'+
+      '<input type="number" class="inp" id="ib-b" step="0.01" value="'+(r.bmi||'')+'" readonly style="background:var(--s2);color:var(--t2)">'+
+    '</div>'+
+    '<div class="fg"><label class="fl">메모 (선택)</label><input class="inp" id="ib-n" value="'+(r.note||'')+'"></div>',
     '<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="saveInbody('+(id?'\''+id+'\'':'null')+')">저장</button>'
   );
+  setTimeout(calcBmi, 80);
+}
+
+function calcBmi(){
+  var wEl=document.getElementById('ib-w'), hEl=document.getElementById('ib-h'), bEl=document.getElementById('ib-b');
+  if(!wEl||!hEl||!bEl) return;
+  var w=parseFloat(wEl.value), h=parseFloat(hEl.value);
+  if(w>0&&h>0) bEl.value=(w/((h/100)*(h/100))).toFixed(1);
 }
 
 function selectIbTiming(t){
@@ -3737,12 +3774,15 @@ function saveInbody(id){
   const m=document.getElementById('ib-m').value;
   const f=document.getElementById('ib-f').value;
   const b=document.getElementById('ib-b').value;
+  const h=document.getElementById('ib-h').value;
   const n=document.getElementById('ib-n').value.trim();
   const timing=document.getElementById('ib-timing').value;
   if(!d){alert('측정일을 입력해주세요');return;}
   if(!S.health) S.health={schedules:[],records:[],memo:'',inbody:[],tab:'inbody'};
   if(!S.health.inbody) S.health.inbody=[];
-  const entry={id:id||gid(),date:d,weight:w||'',muscle:m||'',fat:f||'',bmi:b||'',note:n,timing:timing};
+  // 키는 health에 한번만 저장 (매번 기록에 넣지 않아도 됨)
+  if(h) S.health.height=h;
+  const entry={id:id||gid(),date:d,weight:w||'',muscle:m||'',fat:f||'',bmi:b||'',height:h||'',note:n,timing:timing};
   if(id){
     var idx=S.health.inbody.findIndex(x=>x.id===id);
     if(idx>=0) S.health.inbody[idx]=entry;
@@ -3884,6 +3924,35 @@ function openHealthFile(recId,fi){
   else{w.document.write('<html><body style="margin:0"><iframe src="'+f.data+'" style="width:100vw;height:100vh;border:none"></iframe></body></html>');}
 }
 function saveHealthMemo(v){if(!S.health)S.health={schedules:[],records:[],memo:''};S.health.memo=v;save();}
+
+function openHealthMemoModal(id){
+  if(!S.health) S.health={schedules:[],records:[],memo:'',memos:[]};
+  if(!S.health.memos) S.health.memos=[];
+  const m=id?S.health.memos.find(x=>x.id===id):{};
+  openMo((id?'메모 수정':'건강 메모 추가'),
+    '<div class="fg"><label class="fl">제목</label><input class="inp" id="hm-t" value="'+(m.title||'')+'"></div>'+
+    '<div class="fg"><label class="fl">내용</label><textarea class="ta" id="hm-c" rows="5" style="resize:vertical">'+(m.content||'')+'</textarea></div>',
+    '<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="saveHealthMemoCard('+(id?'\''+id+'\'':'null')+')">저장</button>'
+  );
+}
+function saveHealthMemoCard(id){
+  const t=document.getElementById('hm-t').value.trim();
+  const c=document.getElementById('hm-c').value.trim();
+  if(!t){alert('제목을 입력해주세요');return;}
+  if(!S.health.memos) S.health.memos=[];
+  if(id){
+    const m=S.health.memos.find(x=>x.id===id);
+    if(m){m.title=t;m.content=c;}
+  } else {
+    S.health.memos.push({id:gid(),title:t,content:c});
+  }
+  save();closeMo();render();
+}
+function delHealthMemo(id){
+  if(!S.health||!S.health.memos) return;
+  S.health.memos=S.health.memos.filter(x=>x.id!==id);
+  save();render();
+}
 
 // ════ 회고 & 통계 ════
 function renderInsights(){

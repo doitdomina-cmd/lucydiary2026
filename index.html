@@ -3519,10 +3519,18 @@ function renderHealth(){
     } else {
       nextSched.slice(0,3).forEach(function(s){
         var dd=dLeft(s.date);
+        var condName=s.conditionId?((S.health.conditions||[]).find(function(c){return c.id===s.conditionId;})||{}).name:'';
+        var uc=dd<=7?'var(--red)':dd<=30?'var(--accent)':'var(--t2)';
         html+='<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">'+
-          '<div style="flex:1;font-size:0.9286em">'+s.title+'</div>'+
-          '<div style="font-size:0.82em;color:var(--t3)">'+s.date.slice(5).replace('-','/')+'</div>'+
-          '<div style="font-size:0.82em;font-weight:700;color:'+(dd<=30?'var(--accent)':'var(--t2)')+'">D-'+dd+'</div>'+
+          '<div style="flex:1;min-width:0">'+
+            '<div style="font-size:0.9286em">'+s.title+'</div>'+
+            '<div style="font-size:0.78em;color:var(--t3);display:flex;gap:6px;flex-wrap:wrap">'+
+              (s.hospital?'<span>🏥 '+s.hospital+'</span>':'')+
+              (condName?'<span>🩺 '+condName+'</span>':'')+
+            '</div>'+
+          '</div>'+
+          '<div style="font-size:0.82em;color:var(--t3);flex-shrink:0">'+s.date.slice(5).replace('-','/')+'</div>'+
+          '<div style="font-size:0.82em;font-weight:700;color:'+uc+';flex-shrink:0">D-'+dd+'</div>'+
         '</div>';
       });
     }
@@ -3581,20 +3589,23 @@ function renderHealth(){
     } else {
       upcoming.forEach(function(s){
         var dd=dLeft(s.date),f=fmtDateObj(s.date);
+        var yr=s.date.slice(0,4);
         var uc=dd<0?'var(--t3)':dd===0?'var(--red)':dd<=30?'var(--accent)':'var(--t2)';
         var ddLabel=dd<0?'지남':dd===0?'오늘':'D-'+dd;
+        var condName=s.conditionId?((S.health.conditions||[]).find(function(c){return c.id===s.conditionId;})||{}).name:'';
         html+='<div class="ci" style="align-items:flex-start">'+
-          '<div style="display:flex;flex-direction:column;align-items:center;background:var(--s2);border-radius:8px;padding:5px 10px;flex-shrink:0;min-width:46px;text-align:center">'+
+          '<div style="background:var(--s2);border-radius:8px;padding:4px 8px;flex-shrink:0;text-align:center;min-width:48px">'+
+            '<div style="font-size:0.6em;color:var(--t3);font-weight:600">'+yr+'</div>'+
             '<div style="font-size:0.65em;color:var(--t3);font-weight:600;text-transform:uppercase">'+f.month+'</div>'+
-            '<div style="font-size:1.15em;font-weight:700;color:var(--text)">'+f.day+'</div>'+
+            '<div style="font-size:1.15em;font-weight:700;color:var(--text);line-height:1.1">'+f.day+'</div>'+
           '</div>'+
           '<div style="flex:1;min-width:0">'+
             '<div style="font-size:0.9643em;font-weight:600">'+s.title+'</div>'+
-            ((s.hospital||s.conditionId)?'<div style="font-size:0.8em;color:var(--t3);margin-top:2px">'+
-              (s.hospital?'🏥 '+s.hospital:'')+(s.hospital&&s.conditionId?' · ':'')+
-              (s.conditionId&&(S.health.conditions||[]).find(function(c){return c.id===s.conditionId;})?
-                '🩺 '+S.health.conditions.find(function(c){return c.id===s.conditionId;}).name:'')+'</div>':'')+
-            (s.memo?'<div style="font-size:0.8em;color:var(--t3)">'+s.memo+'</div>':'')+
+            '<div style="font-size:0.8em;color:var(--t3);margin-top:3px;display:flex;flex-wrap:wrap;gap:6px">'+
+              (s.hospital?'<span>🏥 '+s.hospital+'</span>':'')+
+              (condName?'<span>🩺 '+condName+'</span>':'')+
+              (s.memo?'<span>'+s.memo+'</span>':'')+
+            '</div>'+
           '</div>'+
           '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">'+
             '<div style="font-family:var(--mono);font-size:0.85em;font-weight:700;color:'+uc+'">'+ddLabel+'</div>'+

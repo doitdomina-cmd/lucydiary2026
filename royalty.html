@@ -54,6 +54,12 @@
             outline: 3px solid var(--primary);
             box-shadow: 0 0 10px rgba(0,0,0,0.2);
         }
+        #mail-body-editor:empty:before {
+            content: attr(placeholder);
+            color: #94a3b8;
+            pointer-events: none;
+        }
+        #mail-body-editor a { color: var(--primary); text-decoration: underline; }
 
         /* 커스텀 스크롤바 */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -1410,36 +1416,56 @@
 
     <!-- 웹툰투고 모달 -->
     <div id="webtoon-sub-modal" class="modal-overlay">
-        <div class="modal-content max-w-lg w-full">
+        <div class="modal-content w-full" style="max-width:560px;">
             <div class="flex justify-between items-center mb-4">
                 <h3 class="text-lg font-bold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-rocket" style="color:var(--primary)"></i> <span id="wsub-modal-title">투고 이력 추가</span></h3>
                 <button onclick="closeWebtoonSubModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-times text-xl"></i></button>
             </div>
             <div class="grid grid-cols-2 gap-3">
                 <div class="col-span-2">
-                    <label class="text-xs font-bold text-slate-500 ml-1 mb-1 block">웹툰사 *</label>
-                    <select id="wsub-studio" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100">
-                        <option value="">선택</option>
-                    </select>
+                    <label class="text-xs font-bold text-slate-500 ml-1 mb-1.5 block">웹툰사 *</label>
+                    <!-- 커스텀 드롭다운 (클릭 시 펼쳐짐, 20개 표시) -->
+                    <div id="wsub-studio-wrapper" style="position:relative; width:100%;">
+                        <div id="wsub-studio-display"
+                             onclick="toggleWsubStudioDropdown()"
+                             style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;
+                                    background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:12px;
+                                    padding:10px 14px; font-size:0.93rem; font-family:'Pretendard','Apple SD Gothic Neo','Noto Sans KR',sans-serif;
+                                    color:#64748b; user-select:none;">
+                            <span id="wsub-studio-label">선택</span>
+                            <i id="wsub-studio-chevron" class="fa-solid fa-chevron-down" style="font-size:0.75rem; color:#94a3b8; transition:transform 0.2s;"></i>
+                        </div>
+                        <div id="wsub-studio-dropdown"
+                             style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:9999;
+                                    background:#fff; border:1.5px solid #e2e8f0; border-radius:12px;
+                                    box-shadow:0 8px 24px rgba(0,0,0,0.12); overflow:hidden;">
+                            <div id="wsub-studio-list"
+                                 style="max-height:calc(38px * 20 + 8px); overflow-y:auto; padding:4px 0;
+                                        font-family:'Pretendard','Apple SD Gothic Neo','Noto Sans KR',sans-serif; font-size:0.93rem;">
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 실제 값 저장용 hidden input -->
+                    <input type="hidden" id="wsub-studio" value="">
                 </div>
                 <div>
-                    <label class="text-xs font-bold text-slate-500 ml-1 mb-1 block">투고일</label>
+                    <label class="text-xs font-bold text-slate-500 ml-1 mb-1.5 block">투고일</label>
                     <input type="date" id="wsub-date" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100">
                 </div>
                 <div>
-                    <label class="text-xs font-bold text-slate-500 ml-1 mb-1 block">접수 답변일</label>
+                    <label class="text-xs font-bold text-slate-500 ml-1 mb-1.5 block">접수 답변일</label>
                     <input type="date" id="wsub-accept-date" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100">
                 </div>
                 <div>
-                    <label class="text-xs font-bold text-slate-500 ml-1 mb-1 block">답변 예정일</label>
+                    <label class="text-xs font-bold text-slate-500 ml-1 mb-1.5 block">답변 예정일</label>
                     <input type="date" id="wsub-expected-date" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100">
                 </div>
                 <div>
-                    <label class="text-xs font-bold text-slate-500 ml-1 mb-1 block">최종 답변일</label>
+                    <label class="text-xs font-bold text-slate-500 ml-1 mb-1.5 block">최종 답변일</label>
                     <input type="date" id="wsub-reply-date" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100">
                 </div>
                 <div class="col-span-2">
-                    <label class="text-xs font-bold text-slate-500 ml-1 mb-1 block">결과</label>
+                    <label class="text-xs font-bold text-slate-500 ml-1 mb-1.5 block">결과</label>
                     <select id="wsub-result" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100">
                         <option value="답변대기">답변대기</option>
                         <option value="거절">거절</option>
@@ -1451,6 +1477,80 @@
             <div class="flex gap-3 pt-4 border-t border-slate-100 mt-4">
                 <button onclick="closeWebtoonSubModal()" class="flex-1 py-3 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200">취소</button>
                 <button onclick="saveWebtoonSubEntry()" class="flex-1 py-3 rounded-xl font-bold text-white shadow-lg" style="background:var(--primary)">저장</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 메일 내용 모달 -->
+    <div id="mail-content-modal" class="modal-overlay">
+        <div class="modal-content w-full" style="max-width:700px;">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-slate-700 flex items-center gap-2">
+                    <i class="fa-solid fa-envelope" style="color:var(--primary)"></i>
+                    <span id="mail-modal-work-title">메일 내용</span>
+                </h3>
+                <button onclick="closeMailContentModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-times text-xl"></i></button>
+            </div>
+            <!-- 제목 -->
+            <div class="mb-3">
+                <label class="text-xs font-bold text-slate-500 ml-1 mb-1 block">메일 제목</label>
+                <input type="text" id="mail-subject-input" placeholder="메일 제목을 입력하세요" spellcheck="false" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100">
+            </div>
+            <!-- 리치 에디터 툴바 -->
+            <div class="mb-1">
+                <label class="text-xs font-bold text-slate-500 ml-1 mb-1 block">메일 본문</label>
+                <div class="flex flex-wrap items-center gap-1 p-2 bg-slate-50 rounded-t-xl border border-slate-200 border-b-0" id="mail-editor-toolbar">
+                    <!-- 폰트 크기 -->
+                    <select onchange="mailEditorExec('fontSize', this.value); this.value=''" class="text-xs border border-slate-200 rounded-lg px-1.5 py-1 bg-white outline-none cursor-pointer text-slate-600">
+                        <option value="">크기</option>
+                        <option value="1">아주 작게</option>
+                        <option value="2">작게</option>
+                        <option value="3">보통</option>
+                        <option value="4">크게</option>
+                        <option value="5">아주 크게</option>
+                    </select>
+                    <div class="w-px h-5 bg-slate-200 mx-0.5"></div>
+                    <!-- 서식 -->
+                    <button onclick="mailEditorExec('bold')" title="굵게" class="w-7 h-7 rounded-lg hover:bg-slate-200 transition-colors text-slate-600 font-bold text-sm flex items-center justify-center">B</button>
+                    <button onclick="mailEditorExec('italic')" title="기울임" class="w-7 h-7 rounded-lg hover:bg-slate-200 transition-colors text-slate-500 italic text-sm flex items-center justify-center">I</button>
+                    <button onclick="mailEditorExec('underline')" title="밑줄" class="w-7 h-7 rounded-lg hover:bg-slate-200 transition-colors text-slate-500 underline text-sm flex items-center justify-center">U</button>
+                    <div class="w-px h-5 bg-slate-200 mx-0.5"></div>
+                    <!-- 정렬 -->
+                    <button onclick="mailEditorExec('justifyLeft')" title="왼쪽 정렬" class="w-7 h-7 rounded-lg hover:bg-slate-200 transition-colors text-slate-500 text-sm flex items-center justify-center"><i class="fa-solid fa-align-left text-xs"></i></button>
+                    <button onclick="mailEditorExec('justifyCenter')" title="가운데 정렬" class="w-7 h-7 rounded-lg hover:bg-slate-200 transition-colors text-slate-500 text-sm flex items-center justify-center"><i class="fa-solid fa-align-center text-xs"></i></button>
+                    <button onclick="mailEditorExec('justifyRight')" title="오른쪽 정렬" class="w-7 h-7 rounded-lg hover:bg-slate-200 transition-colors text-slate-500 text-sm flex items-center justify-center"><i class="fa-solid fa-align-right text-xs"></i></button>
+                    <div class="w-px h-5 bg-slate-200 mx-0.5"></div>
+                    <!-- 링크 -->
+                    <button onclick="mailEditorInsertLink()" title="링크 삽입" class="w-7 h-7 rounded-lg hover:bg-slate-200 transition-colors text-slate-500 text-sm flex items-center justify-center"><i class="fa-solid fa-link text-xs"></i></button>
+                    <button onclick="mailEditorExec('unlink')" title="링크 제거" class="w-7 h-7 rounded-lg hover:bg-slate-200 transition-colors text-slate-500 text-sm flex items-center justify-center"><i class="fa-solid fa-link-slash text-xs"></i></button>
+                    <div class="w-px h-5 bg-slate-200 mx-0.5"></div>
+                    <!-- 색상 -->
+                    <label title="글자 색상" class="w-7 h-7 rounded-lg hover:bg-slate-200 transition-colors flex items-center justify-center cursor-pointer">
+                        <i class="fa-solid fa-palette text-xs text-slate-500"></i>
+                        <input type="color" class="sr-only" onchange="mailEditorExec('foreColor', this.value)">
+                    </label>
+                    <div class="w-px h-5 bg-slate-200 mx-0.5"></div>
+                    <!-- 목록 -->
+                    <button onclick="mailEditorExec('insertUnorderedList')" title="글머리 목록" class="w-7 h-7 rounded-lg hover:bg-slate-200 transition-colors text-slate-500 text-sm flex items-center justify-center"><i class="fa-solid fa-list-ul text-xs"></i></button>
+                    <button onclick="mailEditorExec('insertOrderedList')" title="번호 목록" class="w-7 h-7 rounded-lg hover:bg-slate-200 transition-colors text-slate-500 text-sm flex items-center justify-center"><i class="fa-solid fa-list-ol text-xs"></i></button>
+                </div>
+                <div id="mail-body-editor" contenteditable="true" spellcheck="false"
+                    class="w-full min-h-[260px] p-3 bg-white border border-slate-200 rounded-b-xl text-sm outline-none"
+                    style="line-height:1.8; overflow-y:auto; max-height:380px;"
+                    placeholder="메일 본문을 입력하세요..."></div>
+            </div>
+            <!-- 하단 버튼 -->
+            <div class="flex gap-3 pt-4 border-t border-slate-100 mt-4">
+                <button onclick="closeMailContentModal()" class="flex-1 py-3 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 text-sm">닫기</button>
+                <button onclick="copyMailSubject()" class="py-3 px-4 rounded-xl font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 text-sm flex items-center gap-1.5">
+                    <i class="fa-solid fa-copy text-xs"></i> 제목 복사
+                </button>
+                <button onclick="copyMailBody()" class="py-3 px-4 rounded-xl font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 text-sm flex items-center gap-1.5">
+                    <i class="fa-solid fa-copy text-xs"></i> 본문 복사
+                </button>
+                <button onclick="saveMailContent()" class="flex-1 py-3 rounded-xl font-bold text-white shadow-lg text-sm flex items-center justify-center gap-1.5" style="background:var(--primary)">
+                    <i class="fa-solid fa-floppy-disk text-xs"></i> 저장
+                </button>
             </div>
         </div>
     </div>
@@ -4812,15 +4912,57 @@
             if (!currentWebtoonTabWorkId && tabWorks.length > 0) currentWebtoonTabWorkId = tabWorks[0].id;
             if (!workIds.includes(currentWebtoonTabWorkId)) currentWebtoonTabWorkId = tabWorks.length > 0 ? tabWorks[0].id : null;
 
-            // 왼쪽 탭 목록
-            const tabList = tabWorks.map((w, idx) => {
-                const isActive = w.id === currentWebtoonTabWorkId;
-                return `<div class="flex items-center group ${idx > 0 ? 'border-t border-slate-100' : ''} wsub-tab-item" draggable="true" data-id="${w.id}" ondragstart="webtoonTabDragStart(event,'${w.id}')" ondragover="webtoonTabDragOver(event)" ondrop="webtoonTabDrop(event,'${w.id}')" ondragend="webtoonTabDragEnd(event)">
-                    <span class="text-[10px] text-slate-400 w-6 shrink-0 text-center cursor-grab active:cursor-grabbing">${idx+1}</span>
-                    <button onclick="selectWebtoonTab('${w.id}')" class="flex-1 text-left px-1 py-2 text-sm transition-all truncate ${isActive ? 'font-bold' : 'text-slate-500 hover:text-slate-700'}" style="${isActive ? 'color:var(--primary);' : ''}">${w.title}</button>
-                    <button onclick="event.stopPropagation(); removeWebtoonTab('${w.id}')" class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 text-xs shrink-0 px-1 transition-all"><i class="fa-solid fa-xmark"></i></button>
-                </div>`;
-            }).join('');
+            const genreOrder = ['BL 장편', '현로 장편', '현로 초단', 'BL 초단'];
+            // 장르별로 분류
+            const grouped = {};
+            const etcWorks = [];
+            tabWorks.forEach(w => {
+                const g = (w.genre || '').trim();
+                if (genreOrder.includes(g)) {
+                    if (!grouped[g]) grouped[g] = [];
+                    grouped[g].push(w);
+                } else {
+                    etcWorks.push(w);
+                }
+            });
+
+            let tabListHtml = '';
+            let isFirstGroup = true;
+            genreOrder.forEach(genre => {
+                const works = grouped[genre];
+                if (!works || works.length === 0) return;
+                const gc = getGenreColor(genre);
+                const bgColor = hexToRgba(gc, 0.55);
+                // 배경 밝기에 따라 텍스트 색상 결정 (어두운 배경 → 흰색, 밝은 배경 → 어두운색)
+                const r = parseInt(gc.slice(1,3),16), gv = parseInt(gc.slice(3,5),16), b = parseInt(gc.slice(5,7),16);
+                const lum = (r*0.299 + gv*0.587 + b*0.114) / 255;
+                const textColor = lum > 0.55 ? '#4a4a4a' : '#fff';
+                if (!isFirstGroup) tabListHtml += `<div style="height:1px; background:rgba(0,0,0,0.07);"></div>`;
+                isFirstGroup = false;
+                tabListHtml += `<div style="background:${bgColor}; color:${textColor}; padding:10px 10px; font-family:'Pretendard','Apple SD Gothic Neo','Noto Sans KR',sans-serif; font-size:0.82rem; font-weight:700; letter-spacing:0.04em; text-align:center;">${genre}</div>`;
+                works.forEach((w, idx) => {
+                    const isActive = w.id === currentWebtoonTabWorkId;
+                    const rowBg = isActive ? hexToRgba(gc, 0.13) : '';
+                    tabListHtml += `<div class="flex items-center group wsub-tab-item" draggable="true" data-id="${w.id}" ondragstart="webtoonTabDragStart(event,'${w.id}')" ondragover="webtoonTabDragOver(event)" ondrop="webtoonTabDrop(event,'${w.id}')" ondragend="webtoonTabDragEnd(event)" style="border-top:1px solid rgba(0,0,0,0.05); ${rowBg ? 'background:'+rowBg+';' : ''}">
+                        <span style="font-family:'Pretendard','Apple SD Gothic Neo',sans-serif; font-size:0.78rem; font-weight:700; color:${gc}; width:1.5rem; text-align:center; flex-shrink:0; cursor:grab;">${idx+1}</span>
+                        <button onclick="selectWebtoonTab('${w.id}')" class="flex-1 text-left py-2.5 transition-all truncate" style="font-family:'Pretendard','Apple SD Gothic Neo','Noto Sans KR',sans-serif; font-size:0.88rem; padding-left:2px; padding-right:4px; ${isActive ? 'font-weight:700; color:'+gc+';' : 'color:#64748b;'}">${w.title}</button>
+                        <button onclick="event.stopPropagation(); removeWebtoonTab('${w.id}')" class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 text-xs shrink-0 px-1 transition-all"><i class="fa-solid fa-xmark"></i></button>
+                    </div>`;
+                });
+            });
+            // 기타 장르
+            if (etcWorks.length > 0) {
+                if (!isFirstGroup) tabListHtml += `<div style="height:1px; background:rgba(0,0,0,0.07);"></div>`;
+                tabListHtml += `<div style="background:#e2e8f0; color:#475569; padding:10px 10px; font-family:'Pretendard','Apple SD Gothic Neo','Noto Sans KR',sans-serif; font-size:0.82rem; font-weight:700; letter-spacing:0.04em; text-align:center;">기타</div>`;
+                etcWorks.forEach((w, idx) => {
+                    const isActive = w.id === currentWebtoonTabWorkId;
+                    tabListHtml += `<div class="flex items-center group wsub-tab-item" draggable="true" data-id="${w.id}" ondragstart="webtoonTabDragStart(event,'${w.id}')" ondragover="webtoonTabDragOver(event)" ondrop="webtoonTabDrop(event,'${w.id}')" ondragend="webtoonTabDragEnd(event)" style="border-top:1px solid rgba(0,0,0,0.05);">
+                        <span style="font-family:'Pretendard',sans-serif; font-size:0.78rem; color:#94a3b8; width:1.5rem; text-align:center; flex-shrink:0;">${idx+1}</span>
+                        <button onclick="selectWebtoonTab('${w.id}')" class="flex-1 text-left py-2.5 transition-all truncate" style="font-family:'Pretendard','Apple SD Gothic Neo','Noto Sans KR',sans-serif; font-size:0.88rem; padding-left:2px; ${isActive ? 'font-weight:700; color:var(--primary);' : 'color:#64748b;'}">${w.title}</button>
+                        <button onclick="event.stopPropagation(); removeWebtoonTab('${w.id}')" class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 text-xs shrink-0 px-1 transition-all"><i class="fa-solid fa-xmark"></i></button>
+                    </div>`;
+                });
+            }
 
             // 오른쪽 이력 테이블
             let rightContent = '';
@@ -4833,7 +4975,10 @@
                         <span class="font-bold text-slate-700">${w?.title || ''}</span>
                         <span class="text-xs text-slate-400">${w?.genre || ''}</span>
                     </div>
-                    <button onclick="openWebtoonSubModal('${currentWebtoonTabWorkId}')" class="px-3 rounded-lg text-white flex items-center gap-1.5 transition-all hover:-translate-y-0.5" style="background:var(--primary); padding-top:0.44rem; padding-bottom:0.44rem; font-size:0.8rem; font-weight:500;"><i class="fa-solid fa-plus"></i> 이력 추가</button>
+                    <div class="flex items-center gap-2">
+                        <button onclick="openMailContentModal('${currentWebtoonTabWorkId}')" class="px-3 rounded-lg flex items-center gap-1.5 transition-all hover:-translate-y-0.5 border" style="padding-top:0.44rem; padding-bottom:0.44rem; font-size:0.8rem; font-weight:500; color:var(--primary); border-color:var(--primary); background:var(--primary-light);"><i class="fa-solid fa-envelope text-xs"></i> 메일 내용</button>
+                        <button onclick="openWebtoonSubModal('${currentWebtoonTabWorkId}')" class="px-3 rounded-lg text-white flex items-center gap-1.5 transition-all hover:-translate-y-0.5" style="background:var(--primary); padding-top:0.44rem; padding-bottom:0.44rem; font-size:0.8rem; font-weight:500;"><i class="fa-solid fa-plus"></i> 이력 추가</button>
+                    </div>
                 </div>`;
                 if (entries.length === 0) {
                     rightContent += `<div class="text-center py-12 text-slate-400 text-sm">아직 투고 이력이 없어요.<br><span class="text-xs text-slate-300">이력 추가 버튼을 눌러 추가해보세요.</span></div>`;
@@ -4892,9 +5037,8 @@
                 <!-- 왼쪽 작품 탭 -->
                 <div class="w-52 shrink-0 flex flex-col">
                     <button onclick="openWebtoonSubWorkPicker()" class="w-full mb-3 px-3 rounded-lg text-white flex items-center gap-1.5 justify-center hover:-translate-y-0.5 transition-all" style="background:var(--primary); padding-top:0.44rem; padding-bottom:0.44rem; font-size:0.8rem; font-weight:500;"><i class="fa-solid fa-plus"></i> 작품 추가</button>
-                    <div class="border border-slate-200 rounded-xl overflow-hidden" style="background:var(--primary-light, #effcf6)">
-                        <div class="px-3 py-2 text-sm text-center font-medium" style="background:var(--primary); color:white;">투고 목록</div>
-                        ${tabList || '<p class="text-xs text-slate-400 text-center py-4">추가된 작품 없음</p>'}
+                    <div class="border border-slate-200 rounded-xl overflow-hidden" style="background:#f8fafc">
+                        ${tabListHtml || '<p class="text-xs text-slate-400 text-center py-4">추가된 작품 없음</p>'}
                     </div>
                 </div>
                 <!-- 오른쪽 이력 -->\n                <div class="flex-1 min-w-0">${rightContent}</div>
@@ -5007,9 +5151,8 @@
             currentWebtoonSubEntryId = entryId;
             const entry = entryId ? (webtoonSubs[workId] || []).find(e => e.id === entryId) : null;
             document.getElementById('wsub-modal-title').textContent = entryId ? '투고 이력 수정' : '투고 이력 추가';
-            const sel = document.getElementById('wsub-studio');
             const sortedSubs = [...submissions].sort((a, b) => (a.studio || '').localeCompare(b.studio || '', 'ko'));
-            sel.innerHTML = '<option value="">선택</option>' + sortedSubs.map(s => `<option value="${s.studio}" ${entry?.studio === s.studio ? 'selected' : ''}>${s.studio}</option>`).join('');
+            populateWsubStudioDropdown(sortedSubs, entry?.studio || '');
             document.getElementById('wsub-date').value = entry?.date || '';
             document.getElementById('wsub-accept-date').value = entry?.acceptDate || '';
             document.getElementById('wsub-expected-date').value = entry?.expectedDate || '';
@@ -5018,7 +5161,187 @@
             document.getElementById('webtoon-sub-modal').classList.add('open');
         }
 
-        function closeWebtoonSubModal() { document.getElementById('webtoon-sub-modal').classList.remove('open'); }
+        function closeWebtoonSubModal() {
+            document.getElementById('webtoon-sub-modal').classList.remove('open');
+            closeWsubStudioDropdown();
+        }
+
+        // ════════ 웹툰사 커스텀 드롭다운 ════════
+        function populateWsubStudioDropdown(sortedSubs, selectedValue) {
+            const list = document.getElementById('wsub-studio-list');
+            const hiddenInput = document.getElementById('wsub-studio');
+            const label = document.getElementById('wsub-studio-label');
+
+            // 선택 없음 항목
+            const items = [{ studio: '' }, ...sortedSubs];
+
+            list.innerHTML = items.map(s => {
+                const val = s.studio || '';
+                const txt = val || '선택';
+                const isSelected = val === selectedValue;
+                return `<div class="wsub-studio-item" data-value="${val}"
+                    onclick="selectWsubStudio('${val.replace(/'/g,"\\'")}', '${txt.replace(/'/g,"\\'")}', this)"
+                    style="padding:0 16px; height:38px; display:flex; align-items:center; cursor:pointer; color:${isSelected ? 'var(--primary)' : '#475569'};
+                           background:${isSelected ? 'var(--primary-light)' : 'transparent'};
+                           font-weight:${isSelected ? '600' : '400'};
+                           transition:background 0.12s;"
+                    onmouseenter="this.style.background=this.dataset.value==='${selectedValue}' ? 'var(--primary-light)' : '#f1f5f9'"
+                    onmouseleave="this.style.background=this.dataset.value==='${selectedValue}' ? 'var(--primary-light)' : 'transparent'"
+                    >${txt}</div>`;
+            }).join('');
+
+            hiddenInput.value = selectedValue;
+            label.textContent = selectedValue || '선택';
+            label.style.color = selectedValue ? '#334155' : '#94a3b8';
+        }
+
+        function toggleWsubStudioDropdown() {
+            const dd = document.getElementById('wsub-studio-dropdown');
+            const chevron = document.getElementById('wsub-studio-chevron');
+            const isOpen = dd.style.display !== 'none';
+            if (isOpen) {
+                dd.style.display = 'none';
+                chevron.style.transform = '';
+            } else {
+                dd.style.display = 'block';
+                chevron.style.transform = 'rotate(180deg)';
+                // 선택된 항목으로 스크롤
+                const selected = dd.querySelector('.wsub-studio-item[data-value="' + document.getElementById('wsub-studio').value + '"]');
+                if (selected) setTimeout(() => selected.scrollIntoView({ block: 'nearest' }), 50);
+            }
+        }
+
+        function closeWsubStudioDropdown() {
+            const dd = document.getElementById('wsub-studio-dropdown');
+            if (dd) { dd.style.display = 'none'; }
+            const chevron = document.getElementById('wsub-studio-chevron');
+            if (chevron) chevron.style.transform = '';
+        }
+
+        function selectWsubStudio(value, text, el) {
+            const hiddenInput = document.getElementById('wsub-studio');
+            const label = document.getElementById('wsub-studio-label');
+            hiddenInput.value = value;
+            label.textContent = text;
+            label.style.color = value ? '#334155' : '#94a3b8';
+            // 하이라이트 갱신
+            el.closest('#wsub-studio-list').querySelectorAll('.wsub-studio-item').forEach(item => {
+                const sel = item.dataset.value === value;
+                item.style.color = sel ? 'var(--primary)' : '#475569';
+                item.style.background = sel ? 'var(--primary-light)' : 'transparent';
+                item.style.fontWeight = sel ? '600' : '400';
+            });
+            closeWsubStudioDropdown();
+        }
+
+        // 드롭다운 외부 클릭 시 닫기
+        document.addEventListener('click', function(e) {
+            const wrapper = document.getElementById('wsub-studio-wrapper');
+            if (wrapper && !wrapper.contains(e.target)) closeWsubStudioDropdown();
+        });
+
+        // ════════ 메일 내용 관리 ════════
+        let currentMailWorkId = null;
+
+        function openMailContentModal(workId) {
+            currentMailWorkId = workId;
+            const w = masterWorks.find(x => x.id === workId);
+            document.getElementById('mail-modal-work-title').textContent = (w?.title || '') + ' — 메일 내용';
+            const mailData = (webtoonSubs['__mail__'] || {})[workId] || {};
+            document.getElementById('mail-subject-input').value = mailData.subject || '';
+            const editor = document.getElementById('mail-body-editor');
+            editor.innerHTML = mailData.body || '';
+            document.getElementById('mail-content-modal').classList.add('open');
+            setTimeout(() => editor.focus(), 100);
+        }
+
+        function closeMailContentModal() {
+            document.getElementById('mail-content-modal').classList.remove('open');
+        }
+
+        function mailEditorExec(cmd, val) {
+            document.getElementById('mail-body-editor').focus();
+            document.execCommand(cmd, false, val || null);
+        }
+
+        function mailEditorInsertLink() {
+            const url = prompt('링크 URL을 입력하세요:', 'https://');
+            if (!url) return;
+            document.getElementById('mail-body-editor').focus();
+            document.execCommand('createLink', false, url);
+            // 링크에 target="_blank" 자동 추가
+            const links = document.getElementById('mail-body-editor').querySelectorAll('a');
+            links.forEach(a => { a.target = '_blank'; a.rel = 'noopener'; });
+        }
+
+        function saveMailContent() {
+            if (!currentMailWorkId) return;
+            if (!webtoonSubs['__mail__']) webtoonSubs['__mail__'] = {};
+            webtoonSubs['__mail__'][currentMailWorkId] = {
+                subject: document.getElementById('mail-subject-input').value,
+                body: document.getElementById('mail-body-editor').innerHTML
+            };
+            save();
+            // 저장 완료 토스트
+            const btn = document.querySelector('#mail-content-modal button[onclick="saveMailContent()"]');
+            if (btn) {
+                const orig = btn.innerHTML;
+                btn.innerHTML = '<i class="fa-solid fa-check text-xs"></i> 저장됨';
+                setTimeout(() => { btn.innerHTML = orig; }, 1200);
+            }
+        }
+
+        function copyMailSubject() {
+            const subject = document.getElementById('mail-subject-input').value;
+            if (!subject) { alert('제목이 비어 있습니다.'); return; }
+            navigator.clipboard.writeText(subject).then(() => {
+                showMailCopyToast('제목이 복사되었습니다!');
+            }).catch(() => {
+                // fallback
+                const ta = document.createElement('textarea');
+                ta.value = subject; document.body.appendChild(ta); ta.select();
+                document.execCommand('copy'); document.body.removeChild(ta);
+                showMailCopyToast('제목이 복사되었습니다!');
+            });
+        }
+
+        function copyMailBody() {
+            const editor = document.getElementById('mail-body-editor');
+            if (!editor.innerText.trim()) { alert('본문이 비어 있습니다.'); return; }
+            // HTML + 텍스트 모두 클립보드에 (서식 유지)
+            if (navigator.clipboard && window.ClipboardItem) {
+                const blob = new Blob([editor.innerHTML], { type: 'text/html' });
+                const blobText = new Blob([editor.innerText], { type: 'text/plain' });
+                navigator.clipboard.write([new ClipboardItem({ 'text/html': blob, 'text/plain': blobText })])
+                    .then(() => showMailCopyToast('본문이 복사되었습니다! (서식 포함)'))
+                    .catch(() => {
+                        navigator.clipboard.writeText(editor.innerText).then(() => showMailCopyToast('본문이 복사되었습니다!'));
+                    });
+            } else {
+                // 구형 브라우저 fallback — 서식 포함 복사
+                const range = document.createRange();
+                range.selectNodeContents(editor);
+                const sel = window.getSelection();
+                sel.removeAllRanges(); sel.addRange(range);
+                document.execCommand('copy');
+                sel.removeAllRanges();
+                showMailCopyToast('본문이 복사되었습니다!');
+            }
+        }
+
+        function showMailCopyToast(msg) {
+            let toast = document.getElementById('mail-copy-toast');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'mail-copy-toast';
+                toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#334155;color:white;padding:10px 22px;border-radius:12px;font-size:0.85rem;font-weight:600;z-index:99999;box-shadow:0 4px 20px rgba(0,0,0,0.18);transition:opacity 0.3s;';
+                document.body.appendChild(toast);
+            }
+            toast.textContent = msg;
+            toast.style.opacity = '1';
+            clearTimeout(toast._timer);
+            toast._timer = setTimeout(() => { toast.style.opacity = '0'; }, 1800);
+        }
 
         function saveWebtoonSubEntry() {
             const studio = document.getElementById('wsub-studio').value;

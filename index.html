@@ -3434,6 +3434,7 @@ function renderHealth(){
   const H=S.health;
   if(!H.inbody) H.inbody=[];
   if(!H.tab||H.tab==='sched') H.tab='summary';
+  if(!['summary','inbody','records','supps','memo'].includes(H.tab)) H.tab='summary';
   const tab=H.tab;
 
   // ── 탭 헤더 ──
@@ -3443,7 +3444,7 @@ function renderHealth(){
     records:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M9 4h6a1 1 0 0 1 1 1v1h1a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h1V5a1 1 0 0 1 1-1z"/><rect x="8.5" y="2.5" width="7" height="3.5" rx="1"/><path d="M9 12h6M9 16h4"/></svg>',
     memo:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M3.5 20.5l1-4 12-12a1.6 1.6 0 0 1 2.3 0l0.7 0.7a1.6 1.6 0 0 1 0 2.3l-12 12z"/><path d="M14 6l4 4"/></svg>'
   };
-  const tabs=[{k:'summary',l:'건강 요약'},{k:'inbody',l:'인바디'},{k:'records',l:'검진 기록'},{k:'memo',l:'메모'}];
+  const tabs=[{k:'summary',l:'건강 요약'},{k:'inbody',l:'인바디'},{k:'records',l:'검진 기록'},{k:'supps',l:'식품 정리'},{k:'memo',l:'메모'}];
   let html='<div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">';
   tabs.forEach(function(t){
     var on=tab===t.k;
@@ -3577,47 +3578,6 @@ function renderHealth(){
       });
       html+='</div>';
     }
-
-    // 영양제 식품 정리
-    const suppSlots=[
-      {key:'morning_empty', label:'기상 직후'},
-      {key:'morning_meal',  label:'아침 식사 후'},
-      {key:'lunch',         label:'점심 식사 후'},
-      {key:'dinner',        label:'저녁 식사 후'},
-      {key:'bedtime',       label:'취침 전'}
-    ];
-    const supps=H.supplements||{};
-    html+='<div class="card" style="margin-bottom:14px">'+
-      '<div class="ch" style="margin-bottom:12px"><div class="ct" style="gap:5px">'+
-        '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6l1 4H8L9 3z"/><rect x="5" y="7" width="14" height="14" rx="2"/><path d="M12 11v6M9 14h6"/></svg>'+
-        '식품 정리</div></div>'+
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-    suppSlots.forEach(function(slot,si){
-      var items=supps[slot.key]||[];
-      var isLast=(si===suppSlots.length-1);
-      html+='<div style="background:var(--s2);border-radius:8px;padding:10px 12px'+(isLast?';grid-column:1/-1':'')+'">'+ 
-        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'+
-          '<div style="font-size:0.78em;font-weight:600;color:var(--t2)">'+slot.label+'</div>'+
-          '<button class="bi" onclick="openSuppModal(\''+slot.key+'\',\''+slot.label+'\')" style="font-size:0.78em;color:var(--accent)">+ 추가</button>'+
-        '</div>'+
-        (items.length===0
-          ? '<div style="font-size:0.75em;color:var(--t3)">없음</div>'
-          : items.map(function(it){
-              return '<div style="display:flex;align-items:center;justify-content:space-between;padding:3px 0;position:relative" '+
-                'onmouseenter="this.querySelector(\'.supp-tip\').style.opacity=\'1\'" '+
-                'onmouseleave="this.querySelector(\'.supp-tip\').style.opacity=\'0\'">'+
-                '<span style="font-size:0.8em;color:var(--text)">'+it.name+'</span>'+
-                '<div style="display:flex;align-items:center;gap:6px">'+
-                  '<span style="font-size:0.75em;font-weight:600;color:var(--accent)">×'+it.count+'</span>'+
-                  '<button class="bi" onclick="delSupp(\''+slot.key+'\',\''+it.id+'\')" style="font-size:0.72em;color:var(--t3)">✕</button>'+
-                '</div>'+
-                (it.effect?'<div class="supp-tip" style="position:absolute;right:0;top:100%;z-index:10;background:var(--text);color:#fff;font-size:0.72em;padding:4px 8px;border-radius:6px;white-space:nowrap;opacity:0;transition:opacity .15s;pointer-events:none;margin-top:2px">'+it.effect+'</div>':'')+
-              '</div>';
-            }).join(''))+
-      '</div>';
-    });
-    // 5번째 슬롯(취침 전)이 홀수라 2컬럼 그리드에서 혼자 남을 때 full width
-    html+='</div></div>';
 
     // 건강 메모 카드 (있으면 미리보기)
     const memos=H.memos||[];
@@ -3828,6 +3788,79 @@ function renderHealth(){
     html+='</div>';
   }
 
+  // ══ 탭: 식품 정리 ══
+  else if(tab==='supps'){
+    const suppSlots=[
+      {key:'morning_empty', label:'기상 직후'},
+      {key:'morning_meal',  label:'아침 식사 후'},
+      {key:'lunch',         label:'점심 식사 후'},
+      {key:'dinner',        label:'저녁 식사 후'},
+      {key:'bedtime',       label:'취침 전'}
+    ];
+    // 알약 배지 색상 팔레트 (사진처럼 파스텔 듀오톤)
+    const pillPalette=[
+      {bg:'#D6E8FF',fg:'#4A7CC7',dot:'#7FAAED'},
+      {bg:'#FFD6D6',fg:'#C05050',dot:'#E88888'},
+      {bg:'#D6FFE8',fg:'#3A8C5C',dot:'#70C490'},
+      {bg:'#FFF0D6',fg:'#B87030',dot:'#E0A860'},
+      {bg:'#EDD6FF',fg:'#8040B8',dot:'#B870E0'},
+      {bg:'#D6F4FF',fg:'#2E8CB0',dot:'#60C0E0'},
+      {bg:'#FFE8D6',fg:'#B06030',dot:'#E09060'},
+      {bg:'#D6FFD6',fg:'#388038',dot:'#70C070'},
+    ];
+    const supps=H.supplements||{};
+    // 모든 아이템에 전역 색상 인덱스 배정 (아이디 기준 고정)
+    var allIds=[];
+    suppSlots.forEach(function(s){(supps[s.key]||[]).forEach(function(it){if(!allIds.includes(it.id))allIds.push(it.id);});});
+
+    html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px" id="supp-grid">';
+    suppSlots.forEach(function(slot,si){
+      var items=supps[slot.key]||[];
+      var isLast=(si===suppSlots.length-1);
+      html+='<div class="card supp-slot" data-slot="'+slot.key+'" style="margin-bottom:0;'+(isLast?'grid-column:1/-1':'')+
+        ';min-height:90px;transition:background .15s" '+
+        'ondragover="event.preventDefault();this.style.background=\'var(--s2)\'" '+
+        'ondragleave="this.style.background=\'\'" '+
+        'ondrop="suppDrop(event,\''+slot.key+'\')">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'+
+          '<div style="font-size:0.9em;font-weight:700;color:var(--text)">'+slot.label+'</div>'+
+          '<button class="bi" onclick="openSuppModal(\''+slot.key+'\',\''+slot.label+'\')" style="font-size:0.8em;color:var(--accent)">+ 추가</button>'+
+        '</div>'+
+        '<div style="display:flex;flex-wrap:wrap;gap:6px">'+
+        (items.length===0
+          ? '<div style="font-size:0.78em;color:var(--t3);width:100%;text-align:center;padding:8px 0">없음</div>'
+          : items.map(function(it){
+              var ci=allIds.indexOf(it.id)%pillPalette.length;
+              var p=pillPalette[ci<0?0:ci];
+              return '<div class="supp-pill" draggable="true" data-id="'+it.id+'" data-slot="'+slot.key+'" '+
+                'ondragstart="suppDragStart(event,\''+slot.key+'\',\''+it.id+'\')" '+
+                'style="position:relative;display:inline-flex;align-items:center;gap:5px;'+
+                'background:'+p.bg+';color:'+p.fg+';'+
+                'padding:4px 10px 4px 8px;border-radius:20px;cursor:grab;user-select:none;'+
+                'font-size:0.82em;font-weight:600;white-space:nowrap;'+
+                'box-shadow:inset 0 -2px 0 rgba(0,0,0,.08)" '+
+                'title="'+it.effect+'" '+
+                'onmouseenter="var t=this.querySelector(\'.sp-tip\');if(t)t.style.opacity=\'1\'" '+
+                'onmouseleave="var t=this.querySelector(\'.sp-tip\');if(t)t.style.opacity=\'0\'">'+
+                // 알약 왼쪽 동그라미 도트
+                '<span style="width:8px;height:8px;border-radius:50%;background:'+p.dot+';flex-shrink:0;display:inline-block"></span>'+
+                it.name+' '+it.count+'알'+
+                '<button onclick="event.stopPropagation();delSupp(\''+slot.key+'\',\''+it.id+'\')" '+
+                  'style="background:none;border:none;cursor:pointer;color:'+p.fg+';opacity:.5;font-size:0.9em;padding:0;margin-left:2px;line-height:1">×</button>'+
+                (it.effect
+                  ? '<div class="sp-tip" style="position:absolute;bottom:calc(100%+6px);left:50%;transform:translateX(-50%);'+
+                    'background:rgba(30,30,30,.92);color:#fff;font-size:0.72em;padding:4px 9px;border-radius:6px;'+
+                    'white-space:nowrap;opacity:0;transition:opacity .15s;pointer-events:none;z-index:30;'+
+                    'box-shadow:0 2px 8px rgba(0,0,0,.2)">'+it.effect+'</div>'
+                  : '')+
+              '</div>';
+            }).join(''))+
+        '</div>'+
+      '</div>';
+    });
+    html+='</div>';
+  }
+
   // ══ 탭 4: 건강 메모 ══
   else if(tab==='memo'){
     const memos=H.memos||[];
@@ -3859,7 +3892,7 @@ function openSuppModal(slotKey, slotLabel){
   if(!S.health) S.health={schedules:[],records:[],memo:'',inbody:[],tab:'summary'};
   openHealthMo(slotLabel+' 영양제 추가',
     '<div class="fg"><label class="fl">이름</label><input class="inp" id="supp-name" placeholder="예: 비타민D"></div>'+
-    '<div class="fg"><label class="fl">갯수</label><input class="inp" id="supp-count" type="number" min="1" value="1" style="max-width:80px"></div>'+
+    '<div class="fg"><label class="fl">갯수 (알)</label><input class="inp" id="supp-count" type="number" min="1" value="1" style="max-width:80px"></div>'+
     '<div class="fg"><label class="fl">효능 <span style="font-size:0.8em;color:var(--t3)">(마우스 오버 시 표시)</span></label><input class="inp" id="supp-effect" placeholder="예: 면역력 강화, 뼈 건강"></div>',
     '<button class="btn bg" onclick="closeMo()">취소</button>'+
     '<button class="btn bp" onclick="saveSuppItem(\''+slotKey+'\')">추가</button>'
@@ -3874,6 +3907,25 @@ function saveSuppItem(slotKey){
   if(!S.health.supplements[slotKey]) S.health.supplements[slotKey]=[];
   S.health.supplements[slotKey].push({id:gid(),name:name,count:count,effect:effect});
   save();closeMo();render();
+}
+var _suppDragSlot='',_suppDragId='';
+function suppDragStart(e,slot,id){
+  _suppDragSlot=slot; _suppDragId=id;
+  e.dataTransfer.effectAllowed='move';
+}
+function suppDrop(e,toSlot){
+  e.preventDefault();
+  e.currentTarget.style.background='';
+  if(!_suppDragId||_suppDragSlot===toSlot)return;
+  var supps=S.health.supplements||{};
+  var fromArr=supps[_suppDragSlot]||[];
+  var item=fromArr.find(function(x){return x.id===_suppDragId;});
+  if(!item)return;
+  supps[_suppDragSlot]=fromArr.filter(function(x){return x.id!==_suppDragId;});
+  if(!supps[toSlot])supps[toSlot]=[];
+  supps[toSlot].push(item);
+  S.health.supplements=supps;
+  save();render();
 }
 function delSupp(slotKey,id){
   if(!S.health||!S.health.supplements||!S.health.supplements[slotKey])return;

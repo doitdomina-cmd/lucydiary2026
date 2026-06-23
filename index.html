@@ -3741,7 +3741,8 @@ function renderHealth(){
         {key:'fat',label:'체지방률',unit:'%',color:'#E8A87C'},
       ];
 
-      METRICS.forEach(function(m){
+      var ibGrpId='ibg_'+Date.now();
+      METRICS.forEach(function(m,mi){
         var vals=ibs.filter(function(r){return r[m.key]!=null&&r[m.key]!=='';}).map(function(r){return {date:r.date,val:parseFloat(r[m.key])};});
         if(vals.length<1) return;
 
@@ -3752,6 +3753,7 @@ function renderHealth(){
         var W=320,H_=120,PL=40,PR=12,PT=10,PB=24;
         var iW=W-PL-PR, iH=H_-PT-PB;
         var latest=vals[vals.length-1];
+        var svgId=ibGrpId+'_'+m.key;
 
         function xPos(i){return PL+iW*(vals.length===1?0.5:i/(vals.length-1));}
         function yPos(v){return PT+iH*(1-(v-lo)/(hi-lo));}
@@ -3772,7 +3774,7 @@ function renderHealth(){
 
         var dots=vals.map(function(v,i){
           var isLast=i===vals.length-1;
-          return '<circle cx="'+xPos(i)+'" cy="'+yPos(v.val)+'" r="'+(isLast?5:3.5)+'" fill="'+(isLast?m.color:'var(--surface)')+'" stroke="'+m.color+'" stroke-width="2"/>'+
+          return '<circle cx="'+xPos(i)+'" cy="'+yPos(v.val)+'" r="'+(isLast?5:3.5)+'" fill="'+(isLast?m.color:'var(--surface)')+'" stroke="'+m.color+'" stroke-width="2" class="ib-dot"/>'+
             (isLast?'<text x="'+xPos(i)+'" y="'+(yPos(v.val)-8)+'" font-size="10" font-weight="600" fill="'+m.color+'" text-anchor="middle">'+v.val+'</text>':'');
         }).join('');
 
@@ -3785,6 +3787,27 @@ function renderHealth(){
           }
         });
 
+        // 마우스오버용 투명 히트 영역 + 툴팁 요소
+        var hitRects='';
+        var tooltipEl='<g id="tt_'+svgId+'" style="display:none;pointer-events:none">'+
+          '<rect id="ttbg_'+svgId+'" x="0" y="0" width="80" height="32" rx="5" fill="var(--surface)" stroke="var(--border)" stroke-width="1" filter="url(#ds_'+svgId+')"/>'+
+          '<text id="ttdate_'+svgId+'" x="8" y="13" font-size="9" fill="var(--t3)"></text>'+
+          '<text id="ttval_'+svgId+'" x="8" y="26" font-size="11" font-weight="700" fill="'+m.color+'"></text>'+
+        '</g>';
+        var defs='<defs><filter id="ds_'+svgId+'" x="-20%" y="-20%" width="140%" height="140%">'+
+          '<feDropShadow dx="0" dy="1" stdDeviation="2" flood-opacity="0.1"/></filter></defs>';
+
+        vals.forEach(function(v,i){
+          var cx=xPos(i), cy=yPos(v.val);
+          var hitW=iW/(vals.length>1?vals.length-1:1);
+          var hx=Math.max(PL, cx-hitW/2);
+          hitRects+='<rect x="'+hx+'" y="'+PT+'" width="'+hitW+'" height="'+iH+'" fill="transparent" '+
+            'onmouseenter="ibTT(this,\''+svgId+'\','+cx+','+cy+',\''+v.date.slice(5).replace('-','/')+'\',' +v.val+',\''+m.unit+'\')" '+
+            'onmouseleave="ibTTH(\''+svgId+'\')"/>';
+        });
+        // 크로스헤어
+        var crosshair='<line id="cr_'+svgId+'" x1="0" y1="'+PT+'" x2="0" y2="'+(PT+iH)+'" stroke="'+m.color+'" stroke-width="1" stroke-dasharray="3,2" style="display:none;pointer-events:none"/>';
+
         html+=
           '<div style="margin-bottom:14px">'+
             '<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px">'+
@@ -3792,27 +3815,55 @@ function renderHealth(){
               '<span style="font-family:var(--serif);font-size:1.4em;font-weight:700;color:var(--text)">'+latest.val+'</span>'+
               '<span style="font-size:0.8em;color:var(--t3)">'+m.unit+'</span>'+
             '</div>'+
-            '<svg viewBox="0 0 '+W+' '+H_+'" style="width:100%;max-width:'+W+'px;overflow:visible">'+
-              gridLines+polyline+dots+xLabels+
+            '<svg id="'+svgId+'" viewBox="0 0 '+W+' '+H_+'" style="width:100%;max-width:'+W+'px;overflow:visible;cursor:crosshair">'+
+              defs+gridLines+polyline+dots+xLabels+crosshair+hitRects+tooltipEl+
             '</svg>'+
           '</div>';
       });
 
-      // ── 기록 목록 ──
+      // ── 기록 목록 (월별 접힘, 2열 카드) ──
+      var byMonth={};
+      ibs.slice().reverse().forEach(function(r){
+        var ym=r.date.slice(0,7);
+        if(!byMonth[ym])byMonth[ym]=[];
+        byMonth[ym].push(r);
+      });
+      var months=Object.keys(byMonth).sort().reverse();
       html+='<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:10px">'+
         '<div style="font-size:0.78em;color:var(--t3);font-weight:600;margin-bottom:8px">측정 기록</div>';
-      ibs.slice().reverse().forEach(function(r){
-        html+='<div class="row-hov" style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">'+
-          '<div style="font-size:0.82em;color:var(--t3);flex-shrink:0;min-width:46px">'+r.date.slice(5).replace('-','/')+(r.timing?'<br><span style="font-size:0.85em">'+r.timing+'</span>':'')+'</div>'+
-          '<div style="flex:1;display:flex;gap:12px;flex-wrap:wrap">'+
-            (r.weight?'<span style="font-size:0.875em"><span style="color:var(--t3);font-size:0.85em">체중</span> <b>'+r.weight+'</b>kg</span>':'')+
-            (r.muscle?'<span style="font-size:0.875em"><span style="color:var(--t3);font-size:0.85em">골격근</span> <b>'+r.muscle+'</b>kg</span>':'')+
-            (r.fat?'<span style="font-size:0.875em"><span style="color:var(--t3);font-size:0.85em">체지방</span> <b>'+r.fat+'</b>%</span>':'')+
-            (r.bmi?'<span style="font-size:0.875em"><span style="color:var(--t3);font-size:0.85em">BMI</span> <b>'+r.bmi+'</b></span>':'')+
+      months.forEach(function(ym,mi){
+        var ymLabel=ym.replace('-','년 ')+'월';
+        var cnt=byMonth[ym].length;
+        var isOpen=mi===0; // 최근 월만 기본 오픈
+        var gid='ibm_'+ym.replace('-','');
+        html+='<div style="margin-bottom:6px">'+
+          '<div onclick="var g=document.getElementById(\''+gid+'\');var arr=this.querySelector(\'span.arr\');if(g.style.display===\'none\'){g.style.display=\'grid\';arr.textContent=\'▾\';}else{g.style.display=\'none\';arr.textContent=\'▸\';}" '+
+          'style="display:flex;align-items:center;justify-content:space-between;padding:6px 4px;cursor:pointer;border-radius:6px;transition:background .12s" '+
+          'onmouseenter="this.style.background=\'var(--s2)\'" onmouseleave="this.style.background=\'transparent\'">'+
+            '<span style="font-size:0.82em;font-weight:700;color:var(--text)">'+ymLabel+'</span>'+
+            '<span style="display:flex;align-items:center;gap:6px">'+
+              '<span style="font-size:0.72em;color:var(--t3)">'+cnt+'건</span>'+
+              '<span class="arr" style="font-size:0.72em;color:var(--t3)">'+(isOpen?'▾':'▸')+'</span>'+
+            '</span>'+
           '</div>'+
-          '<div style="display:flex;gap:4px;flex-shrink:0">'+
-            '<button class="bi hov-btns" onclick="editInbody(\''+r.id+'\')" style="font-size:0.8em">✎</button>'+
-            '<button class="bi hov-btns" onclick="delInbody(\''+r.id+'\')" style="font-size:0.8em;color:var(--red)">✕</button>'+
+          '<div id="'+gid+'" style="display:'+(isOpen?'grid':'none')+';grid-template-columns:1fr 1fr;gap:6px;padding:4px 0 8px">'+
+          byMonth[ym].map(function(r){
+            return '<div style="border:1px solid var(--border);border-radius:8px;padding:9px 10px;background:var(--surface)">'+
+              '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">'+
+                '<span style="font-size:0.8em;font-weight:700;color:var(--text)">'+r.date.slice(5).replace('-','/')+(r.timing?' <span style="font-size:0.8em;color:var(--t3);font-weight:400">'+r.timing+'</span>':'')+'</span>'+
+                '<span style="display:flex;gap:3px">'+
+                  '<button class="bi" onclick="editInbody(\''+r.id+'\')" style="font-size:0.78em;padding:2px 4px">✎</button>'+
+                  '<button class="bi" onclick="delInbody(\''+r.id+'\')" style="font-size:0.78em;padding:2px 4px;color:var(--red)">✕</button>'+
+                '</span>'+
+              '</div>'+
+              '<div style="display:flex;flex-wrap:wrap;gap:6px 10px">'+
+                (r.weight?'<div><div style="font-size:0.65em;color:var(--t3)">체중</div><div style="font-size:0.9em;font-weight:700;color:#7EB8A0">'+r.weight+'<span style="font-size:0.7em;font-weight:400">kg</span></div></div>':'')+
+                (r.muscle?'<div><div style="font-size:0.65em;color:var(--t3)">골격근량</div><div style="font-size:0.9em;font-weight:700;color:#7898D8">'+r.muscle+'<span style="font-size:0.7em;font-weight:400">kg</span></div></div>':'')+
+                (r.fat?'<div><div style="font-size:0.65em;color:var(--t3)">체지방률</div><div style="font-size:0.9em;font-weight:700;color:#E8A87C">'+r.fat+'<span style="font-size:0.7em;font-weight:400">%</span></div></div>':'')+
+                (r.bmi?'<div><div style="font-size:0.65em;color:var(--t3)">BMI</div><div style="font-size:0.9em;font-weight:700;color:var(--text)">'+r.bmi+'</div></div>':'')+
+              '</div>'+
+            '</div>';
+          }).join('')+
           '</div>'+
         '</div>';
       });
@@ -4366,6 +4417,35 @@ function saveInbody(id){
   save();closeMo();render();
 }
 function editInbody(id){openInbodyModal(id);}
+function ibTT(el,svgId,cx,cy,date,val,unit){
+  var svg=document.getElementById(svgId);
+  if(!svg)return;
+  var tt=document.getElementById('tt_'+svgId);
+  var ttbg=document.getElementById('ttbg_'+svgId);
+  var ttdate=document.getElementById('ttdate_'+svgId);
+  var ttval=document.getElementById('ttval_'+svgId);
+  var cr=document.getElementById('cr_'+svgId);
+  if(!tt)return;
+  var label=date+' · '+val+unit;
+  var dateStr=date, valStr=val+unit;
+  // 툴팁 너비 계산
+  var w=Math.max(dateStr.length*6+16, valStr.length*7+16, 60);
+  var svgW=320;
+  var tx=cx+8; if(tx+w>svgW-4)tx=cx-w-8;
+  var ty=cy-38; if(ty<2)ty=cy+12;
+  ttbg.setAttribute('x',tx); ttbg.setAttribute('y',ty);
+  ttbg.setAttribute('width',w); ttbg.setAttribute('height',32);
+  ttdate.setAttribute('x',tx+8); ttdate.setAttribute('y',ty+13); ttdate.textContent=dateStr;
+  ttval.setAttribute('x',tx+8); ttval.setAttribute('y',ty+26); ttval.textContent=valStr;
+  tt.style.display='';
+  if(cr){cr.setAttribute('x1',cx);cr.setAttribute('x2',cx);cr.style.display='';}
+}
+function ibTTH(svgId){
+  var tt=document.getElementById('tt_'+svgId);
+  var cr=document.getElementById('cr_'+svgId);
+  if(tt)tt.style.display='none';
+  if(cr)cr.style.display='none';
+}
 function delInbody(id){
   if(!S.health||!S.health.inbody) return;
   S.health.inbody=S.health.inbody.filter(x=>x.id!==id);

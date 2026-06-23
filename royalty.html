@@ -8441,7 +8441,7 @@
                 +   '<button id="cloudSkip" style="margin-top:10px;border:none;background:#f1f5f9;color:#64748b;border-radius:10px;padding:8px;width:100%;cursor:pointer;">\uBE48 \uC0C1\uD0DC\uB85C \uC2DC\uC791</button>'
                 + '</div></div>';
             document.body.appendChild(overlay);
-            const setMsg = (t) => { const m = document.getElementById('cloudMsg'); if (m) m.textContent = t; };
+            const setMsg = (t) => { try { const m = document.getElementById('cloudMsg'); if (m) m.textContent = t; } catch(e) {} };
 
             document.getElementById('cloudLoginBtn').onclick = () => {
                 setMsg('\uAD6C\uAE00 \uB85C\uADF8\uC778 \uCC3D \uC5EC\uB294 \uC911...');
@@ -8509,13 +8509,19 @@
                     window.__cloudDocRef.get(),
                     window.__cloudSubsRef.get()
                 ]).then(([mainSnap, subsSnap]) => {
+                    console.log('[Cloud] mainSnap exists:', mainSnap.exists);
+                    console.log('[Cloud] subsSnap exists:', subsSnap.exists);
                     if (mainSnap.exists && mainSnap.data() && mainSnap.data().payload) {
                         const mainParsed = JSON.parse(mainSnap.data().payload);
+                        console.log('[Cloud] mainParsed webtoonSubs keys:', Object.keys(mainParsed.webtoonSubs || {}));
                         // webtoonSubs를 별도 doc에서 복원 (있으면)
                         if (subsSnap.exists && subsSnap.data() && subsSnap.data().payload) {
                             const subsParsed = JSON.parse(subsSnap.data().payload);
+                            console.log('[Cloud] subsParsed __mail__:', !!subsParsed.webtoonSubs?.['__mail__']);
                             mainParsed.webtoonSubs = subsParsed.webtoonSubs || {};
                             mainParsed.webtoonSubOrder = subsParsed.webtoonSubOrder || [];
+                        } else {
+                            console.log('[Cloud] subsSnap 없음 → webtoonSubs doc 미존재');
                         }
                         applyAndRender(mainParsed);
                         cloudReady = true;
@@ -8526,7 +8532,7 @@
                         setMsg(user.email + ' 로그인됨');
                         cloudReady = true;
                     }
-                }).catch(e => setMsg('불러오기 오류: ' + e.message));
+                }).catch(e => { console.error('[Cloud] 불러오기 오류:', e); setMsg('불러오기 오류: ' + e.message); });
             });
         })();
 

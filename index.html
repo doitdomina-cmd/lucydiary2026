@@ -717,30 +717,16 @@ function hideLoginScreen() {
 function signInWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
-  const loadingEl = document.getElementById('login-loading');
-  const btnEl = document.getElementById('google-login-btn');
-  // 팝업 먼저 시도, 차단되면 redirect로 전환
   auth.signInWithPopup(provider).catch(function(e) {
-    if(e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
-      // 팝업 차단 시 redirect 방식으로 전환
+    if(e.code === 'auth/popup-blocked') {
+      // 팝업 차단 시 redirect로 전환
+      const loadingEl = document.getElementById('login-loading');
+      const btnEl = document.getElementById('google-login-btn');
       if(loadingEl) loadingEl.style.display = 'block';
       if(btnEl) { btnEl.style.opacity = '0.5'; btnEl.disabled = true; }
-      auth.signInWithRedirect(provider).catch(function(e2) {
-        alert('로그인 실패: ' + e2.message);
-        if(loadingEl) loadingEl.style.display = 'none';
-        if(btnEl) { btnEl.style.opacity = '1'; btnEl.disabled = false; }
-      });
-    } else if(e.code === 'auth/unauthorized-domain') {
-      // 도메인 미등록 → redirect로 전환
-      if(loadingEl) loadingEl.style.display = 'block';
-      if(btnEl) { btnEl.style.opacity = '0.5'; btnEl.disabled = true; }
-      auth.signInWithRedirect(provider).catch(function(e2) {
-        alert('로그인 실패: ' + e2.message);
-        if(loadingEl) loadingEl.style.display = 'none';
-        if(btnEl) { btnEl.style.opacity = '1'; btnEl.disabled = false; }
-      });
-    } else {
-      alert('로그인 실패: ' + e.message + '\n\n팁: 팝업이 차단되었다면 브라우저 주소창 우측의 팝업 허용 버튼을 눌러주세요.');
+      auth.signInWithRedirect(provider);
+    } else if(e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') {
+      alert('로그인 실패: ' + e.message);
     }
   });
 }
@@ -7346,27 +7332,6 @@ function initApp(){
 }
 
 // Firebase Auth 상태 감지 → 앱 시작점
-// redirect 로그인 결과 먼저 처리
-auth.getRedirectResult().then(function(result) {
-  // redirect 로그인 성공 시 onAuthStateChanged가 자동 처리
-  if(result && result.user) {
-    console.log('redirect 로그인 성공:', result.user.email);
-  }
-}).catch(function(e) {
-  if(e.code !== 'auth/no-current-user') {
-    console.error('redirect 결과 오류:', e);
-    // 로그인 화면에 에러 표시
-    var loginScreen = document.getElementById('login-screen');
-    if(loginScreen) {
-      var errDiv = document.createElement('div');
-      errDiv.style.cssText = 'font-size:0.8em;color:#E06060;margin-top:12px;padding:8px 12px;background:#fde8e8;border-radius:8px;max-width:300px;text-align:left';
-      errDiv.textContent = '로그인 오류: ' + e.message;
-      var btn = document.getElementById('google-login-btn');
-      if(btn) btn.parentNode.insertBefore(errDiv, btn.nextSibling);
-    }
-  }
-});
-
 auth.onAuthStateChanged(async function(user){
   if(user){
     currentUser = user;

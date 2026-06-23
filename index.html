@@ -3864,27 +3864,48 @@ function renderHealth(){
             '</div>'+
           '</div>';
         };
-        // 대표 카드(1일자) + 나머지는 클릭 시 펼침
+        // 대표(1일자) 수치 인라인 + 클릭 시 전체 목록 펼침
         var otherRecs=recs.filter(function(r){return r.id!==rep.id;});
         var oidgid='ibo_'+ym.replace('-','');
-        html+='<div style="margin-bottom:10px">'+
-          // 월 헤더 (클릭 시 나머지 펼침)
-          '<div onclick="var g=document.getElementById(\''+oidgid+'\');var arr=this.querySelector(\'span.arr\');if(g.style.display===\'none\'){g.style.display=\'grid\';arr.textContent=\'▾\';}else{g.style.display=\'none\';arr.textContent=\'▸\';}" '+
-          'style="display:flex;align-items:center;justify-content:space-between;padding:4px 4px 8px;cursor:pointer;border-radius:6px;transition:background .12s" '+
-          'onmouseenter="this.style.background=\'var(--s2)\'" onmouseleave="this.style.background=\'transparent\'">'+
-            '<span style="font-size:0.82em;font-weight:700;color:var(--text)">'+ymLabel+'</span>'+
-            '<span style="display:flex;align-items:center;gap:6px">'+
-              '<span style="font-size:0.72em;color:var(--t3)">'+cnt+'건</span>'+
-              (cnt>1?'<span class="arr" style="font-size:0.72em;color:var(--t3)">▸</span>':'')+
+        var repVals=[
+          (rep.weight?'<span style="color:#7EB8A0;font-weight:700">'+rep.weight+'kg</span>':''),
+          (rep.muscle?'<span style="color:#7898D8;font-weight:700">'+rep.muscle+'kg</span>':''),
+          (rep.fat?'<span style="color:#E8A87C;font-weight:700">'+rep.fat+'%</span>':''),
+          (rep.bmi?'<span style="color:var(--text);font-weight:700">BMI '+rep.bmi+'</span>':''),
+        ].filter(Boolean).join('<span style="color:var(--border);margin:0 4px">·</span>');
+        // 펼쳐진 목록: 카드 없이 한 줄씩
+        var allRecsInline=recs.map(function(r){
+          var vals=[
+            (r.weight?'<span style="color:#7EB8A0;font-weight:700">'+r.weight+'kg</span>':''),
+            (r.muscle?'<span style="color:#7898D8;font-weight:700">'+r.muscle+'kg</span>':''),
+            (r.fat?'<span style="color:#E8A87C;font-weight:700">'+r.fat+'%</span>':''),
+            (r.bmi?'<span style="color:var(--text);font-weight:700">BMI '+r.bmi+'</span>':''),
+          ].filter(Boolean).join('<span style="color:var(--border);margin:0 4px">·</span>');
+          return '<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-top:1px solid var(--border)">'+
+            '<span style="font-size:0.78em;color:var(--t3);flex-shrink:0;margin-right:10px">'+r.date.slice(5).replace('-','/')+(r.timing?' '+r.timing:'')+'</span>'+
+            '<span style="font-size:0.82em;display:flex;align-items:center;flex-wrap:wrap;gap:2px">'+vals+'</span>'+
+            '<span style="display:flex;gap:2px;flex-shrink:0;margin-left:8px">'+
+              '<button class="bi" onclick="event.stopPropagation();editInbody(\''+r.id+'\')" style="font-size:0.75em;padding:1px 4px">✎</button>'+
+              '<button class="bi" onclick="event.stopPropagation();delInbody(\''+r.id+'\')" style="font-size:0.75em;padding:1px 4px;color:var(--red)">✕</button>'+
+            '</span>'+
+          '</div>';
+        }).join('');
+        html+='<div style="margin-bottom:8px;border:1px solid var(--border);border-radius:10px;overflow:hidden">'+
+          // 월 카드 헤더 - 클릭 시 전체 펼침
+          '<div onclick="var g=document.getElementById(\''+oidgid+'\');var arr=this.querySelector(\'span.arr\');if(g.style.display===\'none\'){g.style.display=\'block\';arr.textContent=\'▾\';}else{g.style.display=\'none\';arr.textContent=\'▸\';}" '+
+          'style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:pointer;background:var(--surface);transition:background .12s" '+
+          'onmouseenter="this.style.background=\'var(--s2)\'" onmouseleave="this.style.background=\'var(--surface)\'">'+
+            '<span style="font-size:0.85em;font-weight:700;color:var(--text)">'+ymLabel+'</span>'+
+            '<span style="display:flex;align-items:center;gap:10px">'+
+              '<span style="font-size:0.82em">'+repVals+'</span>'+
+              '<span style="display:flex;align-items:center;gap:4px">'+
+                '<span style="font-size:0.7em;color:var(--t3)">'+cnt+'건</span>'+
+                '<span class="arr" style="font-size:0.7em;color:var(--t3)">▸</span>'+
+              '</span>'+
             '</span>'+
           '</div>'+
-          // 대표 카드 (1일자 or 최초)
-          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'+ibRecCardHtml(rep,true)+'</div>'+
-          // 나머지 (기본 숨김, 클릭 시 펼침)
-          (otherRecs.length?
-            '<div id="'+oidgid+'" style="display:none;grid-template-columns:1fr 1fr;gap:6px;padding-top:4px">'+
-            otherRecs.map(function(r){return ibRecCardHtml(r,false);}).join('')+
-            '</div>':'')+
+          // 펼쳐진 전체 목록 (기본 숨김)
+          '<div id="'+oidgid+'" style="display:none;padding:0 14px 6px">'+allRecsInline+'</div>'+
         '</div>';
       });
       html+='</div>';

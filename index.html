@@ -1398,18 +1398,16 @@ function renderToday(){
         var ci3=allSuppIds.indexOf(it.id);
         var p3=pillColorsT[(ci3<0?0:ci3)%pillColorsT.length];
         suppRows+='<div onclick="togSuppCheck(\''+t+'\',\''+it.id+'\')" '+
-          'style="cursor:pointer;display:flex;align-items:center;gap:8px;'+
-          'padding:5px 10px;border-radius:20px;margin-bottom:3px;'+
-          'background:'+(done?p3.bg:'transparent')+';'+
-          'border:1.5px solid '+(done?p3.color:'var(--border)')+';'+
+          'style="cursor:pointer;display:flex;align-items:center;gap:6px;'+
+          'padding:2px 2px;margin-bottom:1px;'+
           'transition:all .15s;user-select:none" '+
           'onmouseenter="this.style.opacity=\'0.8\'" onmouseleave="this.style.opacity=\'1\'">'+
-          '<span style="width:14px;height:14px;border-radius:50%;border:1.5px solid '+(done?p3.color:'var(--border2)')+
+          '<span style="width:12px;height:12px;border-radius:50%;border:1.5px solid '+(done?p3.color:'var(--border2)')+
           ';display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;'+
           'background:'+(done?p3.color:'transparent')+';transition:all .15s">'+
             (done?'<svg width="8" height="8" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5 3.5-4" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>':'')+
           '</span>'+
-          '<span style="font-size:0.875em;font-weight:600;color:'+(done?p3.color:'var(--text)')+';text-decoration:'+(done?'line-through':'none')+';transition:all .15s">'+
+          '<span style="font-size:0.8em;font-weight:500;color:'+(done?p3.color:'var(--text)')+';text-decoration:'+(done?'line-through':'none')+';opacity:'+(done?'0.7':'1')+';transition:all .15s">'+
             it.name+' <span style="font-size:0.85em;opacity:0.7">'+it.count+'알</span>'+
           '</span>'+
         '</div>';
@@ -3843,39 +3841,50 @@ function renderHealth(){
       months.forEach(function(ym,mi){
         var ymLabel=ym.replace('-','년 ')+'월';
         var cnt=byMonth[ym].length;
-        var isOpen=mi===0; // 최근 월만 기본 오픈
         var gid='ibm_'+ym.replace('-','');
-        html+='<div style="margin-bottom:6px">'+
-          '<div onclick="var g=document.getElementById(\''+gid+'\');var arr=this.querySelector(\'span.arr\');if(g.style.display===\'none\'){g.style.display=\'grid\';arr.textContent=\'▾\';}else{g.style.display=\'none\';arr.textContent=\'▸\';}" '+
-          'style="display:flex;align-items:center;justify-content:space-between;padding:6px 4px;cursor:pointer;border-radius:6px;transition:background .12s" '+
+        // 대표값: 1일자 데이터 우선, 없으면 해당 월 최초 기록
+        var recs=byMonth[ym].slice().sort(function(a,b){return a.date.localeCompare(b.date);});
+        var rep=recs.find(function(r){return r.date.slice(8)==='01';})||recs[0];
+        var ibRecCardHtml=function(r,isRep){
+          return '<div class="ib-rec-card" style="border:1px solid var(--border);border-radius:8px;padding:9px 10px;background:var(--surface);position:relative" '+
+            'onmouseenter="var b=this.querySelector(\'.ib-hov-btns\');if(b)b.style.opacity=\'1\'" '+
+            'onmouseleave="var b=this.querySelector(\'.ib-hov-btns\');if(b)b.style.opacity=\'0\'">'+
+            '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">'+
+              '<span style="font-size:0.8em;font-weight:700;color:var(--text)">'+r.date.slice(5).replace('-','/')+(r.timing?' <span style="font-size:0.8em;color:var(--t3);font-weight:400">'+r.timing+'</span>':'')+'</span>'+
+              '<span class="ib-hov-btns" style="display:flex;gap:3px;opacity:0;transition:opacity .15s">'+
+                '<button class="bi" onclick="event.stopPropagation();editInbody(\''+r.id+'\')" style="font-size:0.78em;padding:2px 4px">✎</button>'+
+                '<button class="bi" onclick="event.stopPropagation();delInbody(\''+r.id+'\')" style="font-size:0.78em;padding:2px 4px;color:var(--red)">✕</button>'+
+              '</span>'+
+            '</div>'+
+            '<div style="display:flex;flex-wrap:wrap;gap:6px 10px">'+
+              (r.weight?'<div><div style="font-size:0.65em;color:var(--t3)">체중</div><div style="font-size:0.9em;font-weight:700;color:#7EB8A0">'+r.weight+'<span style="font-size:0.7em;font-weight:400">kg</span></div></div>':'')+
+              (r.muscle?'<div><div style="font-size:0.65em;color:var(--t3)">골격근량</div><div style="font-size:0.9em;font-weight:700;color:#7898D8">'+r.muscle+'<span style="font-size:0.7em;font-weight:400">kg</span></div></div>':'')+
+              (r.fat?'<div><div style="font-size:0.65em;color:var(--t3)">체지방률</div><div style="font-size:0.9em;font-weight:700;color:#E8A87C">'+r.fat+'<span style="font-size:0.7em;font-weight:400">%</span></div></div>':'')+
+              (r.bmi?'<div><div style="font-size:0.65em;color:var(--t3)">BMI</div><div style="font-size:0.9em;font-weight:700;color:var(--text)">'+r.bmi+'</div></div>':'')+
+            '</div>'+
+          '</div>';
+        };
+        // 대표 카드(1일자) + 나머지는 클릭 시 펼침
+        var otherRecs=recs.filter(function(r){return r.id!==rep.id;});
+        var oidgid='ibo_'+ym.replace('-','');
+        html+='<div style="margin-bottom:10px">'+
+          // 월 헤더 (클릭 시 나머지 펼침)
+          '<div onclick="var g=document.getElementById(\''+oidgid+'\');var arr=this.querySelector(\'span.arr\');if(g.style.display===\'none\'){g.style.display=\'grid\';arr.textContent=\'▾\';}else{g.style.display=\'none\';arr.textContent=\'▸\';}" '+
+          'style="display:flex;align-items:center;justify-content:space-between;padding:4px 4px 8px;cursor:pointer;border-radius:6px;transition:background .12s" '+
           'onmouseenter="this.style.background=\'var(--s2)\'" onmouseleave="this.style.background=\'transparent\'">'+
             '<span style="font-size:0.82em;font-weight:700;color:var(--text)">'+ymLabel+'</span>'+
             '<span style="display:flex;align-items:center;gap:6px">'+
               '<span style="font-size:0.72em;color:var(--t3)">'+cnt+'건</span>'+
-              '<span class="arr" style="font-size:0.72em;color:var(--t3)">'+(isOpen?'▾':'▸')+'</span>'+
+              (cnt>1?'<span class="arr" style="font-size:0.72em;color:var(--t3)">▸</span>':'')+
             '</span>'+
           '</div>'+
-          '<div id="'+gid+'" style="display:'+(isOpen?'grid':'none')+';grid-template-columns:1fr 1fr;gap:6px;padding:4px 0 8px">'+
-          byMonth[ym].map(function(r){
-            return '<div class="ib-rec-card" style="border:1px solid var(--border);border-radius:8px;padding:9px 10px;background:var(--surface);position:relative" '+
-              'onmouseenter="var b=this.querySelector(\'.ib-hov-btns\');if(b)b.style.opacity=\'1\'" '+
-              'onmouseleave="var b=this.querySelector(\'.ib-hov-btns\');if(b)b.style.opacity=\'0\'">'+
-              '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">'+
-                '<span style="font-size:0.8em;font-weight:700;color:var(--text)">'+r.date.slice(5).replace('-','/')+(r.timing?' <span style="font-size:0.8em;color:var(--t3);font-weight:400">'+r.timing+'</span>':'')+'</span>'+
-                '<span class="ib-hov-btns" style="display:flex;gap:3px;opacity:0;transition:opacity .15s">'+
-                  '<button class="bi" onclick="event.stopPropagation();editInbody(\''+r.id+'\')" style="font-size:0.78em;padding:2px 4px">✎</button>'+
-                  '<button class="bi" onclick="event.stopPropagation();delInbody(\''+r.id+'\')" style="font-size:0.78em;padding:2px 4px;color:var(--red)">✕</button>'+
-                '</span>'+
-              '</div>'+
-              '<div style="display:flex;flex-wrap:wrap;gap:6px 10px">'+
-                (r.weight?'<div><div style="font-size:0.65em;color:var(--t3)">체중</div><div style="font-size:0.9em;font-weight:700;color:#7EB8A0">'+r.weight+'<span style="font-size:0.7em;font-weight:400">kg</span></div></div>':'')+
-                (r.muscle?'<div><div style="font-size:0.65em;color:var(--t3)">골격근량</div><div style="font-size:0.9em;font-weight:700;color:#7898D8">'+r.muscle+'<span style="font-size:0.7em;font-weight:400">kg</span></div></div>':'')+
-                (r.fat?'<div><div style="font-size:0.65em;color:var(--t3)">체지방률</div><div style="font-size:0.9em;font-weight:700;color:#E8A87C">'+r.fat+'<span style="font-size:0.7em;font-weight:400">%</span></div></div>':'')+
-                (r.bmi?'<div><div style="font-size:0.65em;color:var(--t3)">BMI</div><div style="font-size:0.9em;font-weight:700;color:var(--text)">'+r.bmi+'</div></div>':'')+
-              '</div>'+
-            '</div>';
-          }).join('')+
-          '</div>'+
+          // 대표 카드 (1일자 or 최초)
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'+ibRecCardHtml(rep,true)+'</div>'+
+          // 나머지 (기본 숨김, 클릭 시 펼침)
+          (otherRecs.length?
+            '<div id="'+oidgid+'" style="display:none;grid-template-columns:1fr 1fr;gap:6px;padding-top:4px">'+
+            otherRecs.map(function(r){return ibRecCardHtml(r,false);}).join('')+
+            '</div>':'')+
         '</div>';
       });
       html+='</div>';
@@ -4184,19 +4193,13 @@ function renderSuppCalendar(){
           if(cellItems) cellItems+='<div style="height:0.5px;background:var(--border);margin:2px 0;opacity:0.5"></div>';
         }
         var done=!!checks[x.it.id];
-        var pillBg=done?'var(--accent)':'var(--s2)';
-        var pillColor=done?'#fff':'var(--t2)';
-        var pillBorder=done?'var(--accent)':'var(--border)';
         cellItems+='<div onclick="event.stopPropagation();togSuppCheck(\''+ds+'\',\''+x.it.id+'\')" '+
-          'style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px 2px 5px;margin-bottom:2px;cursor:pointer;user-select:none;'+
-          'border-radius:20px;border:1.5px solid '+pillBorder+';background:'+pillBg+';transition:all .12s;width:100%;box-sizing:border-box" '+
-          'onmouseenter="this.style.opacity=\'0.8\'" onmouseleave="this.style.opacity=\'1\'">'+
-          '<span style="width:10px;height:10px;border-radius:50%;border:1.5px solid '+(done?'rgba(255,255,255,0.7)':'var(--border2)')+
-          ';display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;'+
-          'background:'+(done?'rgba(255,255,255,0.3)':'transparent')+';transition:all .12s">'+
-            (done?'<svg width="6" height="6" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5 3.5-4" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>':'')+
-          '</span>'+
-          '<span style="font-size:0.62em;font-weight:600;color:'+pillColor+';line-height:1.3;transition:all .12s;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:calc(100% - 16px)">'+
+          'style="display:flex;align-items:center;gap:3px;padding:1px 2px;margin-bottom:1px;cursor:pointer;user-select:none;transition:all .12s" '+
+          'onmouseenter="this.style.opacity=\'0.6\'" onmouseleave="this.style.opacity=\'1\'">'+
+          '<span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;'+
+          'border:1.2px solid '+(done?'var(--accent)':'var(--border2)')+';'+
+          'background:'+(done?'var(--accent)':'transparent')+';transition:all .12s"></span>'+
+          '<span style="font-size:0.6em;font-weight:500;color:'+(done?'var(--accent)':'var(--t2)')+';line-height:1.3;transition:all .12s;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:calc(100% - 12px);text-decoration:'+(done?'line-through':'none')+'">'+
             x.it.name+
           '</span>'+
         '</div>';
@@ -4213,7 +4216,11 @@ function renderSuppCalendar(){
           'font-size:0.75em;font-weight:'+(isToday?'700':'500')+';'+
           'color:'+(isToday?'#fff':col===0?'#E06060':col===6?'var(--accent)':'var(--text)')+'">'+d+'</div>'+
         (!isFuture&&allItemsFull.length?
-          '<span style="font-size:0.6em;color:'+(pct===100?'var(--green)':pct>0?'var(--accent)':'var(--t3)')+'">'+
+          '<span style="display:inline-flex;align-items:center;justify-content:center;'+
+          'font-size:0.55em;font-weight:700;'+
+          'padding:1px 5px;border-radius:20px;'+
+          'background:'+(pct===100?'var(--green)':pct>0?'var(--accent)':'var(--border)')+';'+
+          'color:'+(pct===100||pct>0?'#fff':'var(--t3)')+'">'+
             (pct===100?'✓':doneCnt+'/'+allItemsFull.length)+
           '</span>':'')+
       '</div>'+

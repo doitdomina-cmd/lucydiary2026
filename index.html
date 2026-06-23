@@ -1388,29 +1388,25 @@ function renderToday(){
     suppSlotsDef.forEach(function(sl){
       var items=((S.health&&S.health.supplements&&S.health.supplements[sl.key])||[]);
       if(!items.length)return;
-      // 슬롯 헤더: 작은 텍스트 + 구분선
-      if(suppRows) suppRows+='<div style="height:0.5px;background:var(--border);margin:5px 0;opacity:0.6"></div>';
-      suppRows+='<div style="margin:4px 0 3px">'+
-        '<span style="display:inline-block;font-size:0.65em;font-weight:600;color:var(--t3);letter-spacing:0.04em">'+
+      // 슬롯 헤더: pill 태그 스타일
+      suppRows+='<div style="margin:8px 0 5px">'+
+        '<span style="display:inline-block;font-size:0.7em;font-weight:700;color:var(--t2);'+
+        'background:var(--s2);border:1px solid var(--border);border-radius:20px;padding:2px 10px;letter-spacing:0.03em">'+
         sl.label+'</span></div>';
       items.forEach(function(it){
         var done=!!suppChecks[it.id];
-        var ci3=allSuppIds.indexOf(it.id);
-        var p3=pillColorsT[(ci3<0?0:ci3)%pillColorsT.length];
         suppRows+='<div onclick="togSuppCheck(\''+t+'\',\''+it.id+'\')" '+
-          'style="cursor:pointer;display:flex;align-items:center;gap:8px;'+
-          'padding:5px 10px;border-radius:20px;margin-bottom:3px;'+
-          'background:'+(done?p3.bg:'transparent')+';'+
-          'border:1.5px solid '+(done?p3.color:'var(--border)')+';'+
-          'transition:all .15s;user-select:none" '+
-          'onmouseenter="this.style.opacity=\'0.8\'" onmouseleave="this.style.opacity=\'1\'">'+
-          '<span style="width:14px;height:14px;border-radius:50%;border:1.5px solid '+(done?p3.color:'var(--border2)')+
+          'style="cursor:pointer;display:flex;align-items:center;gap:10px;'+
+          'padding:5px 6px;border-radius:6px;margin-bottom:2px;transition:background .12s;user-select:none" '+
+          'onmouseenter="this.style.background=\'var(--s2)\'" onmouseleave="this.style.background=\'transparent\'">'+
+          // 사각 체크박스
+          '<span style="width:16px;height:16px;border-radius:3px;border:1.8px solid '+(done?'var(--accent)':'var(--border)')+
           ';display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;'+
-          'background:'+(done?p3.color:'transparent')+';transition:all .15s">'+
-            (done?'<svg width="8" height="8" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5 3.5-4" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>':'')+
+          'background:'+(done?'var(--accent)':'transparent')+';transition:all .15s">'+
+            (done?'<svg width="9" height="9" viewBox="0 0 10 10"><path d="M1.5 5l2.5 2.8 4.5-5" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>':'')+
           '</span>'+
-          '<span style="font-size:0.875em;font-weight:600;color:'+(done?p3.color:'var(--text)')+';text-decoration:'+(done?'line-through':'none')+';transition:all .15s">'+
-            it.name+' <span style="font-size:0.85em;opacity:0.7">'+it.count+'알</span>'+
+          '<span style="font-size:0.875em;color:'+(done?'var(--t3)':'var(--text)')+';text-decoration:'+(done?'line-through':'none')+';transition:all .15s">'+
+            it.name+' <span style="color:var(--t3);font-size:0.85em">'+it.count+'알</span>'+
           '</span>'+
         '</div>';
       });
@@ -2080,11 +2076,6 @@ var _dragAreaId = null;   // 드래그 중인 라이프 카드 aid
 var _dragPjId = null;     // 드래그 중인 프로젝트 pid
 
 document.addEventListener('dragstart', function(e){
-  // pj-slot 드래그 (카드 레이아웃 편집)는 방해하지 않음
-  if(e.target.closest('.pj-slot[draggable]')) return;
-  // supp-slot 드래그 (영양제 슬롯 간 이동)는 방해하지 않음
-  if(e.target.closest('[draggable][data-id]')) return;
-
   // pj-drag-item 안에서 시작했는지 먼저 확인 (부모 카드보다 우선)
   var pj = e.target.closest('.pj-drag-item[draggable]');
   var card = e.target.closest('.la-card[draggable]');
@@ -3857,14 +3848,12 @@ function renderHealth(){
           '</div>'+
           '<div id="'+gid+'" style="display:'+(isOpen?'grid':'none')+';grid-template-columns:1fr 1fr;gap:6px;padding:4px 0 8px">'+
           byMonth[ym].map(function(r){
-            return '<div class="ib-rec-card" style="border:1px solid var(--border);border-radius:8px;padding:9px 10px;background:var(--surface);position:relative" '+
-              'onmouseenter="var b=this.querySelector(\'.ib-hov-btns\');if(b)b.style.opacity=\'1\'" '+
-              'onmouseleave="var b=this.querySelector(\'.ib-hov-btns\');if(b)b.style.opacity=\'0\'">'+
+            return '<div style="border:1px solid var(--border);border-radius:8px;padding:9px 10px;background:var(--surface)">'+
               '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">'+
                 '<span style="font-size:0.8em;font-weight:700;color:var(--text)">'+r.date.slice(5).replace('-','/')+(r.timing?' <span style="font-size:0.8em;color:var(--t3);font-weight:400">'+r.timing+'</span>':'')+'</span>'+
-                '<span class="ib-hov-btns" style="display:flex;gap:3px;opacity:0;transition:opacity .15s">'+
-                  '<button class="bi" onclick="event.stopPropagation();editInbody(\''+r.id+'\')" style="font-size:0.78em;padding:2px 4px">✎</button>'+
-                  '<button class="bi" onclick="event.stopPropagation();delInbody(\''+r.id+'\')" style="font-size:0.78em;padding:2px 4px;color:var(--red)">✕</button>'+
+                '<span style="display:flex;gap:3px">'+
+                  '<button class="bi" onclick="editInbody(\''+r.id+'\')" style="font-size:0.78em;padding:2px 4px">✎</button>'+
+                  '<button class="bi" onclick="delInbody(\''+r.id+'\')" style="font-size:0.78em;padding:2px 4px;color:var(--red)">✕</button>'+
                 '</span>'+
               '</div>'+
               '<div style="display:flex;flex-wrap:wrap;gap:6px 10px">'+
@@ -4124,10 +4113,7 @@ function renderSuppCalendar(){
   if(!total)return'<div style="font-size:0.85em;color:var(--t3);text-align:center;padding:16px 0;margin-top:16px">영양제를 먼저 추가해주세요</div>';
 
   var now=new Date();
-  // 월 오프셋 지원
-  var moOffset=window._suppCalMonthOffset||0;
-  var baseDate=new Date(now.getFullYear(), now.getMonth()+moOffset, 1);
-  var yr=baseDate.getFullYear(),mo=baseDate.getMonth();
+  var yr=now.getFullYear(),mo=now.getMonth();
   var firstDay=new Date(yr,mo,1).getDay();
   var daysInMonth=new Date(yr,mo+1,0).getDate();
   var today=todStr();
@@ -4139,12 +4125,8 @@ function renderSuppCalendar(){
   var slotLabels={morning_empty:'기상 직후',morning_meal:'아침 식사 후',lunch:'점심 식사 후',dinner:'저녁 식사 후',bedtime:'취침 전'};
 
   var cal='<div style="margin-top:20px;border:1px solid var(--border);border-radius:12px;overflow:hidden">';
-  // 헤더 + 월 이동 버튼
-  cal+='<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--border)">'+
-    '<button onclick="suppCalNav(-1)" style="background:none;border:1px solid var(--border);border-radius:8px;cursor:pointer;width:28px;height:28px;display:flex;align-items:center;justify-content:center;color:var(--t2);font-size:0.9em">‹</button>'+
-    '<div style="font-size:0.9em;font-weight:700;color:var(--text)">'+yr+'년 '+MN[mo]+' 복용 달력</div>'+
-    '<button onclick="suppCalNav(1)" style="background:none;border:1px solid var(--border);border-radius:8px;cursor:pointer;width:28px;height:28px;display:flex;align-items:center;justify-content:center;color:var(--t2);font-size:0.9em">›</button>'+
-  '</div>';
+  // 헤더
+  cal+='<div style="padding:14px 18px;font-size:0.9em;font-weight:700;color:var(--text);border-bottom:1px solid var(--border)">'+yr+'년 '+MN[mo]+' 복용 달력</div>';
   // 요일 헤더
   cal+='<div style="display:grid;grid-template-columns:repeat(7,1fr);border-bottom:1px solid var(--border)">';
   DN.forEach(function(d,i){cal+='<div style="padding:8px 0;text-align:center;font-size:0.72em;font-weight:600;color:'+(i===0?'#E06060':i===6?'var(--accent)':'var(--t3)')+'">'+d+'</div>';});
@@ -4184,22 +4166,18 @@ function renderSuppCalendar(){
         if(x.slotLabel!==curSlotLabel){
           curSlotLabel=x.slotLabel;
           // 슬롯 구분선 (첫 번째 슬롯 제외)
-          if(cellItems) cellItems+='<div style="height:0.5px;background:var(--border);margin:2px 0;opacity:0.5"></div>';
+          if(cellItems) cellItems+='<div style="height:1px;background:var(--border);margin:3px 0"></div>';
         }
         var done=!!checks[x.it.id];
-        var pillBg=done?'var(--accent)':'var(--s2)';
-        var pillColor=done?'#fff':'var(--t2)';
-        var pillBorder=done?'var(--accent)':'var(--border)';
         cellItems+='<div onclick="event.stopPropagation();togSuppCheck(\''+ds+'\',\''+x.it.id+'\')" '+
-          'style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px 2px 5px;margin-bottom:2px;cursor:pointer;user-select:none;'+
-          'border-radius:20px;border:1.5px solid '+pillBorder+';background:'+pillBg+';transition:all .12s;width:100%;box-sizing:border-box" '+
-          'onmouseenter="this.style.opacity=\'0.8\'" onmouseleave="this.style.opacity=\'1\'">'+
-          '<span style="width:10px;height:10px;border-radius:50%;border:1.5px solid '+(done?'rgba(255,255,255,0.7)':'var(--border2)')+
+          'style="display:flex;align-items:center;gap:4px;padding:2px 1px;cursor:pointer;user-select:none;border-radius:3px;transition:background .1s" '+
+          'onmouseenter="this.style.background=\'var(--s2)\'" onmouseleave="this.style.background=\'transparent\'">'+
+          '<span style="width:11px;height:11px;border-radius:2px;border:1.5px solid '+(done?'var(--accent)':'var(--border)')+
           ';display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;'+
-          'background:'+(done?'rgba(255,255,255,0.3)':'transparent')+';transition:all .12s">'+
-            (done?'<svg width="6" height="6" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5 3.5-4" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>':'')+
+          'background:'+(done?'var(--accent)':'transparent')+';transition:all .12s">'+
+            (done?'<svg width="7" height="7" viewBox="0 0 10 10"><path d="M1.5 5l2.5 2.8 4.5-5" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>':'')+
           '</span>'+
-          '<span style="font-size:0.62em;font-weight:600;color:'+pillColor+';line-height:1.3;transition:all .12s;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:calc(100% - 16px)">'+
+          '<span style="font-size:0.65em;color:'+(done?'var(--t3)':'var(--text)')+';text-decoration:'+(done?'line-through':'none')+';line-height:1.3;transition:all .12s;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:calc(100% - 18px)">'+
             x.it.name+
           '</span>'+
         '</div>';
@@ -4325,16 +4303,7 @@ function suppDragStart(e,slot,id){
   e.dataTransfer.effectAllowed='move';
   e.dataTransfer.setData('text/plain',id);
 }
-
-function suppCalNav(dir){
-  window._suppCalMonthOffset=(window._suppCalMonthOffset||0)+dir;
-  render();
-  // 달력 위치로 스크롤
-  setTimeout(function(){
-    var el=document.querySelector('[data-tab="supps"]')||document.querySelector('.supp-slot');
-    if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
-  },100);
-}(e,el){
+function suppDragEnter(e,el){
   e.preventDefault();
   _suppDragEnterCount++;
   el.style.outline='2px dashed var(--accent)';

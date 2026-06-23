@@ -532,10 +532,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <div style="font-size:2.8em;margin-bottom:12px">✨</div>
     <div style="font-family:var(--serif-fancy);font-size:2.3em;letter-spacing:0.5px;margin-bottom:6px">Lucy's Space</div>
     <div style="font-size:0.88em;color:var(--t3);margin-bottom:32px">나만의 작업 공간에 오신 걸 환영해요</div>
-    <div id="login-loading" style="display:none;font-size:0.85em;color:var(--t3);margin-bottom:16px;padding:10px;background:var(--s2);border-radius:8px">
-      ⏳ Google 로그인 중... 잠시만 기다려주세요
-    </div>
-    <button id="google-login-btn" onclick="signInWithGoogle()" style="
+    <button onclick="signInWithGoogle()" style="
       display:inline-flex;align-items:center;justify-content:center;gap:10px;
       width:100%;padding:13px 20px;border-radius:12px;border:1.5px solid var(--border);
       background:var(--surface);cursor:pointer;font-size:0.95em;font-family:var(--sans);
@@ -716,18 +713,8 @@ function hideLoginScreen() {
 
 function signInWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
-  provider.setCustomParameters({ prompt: 'select_account' });
-  auth.signInWithPopup(provider).catch(function(e) {
-    if(e.code === 'auth/popup-blocked') {
-      // 팝업 차단 시 redirect로 전환
-      const loadingEl = document.getElementById('login-loading');
-      const btnEl = document.getElementById('google-login-btn');
-      if(loadingEl) loadingEl.style.display = 'block';
-      if(btnEl) { btnEl.style.opacity = '0.5'; btnEl.disabled = true; }
-      auth.signInWithRedirect(provider);
-    } else if(e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') {
-      alert('로그인 실패: ' + e.message);
-    }
+  auth.signInWithPopup(provider).catch(e => {
+    alert('로그인 실패: ' + e.message);
   });
 }
 function signOut() {

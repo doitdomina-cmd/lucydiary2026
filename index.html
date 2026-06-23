@@ -1370,12 +1370,7 @@ function renderToday(){
   var suppDone=allSupps.filter(function(x){return suppChecks[x.it.id];}).length;
   var suppPct=suppTotal?Math.round(suppDone/suppTotal*100):0;
 
-  var pillColorsT=[
-    {bg:'#DDEEFF',color:'#4878A8'},{bg:'#FFE0E8',color:'#C06070'},
-    {bg:'#DFF4E8',color:'#3D8C60'},{bg:'#FFF0D8',color:'#B87828'},
-    {bg:'#EEE0FF',color:'#7850B8'},{bg:'#D8F4F4',color:'#2E8888'},
-    {bg:'#FFE8D8',color:'#B06838'},{bg:'#E8FFD8',color:'#508838'},
-  ];
+  var pillColorsT=_pillColorPalette;
   var allSuppIds=[];
   suppSlotsDef.forEach(function(s){((S.health&&S.health.supplements&&S.health.supplements[s.key])||[]).forEach(function(it){if(!allSuppIds.includes(it.id))allSuppIds.push(it.id);});});
 
@@ -1396,8 +1391,7 @@ function renderToday(){
         sl.label+'</span></div>';
       items.forEach(function(it){
         var done=!!suppChecks[it.id];
-        var ci3=allSuppIds.indexOf(it.id);
-        var p3=pillColorsT[(ci3<0?0:ci3)%pillColorsT.length];
+        var p3=pillColorByName(it.name);
         suppRows+='<div onclick="togSuppCheck(\''+t+'\',\''+it.id+'\')" '+
           'style="cursor:pointer;display:flex;align-items:center;gap:6px;'+
           'padding:2px 2px;margin-bottom:1px;'+
@@ -3525,10 +3519,19 @@ function renderHealth(){
     memo:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M3.5 20.5l1-4 12-12a1.6 1.6 0 0 1 2.3 0l0.7 0.7a1.6 1.6 0 0 1 0 2.3l-12 12z"/><path d="M14 6l4 4"/></svg>'
   };
   const tabs=[{k:'summary',l:'건강 요약'},{k:'inbody',l:'인바디'},{k:'records',l:'검진 기록'},{k:'supps',l:'식품 정리'},{k:'memo',l:'메모'}];
-  let html='<div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">';
+  let html='<div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;justify-content:center">';
   tabs.forEach(function(t){
     var on=tab===t.k;
-    html+='<button class="btn '+(on?'bp':'bg')+' bsm" onclick="setHealthTab(\''+t.k+'\')" style="flex:1;min-width:0">'+tabIco[t.k]+t.l+'</button>';
+    html+='<button onclick="setHealthTab(\''+t.k+'\')" style="'+
+      'flex:1;min-width:0;'+
+      'padding:7px 10px;border-radius:10px;border:none;cursor:pointer;'+
+      'font-family:var(--sans);font-size:0.82em;font-weight:600;'+
+      'display:flex;align-items:center;justify-content:center;gap:4px;'+
+      'transition:all .18s ease;'+
+      (on
+        ? 'background:var(--green);color:#fff;box-shadow:0 3px 10px rgba(74,124,111,.35),0 1px 3px rgba(74,124,111,.2);'
+        : 'background:var(--surface);color:var(--t2);box-shadow:0 2px 6px rgba(0,0,0,.07),0 1px 2px rgba(0,0,0,.04);border:1px solid var(--border);')+
+      '">'+tabIco[t.k]+t.l+'</button>';
   });
   html+='</div>';
 
@@ -3984,19 +3987,7 @@ function renderHealth(){
       {key:'dinner',        label:'저녁 식사 후'},
       {key:'bedtime',       label:'취침 전'}
     ];
-    const pillColors=[
-      {bg:'#DDEEFF',color:'#4878A8',dot:'#88B4DC'},
-      {bg:'#FFE0E8',color:'#C06070',dot:'#E899AA'},
-      {bg:'#DFF4E8',color:'#3D8C60',dot:'#7DC49A'},
-      {bg:'#FFF0D8',color:'#B87828',dot:'#DDAA60'},
-      {bg:'#EEE0FF',color:'#7850B8',dot:'#B090DC'},
-      {bg:'#D8F4F4',color:'#2E8888',dot:'#70C0C0'},
-      {bg:'#FFE8D8',color:'#B06838',dot:'#DDA070'},
-      {bg:'#E8FFD8',color:'#508838',dot:'#8CC060'},
-    ];
     const supps=H.supplements||{};
-    var allIds=[];
-    suppSlots.forEach(function(s){(supps[s.key]||[]).forEach(function(it){if(!allIds.includes(it.id))allIds.push(it.id);});});
 
     html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
     suppSlots.forEach(function(slot,si){
@@ -4015,8 +4006,7 @@ function renderHealth(){
         (items.length===0
           ? '<div style="font-size:0.78em;color:var(--t3);width:100%;text-align:center;padding:6px 0">없음</div>'
           : items.map(function(it){
-              var ci=allIds.indexOf(it.id);
-              var p=pillColors[(ci<0?0:ci)%pillColors.length];
+              var p=pillColorByName(it.name);
               return '<div draggable="true" data-id="'+it.id+'" data-fromslot="'+slot.key+'" '+
                 'ondragstart="suppDragStart(event,\''+slot.key+'\',\''+it.id+'\')" '+
                 'style="position:relative;display:inline-flex;align-items:center;gap:5px;'+
@@ -4113,12 +4103,7 @@ function showSuppDayPanel(ds){
   var doneCnt=allItems.filter(function(x){return checks[x.it.id];}).length;
   var pct=total?Math.round(doneCnt/total*100):0;
 
-  var pillColorsT=[
-    {bg:'#DDEEFF',color:'#4878A8'},{bg:'#FFE0E8',color:'#C06070'},
-    {bg:'#DFF4E8',color:'#3D8C60'},{bg:'#FFF0D8',color:'#B87828'},
-    {bg:'#EEE0FF',color:'#7850B8'},{bg:'#D8F4F4',color:'#2E8888'},
-    {bg:'#FFE8D8',color:'#B06838'},{bg:'#E8FFD8',color:'#508838'},
-  ];
+  var pillColorsT=_pillColorPalette;
   var allSuppIds=[];
   suppSlotsDef.forEach(function(s){((S.health&&S.health.supplements&&S.health.supplements[s.key])||[]).forEach(function(it){if(!allSuppIds.includes(it.id))allSuppIds.push(it.id);});});
 
@@ -4140,8 +4125,7 @@ function showSuppDayPanel(ds){
       h+='<div style="font-size:0.72em;font-weight:700;color:var(--t3);margin:8px 0 5px;letter-spacing:0.03em">'+curSlot+'</div>';
     }
     var done=!!checks[x.it.id];
-    var ci=allSuppIds.indexOf(x.it.id);
-    var p=pillColorsT[(ci<0?0:ci)%pillColorsT.length];
+    var p=pillColorByName(x.it.name);
     h+='<div onclick="togSuppCheckPanel(\''+ds+'\',\''+x.it.id+'\')" style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;'+
       'padding:4px 10px 4px 7px;border-radius:20px;font-size:0.82em;font-weight:600;margin:2px 3px 2px 0;'+
       'background:'+(done?p.color:p.bg)+';color:'+(done?'#fff':p.color)+';transition:all .15s;user-select:none">'+
@@ -4297,12 +4281,7 @@ function renderSuppCalendar(){
   var todayTotal2=todayAllItems2.length;
   var todayDone2=todayAllItems2.filter(function(x){return todayChecks2[x.it.id];}).length;
   var todayPct2=todayTotal2?Math.round(todayDone2/todayTotal2*100):0;
-  var pillColorsC=[
-    {bg:'#DDEEFF',color:'#4878A8'},{bg:'#FFE0E8',color:'#C06070'},
-    {bg:'#DFF4E8',color:'#3D8C60'},{bg:'#FFF0D8',color:'#B87828'},
-    {bg:'#EEE0FF',color:'#7850B8'},{bg:'#D8F4F4',color:'#2E8888'},
-    {bg:'#FFE8D8',color:'#B06838'},{bg:'#E8FFD8',color:'#508838'},
-  ];
+  var pillColorsC=_pillColorPalette;
   var allSuppIdsC=[];
   ['morning_empty','morning_meal','lunch','dinner','bedtime'].forEach(function(slKey){
     ((S.health.supplements[slKey])||[]).forEach(function(it){if(!allSuppIdsC.includes(it.id))allSuppIdsC.push(it.id);});
@@ -4320,8 +4299,7 @@ function renderSuppCalendar(){
         +'</div>';
     }
     var done2=!!todayChecks2[x.it.id];
-    var ci2=allSuppIdsC.indexOf(x.it.id);
-    var p2=pillColorsC[(ci2<0?0:ci2)%pillColorsC.length];
+    var p2=pillColorByName(x.it.name);
     todayPanelRows+='<div onclick="togSuppCheck(\''+today+'\',\''+x.it.id+'\')" style="cursor:pointer;display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:8px;margin-bottom:3px;background:'+(done2?p2.bg:'transparent')+';transition:all .15s;user-select:none">'
       +'<span style="width:18px;height:18px;border-radius:50%;border:1.8px solid '+(done2?p2.color:'var(--border)')+';display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;background:'+(done2?p2.color:'transparent')+';transition:all .15s">'
         +(done2?'<svg width="9" height="9" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5 3.5-4" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>':'')
@@ -4366,6 +4344,21 @@ function saveSuppItem(slotKey){
   if(!S.health.supplements[slotKey]) S.health.supplements[slotKey]=[];
   S.health.supplements[slotKey].push({id:gid(),name:name,count:count,effect:effect});
   save();closeMo();render();
+}
+// ── 알약 이름 → 고정 색상 (이름이 같으면 항상 같은 색) ──
+var _pillColorPalette=[
+  {bg:'#DDEEFF',color:'#4878A8',dot:'#88B4DC'},
+  {bg:'#FFE0E8',color:'#C06070',dot:'#E899AA'},
+  {bg:'#DFF4E8',color:'#3D8C60',dot:'#7DC49A'},
+  {bg:'#FFF0D8',color:'#B87828',dot:'#DDAA60'},
+  {bg:'#EEE0FF',color:'#7850B8',dot:'#B090DC'},
+  {bg:'#D8F4F4',color:'#2E8888',dot:'#70C0C0'},
+  {bg:'#FFE8D8',color:'#B06838',dot:'#DDA070'},
+  {bg:'#E8FFD8',color:'#508838',dot:'#8CC060'},
+];
+function pillColorByName(name){
+  var s=0;for(var i=0;i<name.length;i++)s=(s*31+name.charCodeAt(i))&0xFFFFFF;
+  return _pillColorPalette[Math.abs(s)%_pillColorPalette.length];
 }
 var _suppDragSlot='',_suppDragId='',_suppDragEnterCount=0;
 function suppDragStart(e,slot,id){

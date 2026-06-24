@@ -1389,24 +1389,29 @@ function renderToday(){
       suppRows+='<div style="margin:4px 0 3px">'+
         '<span style="display:inline-block;font-size:0.65em;font-weight:600;color:var(--t3);letter-spacing:0.04em">'+
         sl.label+'</span></div>';
+      var slotItemsArr=[];
       items.forEach(function(it){
+        slotItemsArr.push(it);
+      });
+      suppRows+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 8px;margin-bottom:2px">';
+      slotItemsArr.forEach(function(it){
         var done=!!suppChecks[it.id];
         var p3=pillColorByName(it.name);
         suppRows+='<div onclick="togSuppCheck(\''+t+'\',\''+it.id+'\')" '+
-          'style="cursor:pointer;display:flex;align-items:center;gap:6px;'+
-          'padding:2px 2px;margin-bottom:1px;'+
-          'transition:all .15s;user-select:none" '+
-          'onmouseenter="this.style.opacity=\'0.8\'" onmouseleave="this.style.opacity=\'1\'">'+
-          '<span style="width:12px;height:12px;border-radius:50%;border:1.5px solid '+(done?p3.color:'var(--border2)')+
+          'style="cursor:pointer;display:flex;align-items:center;gap:5px;'+
+          'padding:2px 2px;transition:all .15s;user-select:none;min-width:0" '+
+          'onmouseenter="this.style.opacity=\'0.7\'" onmouseleave="this.style.opacity=\'1\'">'+
+          '<span style="width:11px;height:11px;border-radius:50%;border:1.5px solid '+(done?p3.color:'var(--border2)')+
           ';display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;'+
           'background:'+(done?p3.color:'transparent')+';transition:all .15s">'+
-            (done?'<svg width="8" height="8" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5 3.5-4" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>':'')+
+            (done?'<svg width="7" height="7" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5 3.5-4" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>':'')+
           '</span>'+
-          '<span style="font-size:0.8em;font-weight:500;color:'+(done?p3.color:'var(--text)')+';text-decoration:'+(done?'line-through':'none')+';opacity:'+(done?'0.7':'1')+';transition:all .15s">'+
-            it.name+' <span style="font-size:0.85em;opacity:0.7">'+it.count+'알</span>'+
+          '<span style="font-size:0.78em;font-weight:500;color:'+(done?p3.color:'var(--text)')+';text-decoration:'+(done?'line-through':'none')+';opacity:'+(done?'0.65':'1')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:all .15s">'+
+            it.name+' <span style="font-size:0.85em;opacity:0.65">'+it.count+'알</span>'+
           '</span>'+
         '</div>';
       });
+      suppRows+='</div>';
     });
     suppTodayCard='<div class="card" style="margin-bottom:0">'+
       '<div class="ch" style="margin-bottom:10px"><div class="ct">'+
@@ -4210,28 +4215,25 @@ function renderSuppCalendar(){
     var isFuture=ds>today;
     var isLastCol=col===6;
 
-    // 셀 안 약 체크박스 목록
+    // 셀 안 약 체크박스 목록 (2열 그리드)
     var cellItems='';
     if(!isFuture && allItemsFull.length){
-      var curSlotLabel='';
+      var cellItemInners='';
       allItemsFull.forEach(function(x){
-        if(x.slotLabel!==curSlotLabel){
-          curSlotLabel=x.slotLabel;
-          // 슬롯 구분선 (첫 번째 슬롯 제외)
-          if(cellItems) cellItems+='<div style="height:0.5px;background:var(--border);margin:2px 0;opacity:0.5"></div>';
-        }
         var done=!!checks[x.it.id];
-        cellItems+='<div onclick="event.stopPropagation();togSuppCheck(\''+ds+'\',\''+x.it.id+'\')" '+
-          'style="display:flex;align-items:center;gap:3px;padding:1px 2px;margin-bottom:1px;cursor:pointer;user-select:none;transition:all .12s" '+
+        var pc=pillColorByName(x.it.name);
+        cellItemInners+='<div onclick="event.stopPropagation();togSuppCheck(\''+ds+'\',\''+x.it.id+'\')" '+
+          'style="display:flex;align-items:center;gap:3px;padding:1px 2px;cursor:pointer;user-select:none;transition:all .12s;min-width:0" '+
           'onmouseenter="this.style.opacity=\'0.6\'" onmouseleave="this.style.opacity=\'1\'">'+
-          '<span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;'+
-          'border:1.2px solid '+(done?'var(--accent)':'var(--border2)')+';'+
-          'background:'+(done?'var(--accent)':'transparent')+';transition:all .12s"></span>'+
-          '<span style="font-size:0.6em;font-weight:500;color:'+(done?'var(--accent)':'var(--t2)')+';line-height:1.3;transition:all .12s;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:calc(100% - 12px);text-decoration:'+(done?'line-through':'none')+'">'+
+          '<span style="width:7px;height:7px;border-radius:50%;flex-shrink:0;'+
+          'border:1.2px solid '+(done?pc.color:'var(--border2)')+';'+
+          'background:'+(done?pc.color:'transparent')+';transition:all .12s"></span>'+
+          '<span style="font-size:0.6em;font-weight:500;color:'+(done?pc.color:'var(--t2)')+';line-height:1.3;transition:all .12s;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:'+(done?'line-through':'none')+'">'+
             x.it.name+
           '</span>'+
         '</div>';
       });
+      cellItems='<div style="display:grid;grid-template-columns:1fr 1fr;gap:1px 2px;margin-top:2px">'+cellItemInners+'</div>';
     }
 
     cal+='<div style="min-height:120px;border-right:'+(isLastCol?'none':'1px solid var(--border)')+';border-bottom:1px solid var(--border);'+
@@ -4286,26 +4288,38 @@ function renderSuppCalendar(){
   ['morning_empty','morning_meal','lunch','dinner','bedtime'].forEach(function(slKey){
     ((S.health.supplements[slKey])||[]).forEach(function(it){if(!allSuppIdsC.includes(it.id))allSuppIdsC.push(it.id);});
   });
-  var todayPanelRows='';
+  // 슬롯별로 그룹핑
+  var slotGroups=[];
   var curSlotC='';
   todayAllItems2.forEach(function(x){
     if(x.slotLabel!==curSlotC){
       curSlotC=x.slotLabel;
-      var slotItemsC=todayAllItems2.filter(function(i){return i.slotLabel===x.slotLabel;});
-      var slotDoneC=slotItemsC.filter(function(i){return todayChecks2[i.it.id];}).length;
-      todayPanelRows+='<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0 4px;'+(todayPanelRows?'border-top:1px solid var(--border)':'')+'">'
-        +'<span style="font-size:0.72em;font-weight:700;color:var(--t3);letter-spacing:0.03em">'+x.slotLabel+'</span>'
-        +(slotDoneC===slotItemsC.length?'<span style="font-size:0.68em;color:var(--green);font-weight:700">✓</span>':'<span style="font-size:0.68em;color:var(--t3)">'+slotDoneC+'/'+slotItemsC.length+'</span>')
-        +'</div>';
+      slotGroups.push({label:x.slotLabel,items:[]});
     }
-    var done2=!!todayChecks2[x.it.id];
-    var p2=pillColorByName(x.it.name);
-    todayPanelRows+='<div onclick="togSuppCheck(\''+today+'\',\''+x.it.id+'\')" style="cursor:pointer;display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:8px;margin-bottom:3px;background:'+(done2?p2.bg:'transparent')+';transition:all .15s;user-select:none">'
-      +'<span style="width:18px;height:18px;border-radius:50%;border:1.8px solid '+(done2?p2.color:'var(--border)')+';display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;background:'+(done2?p2.color:'transparent')+';transition:all .15s">'
-        +(done2?'<svg width="9" height="9" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5 3.5-4" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>':'')
-      +'</span>'
-      +'<span style="font-size:0.85em;font-weight:600;color:'+(done2?p2.color:'var(--text)')+';transition:color .15s">'+x.it.name+' '+x.it.count+'알</span>'
-      +'</div>';
+    slotGroups[slotGroups.length-1].items.push(x);
+  });
+
+  var todayPanelRows='';
+  slotGroups.forEach(function(sg,si){
+    var slotDoneC=sg.items.filter(function(x){return todayChecks2[x.it.id];}).length;
+    todayPanelRows+='<div style="'+(si>0?'margin-top:8px;padding-top:8px;border-top:1px solid var(--border)':'')+'">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">'
+        +'<span style="font-size:0.72em;font-weight:700;color:var(--t3);letter-spacing:0.03em">'+sg.label+'</span>'
+        +(slotDoneC===sg.items.length?'<span style="font-size:0.68em;color:var(--green);font-weight:700">✓</span>':'<span style="font-size:0.68em;color:var(--t3)">'+slotDoneC+'/'+sg.items.length+'</span>')
+      +'</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 6px">';
+    sg.items.forEach(function(x){
+      var done2=!!todayChecks2[x.it.id];
+      var p2=pillColorByName(x.it.name);
+      todayPanelRows+='<div onclick="togSuppCheck(\''+today+'\',\''+x.it.id+'\')" style="cursor:pointer;display:flex;align-items:center;gap:6px;padding:3px 4px;border-radius:6px;transition:all .15s;user-select:none" '
+        +'onmouseenter="this.style.background=\'var(--surface)\'" onmouseleave="this.style.background=\'transparent\'">'
+        +'<span style="width:14px;height:14px;border-radius:50%;border:1.5px solid '+(done2?p2.color:'var(--border)')+';display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;background:'+(done2?p2.color:'transparent')+';transition:all .15s">'
+          +(done2?'<svg width="8" height="8" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5 3.5-4" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>':'')
+        +'</span>'
+        +'<span style="font-size:0.8em;font-weight:500;color:'+(done2?p2.color:'var(--text)')+';text-decoration:'+(done2?'line-through':'none')+';opacity:'+(done2?'0.7':'1')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:all .15s">'+x.it.name+' <span style="font-size:0.85em;opacity:0.6">'+x.it.count+'알</span></span>'
+        +'</div>';
+    });
+    todayPanelRows+='</div></div>';
   });
   if(todayTotal2>0){
     cal+='<div style="margin-top:12px;border:1px solid var(--border);border-radius:12px;padding:14px 16px;background:var(--bg)">'

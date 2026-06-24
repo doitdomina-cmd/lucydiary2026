@@ -8,7 +8,7 @@
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firesto re-compat.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -1387,7 +1387,7 @@ function renderToday(){
       // 슬롯 헤더: 작은 텍스트 + 얇은 구분선
       if(suppRows) suppRows+='<div style="height:0.5px;background:var(--border);margin:5px 0;opacity:0.6"></div>';
       suppRows+='<div style="margin:4px 0 3px">'+
-        '<span style="display:inline-block;font-size:0.65em;font-weight:600;color:var(--t3);letter-spacing:0.04em">'+
+        '<span style="display:inline-block;font-size:0.75em;font-weight:600;color:var(--t2);letter-spacing:0.04em">'+
         sl.label+'</span></div>';
       var slotItemsArr=[];
       items.forEach(function(it){
@@ -1418,8 +1418,8 @@ function renderToday(){
         '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M10.5 3.5a4 4 0 0 1 0 5.66L5.16 14.5a4 4 0 1 1-5.66-5.66L4.84 3.5a4 4 0 0 1 5.66 0z" transform="translate(4 2)"/><line x1="8.5" y1="8.5" x2="15.5" y2="15.5"/></svg>오늘 영양제</div>'+
         '<div style="display:flex;align-items:center;gap:6px">'+
           '<div style="font-size:0.8em;font-weight:700;color:'+(suppPct===100?'var(--green)':'var(--accent)')+'">'+suppDone+'/'+suppTotal+'</div>'+
-          '<div style="width:60px;height:5px;background:var(--border);border-radius:3px;overflow:hidden">'+
-            '<div style="width:'+suppPct+'%;height:100%;background:'+(suppPct===100?'var(--green)':'var(--accent)')+';border-radius:3px;transition:width .3s"></div>'+
+          '<div style="width:60px;height:8px;background:var(--border);border-radius:4px;overflow:hidden">'+
+            '<div style="width:'+suppPct+'%;height:100%;background:'+(suppPct===100?'var(--green)':'var(--accent)')+';border-radius:4px;transition:width .3s"></div>'+
           '</div>'+
         '</div>'+
       '</div>'+
@@ -4215,25 +4215,38 @@ function renderSuppCalendar(){
     var isFuture=ds>today;
     var isLastCol=col===6;
 
-    // 셀 안 약 체크박스 목록 (2열 그리드)
+    // 셀 안 약 체크박스 목록 (위: 기상직후+아침식사후 / 아래: 나머지, 각 2열 그리드)
     var cellItems='';
     if(!isFuture && allItemsFull.length){
-      var cellItemInners='';
-      allItemsFull.forEach(function(x){
-        var done=!!checks[x.it.id];
-        var pc=pillColorByName(x.it.name);
-        cellItemInners+='<div onclick="event.stopPropagation();togSuppCheck(\''+ds+'\',\''+x.it.id+'\')" '+
-          'style="display:flex;align-items:center;gap:3px;padding:1px 2px;cursor:pointer;user-select:none;transition:all .12s;min-width:0" '+
-          'onmouseenter="this.style.opacity=\'0.6\'" onmouseleave="this.style.opacity=\'1\'">'+
-          '<span style="width:7px;height:7px;border-radius:50%;flex-shrink:0;'+
-          'border:1.2px solid '+(done?pc.color:'var(--border2)')+';'+
-          'background:'+(done?pc.color:'transparent')+';transition:all .12s"></span>'+
-          '<span style="font-size:0.6em;font-weight:500;color:'+(done?pc.color:'var(--t2)')+';line-height:1.3;transition:all .12s;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:'+(done?'line-through':'none')+'">'+
-            x.it.name+
-          '</span>'+
-        '</div>';
-      });
-      cellItems='<div style="display:grid;grid-template-columns:1fr 1fr;gap:1px 2px;margin-top:2px">'+cellItemInners+'</div>';
+      var topKeys=['morning_empty','morning_meal'];
+      var topItems=allItemsFull.filter(function(x){return topKeys.indexOf(x.slotKey)!==-1;});
+      var botItems=allItemsFull.filter(function(x){return topKeys.indexOf(x.slotKey)===-1;});
+      function makeCellRow(arr){
+        if(!arr.length) return '';
+        var inner='';
+        arr.forEach(function(x){
+          var done=!!checks[x.it.id];
+          var pc=pillColorByName(x.it.name);
+          inner+='<div onclick="event.stopPropagation();togSuppCheck(\''+ds+'\',\''+x.it.id+'\')" '+
+            'style="display:flex;align-items:center;gap:3px;padding:1px 2px;cursor:pointer;user-select:none;transition:all .12s;min-width:0" '+
+            'onmouseenter="this.style.opacity=\'0.6\'" onmouseleave="this.style.opacity=\'1\'">'+
+            '<span style="width:7px;height:7px;border-radius:50%;flex-shrink:0;'+
+            'border:1.2px solid '+(done?pc.color:'var(--border2)')+';'+
+            'background:'+(done?pc.color:'transparent')+';transition:all .12s"></span>'+
+            '<span style="font-size:0.6em;font-weight:500;color:'+(done?pc.color:'var(--t2)')+';line-height:1.3;transition:all .12s;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:'+(done?'line-through':'none')+'">'+
+              x.it.name+
+            '</span>'+
+          '</div>';
+        });
+        return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1px 2px">'+inner+'</div>';
+      }
+      var topHtml=makeCellRow(topItems);
+      var botHtml=makeCellRow(botItems);
+      cellItems='<div style="margin-top:2px">'+
+        topHtml+
+        (topHtml&&botHtml?'<div style="height:1px;background:var(--border);margin:3px 0;opacity:0.7"></div>':'')+
+        botHtml+
+      '</div>';
     }
 
     cal+='<div style="min-height:120px;border-right:'+(isLastCol?'none':'1px solid var(--border)')+';border-bottom:1px solid var(--border);'+
@@ -4369,6 +4382,14 @@ var _pillColorPalette=[
   {bg:'#D8F4F4',color:'#2E8888',dot:'#70C0C0'},
   {bg:'#FFE8D8',color:'#B06838',dot:'#DDA070'},
   {bg:'#E8FFD8',color:'#508838',dot:'#8CC060'},
+  {bg:'#FFF0F8',color:'#B03878',dot:'#E080B0'},
+  {bg:'#F0F0FF',color:'#5050B0',dot:'#9090D8'},
+  {bg:'#F8FFD8',color:'#707020',dot:'#B0B040'},
+  {bg:'#D8E8FF',color:'#305898',dot:'#7098D0'},
+  {bg:'#FFD8F0',color:'#A03080',dot:'#D870B8'},
+  {bg:'#D8FFF0',color:'#207858',dot:'#60B898'},
+  {bg:'#FFF8D8',color:'#986020',dot:'#D09850'},
+  {bg:'#F0D8FF',color:'#802898',dot:'#C070D0'},
 ];
 function pillColorByName(name){
   var s=0;for(var i=0;i<name.length;i++)s=(s*31+name.charCodeAt(i))&0xFFFFFF;

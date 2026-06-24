@@ -894,8 +894,9 @@
                         <div class="relative flex items-center justify-between mb-6">
                             <h3 class="text-lg font-bold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-pen-nib text-emerald-500"></i> 집필 관리 일정</h3>
                             <!-- 가운데 목표 합계 -->
-                            <div class="absolute left-1/2 -translate-x-1/2 text-center pointer-events-none">
-                                <p class="text-xl font-semibold" style="font-family:'Pretendard','Apple SD Gothic Neo',sans-serif; color:#475569;">이번달 목표 합계: <span id="write-month-goal-sum" style="color:var(--primary)">0자</span></p>
+                            <div class="absolute left-1/2 -translate-x-1/2 flex items-center gap-4 pointer-events-none">
+                                <span id="write-month-big-label" style="font-family:'Pretendard','Apple SD Gothic Neo',sans-serif; font-size:2.5rem; font-weight:800; color:var(--primary); line-height:1;"></span>
+                                <p class="text-xl font-semibold" style="font-family:'Pretendard','Apple SD Gothic Neo',sans-serif; color:#475569; margin:0;">이번달 목표 합계: <span id="write-month-goal-sum" style="color:var(--primary)">0자</span></p>
                             </div>
                             <div class="flex items-center bg-slate-100 rounded-lg p-1">
                                 <button onclick="changeWriteMonth(-1)" class="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-white rounded-md transition-all"><i class="fa-solid fa-chevron-left"></i></button>
@@ -922,9 +923,12 @@
                 <!-- 스케줄 관리 탭 (NEW) -->
                 <div id="tab-task" class="tab-content space-y-8 pb-20">
                     <div class="glass-card p-8">
-                        <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                        <div class="relative flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
                             <div>
                                 <h3 class="text-lg font-bold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-list-check text-indigo-500"></i> 스케줄 & 태스크 관리</h3>
+                            </div>
+                            <div class="absolute left-1/2 -translate-x-1/2 text-center pointer-events-none">
+                                <p id="task-month-big-label" style="font-family:'Pretendard','Apple SD Gothic Neo',sans-serif; font-size:2.5rem; font-weight:800; color:var(--primary); line-height:1;"></p>
                             </div>
                             <div class="flex items-center bg-slate-100 rounded-lg p-1">
                                 <button onclick="changeTaskMonth(-1)" class="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-white rounded-md transition-all"><i class="fa-solid fa-chevron-left"></i></button>
@@ -6791,6 +6795,7 @@
 
         function renderWriteCalendar() {
             document.getElementById('write-cal-title').innerText = `${writeCalDate.getFullYear()}년 ${writeCalDate.getMonth() + 1}월`;
+            const wbl = document.getElementById('write-month-big-label'); if (wbl) wbl.innerText = `${writeCalDate.getMonth() + 1}월`;
             
             const dragEvents = `ondragover="handleDragOver(event)" ondragenter="handleDragEnter(event)" ondragleave="handleDragLeave(event)" ondrop="handleWriteDrop(event, this)"`;
 
@@ -6865,12 +6870,8 @@
                     // 작품의 실제 누적 집필량 (workId가 외전 ID면 외전 기록만)
                     const workTotal = writerGetWorkTotal(s.workId);
                     
-                    let writtenInBlock = 0;
-                    if (workTotal >= blockEnd) writtenInBlock = blockGoal;
-                    else if (workTotal > blockStart) writtenInBlock = workTotal - blockStart;
-                    
                     let fillPct = 0;
-                    if (blockGoal > 0) fillPct = Math.round((writtenInBlock / blockGoal) * 100);
+                    if (blockGoal > 0) fillPct = Math.min(100, Math.round((Math.max(0, workTotal - blockStart) / blockGoal) * 100));
 
                     const ownGoalText = `${blockGoal.toLocaleString()}자`;
                     const cumulativeText = workTotalGoal > 0
@@ -6956,6 +6957,7 @@
         // -- 스케줄 캘린더 렌더 --
         function renderTaskCalendar() {
             document.getElementById('task-cal-title').innerText = `${taskCalDate.getFullYear()}년 ${taskCalDate.getMonth() + 1}월`;
+            const tbl = document.getElementById('task-month-big-label'); if (tbl) tbl.innerText = `${taskCalDate.getMonth() + 1}월`;
             
             const dragEvents = `ondragover="handleDragOver(event)" ondragenter="handleDragEnter(event)" ondragleave="handleDragLeave(event)" ondrop="handleTaskDrop(event, this)"`;
 

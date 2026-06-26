@@ -764,6 +764,7 @@
                                             <label class="text-sm font-bold text-slate-600 ml-1 mb-1 block">출간일</label>
                                             <div class="flex items-center gap-2">
                                                 <input type="date" id="new-work-date-webtoon" class="flex-1 p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100 transition-all">
+                                                <input type="month" id="new-work-pending-month-webtoon" class="flex-1 p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100 transition-all hidden">
                                                 <label class="flex items-center gap-1.5 cursor-pointer shrink-0 bg-slate-50 border border-slate-200 rounded-xl px-3 py-3">
                                                     <input type="checkbox" id="new-work-pending-webtoon" class="accent-emerald-500 w-3.5 h-3.5" onchange="document.getElementById('new-work-pending').checked=this.checked; toggleNewWorkDate(this)">
                                                     <span class="text-xs text-slate-500 whitespace-nowrap">출간 예정</span>
@@ -794,6 +795,7 @@
                                                 <label class="text-sm font-bold text-slate-600 ml-1 mb-1 block">출간일</label>
                                                 <div class="flex items-center gap-2">
                                                     <input type="date" id="new-work-date" class="flex-1 p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100 transition-all">
+                                                    <input type="month" id="new-work-pending-month" class="flex-1 p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100 transition-all hidden">
                                                     <label class="flex items-center gap-1.5 cursor-pointer shrink-0 bg-slate-50 border border-slate-200 rounded-xl px-3 py-3">
                                                         <input type="checkbox" id="new-work-pending" class="accent-emerald-500 w-3.5 h-3.5" onchange="toggleNewWorkDate(this)">
                                                         <span class="text-xs text-slate-500 whitespace-nowrap">출간 예정</span>
@@ -833,7 +835,7 @@
                             </div>
                         </div> <!-- /왼쪽 셀 h-full -->
                         <!-- 오른쪽: 작품 목록 -->
-                        <div style="min-height: calc(100vh - 120px);">
+                        <div id="works-right-panel" style="min-height: calc(100vh - 120px);">
                             <div class="glass-card p-6 flex flex-col" style="min-height: calc(100vh - 120px);">
                                 <div class="flex items-center justify-between mb-4 flex-shrink-0">
                                     <h3 class="text-lg font-bold text-slate-700 flex items-center gap-2"><button onclick="openGenreManager()" class="text-slate-400 hover:text-emerald-600 transition-colors p-1 rounded-lg hover:bg-slate-100" title="장르 및 태그 관리"><i class="fa-solid fa-gear text-base"></i></button> 등록된 작품 목록 <span id="total-works-badge" class="ml-2 bg-slate-100 text-slate-500 text-xs px-2 py-0.5 rounded-full font-bold">0</span><span id="total-volumes-badge" class="hidden text-xs text-slate-400 font-medium"></span></h3>
@@ -3026,7 +3028,7 @@
                 const idxA = sortOrder.indexOf(a.genre), idxB = sortOrder.indexOf(b.genre);
                 const valA = idxA === -1 ? 999 : idxA, valB = idxB === -1 ? 999 : idxB;
                 if (valA !== valB) return valA - valB;
-                const dateA = a.isPending ? '9999-12-31' : a.publishDate, dateB = b.isPending ? '9999-12-31' : b.publishDate;
+                const dateA = sortKeyDate(a), dateB = sortKeyDate(b);
                 return dateA < dateB ? -1 : (dateA > dateB ? 1 : 0);
             });
             container.innerHTML = ""; container.className = "grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-8";
@@ -3039,7 +3041,7 @@
             works.forEach(w => {
                 const totalProfit = getCumulativeWorkData(w.id).totalProfit;
                 const showWebtoonBadge = w.hasWebtoon;
-                const dateDisplay = w.isPending ? '출간 예정' : w.publishDate;
+                const dateDisplay = getPendingLabel(w);
                 const genreColor = getGenreColor(w.genre);
 
                 // 이미지: 일단 placeholder로 렌더, 나중에 실제 이미지 삽입
@@ -3242,8 +3244,21 @@
         function openWorkMemo(workId) {
             memoEditingWorkId = workId; const work = masterWorks.find(w => w.id === workId); if (!work) return;
             document.getElementById('memo-work-title').innerText = work.title + " 메모";
-            document.getElementById('memo-rate-display').innerText = work.rate ? work.rate + '%' : '-';
-            document.getElementById('memo-date-display').innerText = work.isPending ? '출간 예정' : (work.publishDate || '-');
+            const isWebtoonMemo = work.genre && work.genre.includes('웹툰');
+            if (isWebtoonMemo) {
+                let rateText = '';
+                if (work.rs && work.webtoonRate) rateText = `RS ${work.rs} (비율 ${work.webtoonRate})`;
+                else if (work.rs) rateText = `RS ${work.rs}`;
+                else if (work.webtoonRate) rateText = `비율 ${work.webtoonRate}`;
+                else rateText = '-';
+                document.getElementById('memo-rate-display').innerText = rateText;
+            } else {
+                document.getElementById('memo-rate-display').innerText = work.rate ? work.rate + '%' : '-';
+            }
+            const _pendingLabel = getPendingLabel(work);
+            const _dateEl = document.getElementById('memo-date-display');
+            _dateEl.textContent = _pendingLabel;
+            _dateEl.style.color = work.isPending ? (work.pendingMonth ? '#ec4899' : '#3b82f6') : '';
             document.getElementById('memo-contract-term').value = work.contractTerm || '';
             document.getElementById('memo-extension-term').value = work.extensionTerm || '';
             document.getElementById('memo-editor').innerHTML = work.memo || ''; 
@@ -3643,7 +3658,59 @@
         function switchGenreTab(genre) { currentGenreTab = genre; renderRoyaltySheets(); }
         function switchLibraryTab(tab) { currentLibraryTab = tab; renderMasterWorksList(); }
         function handleRateSelectChange(select) { const customInput = document.getElementById('new-work-rate-custom'); if(select.value === 'custom') { customInput.classList.remove('hidden'); customInput.focus(); } else { customInput.classList.add('hidden'); } }
-        function toggleNewWorkDate(checkbox) { const dateInput = document.getElementById('new-work-date'); if (checkbox.checked) { dateInput.disabled = true; dateInput.value = ''; dateInput.classList.add('bg-slate-100', 'text-slate-400'); } else { dateInput.disabled = false; dateInput.classList.remove('bg-slate-100', 'text-slate-400'); } }
+        function getPendingLabel(w) {
+            if (!w.isPending) return w.publishDate || '-';
+            if (w.pendingMonth) {
+                const [y, m] = w.pendingMonth.split('-');
+                return `${y.slice(2)}-${m} 출간예정`;
+            }
+            return '출간 예정';
+        }
+        function getDateDisplay(w) {
+            const today = new Date().toISOString().slice(0, 10);
+            if (!w.isPending) {
+                const d = w.publishDate || '';
+                if (d && d > today) {
+                    // 미래 확정 날짜 → 핑크 진하게
+                    return `<span style="color:#ec4899;font-weight:700;">${d}</span>`;
+                }
+                return d || '-';
+            }
+            if (w.pendingMonth) {
+                return `<span style="color:#ec4899;font-weight:600;">${getPendingLabel(w)}</span>`;
+            }
+            return '<span style="color:#3b82f6;font-weight:400;">출간 예정</span>';
+        }
+        function sortKeyDate(w) {
+            // 정렬 우선순위:
+            // 1. 출간완료 (오늘 이전)           → "1_YYYY-MM-DD"
+            // 2. 미래확정 or 월있는예정 → 날짜순 → "2_YYYY-MM-DD" (같은 그룹, 날짜로 섞임)
+            // 3. 출간예정 + 월 없음              → "3_9999-12-31"
+            const today = new Date().toISOString().slice(0, 10);
+            if (!w.isPending) {
+                const d = w.publishDate || '0000-00-00';
+                return d <= today ? '1_' + d : '2_' + d;
+            }
+            if (w.pendingMonth) return '2_' + w.pendingMonth + '-01';
+            return '3_9999-12-31';
+        }
+        function toggleNewWorkDate(checkbox) {
+            const dateInput = document.getElementById('new-work-date');
+            const monthInput = document.getElementById('new-work-pending-month');
+            const wtDateInput = document.getElementById('new-work-date-webtoon');
+            const wtMonthInput = document.getElementById('new-work-pending-month-webtoon');
+            if (checkbox.checked) {
+                if (dateInput) { dateInput.classList.add('hidden'); dateInput.value = ''; }
+                if (monthInput) monthInput.classList.remove('hidden');
+                if (wtDateInput) { wtDateInput.classList.add('hidden'); wtDateInput.value = ''; }
+                if (wtMonthInput) wtMonthInput.classList.remove('hidden');
+            } else {
+                if (dateInput) dateInput.classList.remove('hidden');
+                if (monthInput) { monthInput.classList.add('hidden'); monthInput.value = ''; }
+                if (wtDateInput) wtDateInput.classList.remove('hidden');
+                if (wtMonthInput) { wtMonthInput.classList.add('hidden'); wtMonthInput.value = ''; }
+            }
+        }
         function toggleEditWorkDate(id) { const checkbox = document.getElementById(`edit-pending-${id}`); const dateInput = document.getElementById(`edit-date-${id}`); if (checkbox.checked) { dateInput.disabled = true; dateInput.value = ''; dateInput.classList.add('bg-slate-100', 'text-slate-400'); } else { dateInput.disabled = false; dateInput.classList.remove('bg-slate-100', 'text-slate-400'); } }
         function toggleStudioInput() { 
             const genre = document.getElementById('new-work-genre').value; 
@@ -3653,9 +3720,11 @@
             const datesRow = document.getElementById('dates-row');
             const pubRateRow = document.getElementById('publisher-rate-row');
             const webtoonDates = document.getElementById('webtoon-dates-group');
+            const volsGroup = document.getElementById('volumes-field-group');
             if (genre.includes('웹툰')) { 
                 studioGroup.classList.remove('hidden');
                 normalRate.classList.add('hidden');
+                if (volsGroup) volsGroup.classList.add('hidden');
                 if (goalGroup) goalGroup.classList.add('hidden');
                 if (webtoonDates) webtoonDates.classList.remove('hidden');
                 if (pubRateRow) pubRateRow.className = 'grid grid-cols-1 gap-3';
@@ -3675,6 +3744,7 @@
             } else { 
                 studioGroup.classList.add('hidden');
                 normalRate.classList.remove('hidden');
+                if (volsGroup) volsGroup.classList.remove('hidden');
                 if (goalGroup) goalGroup.classList.remove('hidden');
                 if (webtoonDates) webtoonDates.classList.add('hidden');
                 if (pubRateRow) pubRateRow.className = 'grid grid-cols-2 gap-3';
@@ -3921,6 +3991,8 @@
             if (md) md.value = '';
             document.getElementById('new-work-date').value = '';
             document.getElementById('new-work-pending').checked = false;
+            const pmReset = document.getElementById('new-work-pending-month'); if (pmReset) { pmReset.value = ''; pmReset.classList.add('hidden'); }
+            const wmReset = document.getElementById('new-work-pending-month-webtoon'); if (wmReset) { wmReset.value = ''; wmReset.classList.add('hidden'); }
             document.getElementById('new-work-rate').value = '70';
             // 웹툰 날짜 필드도 초기화
             const wtDate = document.getElementById('new-work-date-webtoon');
@@ -4003,6 +4075,8 @@
             if (md) md.value = w.manuscriptDate || '';
             document.getElementById('new-work-date').value = w.publishDate || '';
             document.getElementById('new-work-pending').checked = w.isPending || false;
+            const pmInput = document.getElementById('new-work-pending-month');
+            if (pmInput) { pmInput.value = w.pendingMonth || ''; if (w.isPending) { pmInput.classList.remove('hidden'); document.getElementById('new-work-date').classList.add('hidden'); } }
             const rateEl = document.getElementById('new-work-rate');
             if (rateEl && !w.genre.includes('웹툰')) {
                 const opts = Array.from(rateEl.options).map(o => o.value);
@@ -4014,6 +4088,8 @@
                 const wtPending = document.getElementById('new-work-pending-webtoon');
                 if (wtDate) wtDate.value = w.publishDate || '';
                 if (wtPending) wtPending.checked = w.isPending || false;
+                const wtpm = document.getElementById('new-work-pending-month-webtoon');
+                if (wtpm) { wtpm.value = w.pendingMonth || ''; if (w.isPending) { wtpm.classList.remove('hidden'); if (wtDate) wtDate.classList.add('hidden'); } }
                 const wtContract = document.getElementById('new-work-contract-date');
                 if (wtContract) wtContract.value = w.contractDate || '';
             }
@@ -4037,6 +4113,23 @@
 
         function cancelEditWork() { hideWorkForm(); editingWorkId = null; currentViewWorkId = null; renderMasterWorksList(); }
 
+        // 오른쪽 패널 클릭 시 수정모드 취소
+        document.addEventListener('DOMContentLoaded', function() {
+            const rightPanel = document.getElementById('works-right-panel');
+            if (rightPanel) {
+                rightPanel.addEventListener('click', function(e) {
+                    // 수정 모드일 때만 (취소 버튼이 보일 때)
+                    const cancelBtn = document.getElementById('work-form-cancel-btn');
+                    if (cancelBtn && !cancelBtn.classList.contains('hidden')) {
+                        // 작품 카드 클릭은 제외 (viewWork 실행되는 곳)
+                        if (!e.target.closest('[onclick*="viewWork"]') && !e.target.closest('[onclick*="startEditWork"]')) {
+                            cancelEditWork();
+                        }
+                    }
+                });
+            }
+        });
+
         function registerOrUpdateWork() {
             const editId = document.getElementById('work-editing-id').value;
             const title = document.getElementById('new-work-title').value.trim();
@@ -4046,11 +4139,15 @@
             if (isWebtoon) {
                 const wtDate = document.getElementById('new-work-date-webtoon');
                 const wtPending = document.getElementById('new-work-pending-webtoon');
+                const wtMonthInput = document.getElementById('new-work-pending-month-webtoon');
+                const mainMonthInput = document.getElementById('new-work-pending-month');
                 if (wtDate) document.getElementById('new-work-date').value = wtDate.value || '';
                 if (wtPending) document.getElementById('new-work-pending').checked = wtPending.checked;
+                if (wtMonthInput && mainMonthInput) mainMonthInput.value = wtMonthInput.value || '';
             }
             const date = document.getElementById('new-work-date').value;
             const isPending = document.getElementById('new-work-pending').checked;
+            const pendingMonth = isPending ? (document.getElementById('new-work-pending-month')?.value || '') : '';
             const publisher = document.getElementById('new-work-publisher').value.trim() || '-';
             const studio = document.getElementById('new-work-studio').value.trim();
 
@@ -4088,7 +4185,7 @@
                 w.rate = rate; w.rs = rs; w.webtoonRate = webtoonRate;
                 w.goalNoSpace = goalNoSpace; w.goalWithSpace = goalWithSpace;
                 w.manuscriptDate = manuscriptDate;
-                w.isPending = isPending; w.publishDate = isPending ? '' : date;
+                w.isPending = isPending; w.pendingMonth = isPending ? pendingMonth : ''; w.publishDate = isPending ? '' : date;
                 w.volumes = volumes;
                 w.advanceAmount = advanceAmount ? Number(advanceAmount) : '';
                 w.advanceDate   = advanceDate;
@@ -4101,12 +4198,12 @@
                     const originalWork = masterWorks.find(w => w.title === title && !w.genre.includes('웹툰'));
                     if (originalWork) originalWork.hasWebtoon = true;
                 }
-                const newWork = { id: Date.now().toString(), genre, title, publisher: publisher || '-', studio: studio || '-', rate, rs, webtoonRate, goalNoSpace, goalWithSpace, manuscriptDate, publishDate: date, isPending, volumes, advanceAmount: advanceAmount ? Number(advanceAmount) : '', advanceDate, contractDate };
+                const newWork = { id: Date.now().toString(), genre, title, publisher: publisher || '-', studio: studio || '-', rate, rs, webtoonRate, goalNoSpace, goalWithSpace, manuscriptDate, publishDate: date, isPending, pendingMonth, volumes, advanceAmount: advanceAmount ? Number(advanceAmount) : '', advanceDate, contractDate };
                 masterWorks.push(newWork);
                 // 신규 등록 시 완고 입고일이 있으면 자동 스케줄 생성
                 if (manuscriptDate) syncManuscriptTaskSchedule(newWork, '', manuscriptDate);
             }
-            masterWorks.sort((a,b) => { const dA = a.isPending?'9999-12-31':a.publishDate, dB = b.isPending?'9999-12-31':b.publishDate; return new Date(dA)-new Date(dB); });
+            masterWorks.sort((a,b) => { const dA = sortKeyDate(a), dB = sortKeyDate(b); return dA < dB ? -1 : dA > dB ? 1 : 0; });
             if (editId) {
                 const lbl = document.getElementById('work-form-submit-label');
                 if (lbl) { lbl.textContent = '✓ 수정 완료'; }
@@ -4141,21 +4238,21 @@
                     if (pa !== pb) return pa - pb;
                     if (pa === order.length) { const pc = (a.publisher || '').localeCompare(b.publisher || '', 'ko'); if (pc !== 0) return pc; }
                     // 같은 출판사 안에서는 출간날짜 순 (출간예정/날짜없음은 뒤로, 동일하면 제목순)
-                    const dA = (a.isPending || !a.publishDate) ? '9999-12-31' : a.publishDate;
-                    const dB = (b.isPending || !b.publishDate) ? '9999-12-31' : b.publishDate;
+                    const dA = sortKeyDate(a);
+                    const dB = sortKeyDate(b);
                     if (dA !== dB) return dA.localeCompare(dB);
                     return a.title.localeCompare(b.title, 'ko');
                 }
                 if (currentGenreTab === '웹툰') {
                     // 1) 출간일 순(없으면 뒤로) > 2) 계약일 순 > 3) 제목
-                    const dA = (a.isPending || !a.publishDate) ? '9999-12-31' : a.publishDate;
-                    const dB = (b.isPending || !b.publishDate) ? '9999-12-31' : b.publishDate;
+                    const dA = sortKeyDate(a);
+                    const dB = sortKeyDate(b);
                     if (dA !== dB) return dA < dB ? -1 : 1;
                     const cA = a.contractDate || '9999-12-31', cB = b.contractDate || '9999-12-31';
                     if (cA !== cB) return cA < cB ? -1 : 1;
                     return a.title.localeCompare(b.title, 'ko');
                 }
-                const dateA = (a.isPending || !a.publishDate) ? '9999-12-31' : a.publishDate, dateB = (b.isPending || !b.publishDate) ? '9999-12-31' : b.publishDate; if (dateA !== dateB) return (dateA < dateB) ? -1 : (dateA > dateB ? 1 : 0); return a.title.localeCompare(b.title, 'ko');
+                const dateA = sortKeyDate(a), dateB = sortKeyDate(b); if (dateA !== dateB) return (dateA < dateB) ? -1 : (dateA > dateB ? 1 : 0); return a.title.localeCompare(b.title, 'ko');
             });
             const getStickyHeader = () => { if (currentYear === 'total') return `<th class="sticky-col text-left pl-6">${currentGenreTab === '종합' ? '장르 구분' : '작품 정보'}</th>`; return `<th class="sticky-col text-left pl-6"><div class="flex items-center gap-2"><span class="bg-slate-600 text-white text-sm px-2.5 py-0.5 rounded-md font-bold font-mono shadow-sm tracking-tight">${currentYear}</span><span class="text-slate-600">${currentGenreTab === '종합' ? '장르 구분' : '작품 정보'}</span></div></th>`; };
             if (currentYear === 'total') {
@@ -4185,7 +4282,7 @@
                     gWorks.forEach(w => {
                         let wCumulative = 0, wYearly = {}; years.forEach(y => { wYearly[y] = 0; for(let m=1; m<=12; m++) { const val = (monthlyData[`${y}-${String(m).padStart(2,'0')}`] || {})[w.id] || 0; wYearly[y] += val; } wCumulative += wYearly[y]; });
                         totalCumulative += wCumulative; years.forEach(y => totalYearly[y] += wYearly[y]);
-                        const dateDisplay = w.isPending ? '<span style="color:var(--primary);font-weight:400;"> 출간 예정</span>' : w.publishDate;
+                        const dateDisplay = getDateDisplay(w);
                         const advAmt = w.advanceAmount ? Number(w.advanceAmount).toLocaleString()+'만원' : '';
                         const advHtml = advAmt ? `<span style="color:#16a34a;font-size:12px;font-weight:400;margin-left:auto;padding-left:6px;white-space:nowrap;flex-shrink:0;">선인세 ${advAmt}</span>` : '';
                         const wSales = calculateGrossSales(wCumulative, w.rate); totalSalesAll += wSales;
@@ -4217,7 +4314,7 @@
                     const section = document.createElement('div'); section.innerHTML = `<h4 class="text-sm font-bold text-slate-500 mb-4 pl-2 border-l-4" style="border-color:var(--primary)">${currentGenreTab} 상세 입력 <span class="text-slate-400 font-normal">(${gWorks.length})</span></h4>`;
                     let html = `<div class="spreadsheet-container"><table class="sheet-table"><thead><tr>${getStickyHeader()}` + months.map(m => `<th class="text-center">${parseInt(m.split('-')[1])}월</th>`).join('') + `<th class="genre-total-row" style="min-width:135px;">합계</th></tr></thead><tbody>`;
                     gWorks.forEach(w => {
-                        const dateDisplay = w.isPending ? '<span style="color:var(--primary);font-weight:400;"> 출간 예정</span>' : w.publishDate;
+                        const dateDisplay = getDateDisplay(w);
                         const advAmt2 = w.advanceAmount ? Number(w.advanceAmount).toLocaleString()+'만원' : '';
                         const advHtml2 = advAmt2 ? `<span style="color:#16a34a;font-size:12px;font-weight:400;margin-left:auto;padding-left:6px;white-space:nowrap;flex-shrink:0;">선인세 ${advAmt2}</span>` : '';
                         html += `<tr><td class="sticky-col pl-6"><div class="font-bold text-slate-700 text-sm truncate w-[240px] mb-1">${w.title}</div><div class="text-[11px] text-slate-400 flex items-center">${(currentGenreTab === '웹툰' ? (w.studio || '-') : w.publisher)} | ${dateDisplay}${advHtml2}</div></td>`; 
@@ -4253,7 +4350,18 @@
             tabsContainer.innerHTML = tabs.map(t => `<button onclick="switchLibraryTab('${t}')" class="px-3 py-1.5 text-xs font-bold rounded-lg transition-all mb-1 ${currentLibraryTab === t ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-400 hover:bg-slate-50'}">${t}</button>`).join('');
             container.innerHTML = ""; let worksToShow = currentLibraryTab === '전체' ? [...masterWorks] : masterWorks.filter(w => w.genre === currentLibraryTab);
             const sortOrder = ['BL 장편', '현로 장편', '현로 초단', 'BL 초단', '웹툰'];
-            worksToShow.sort((a,b) => { const idxA = sortOrder.indexOf(a.genre), idxB = sortOrder.indexOf(b.genre); const valA = idxA === -1 ? 999 : idxA, valB = idxB === -1 ? 999 : idxB; if (valA !== valB) return valA - valB; const dateA = (a.isPending || !a.publishDate) ? '9999-12-31' : a.publishDate, dateB = (b.isPending || !b.publishDate) ? '9999-12-31' : b.publishDate; if (dateA !== dateB) return dateA < dateB ? -1 : 1; if (a.genre && a.genre.includes('웹툰')) { const cA = a.contractDate || '9999-12-31', cB = b.contractDate || '9999-12-31'; if (cA !== cB) return cA < cB ? -1 : 1; } return a.title.localeCompare(b.title, 'ko'); });
+            worksToShow.sort((a,b) => {
+                const idxA = sortOrder.indexOf(a.genre), idxB = sortOrder.indexOf(b.genre);
+                const valA = idxA === -1 ? 999 : idxA, valB = idxB === -1 ? 999 : idxB;
+                if (valA !== valB) return valA - valB;
+                const dA = sortKeyDate(a), dB = sortKeyDate(b);
+                if (dA !== dB) return dA < dB ? -1 : 1;
+                if (a.genre && a.genre.includes('웹툰')) {
+                    const cA = a.contractDate || '9999-12-31', cB = b.contractDate || '9999-12-31';
+                    if (cA !== cB) return cA < cB ? -1 : 1;
+                }
+                return a.title.localeCompare(b.title, 'ko');
+            });
             if (badge) {
                 badge.innerText = worksToShow.length;
                 // 웹툰 제외 전체 권수 = 본편 volumes + 외전 수
@@ -4300,7 +4408,7 @@
                 } else {
                     rateLabel = `${w.rate}%`;
                 }
-                const dateDisplay = w.isPending ? '<span class="text-blue-500 font-bold">출간 예정</span>' : w.publishDate;
+                const dateDisplay = getDateDisplay(w);
                 const studioVal = w.studio && w.studio !== '-' && w.studio !== 'undefined' ? w.studio : '';
                 let studioRow = ''; if (studioVal) studioRow = `<div class="flex items-center text-[10px] text-pink-500 mt-0.5 truncate"><i class="fa-solid fa-display mr-1.5 shrink-0 w-3 text-center"></i><span class="truncate">${studioVal}</span></div>`;
                 const extrasNames = (w.extras && w.extras.length > 0) 

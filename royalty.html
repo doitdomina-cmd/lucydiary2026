@@ -985,8 +985,22 @@
                         <!-- 우측: D-Day 사이드바 -->
                         <div class="w-72 shrink-0 flex flex-col sticky top-4" id="publish-dday-sidebar" style="height:calc(100vh - 120px)">
                             <div class="glass-card p-4 flex flex-col" style="height:100%">
-                                <h3 class="text-sm font-bold text-slate-700 flex items-center gap-2 mb-1"><i class="fa-solid fa-star text-yellow-400 text-xs"></i> 출간 예정</h3>
-                                <p class="text-xs text-slate-400 mb-3">오늘 이후 예정된 일정이 표시됩니다.</p>
+                                <div class="flex items-center justify-between mb-1">
+                                    <h3 class="text-sm font-bold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-star text-yellow-400 text-xs"></i> 출간 예정</h3>
+                                    <div class="relative" id="dday-filter-wrap">
+                                        <button id="dday-filter-btn" onclick="toggleDdayFilter()" class="w-6 h-6 flex items-center justify-center rounded-full hover:bg-slate-100 transition-all text-slate-400 hover:text-slate-600" title="장르 필터">
+                                            <i class="fa-solid fa-sliders text-xs"></i>
+                                        </button>
+                                        <div id="dday-filter-dropdown" style="display:none; position:absolute; right:0; top:28px; z-index:100; min-width:150px;"
+                                            class="bg-white rounded-xl shadow-lg border border-slate-100 p-2 space-y-1">
+                                            <div class="text-[10px] font-bold text-slate-400 px-2 pb-1 border-b border-slate-100 mb-1">장르 필터</div>
+                                            <label class="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-slate-50 cursor-pointer text-xs text-slate-600">
+                                                <input type="checkbox" class="dday-genre-check accent-slate-500" value="__all__" onchange="onDdayFilterChange(this)" checked> 전체
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="border-b border-slate-100 mb-3"></div>
                                 <div id="publish-dday-list" class="space-y-2 flex-1" style="overflow-y:auto; scrollbar-width:none; -ms-overflow-style:none;"></div>
                             </div>
                         </div>
@@ -2638,6 +2652,21 @@
                 });
             });
 
+            // 사이드바 필터 드롭다운 체크박스 초기화 (genreList 기반)
+            (function initDdayFilterCheckboxes() {
+                const dropdown = document.getElementById('dday-filter-dropdown');
+                if (!dropdown) return;
+                // 기존 장르 체크박스 제거 후 재생성
+                dropdown.querySelectorAll('label.genre-filter-label').forEach(el => el.remove());
+                genreList.forEach(g => {
+                    const label = document.createElement('label');
+                    label.className = 'genre-filter-label flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-slate-50 cursor-pointer text-xs text-slate-600';
+                    const isChecked = window._ddayGenreFilter ? window._ddayGenreFilter.has(g.name) : true;
+                    label.innerHTML = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${g.color};flex-shrink:0"></span><input type="checkbox" class="dday-genre-check accent-slate-500" value="${g.name}" onchange="onDdayFilterChange(this)" ${isChecked ? 'checked' : ''}><span>${g.name}</span>`;
+                    dropdown.appendChild(label);
+                });
+            })();
+
             // 사이드바: 본편+외전 통합 - 오늘 이후 전체 출간 예정
             const allUpcoming = allItems
                 .map(w => ({ ...w, diff: Math.ceil((new Date(w.publishDate).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / 86400000) }))
@@ -2645,8 +2674,13 @@
                 .sort((a,b) => a.diff - b.diff);
 
             const ddayList = document.getElementById('publish-dday-list');
-            if (allUpcoming.length > 0) {
-                ddayList.innerHTML = allUpcoming.map(w => {
+            // 필터 적용
+            const _activeFilter = window._ddayGenreFilter;
+            const filteredUpcoming = (_activeFilter && _activeFilter.size < genreList.length)
+                ? allUpcoming.filter(w => _activeFilter.has(w.genre))
+                : allUpcoming;
+            if (filteredUpcoming.length > 0) {
+                ddayList.innerHTML = filteredUpcoming.map(w => {
                     const gc = getGenreColor(w.genre);
                     const dLabel = w.diff === 0 ? 'D-Day' : `D-${w.diff}`;
                     const dColor = w.diff === 0 ? '#ef4444' : w.diff <= 7 ? '#f97316' : w.diff <= 30 ? primary : '#94a3b8';
@@ -2662,7 +2696,7 @@
                             <div class="flex items-center justify-between gap-1 mb-0.5">
                                 <span class="text-sm font-black" style="color:${dColor}">${dLabel}</span>
                                 <div class="flex items-center gap-1">
-                                    <span class="text-[10px] text-slate-400 shrink-0">${w.publishDate.slice(5)}</span>
+                                    <span class="text-[10px] text-slate-500 font-semibold shrink-0">${w.publishDate.slice(5)}</span>
                                     <button onclick="${delAction}" class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 text-[10px] transition-all ml-1" title="삭제"><i class="fa-solid fa-trash-can"></i></button>
                                 </div>
                             </div>
@@ -2672,7 +2706,10 @@
                     </div>`;
                 }).join('');
             } else {
-                ddayList.innerHTML = '<div class="text-xs text-slate-400 text-center py-6">예정된 출간 일정이 없습니다.</div>';
+                const emptyMsg = (_activeFilter && _activeFilter.size === 0)
+                    ? '선택된 장르가 없습니다.'
+                    : (_activeFilter ? '해당 장르의 출간 일정이 없습니다.' : '예정된 출간 일정이 없습니다.');
+                ddayList.innerHTML = `<div class="text-xs text-slate-400 text-center py-6">${emptyMsg}</div>`;
             }
 
             // 달력 렌더
@@ -8668,6 +8705,58 @@
                 setTimeout(updateSidebarWidgetBtn, 1000);
             } catch(e) { console.error("Initialization error:", e); }
         };
+        // ── D-Day 사이드바 장르 필터 ────────────────────────────
+        window._ddayGenreFilter = null; // null = 전체
+
+        function toggleDdayFilter() {
+            const dd = document.getElementById('dday-filter-dropdown');
+            if (!dd) return;
+            const isOpen = dd.style.display !== 'none';
+            dd.style.display = isOpen ? 'none' : 'block';
+        }
+
+        function closeDdayFilterOnClickOutside(e) {
+            const wrap = document.getElementById('dday-filter-wrap');
+            const dd = document.getElementById('dday-filter-dropdown');
+            if (!dd || dd.style.display === 'none') return;
+            if (wrap && !wrap.contains(e.target)) {
+                dd.style.display = 'none';
+            }
+        }
+        document.addEventListener('click', closeDdayFilterOnClickOutside);
+
+        function onDdayFilterChange(el) {
+            const checkboxes = document.querySelectorAll('.dday-genre-check');
+            const allBox = document.querySelector('.dday-genre-check[value="__all__"]');
+
+            if (el.value === '__all__') {
+                // 전체 체크박스 클릭 → 모두 동기화
+                checkboxes.forEach(cb => { cb.checked = el.checked; });
+                window._ddayGenreFilter = el.checked ? null : new Set();
+            } else {
+                // 개별 장르 클릭
+                const genreBoxes = Array.from(checkboxes).filter(cb => cb.value !== '__all__');
+                const checkedGenres = genreBoxes.filter(cb => cb.checked).map(cb => cb.value);
+                // 전체 체크박스 상태 동기화
+                if (allBox) allBox.checked = checkedGenres.length === genreBoxes.length;
+                window._ddayGenreFilter = checkedGenres.length === genreBoxes.length
+                    ? null
+                    : new Set(checkedGenres);
+            }
+
+            // 아이콘 색상: 필터 활성화 시 강조
+            const btn = document.getElementById('dday-filter-btn');
+            if (btn) {
+                const icon = btn.querySelector('i');
+                if (icon) {
+                    icon.style.color = window._ddayGenreFilter ? 'var(--primary)' : '';
+                }
+            }
+
+            // 재렌더 (renderPublishCal 호출)
+            renderPublishCal();
+        }
+        // ─────────────────────────────────────────────────────────
     </script>
 </body>
 </html>

@@ -559,6 +559,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div class="sb-lbl">메인</div>
       <button class="nav on" id="nav-today" onclick="go('today')"><span class="nav-ic" data-color="#F5C842"></span>Today<span class="nav-bd" id="today-bd" style="display:none"></span></button>
       <button class="nav" id="nav-calendar" onclick="go('calendar')"><span class="nav-ic" data-color="#61C0BF"></span>Monthly</button>
+      <button class="nav" id="nav-todocal" onclick="go('todocal')"><span class="nav-ic" data-color="#F5A623"></span>To Do</button>
       <button class="nav" id="nav-diary" onclick="go('diary')"><span class="nav-ic" data-color="#B2B0E8"></span>Thanks Diary</button>
       <button class="nav" id="nav-deadlines" onclick="go('deadlines')"><span class="nav-ic" data-color="#E07070"></span>마감 관리</button>
       <button class="nav" id="nav-ledger" onclick="go('ledger')"><span class="nav-ic" data-color="#7CB9A8"></span>가계부</button>
@@ -864,7 +865,7 @@ let activePid = null;
 let pjFilter = '';
 let viewDate = todStr();
 
-const titles = {today:'Today',diary:'Thanks Diary',calendar:'Monthly',routine:'루틴 설정',life:'나의 라이프',overview:'목표 요약',projects:'프로젝트',deadlines:'마감 관리',savings:'저축 목표',health:'건강 관리',settings:'설정',ledger:'가계부',insights:'회고 & 통계'};
+const titles = {today:'Today',diary:'Thanks Diary',calendar:'Monthly',todocal:'To Do',routine:'루틴 설정',life:'나의 라이프',overview:'목표 요약',projects:'프로젝트',deadlines:'마감 관리',savings:'저축 목표',health:'건강 관리',settings:'설정',ledger:'가계부',insights:'회고 & 통계'};
 
 function go(p, pid, _fromPopstate){
   page=p; activePid=pid||null; if(p!=='projects') pjFilter='';
@@ -881,7 +882,7 @@ function go(p, pid, _fromPopstate){
   const tbTitle=document.getElementById('tb-title');
   const topbar=document.querySelector('.topbar');
   const isMobile=window.innerWidth<=768;
-  const hideTopbarPages=['ledger','today','calendar','diary','deadlines'];
+  const hideTopbarPages=['ledger','today','calendar','todocal','diary','deadlines'];
 
   // 모바일에서는 항상 탑바 표시, 데스크탑에서만 hideTopbarPages 적용
   if(!isMobile && hideTopbarPages.includes(p)){
@@ -965,6 +966,7 @@ function render(){
   else if(page==='diary') div.innerHTML=renderDiary();
   else if(page==='routine') div.innerHTML=renderRoutinePage();
   else if(page==='calendar') div.innerHTML=renderCalendar();
+  else if(page==='todocal') div.innerHTML=renderTodoCal();
   else if(page==='life') div.innerHTML=renderLife();
   else if(page==='projects') div.innerHTML=activePid?renderPjDetail(activePid):renderProjects();
   else if(page==='deadlines') div.innerHTML=renderDeadlines();
@@ -5423,6 +5425,176 @@ function calRoutineToggle(rid,ds){
 // 캘린더 셀에서 마감 직접 완료 체크 (모달 안 열고 바로 토글)
 function calDlToggle(id){
   togDlDone(id); // save()+render() 포함됨
+}
+
+// ═══════════ TODO CALENDAR ═══════════
+let todoCalY=new Date().getFullYear(), todoCalM=new Date().getMonth();
+
+function renderTodoCal(){
+  const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const MN_KO=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  const ts=todStr();
+
+  // 연도/월 헤더
+  var monthCards='<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:14px;padding-bottom:4px">'+
+    '<div style="display:grid;grid-template-columns:repeat(12,minmax(56px,1fr));gap:4px;min-width:600px">';
+  for(var m=0;m<12;m++){
+    var isCur=m===todoCalM;
+    monthCards+='<div data-m="'+m+'" onclick="todoCalM=parseInt(this.dataset.m);render()" style="'+
+      'border-radius:10px;padding:9px 4px;cursor:pointer;text-align:center;'+
+      'background:'+(isCur?'var(--accent)':'var(--surface)')+';'+
+      'border:1.5px solid '+(isCur?'var(--accent)':'var(--border)')+';transition:all .2s">'+
+      '<div style="font-size:13px;font-weight:700;color:'+(isCur?'#fff':'var(--accent)')+'">'+MN[m]+'</div>'+
+    '</div>';
+  }
+  monthCards+='</div></div>';
+
+  const first=new Date(todoCalY,todoCalM,1),last=new Date(todoCalY,todoCalM+1,0),sdow=first.getDay();
+  const prevLast=new Date(todoCalY,todoCalM,0);
+  var cells=[];
+  for(var i=sdow-1;i>=0;i--){var pd=prevLast.getDate()-i,pm=todoCalM===0?11:todoCalM-1,py=todoCalM===0?todoCalY-1:todoCalY;cells.push({d:pd,m:pm,y:py,cur:false});}
+  for(var d=1;d<=last.getDate();d++)cells.push({d:d,m:todoCalM,y:todoCalY,cur:true});
+  var rem=42-cells.length;
+  for(var d=1;d<=rem;d++){var nm=todoCalM===11?0:todoCalM+1,ny=todoCalM===11?todoCalY+1:todoCalY;cells.push({d:d,m:nm,y:ny,cur:false});}
+
+  var calHtml='<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><div style="min-width:560px">'+
+    '<div style="display:grid;grid-template-columns:repeat(7,1fr);border-bottom:1px solid var(--border)">';
+  ['일','월','화','수','목','금','토'].forEach(function(d,i){
+    calHtml+='<div style="text-align:center;padding:8px 0;font-size:0.75em;font-weight:500;color:'+(i===0?'var(--red)':i===6?'#4A90D9':'var(--t3)')+'">'+d+'</div>';
+  });
+  calHtml+='</div><div style="display:grid;grid-template-columns:repeat(7,1fr)">';
+
+  for(var idx=0;idx<cells.length;idx++){
+    var cell=cells[idx];
+    var ri=Math.floor(idx/7),ci=idx%7;
+    var ds=cell.y+'-'+String(cell.m+1).padStart(2,'0')+'-'+String(cell.d).padStart(2,'0');
+    var isT=ds===ts;
+    var todos=(S.todoList&&S.todoList[ds])||[];
+    var doneCount=todos.filter(function(t){return t.done;}).length;
+    var totalCount=todos.length;
+    var hasTodo=totalCount>0;
+
+    var badge='';
+    if(hasTodo){
+      var allDone=doneCount===totalCount;
+      badge='<span style="font-size:0.62em;font-weight:600;padding:1px 5px;border-radius:99px;background:'+(allDone?'var(--green)':'var(--al)')+';color:'+(allDone?'#fff':'var(--accent)')+'">'+doneCount+'/'+totalCount+'</span>';
+    }
+
+    calHtml+='<div onclick="openTodoCalDay(\''+ds+'\')" style="cursor:pointer;min-height:100px;padding:6px 8px;'+
+      'border-right:'+(ci===6?'none':'1px solid var(--border)')+';'+
+      'border-bottom:'+(ri===5?'none':'1px solid var(--border)')+';'+
+      'background:'+(isT?'var(--accent)15':'transparent')+'">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">'+
+        '<div style="width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;'+
+          'background:'+(isT?'var(--accent)25':'transparent')+';'+
+          'font-size:0.85em;font-weight:'+(isT?'700':'500')+';'+
+          'color:'+(isT?'var(--accent)':!cell.cur?'var(--t3)':ci===0?'var(--red)':ci===6?'#4A90D9':'var(--text)')+'">'+cell.d+'</div>'+
+        (badge?'<div>'+badge+'</div>':'')+
+      '</div>';
+
+    // 투두 항목 최대 3개 표시
+    todos.slice(0,3).forEach(function(item){
+      calHtml+='<div style="display:flex;align-items:center;gap:3px;font-size:0.75em;padding:2px 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:'+(item.done?'var(--t3)':'var(--text)')+'">'+
+        '<span style="flex-shrink:0;width:8px;height:8px;border-radius:2px;display:inline-block;background:'+(item.done?'var(--green)':'var(--border2)')+'"></span>'+
+        '<span style="overflow:hidden;text-overflow:ellipsis;'+(item.done?'text-decoration:line-through':'')+'">'+item.text+'</span>'+
+      '</div>';
+    });
+    if(todos.length>3){
+      calHtml+='<div style="font-size:0.7em;color:var(--t3);margin-top:1px">+' +(todos.length-3)+'개 더</div>';
+    }
+    calHtml+='</div>';
+  }
+  calHtml+='</div></div></div>';
+
+  return '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'+
+    '<button class="btn bg bsm" onclick="todoCalY--;render()">← '+(todoCalY-1)+'</button>'+
+    '<div style="font-family:var(--serif);font-size:1.8em !important;font-weight:700 !important;color:var(--accent)">'+todoCalY+'</div>'+
+    '<button class="btn bg bsm" onclick="todoCalY++;render()">'+(todoCalY+1)+' →</button>'+
+  '</div>'+
+  monthCards+
+  '<div class="card" style="padding:0;overflow:hidden">'+
+    '<div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">'+
+      '<button class="btn bg bsm" onclick="todoCalM=todoCalM===0?11:todoCalM-1;if(todoCalM===11)todoCalY--;render()">←</button>'+
+      '<div style="font-family:var(--serif);font-size:1.2em">'+MN_KO[todoCalM]+'</div>'+
+      '<button class="btn bg bsm" onclick="todoCalM=todoCalM===11?0:todoCalM+1;if(todoCalM===0)todoCalY++;render()">→</button>'+
+    '</div>'+
+    calHtml+
+  '</div>';
+}
+
+function openTodoCalDay(ds){
+  if(!S.todoList)S.todoList={};
+  if(!S.todoList[ds])S.todoList[ds]=[];
+  var items=S.todoList[ds];
+  var d=new Date(ds+'T00:00:00');
+  var label=(d.getMonth()+1)+'월 '+d.getDate()+'일 '+['일','월','화','수','목','금','토'][d.getDay()]+'요일';
+
+  function todoModalHtml(){
+    var html='<div style="margin-bottom:12px"><div style="font-size:0.85em;color:var(--t3);margin-bottom:8px">'+label+'</div>';
+    var its=S.todoList[ds];
+    if(its.length===0){
+      html+='<div style="font-size:0.85em;color:var(--t3);padding:8px 0">할 일이 없어요</div>';
+    } else {
+      its.forEach(function(item,i){
+        html+='<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">'+
+          '<div id="tdcal-chk-'+i+'" onclick="togTodoCalItem(\''+ds+'\','+i+')" style="width:16px;height:16px;border-radius:4px;border:1.5px solid '+(item.done?'var(--green)':'var(--border2)')+';background:'+(item.done?'var(--green)':'transparent')+';cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center">'+
+          (item.done?'<span style="color:#fff;font-size:0.6em">✓</span>':'')+
+          '</div>'+
+          '<div style="flex:1;font-size:0.9em;'+(item.done?'text-decoration:line-through;color:var(--t3)':'')+(item._carried?';color:var(--accent)':'')+'">'+
+            item.text+(item._carried?'<span style="font-size:0.72em;color:var(--accent);margin-left:4px">↩이월</span>':'')+
+          '</div>'+
+          '<button class="bi" onclick="delTodoCalItem(\''+ds+'\','+i+')" style="font-size:0.8em;color:var(--t3)">✕</button>'+
+        '</div>';
+      });
+    }
+    html+='</div>';
+    html+='<div style="display:flex;gap:8px;align-items:center">'+
+      '<input id="tdcal-inp" class="inp" style="flex:1;font-size:0.9em" placeholder="할 일 추가..." onkeydown="if(event.key===\'Enter\')addTodoCalItem(\''+ds+'\')">'+
+      '<button class="btn bp bsm" onclick="addTodoCalItem(\''+ds+'\')">추가</button>'+
+    '</div>';
+    return html;
+  }
+
+  openMo(label, todoModalHtml(), '<button class="btn bg" onclick="closeMo();render()">닫기</button>');
+}
+
+function togTodoCalItem(ds,i){
+  i=parseInt(i);
+  if(!S.todoList||!S.todoList[ds]||!S.todoList[ds][i])return;
+  S.todoList[ds][i].done=!S.todoList[ds][i].done;
+  save();
+  // 모달 내부만 갱신
+  var item=S.todoList[ds][i];
+  var chk=document.getElementById('tdcal-chk-'+i);
+  if(chk){
+    chk.style.background=item.done?'var(--green)':'transparent';
+    chk.style.borderColor=item.done?'var(--green)':'var(--border2)';
+    chk.innerHTML=item.done?'<span style="color:#fff;font-size:0.6em">✓</span>':'';
+    var textDiv=chk.parentElement.querySelector('[style*="font-size:0.9em"]');
+    if(textDiv){textDiv.style.textDecoration=item.done?'line-through':'';textDiv.style.color=item.done?'var(--t3)':'';}
+  }
+}
+
+function addTodoCalItem(ds){
+  var inp=document.getElementById('tdcal-inp');
+  if(!inp)return;
+  var text=inp.value.trim();
+  if(!text)return;
+  inp.value='';
+  if(!S.todoList)S.todoList={};
+  if(!S.todoList[ds])S.todoList[ds]=[];
+  S.todoList[ds].push({id:gid(),text:text,done:false});
+  save();
+  // 모달 body 갱신
+  openTodoCalDay(ds);
+}
+
+function delTodoCalItem(ds,i){
+  i=parseInt(i);
+  if(!S.todoList||!S.todoList[ds])return;
+  S.todoList[ds].splice(i,1);
+  save();
+  openTodoCalDay(ds);
 }
 
 function renderCalendar(){

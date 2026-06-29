@@ -556,18 +556,21 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
   </div>
   <div class="sb-sc">
     <div class="sb-sec">
-      <div class="sb-lbl">메인</div>
+      <div class="sb-lbl">Schedule</div>
       <button class="nav on" id="nav-today" onclick="go('today')"><span class="nav-ic" data-color="#F5C842"></span>Today<span class="nav-bd" id="today-bd" style="display:none"></span></button>
       <button class="nav" id="nav-calendar" onclick="go('calendar')"><span class="nav-ic" data-color="#61C0BF"></span>Monthly</button>
       <button class="nav" id="nav-todocal" onclick="go('todocal')"><span class="nav-ic" data-color="#F5A623"></span>To Do</button>
       <button class="nav" id="nav-diary" onclick="go('diary')"><span class="nav-ic" data-color="#B2B0E8"></span>Thanks Diary</button>
+    </div>
+    <div class="sb-sec">
+      <div class="sb-lbl">Manage</div>
       <button class="nav" id="nav-deadlines" onclick="go('deadlines')"><span class="nav-ic" data-color="#E07070"></span>마감 관리</button>
-      <button class="nav" id="nav-ledger" onclick="go('ledger')"><span class="nav-ic" data-color="#7CB9A8"></span>가계부</button>
       <button class="nav" id="nav-health" onclick="go('health')"><span class="nav-ic" data-color="#E8A0A0"></span>건강 관리</button>
+      <button class="nav" id="nav-ledger" onclick="go('ledger')"><span class="nav-ic" data-color="#7CB9A8"></span>가계부</button>
       <button class="nav" id="nav-insights" onclick="go('insights')"><span class="nav-ic" data-color="#B89BD9"></span>회고 & 통계</button>
     </div>
     <div class="sb-sec">
-      <div class="sb-lbl">관리</div>
+      <div class="sb-lbl">Projects</div>
       <button class="nav" id="nav-life" onclick="go('life')"><span class="nav-ic" data-color="#8BBF88"></span>나의 라이프</button>
       <button class="nav" id="nav-projects" onclick="go('projects')"><span class="nav-ic" data-color="#F5C490"></span>프로젝트</button>
       <button class="nav" id="nav-routine" onclick="go('routine')"><span class="nav-ic" data-color="#E8A87C"></span>루틴 설정</button>
@@ -5469,7 +5472,17 @@ function renderTodoCal(){
     var ri=Math.floor(idx/7),ci=idx%7;
     var ds=cell.y+'-'+String(cell.m+1).padStart(2,'0')+'-'+String(cell.d).padStart(2,'0');
     var isT=ds===ts;
-    var todos=(S.todoList&&S.todoList[ds])||[];
+    // 이월된 항목은 원래 날짜에서 숨기고, 이월 목적지(오늘)에서만 표시
+    // _carried:true 항목은 이미 다음날 todoList에 존재하므로 원래 날짜에서는 미완료+이월된 것만 걸러냄
+    var nextDs=addDays(ds,1);
+    var nextItems=(S.todoList&&S.todoList[nextDs])||[];
+    var todos=((S.todoList&&S.todoList[ds])||[]).filter(function(item){
+      // 이 항목이 미완료이면서 다음날에 이월 복사본이 있으면 원래 날짜에서 숨김
+      if(!item.done && !item._carried){
+        return !nextItems.some(function(nx){return nx._carried&&nx.text===item.text;});
+      }
+      return true;
+    });
     var doneCount=todos.filter(function(t){return t.done;}).length;
     var totalCount=todos.length;
     var hasTodo=totalCount>0;
@@ -5492,15 +5505,15 @@ function renderTodoCal(){
         (badge?'<div>'+badge+'</div>':'')+
       '</div>';
 
-    // 투두 항목 최대 3개 표시
-    todos.slice(0,3).forEach(function(item){
+    // 투두 항목 최대 5개 표시
+    todos.slice(0,5).forEach(function(item){
       calHtml+='<div style="display:flex;align-items:center;gap:3px;font-size:0.75em;padding:2px 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:'+(item.done?'var(--t3)':'var(--text)')+'">'+
-        '<span style="flex-shrink:0;width:8px;height:8px;border-radius:2px;display:inline-block;background:'+(item.done?'var(--green)':'var(--border2)')+'"></span>'+
+        '<span style="flex-shrink:0;width:8px;height:8px;border-radius:2px;display:inline-block;background:'+(item.done?'var(--green)':item._carried?'var(--accent)':'var(--border2)')+'"></span>'+
         '<span style="overflow:hidden;text-overflow:ellipsis;'+(item.done?'text-decoration:line-through':'')+'">'+item.text+'</span>'+
       '</div>';
     });
-    if(todos.length>3){
-      calHtml+='<div style="font-size:0.7em;color:var(--t3);margin-top:1px">+' +(todos.length-3)+'개 더</div>';
+    if(todos.length>5){
+      calHtml+='<div style="font-size:0.7em;color:var(--t3);margin-top:1px">+' +(todos.length-5)+'개 더</div>';
     }
     calHtml+='</div>';
   }

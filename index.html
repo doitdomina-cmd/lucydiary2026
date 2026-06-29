@@ -1263,20 +1263,30 @@ function renderToday(){
 
   function renderTodoList(items,ds,label){
     const safeDs=ds.replace(/-/g,'_');
+    const nextDs=addDays(ds,1);
+    const isToday=(ds===t);
     return '<div class="card" style="margin-bottom:0">'+
       '<div class="ct" style="margin-bottom:10px">'+label+'</div>'+
       (items.length===0?'':
+        '<div id="todo-list-'+safeDs+'" ondragover="event.preventDefault()" ondrop="todoDropItem(event,\''+ds+'\')" style="min-height:4px">'+
         items.map(function(item,i){
-          return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">'+
+          return '<div draggable="true" ondragstart="todoDragStart(event,\''+ds+'\','+i+')" ondragover="todoDragOver(event)" ondragleave="todoDragLeave(event)" ondrop="event.stopPropagation()" data-todo-ds="'+ds+'" data-todo-i="'+i+'" '+
+            'style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);position:relative" '+
+            'onmouseenter="this.querySelector(\'.todo-row-btns\').style.opacity=\'1\'" '+
+            'onmouseleave="this.querySelector(\'.todo-row-btns\').style.opacity=\'0\'">'+
             '<div onclick="togTodoItem(\''+ds+'\','+i+')" style="width:16px;height:16px;border-radius:4px;border:1.5px solid '+(item.done?'var(--green)':'var(--border2)')+';background:'+(item.done?'var(--green)':'transparent')+';cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center">'+
             (item.done?'<span style="color:#fff;font-size:0.6em">✓</span>':'')+
             '</div>'+
             '<div style="flex:1;font-size:0.9em;'+(item.done?'text-decoration:line-through;color:var(--t3)':'')+(item._carried?';color:var(--accent)':'')+'">'+
               item.text+(item._carried?'<span style="font-size:0.72em;color:var(--accent);margin-left:4px">↩이월</span>':'')+
             '</div>'+
-            '<button class="bi" onclick="delTodoItem(\''+ds+'\','+i+')" style="font-size:0.8em;color:var(--t3)">✕</button>'+
+            '<div class="todo-row-btns" style="display:flex;align-items:center;gap:2px;opacity:0;transition:opacity .15s;flex-shrink:0">'+
+              '<button class="bi" title="내일로 이월" onclick="carryTodoToNext(\''+ds+'\','+i+',\''+nextDs+'\')" style="font-size:0.85em;color:var(--accent);padding:2px 4px">↩</button>'+
+              '<button class="bi" onclick="delTodoItem(\''+ds+'\','+i+')" style="font-size:0.8em;color:var(--t3);padding:2px 4px">✕</button>'+
+            '</div>'+
           '</div>';
-        }).join(''))+
+        }).join('')+
+        '</div>'+'')+
       '<div style="display:flex;align-items:center;gap:8px;padding-top:8px">'+
         '<div style="width:16px;height:16px;border-radius:4px;border:1.5px dashed var(--border2);flex-shrink:0"></div>'+
         '<input id="todo-inp-'+safeDs+'" class="inp" style="flex:1;padding:5px 8px;font-size:0.9em;background:transparent;border-color:transparent;border-bottom:1px solid var(--border);border-radius:0" placeholder="할 일 추가..." data-ds="'+ds+'" data-todo-input="1" enterkeyhint="send" inputmode="text">'+
@@ -1519,6 +1529,63 @@ function delTodoItem(ds,i){
   if(!S.todoList||!S.todoList[ds])return;
   S.todoList[ds].splice(i,1);
   save();render();
+}
+function carryTodoToNext(ds,i,nextDs){
+  if(!S.todoList||!S.todoList[ds]||!S.todoList[ds][i])return;
+  var item=S.todoList[ds][i];
+  if(!S.todoList[nextDs])S.todoList[nextDs]=[];
+  // 중복 방지
+  var already=S.todoList[nextDs].some(function(x){return x.text===item.text&&x._carried;});
+  if(!already)S.todoList[nextDs].push({id:gid(),text:item.text,done:false,_carried:true});
+  // 원래 날짜에서 제거
+  S.todoList[ds].splice(i,1);
+  save();render();
+}
+
+// Todo 리스트 드래그&드롭
+var _todoDragDs=null,_todoDragI=null;
+function todoDragStart(e,ds,i){
+  _todoDragDs=ds;_todoDragI=i;
+  e.dataTransfer.effectAllowed='move';
+  e.currentTarget.style.opacity='0.4';
+}
+function todoDragOver(e){
+  e.preventDefault();
+  e.currentTarget.style.background='var(--al)';
+  e.currentTarget.style.borderRadius='4px';
+}
+function todoDragLeave(e){
+  e.currentTarget.style.background='';
+  e.currentTarget.style.borderRadius='';
+}
+function todoDropItem(e,ds){
+  e.preventDefault();
+  // 셀 위에 드롭 (달력 → 달력 이동)
+  if(_todoDragDs===null)return;
+  if(!S.todoList[_todoDragDs])return;
+  var item=S.todoList[_todoDragDs][_todoDragI];
+  if(!item)return;
+  if(_todoDragDs===ds){
+    // 같은 날: 순서 바꾸기 - 타겟 행 찾기
+    var targetEl=e.target.closest('[data-todo-i]');
+    if(targetEl){
+      var toI=parseInt(targetEl.dataset.todoI);
+      var list=S.todoList[ds];
+      var moved=list.splice(_todoDragI,1)[0];
+      list.splice(toI,0,moved);
+      save();render();
+    }
+  } else {
+    // 다른 날: 날짜 이동
+    if(!S.todoList[ds])S.todoList[ds]=[];
+    var already=S.todoList[ds].some(function(x){return x.text===item.text;});
+    if(!already){
+      S.todoList[ds].push({id:gid(),text:item.text,done:false,_carried:item._carried});
+      S.todoList[_todoDragDs].splice(_todoDragI,1);
+      save();render();
+    }
+  }
+  _todoDragDs=null;_todoDragI=null;
 }
 
 // ═══════════ ROUTINE SETTINGS PAGE ═══════════
@@ -5493,7 +5560,11 @@ function renderTodoCal(){
       badge='<span style="font-size:0.62em;font-weight:600;padding:1px 5px;border-radius:99px;background:'+(allDone?'var(--green)':'var(--al)')+';color:'+(allDone?'#fff':'var(--accent)')+'">'+doneCount+'/'+totalCount+'</span>';
     }
 
-    calHtml+='<div onclick="openTodoCalDay(\''+ds+'\')" style="cursor:pointer;min-height:100px;padding:6px 8px;'+
+    calHtml+='<div onclick="openTodoCalDay(\''+ds+'\')" '+
+      'ondragover="event.preventDefault();this.style.background=\'var(--al)\'" '+
+      'ondragleave="this.style.background=\''+(isT?'var(--accent)15':'transparent')+'\'" '+
+      'ondrop="todoCalCellDrop(event,\''+ds+'\')" '+
+      'style="cursor:pointer;min-height:100px;padding:6px 8px;'+
       'border-right:'+(ci===6?'none':'1px solid var(--border)')+';'+
       'border-bottom:'+(ri===5?'none':'1px solid var(--border)')+';'+
       'background:'+(isT?'var(--accent)15':'transparent')+'">'+
@@ -5608,6 +5679,22 @@ function delTodoCalItem(ds,i){
   S.todoList[ds].splice(i,1);
   save();
   openTodoCalDay(ds);
+}
+
+function todoCalCellDrop(e,ds){
+  e.preventDefault();
+  e.stopPropagation();
+  if(_todoDragDs===null||!S.todoList||!S.todoList[_todoDragDs])return;
+  var item=S.todoList[_todoDragDs][_todoDragI];
+  if(!item||_todoDragDs===ds)return;
+  if(!S.todoList[ds])S.todoList[ds]=[];
+  var already=S.todoList[ds].some(function(x){return x.text===item.text;});
+  if(!already){
+    S.todoList[ds].push({id:gid(),text:item.text,done:false,_carried:item._carried||false});
+    S.todoList[_todoDragDs].splice(_todoDragI,1);
+    save();render();
+  }
+  _todoDragDs=null;_todoDragI=null;
 }
 
 function renderCalendar(){

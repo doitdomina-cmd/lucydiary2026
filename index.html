@@ -1546,21 +1546,26 @@ function carryTodoToNext(ds,i,nextDs){
 
 var _todoDragDs=null,_todoDragI=null;
 function todoDragStart(e,ds,i){
-  _todoDragDs=ds;_todoDragI=i;
+  _todoDragDs=ds;
+  _todoDragI=parseInt(i);
   e.dataTransfer.effectAllowed='move';
-  setTimeout(function(){if(e.target)e.target.style.opacity='0.4';},0);
+  e.currentTarget.style.opacity='0.4';
 }
 function todoDropOnRow(e,ds,toI){
-  e.preventDefault();e.stopPropagation();
-  if(_todoDragDs===null)return;
-  if(!S.todoList||!S.todoList[_todoDragDs])return;
-  var item=S.todoList[_todoDragDs][_todoDragI];
+  e.preventDefault();
+  e.stopPropagation();
+  toI=parseInt(toI);
+  if(_todoDragDs===null||!S.todoList)return;
+  var fromDs=_todoDragDs, fromI=_todoDragI;
+  _todoDragDs=null;_todoDragI=null;
+  if(!S.todoList[fromDs])return;
+  var item=S.todoList[fromDs][fromI];
   if(!item)return;
-  if(_todoDragDs===ds){
+  if(fromDs===ds){
     // 같은 카드: 순서 이동
     var list=S.todoList[ds];
-    var moved=list.splice(_todoDragI,1)[0];
-    var dest=toI>_todoDragI?toI-1:toI;
+    var moved=list.splice(fromI,1)[0];
+    var dest=toI>fromI?toI-1:toI;
     list.splice(dest,0,moved);
   } else {
     // 다른 카드: 날짜 이동
@@ -1568,26 +1573,27 @@ function todoDropOnRow(e,ds,toI){
     var already=S.todoList[ds].some(function(x){return x.text===item.text;});
     if(!already){
       S.todoList[ds].splice(toI,0,{id:gid(),text:item.text,done:false,_carried:item._carried||false});
-      S.todoList[_todoDragDs].splice(_todoDragI,1);
+      S.todoList[fromDs].splice(fromI,1);
     }
   }
-  _todoDragDs=null;_todoDragI=null;
   save();render();
 }
 function todoDropItem(e,ds){
   e.preventDefault();
-  if(_todoDragDs===null)return;
-  if(!S.todoList||!S.todoList[_todoDragDs])return;
-  var item=S.todoList[_todoDragDs][_todoDragI];
-  if(!item||_todoDragDs===ds)return;
+  if(_todoDragDs===null||!S.todoList)return;
+  var fromDs=_todoDragDs, fromI=_todoDragI;
+  _todoDragDs=null;_todoDragI=null;
+  if(fromDs===ds)return;
+  if(!S.todoList[fromDs])return;
+  var item=S.todoList[fromDs][fromI];
+  if(!item)return;
   if(!S.todoList[ds])S.todoList[ds]=[];
   var already=S.todoList[ds].some(function(x){return x.text===item.text;});
   if(!already){
     S.todoList[ds].push({id:gid(),text:item.text,done:false,_carried:item._carried||false});
-    S.todoList[_todoDragDs].splice(_todoDragI,1);
+    S.todoList[fromDs].splice(fromI,1);
     save();render();
   }
-  _todoDragDs=null;_todoDragI=null;
 }
 
 // ═══════════ ROUTINE SETTINGS PAGE ═══════════

@@ -5585,8 +5585,12 @@ function renderTodoCal(){
       '</div>';
 
     // 투두 항목 최대 5개 표시
-    todos.slice(0,5).forEach(function(item){
-      calHtml+='<div style="display:flex;align-items:center;gap:3px;font-size:0.75em;padding:2px 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:'+(item.done?'var(--t3)':'var(--text)')+'">'+
+    todos.slice(0,5).forEach(function(item,ti){
+      // 실제 S.todoList[ds] 인덱스 찾기 (필터 후라 ti가 다를 수 있음)
+      var realI=(S.todoList[ds]||[]).indexOf(item);
+      calHtml+='<div draggable="true" ondragstart="todoDragStart(event,\''+ds+'\','+realI+')" ondragend="this.style.opacity=\'\'" '+
+        'style="display:flex;align-items:center;gap:3px;font-size:0.75em;padding:2px 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:'+(item.done?'var(--t3)':'var(--text)')+';cursor:grab" '+
+        'onclick="event.stopPropagation()">'+
         '<span style="flex-shrink:0;width:8px;height:8px;border-radius:2px;display:inline-block;background:'+(item.done?'var(--green)':item._carried?'var(--accent)':'var(--border2)')+'"></span>'+
         '<span style="overflow:hidden;text-overflow:ellipsis;'+(item.done?'text-decoration:line-through':'')+'">'+item.text+'</span>'+
       '</div>';
@@ -5692,17 +5696,20 @@ function delTodoCalItem(ds,i){
 function todoCalCellDrop(e,ds){
   e.preventDefault();
   e.stopPropagation();
-  if(_todoDragDs===null||!S.todoList||!S.todoList[_todoDragDs])return;
-  var item=S.todoList[_todoDragDs][_todoDragI];
-  if(!item||_todoDragDs===ds)return;
+  e.currentTarget.style.background='';
+  if(_todoDragDs===null||!S.todoList)return;
+  var fromDs=_todoDragDs, fromI=_todoDragI;
+  _todoDragDs=null;_todoDragI=null;
+  if(!S.todoList[fromDs])return;
+  var item=S.todoList[fromDs][fromI];
+  if(!item||fromDs===ds)return;
   if(!S.todoList[ds])S.todoList[ds]=[];
   var already=S.todoList[ds].some(function(x){return x.text===item.text;});
   if(!already){
     S.todoList[ds].push({id:gid(),text:item.text,done:false,_carried:item._carried||false});
-    S.todoList[_todoDragDs].splice(_todoDragI,1);
+    S.todoList[fromDs].splice(fromI,1);
     save();render();
   }
-  _todoDragDs=null;_todoDragI=null;
 }
 
 function renderCalendar(){

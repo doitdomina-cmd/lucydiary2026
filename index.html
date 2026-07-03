@@ -4188,60 +4188,10 @@ function saveSuppEdit(slotKey,id){
   arr[idx]={id:id,name:name,count:count,effect:effect};
   save();closeMo();render();
 }
-function showSuppDayPanel(ds){
-  var panel=document.getElementById('supp-day-panel');
-  var inner=document.getElementById('supp-day-panel-inner');
-  if(!panel||!inner)return;
-  var suppSlotsDef=[
-    {key:'morning_empty',label:'기상 직후'},{key:'morning_meal',label:'아침 식사 후'},
-    {key:'lunch',label:'점심 식사 후'},{key:'dinner',label:'저녁 식사 후'},{key:'bedtime',label:'취침 전'}
-  ];
-  if(!S.suppChecks)S.suppChecks={};
-  if(!S.suppChecks[ds])S.suppChecks[ds]={};
-  var checks=S.suppChecks[ds];
-  var allItems=[];
-  suppSlotsDef.forEach(function(sl){((S.health&&S.health.supplements&&S.health.supplements[sl.key])||[]).forEach(function(it){allItems.push({slotKey:sl.key,slotLabel:sl.label,it:it});});});
-  var total=allItems.length;
-  var doneCnt=allItems.filter(function(x){return checks[x.it.id];}).length;
-  var pct=total?Math.round(doneCnt/total*100):0;
-
-  var pillColorsT=_pillColorPalette;
-  var allSuppIds=[];
-  suppSlotsDef.forEach(function(s){((S.health&&S.health.supplements&&S.health.supplements[s.key])||[]).forEach(function(it){if(!allSuppIds.includes(it.id))allSuppIds.push(it.id);});});
-
-  var h='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'+
-    '<div style="font-size:0.85em;font-weight:700;color:var(--text)">'+ds.slice(5).replace('-','/')+'  복용 기록</div>'+
-    '<div style="display:flex;align-items:center;gap:8px">'+
-      '<div style="font-size:0.8em;font-weight:700;color:'+(pct===100?'var(--green)':'var(--accent)')+'">'+doneCnt+'/'+total+'알 ('+pct+'%)</div>'+
-      '<div style="width:80px;height:5px;background:var(--border);border-radius:3px;overflow:hidden">'+
-        '<div style="width:'+pct+'%;height:100%;background:'+(pct===100?'var(--green)':'var(--accent)')+';border-radius:3px"></div>'+
-      '</div>'+
-      '<button class="bi" onclick="document.getElementById(\'supp-day-panel\').style.display=\'none\'" style="font-size:0.85em;color:var(--t3)">✕</button>'+
-    '</div>'+
-  '</div>';
-
-  var curSlot='';
-  allItems.forEach(function(x){
-    if(x.slotLabel!==curSlot){
-      curSlot=x.slotLabel;
-      h+='<div style="font-size:0.72em;font-weight:700;color:var(--t3);margin:8px 0 5px;letter-spacing:0.03em">'+curSlot+'</div>';
-    }
-    var done=!!checks[x.it.id];
-    var p=pillColorByName(x.it.name);
-    h+='<div onclick="togSuppCheckPanel(\''+ds+'\',\''+x.it.id+'\')" style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;'+
-      'padding:4px 10px 4px 7px;border-radius:20px;font-size:0.82em;font-weight:600;margin:2px 3px 2px 0;'+
-      'background:'+(done?p.color:p.bg)+';color:'+(done?'#fff':p.color)+';transition:all .15s;user-select:none">'+
-      '<span style="width:13px;height:13px;border-radius:50%;border:1.5px solid '+(done?'rgba(255,255,255,.7)':p.color)+';display:inline-flex;align-items:center;justify-content:center;flex-shrink:0">'+
-        (done?'<svg width="8" height="8" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5 3.5-4" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>':'')+
-      '</span>'+x.it.name+' '+x.it.count+'알</div>';
-  });
-  inner.innerHTML=h;
-  panel.style.display='block';
-}
-function togSuppCheckPanel(ds,id){
-  togSuppCheck(ds,id);
-  // 패널 다시 그리기
-  setTimeout(function(){showSuppDayPanel(ds);},50);
+// 복용 달력에서 날짜를 클릭하면 아래 체크 패널이 그 날짜로 전환됨
+function selectSuppDay(ds){
+  window._suppSelectedDate=ds;
+  render();
 }
 function togSuppCheck(ds,id){
   if(!S.suppChecks)S.suppChecks={};
@@ -4269,6 +4219,7 @@ function renderSuppCalendar(){
   var firstDay=new Date(yr,mo,1).getDay();
   var daysInMonth=new Date(yr,mo+1,0).getDate();
   var today=todStr();
+  var selDate=window._suppSelectedDate||today;
   var MN=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
   var DN=['일','월','화','수','목','금','토'];
   var sc=S.suppChecks||{};
@@ -4346,8 +4297,10 @@ function renderSuppCalendar(){
       '</div>';
     }
 
-    cal+='<div style="min-height:120px;border-right:'+(isLastCol?'none':'1px solid var(--border)')+';border-bottom:1px solid var(--border);'+
-      'background:var(--cal-cell-bg);padding:5px 5px 5px 5px;position:relative;">'+
+    var isSelected=(ds===selDate);
+    cal+='<div class="cal-cell" onclick="selectSuppDay(\''+ds+'\')" style="min-height:120px;border-right:'+(isLastCol?'none':'1px solid var(--border)')+';border-bottom:1px solid var(--border);'+
+      'background:var(--cal-cell-bg);padding:5px 5px 5px 5px;position:relative;'+
+      (isSelected?'box-shadow:inset 0 0 0 2px var(--accent);':'')+'">'+
       // 날짜 숫자 + 진행바
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">'+
         '<div style="display:inline-flex;align-items:center;justify-content:center;'+
@@ -4378,30 +4331,20 @@ function renderSuppCalendar(){
   if(lastCol<6){for(var f=lastCol+1;f<=6;f++)cal+='<div style="min-height:120px;border-right:'+(f===6?'none':'1px solid var(--border)')+';border-bottom:1px solid var(--border);background:var(--cal-cell-bg);opacity:0.5"></div>';}
   cal+='</div></div>';
 
-  // 날짜 클릭 패널 (숨겨진 상태)
-  cal+='<div id="supp-day-panel" style="display:none;margin-top:10px;border:1px solid var(--border);border-radius:10px;padding:14px 16px;background:var(--bg)">'+
-    '<div id="supp-day-panel-inner"></div></div>';
-
-
-  // 오늘 날짜 체크 패널 (항상 표시)
-  var todayChecks2=sc[today]||{};
-  var todayAllItems2=[];
+  // 선택 날짜 복용 체크 패널 (달력에서 날짜를 클릭하면 해당 날짜로 전환됨, 기본값은 오늘)
+  var selChecks=sc[selDate]||{};
+  var selAllItems=[];
   var slotLabelsCal={morning_empty:'기상 직후',morning_meal:'아침 식사 후',lunch:'점심 식사 후',dinner:'저녁 식사 후',bedtime:'취침 전'};
   ['morning_empty','morning_meal','lunch','dinner','bedtime'].forEach(function(slKey){
-    ((S.health.supplements[slKey])||[]).forEach(function(it){todayAllItems2.push({slotKey:slKey,slotLabel:slotLabelsCal[slKey],it:it});});
+    ((S.health.supplements[slKey])||[]).forEach(function(it){selAllItems.push({slotKey:slKey,slotLabel:slotLabelsCal[slKey],it:it});});
   });
-  var todayTotal2=todayAllItems2.length;
-  var todayDone2=todayAllItems2.filter(function(x){return todayChecks2[x.it.id];}).length;
-  var todayPct2=todayTotal2?Math.round(todayDone2/todayTotal2*100):0;
-  var pillColorsC=_pillColorPalette;
-  var allSuppIdsC=[];
-  ['morning_empty','morning_meal','lunch','dinner','bedtime'].forEach(function(slKey){
-    ((S.health.supplements[slKey])||[]).forEach(function(it){if(!allSuppIdsC.includes(it.id))allSuppIdsC.push(it.id);});
-  });
+  var selTotal=selAllItems.length;
+  var selDone=selAllItems.filter(function(x){return selChecks[x.it.id];}).length;
+  var selPct=selTotal?Math.round(selDone/selTotal*100):0;
   // 슬롯별로 그룹핑
   var slotGroups=[];
   var curSlotC='';
-  todayAllItems2.forEach(function(x){
+  selAllItems.forEach(function(x){
     if(x.slotLabel!==curSlotC){
       curSlotC=x.slotLabel;
       slotGroups.push({label:x.slotLabel,items:[]});
@@ -4409,19 +4352,19 @@ function renderSuppCalendar(){
     slotGroups[slotGroups.length-1].items.push(x);
   });
 
-  var todayPanelRows='';
+  var selPanelRows='';
   slotGroups.forEach(function(sg,si){
-    var slotDoneC=sg.items.filter(function(x){return todayChecks2[x.it.id];}).length;
-    todayPanelRows+='<div style="'+(si>0?'margin-top:8px;padding-top:8px;border-top:1px solid var(--border)':'')+'">'
+    var slotDoneC=sg.items.filter(function(x){return selChecks[x.it.id];}).length;
+    selPanelRows+='<div style="'+(si>0?'margin-top:8px;padding-top:8px;border-top:1px solid var(--border)':'')+'">'
       +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">'
         +'<span style="font-size:0.72em;font-weight:700;color:var(--t3);letter-spacing:0.03em">'+sg.label+'</span>'
         +(slotDoneC===sg.items.length?'<span style="font-size:0.68em;color:var(--green);font-weight:700">✓</span>':'<span style="font-size:0.68em;color:var(--t3)">'+slotDoneC+'/'+sg.items.length+'</span>')
       +'</div>'
       +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 6px">';
     sg.items.forEach(function(x){
-      var done2=!!todayChecks2[x.it.id];
+      var done2=!!selChecks[x.it.id];
       var p2=pillColorByName(x.it.name);
-      todayPanelRows+='<div onclick="togSuppCheck(\''+today+'\',\''+x.it.id+'\')" style="cursor:pointer;display:flex;align-items:center;gap:6px;padding:3px 4px;border-radius:6px;transition:all .15s;user-select:none" '
+      selPanelRows+='<div onclick="togSuppCheck(\''+selDate+'\',\''+x.it.id+'\')" style="cursor:pointer;display:flex;align-items:center;gap:6px;padding:3px 4px;border-radius:6px;transition:all .15s;user-select:none" '
         +'onmouseenter="this.style.background=\'var(--surface)\'" onmouseleave="this.style.background=\'transparent\'">'
         +'<span style="width:14px;height:14px;border-radius:50%;border:1.5px solid '+(done2?p2.color:'var(--border)')+';display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;background:'+(done2?p2.color:'transparent')+';transition:all .15s">'
           +(done2?'<svg width="8" height="8" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5 3.5-4" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>':'')
@@ -4429,20 +4372,26 @@ function renderSuppCalendar(){
         +'<span style="font-size:0.8em;font-weight:500;color:'+(done2?p2.color:'var(--text)')+';text-decoration:'+(done2?'line-through':'none')+';opacity:'+(done2?'0.7':'1')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:all .15s">'+x.it.name+' <span style="font-size:0.85em;opacity:0.6">'+x.it.count+'알</span></span>'
         +'</div>';
     });
-    todayPanelRows+='</div></div>';
+    selPanelRows+='</div></div>';
   });
-  if(todayTotal2>0){
-    cal+='<div style="margin-top:12px;border:1px solid var(--border);border-radius:12px;padding:14px 16px;background:var(--bg)">'
-      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
-        +'<div style="font-size:0.85em;font-weight:700;color:var(--text)">오늘 복용 체크</div>'
+  if(selTotal>0){
+    var selIsToday=(selDate===today);
+    var selMonNum=parseInt(selDate.slice(5,7),10),selDayNum=parseInt(selDate.slice(8,10),10);
+    var selDateLabel=selIsToday?'오늘':(selMonNum+'월 '+selDayNum+'일');
+    cal+='<div style="margin-top:12px;border:1.5px solid '+(selIsToday?'var(--border)':'var(--accent)')+';border-radius:12px;padding:14px 16px;background:var(--bg)">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px">'
         +'<div style="display:flex;align-items:center;gap:7px">'
-          +'<div style="font-size:0.8em;font-weight:700;color:'+(todayPct2===100?'var(--green)':'var(--accent)')+'">'+todayDone2+'/'+todayTotal2+'</div>'
+          +'<div style="font-size:0.85em;font-weight:700;color:var(--text)">'+selDateLabel+' 복용 체크</div>'
+          +(selIsToday?'':'<button onclick="selectSuppDay(\''+today+'\')" style="background:var(--al);color:var(--accent);border:none;border-radius:99px;padding:2px 9px;font-size:0.7em;font-weight:600;cursor:pointer">오늘로</button>')
+        +'</div>'
+        +'<div style="display:flex;align-items:center;gap:7px">'
+          +'<div style="font-size:0.8em;font-weight:700;color:'+(selPct===100?'var(--green)':'var(--accent)')+'">'+selDone+'/'+selTotal+'</div>'
           +'<div style="width:70px;height:5px;background:var(--border);border-radius:3px;overflow:hidden">'
-            +'<div style="width:'+todayPct2+'%;height:100%;background:'+(todayPct2===100?'var(--green)':'var(--accent)')+';border-radius:3px;transition:width .3s"></div>'
+            +'<div style="width:'+selPct+'%;height:100%;background:'+(selPct===100?'var(--green)':'var(--accent)')+';border-radius:3px;transition:width .3s"></div>'
           +'</div>'
         +'</div>'
       +'</div>'
-      +todayPanelRows
+      +selPanelRows
     +'</div>';
   }
 

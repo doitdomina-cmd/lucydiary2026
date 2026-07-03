@@ -1242,16 +1242,23 @@ function renderToday(){
   const cutoff=addDays(t,-30);
   Object.keys(S.todoList).forEach(function(k){if(k<cutoff)delete S.todoList[k];});
 
-  // 자동 이월: 어제 미완료 항목을 오늘로 (_carried 여부 무관하게 미완료면 이월)
-  const yest=addDays(t,-1);
-  if(S.todoList[yest]){
-    const carry=S.todoList[yest].filter(item=>!item.done);
-    carry.forEach(function(item){
-      const already=S.todoList[t].some(x=>x.text===item.text&&x._carried);
-      if(!already) S.todoList[t].unshift({id:gid(),text:item.text,done:false,_carried:true});
-    });
-    if(carry.length>0)save();
+  // 자동 이월: 오늘 이전 날짜에 남은 미완료 항목을 전부 오늘로 모으고,
+  // 원래 날짜에서는 제거해서 며칠을 건너뛰어도 그 날짜에 중복으로 남지 않게 함
+  let carried=false;
+  for(let i=1;i<=30;i++){
+    const pd=addDays(t,-i);
+    if(!S.todoList[pd]||S.todoList[pd].length===0)continue;
+    const incomplete=S.todoList[pd].filter(item=>!item.done);
+    if(incomplete.length>0){
+      incomplete.forEach(function(item){
+        const already=S.todoList[t].some(x=>x.text===item.text&&x._carried);
+        if(!already){ S.todoList[t].unshift({id:gid(),text:item.text,done:false,_carried:true}); carried=true; }
+      });
+      // 이월된 미완료 항목은 원래 날짜에서 제거 (완료된 항목만 남김)
+      S.todoList[pd]=S.todoList[pd].filter(item=>item.done);
+    }
   }
+  if(carried)save();
 
   // 내일 할일 초기화
   const tmr=addDays(t,1);

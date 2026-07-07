@@ -64,6 +64,8 @@
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         
+        .scroll-invisible { scrollbar-width: none; -ms-overflow-style: none; }
+        .scroll-invisible::-webkit-scrollbar { display: none; width: 0; height: 0; }
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         #publish-dday-list::-webkit-scrollbar { display: none; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
@@ -71,6 +73,8 @@
 
         .tab-content { display: none; opacity: 0; transition: opacity 0.3s ease; }
         .tab-content.active { display: block; opacity: 1; }
+        /* 작품 등록 탭이 활성일 때는 페이지 전체 세로 스크롤을 막고, 카드들이 뷰포트에 딱 맞도록 한다 */
+        body.works-tab-active { overflow-y: hidden; }
         
         /* 테마 설정 */
         body.theme-mint { --primary: #87ada1; --primary-light: #effcf6; }
@@ -130,14 +134,20 @@
             background: rgba(255, 255, 255, 0.18);
         }
         
+        .sheet-wrapper {
+            width: 100%;
+            border-top-left-radius: 20px;
+            border-top-right-radius: 20px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05);
+            border: 1px solid rgba(0,0,0,0.08);
+            border-bottom: none;
+            overflow: hidden;
+        }
         .spreadsheet-container { 
             width: 100%; 
             background: #fcfcfc; 
-            border-radius: 20px;
-            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05);
-            border: 1px solid rgba(0,0,0,0.08); 
             overflow: auto; 
-            max-height: calc(100vh - 230px);
+            max-height: calc(100vh - 320px);
             position: relative;
             -webkit-overflow-scrolling: touch;
         }
@@ -146,6 +156,12 @@
         .sheet-table th:first-child, .sheet-table td:first-child { width: 220px; min-width: 260px; } 
         .sheet-table th:not(:first-child), .sheet-table td:not(:first-child) { width: 90px; }
         .sheet-table th, .sheet-table td { border-right: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9; padding: 10px 8px; height: 50px; }
+        /* 모든 데이터 행(본문 tr)의 높이를 종합 요약과 동일한 컴팩트 높이로 통일 */
+        .sheet-table tbody tr { height: 52px; }
+        .sheet-table tbody td { height: 52px; padding-top: 6px; padding-bottom: 6px; overflow: hidden; }
+        /* 작품 정보(제목+출판사 2줄) 셀도 52px 안에 딱 맞게 */
+        .sheet-table tbody td.sticky-col > div:first-child { margin-bottom: 1px; line-height: 1.25; }
+        .sheet-table tbody td.sticky-col > div:last-child { line-height: 1.2; }
         
         .sheet-table thead th { 
             background: #f8fafc; font-weight: 600; font-size: 0.85rem; color: #64748b;
@@ -160,13 +176,32 @@
         }
         /* 좌상단 모서리(작품 정보 헤더): 가로·세로 동시 고정이라 가장 위로 */
         .sheet-table thead th.sticky-col { z-index: 60; }
-        /* tfoot 월별 총합 행도 하단에 고정 */
-        .sheet-table tfoot td {
-            position: sticky; bottom: 0; z-index: 40;
+        /* 총합(월별 총합) 행: 표 바로 아래에 붙는 고정 바(bar). 여백 없이 표 하단에 밀착 */
+        .sheet-footer-outer {
+            border-top: 2px solid #e2e8f0;
+            border-left: 1px solid rgba(0,0,0,0.08);
+            border-right: 1px solid rgba(0,0,0,0.08);
+            border-bottom: 1px solid rgba(0,0,0,0.08);
+            border-bottom-left-radius: 20px;
+            border-bottom-right-radius: 20px;
+            overflow: hidden;
             background: #f1f5f9;
-            box-shadow: 0 -1px 2px rgba(0,0,0,0.03);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05);
         }
-        .sheet-table tfoot td.sticky-col { z-index: 55; }
+        .sheet-footer-inner {
+            overflow: hidden;
+        }
+        .sheet-footer-inner .sheet-table { border-collapse: separate; }
+        .sheet-footer-inner .sheet-table td {
+            background: #f1f5f9;
+            border-bottom: none;
+            border-right: 1px solid #e2e8f0;
+        }
+        .sheet-footer-inner .sheet-table td:last-child { border-right: none; }
+        .sheet-footer-inner .sheet-table td.sticky-col {
+            position: static;
+            box-shadow: none;
+        }
         
         .cell-input {
             width: 100%; height: 100%; border: 1px solid transparent; background: transparent;
@@ -667,7 +702,7 @@
                 </div>
 
                 <!-- 월별 정산 탭 -->
-                <div id="tab-records" class="tab-content space-y-8 pb-20">
+                <div id="tab-records" class="tab-content space-y-8 pb-4">
                     <div class="flex flex-col md:flex-row justify-between items-center gap-4 glass-card p-6 relative z-30">
                         <div class="flex items-center gap-4">
                             <h3 class="text-xl font-bold text-slate-700"><span id="current-view-year" style="color:var(--primary)">2026</span>년 리포트</h3>
@@ -709,8 +744,8 @@
                 </div>
 
                 <!-- 작품 등록 탭 -->
-                <div id="tab-works" class="tab-content space-y-8 pb-20">
-                    <div class="grid gap-8" style="grid-template-columns: 38% 1fr;">
+                <div id="tab-works" class="tab-content">
+                    <div class="grid gap-8" style="grid-template-columns: 30% 1fr;">
                         <div class="h-full">
 
                             <!-- 신규 등록 버튼 (폼 닫혔을 때만 표시) -->
@@ -721,7 +756,7 @@
                             </div>
 
                             <!-- 등록/수정 폼 -->
-                            <div class="glass-card p-8 h-fit" id="work-form-card" style="min-height: calc(100vh - 120px);">
+                            <div class="glass-card p-8 scroll-invisible" id="work-form-card" style="overflow-y: auto;">
                             <div class="space-y-4">
                                     <div id="work-form-title-area" class="flex items-center gap-2 mb-2">
                                         <span class="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center shadow-md text-xs" id="work-form-icon"><i class="fa-solid fa-plus"></i></span>
@@ -808,9 +843,9 @@
                                             <div class="flex items-center gap-2">
                                                 <input type="date" id="new-work-date-webtoon" class="flex-1 p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100 transition-all">
                                                 <input type="month" id="new-work-pending-month-webtoon" class="flex-1 p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100 transition-all hidden">
-                                                <label class="flex items-center gap-1.5 cursor-pointer shrink-0 bg-slate-50 border border-slate-200 rounded-xl px-3 py-3">
+                                                <label class="flex items-center gap-1.5 cursor-pointer shrink-0 bg-slate-50 border border-slate-200 rounded-xl px-3 py-3" title="출간 예정">
                                                     <input type="checkbox" id="new-work-pending-webtoon" class="accent-emerald-500 w-3.5 h-3.5" onchange="document.getElementById('new-work-pending').checked=this.checked; toggleNewWorkDate(this)">
-                                                    <span class="text-xs text-slate-500 whitespace-nowrap">출간 예정</span>
+                                                    <i class="fa-solid fa-star text-yellow-400 text-xs"></i>
                                                 </label>
                                             </div>
                                         </div>
@@ -839,9 +874,9 @@
                                                 <div class="flex items-center gap-2">
                                                     <input type="date" id="new-work-date" class="flex-1 p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100 transition-all">
                                                     <input type="month" id="new-work-pending-month" class="flex-1 p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100 transition-all hidden">
-                                                    <label class="flex items-center gap-1.5 cursor-pointer shrink-0 bg-slate-50 border border-slate-200 rounded-xl px-3 py-3">
+                                                    <label class="flex items-center gap-1.5 cursor-pointer shrink-0 bg-slate-50 border border-slate-200 rounded-xl px-3 py-3" title="출간 예정">
                                                         <input type="checkbox" id="new-work-pending" class="accent-emerald-500 w-3.5 h-3.5" onchange="toggleNewWorkDate(this)">
-                                                        <span class="text-xs text-slate-500 whitespace-nowrap">출간 예정</span>
+                                                        <i class="fa-solid fa-star text-yellow-400 text-xs"></i>
                                                     </label>
                                                 </div>
                                             </div>
@@ -872,19 +907,19 @@
                                             <button type="button" onclick="openExtraModal()" class="text-xs font-bold text-emerald-600 hover:text-emerald-700 px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100">+ 외전 추가</button>
                                         </div>
                                         <p class="text-[10px] text-slate-400 mb-3">외전은 집필 관리/상세 기록에만 표시되며 정산에는 영향 없습니다.</p>
-                                        <div id="extras-list" class="space-y-2"></div>
+                                        <div id="extras-list" class="space-y-2 scroll-invisible" style="max-height: 220px; overflow-y: auto;"></div>
                                     </div>
                                 </div>
                             </div>
                         </div> <!-- /왼쪽 셀 h-full -->
                         <!-- 오른쪽: 작품 목록 -->
-                        <div id="works-right-panel" style="min-height: calc(100vh - 120px);">
-                            <div class="glass-card p-6 flex flex-col" style="min-height: calc(100vh - 120px);">
+                        <div id="works-right-panel">
+                            <div class="glass-card p-6 flex flex-col h-full">
                                 <div class="flex items-center justify-between mb-4 flex-shrink-0">
                                     <h3 class="text-lg font-bold text-slate-700 flex items-center gap-2"><button onclick="openGenreManager()" class="text-slate-400 hover:text-emerald-600 transition-colors p-1 rounded-lg hover:bg-slate-100" title="장르 및 태그 관리"><i class="fa-solid fa-gear text-base"></i></button> 등록된 작품 목록 <span id="total-works-badge" class="ml-2 bg-slate-100 text-slate-500 text-xs px-2 py-0.5 rounded-full font-bold">0</span><span id="total-volumes-badge" class="hidden text-xs text-slate-400 font-medium"></span></h3>
                                     <div id="library-tabs" class="flex gap-1 bg-slate-100 p-1 rounded-lg flex-wrap"></div>
                                 </div>
-                                <div class="overflow-y-auto custom-scrollbar pr-2 min-h-0" style="max-height: calc(100vh - 200px);">
+                                <div class="overflow-y-auto custom-scrollbar pr-2 min-h-0 flex-1">
                                     <div id="master-works-by-genre-container" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3"></div>
                                 </div>
                             </div>
@@ -3046,6 +3081,7 @@
             document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active')); 
             document.getElementById(`nav-${tabName}`).classList.add('active'); 
             document.getElementById(`tab-${tabName}`).classList.add('active'); 
+            document.body.classList.toggle('works-tab-active', tabName === 'works');
             window.scrollTo(0, 0); 
             updateUI(); 
             closeSidebarMobile();
@@ -3058,7 +3094,7 @@
             const activeTab = document.querySelector('.tab-content.active'); if(!activeTab) return;
             const activeId = activeTab.id;
             if (activeId === 'tab-records') renderRoyaltySheets();
-            if (activeId === 'tab-works') renderMasterWorksList();
+            if (activeId === 'tab-works') { renderMasterWorksList(); requestAnimationFrame(fitWorksPanelsHeight); setTimeout(fitWorksPanelsHeight, 60); }
             if (activeId === 'tab-library') renderVisualLibrary(); 
             if (activeId === 'tab-publishers') renderPublisherTab();
             if (activeId === 'tab-settlements') renderSettlementSchedule();
@@ -4537,9 +4573,18 @@
             currentViewWorkId = id;
             workFormMode = 'view';
 
+            // 카드 클릭 시 목록 스크롤 위치가 맨 위로 튀지 않도록 현재 위치를 저장했다가 복원
+            const listScroller = document.querySelector('#master-works-by-genre-container')?.parentElement;
+            const savedScroll = listScroller ? listScroller.scrollTop : 0;
+
             _fillWorkForm(w);
             showWorkForm();
             renderMasterWorksList();
+
+            if (listScroller) {
+                listScroller.scrollTop = savedScroll;
+                requestAnimationFrame(() => { listScroller.scrollTop = savedScroll; });
+            }
 
             // UI: 수정하기 모드
             document.getElementById('work-form-icon').innerHTML = '<i class="fa-solid fa-pen"></i>';
@@ -4753,11 +4798,11 @@
                 }
                 const dateA = sortKeyDate(a), dateB = sortKeyDate(b); if (dateA !== dateB) return (dateA < dateB) ? -1 : (dateA > dateB ? 1 : 0); return a.title.localeCompare(b.title, 'ko');
             });
-            const getStickyHeader = () => { if (currentYear === 'total') return `<th class="sticky-col text-left pl-6">${currentGenreTab === '종합' ? '장르 구분' : '작품 정보'}</th>`; return `<th class="sticky-col text-left pl-6"><div class="flex items-center gap-2"><span class="bg-slate-600 text-white text-sm px-2.5 py-0.5 rounded-md font-bold font-mono shadow-sm tracking-tight">${currentYear}</span><span class="text-slate-600">${currentGenreTab === '종합' ? '장르 구분' : '작품 정보'}</span></div></th>`; };
+            const getStickyHeader = () => { if (currentYear === 'total') return `<th class="sticky-col text-center px-6">${currentGenreTab === '종합' ? '장르 구분' : '작품 정보'}</th>`; return `<th class="sticky-col text-center px-6"><div class="flex items-center justify-center gap-2"><span class="bg-slate-600 text-white text-sm px-2.5 py-0.5 rounded-md font-bold font-mono shadow-sm tracking-tight">${currentYear}</span><span class="text-slate-600">${currentGenreTab === '종합' ? '장르 구분' : '작품 정보'}</span></div></th>`; };
             if (currentYear === 'total') {
                 if (currentGenreTab === '종합') {
                     const section = document.createElement('div'); section.innerHTML = `<h4 class="text-sm font-bold text-slate-500 mb-4 pl-2 border-l-4" style="border-color:var(--primary)">전체 기간 장르별 정산 요약</h4>`;
-                    let html = `<div class="spreadsheet-container"><table class="sheet-table"><thead><tr>${getStickyHeader()}<th style="min-width:130px; font-weight:700; font-size:0.85rem;" class="grand-total-cell">누적 수익</th><th style="min-width:120px; font-weight:700; font-size:0.85rem;" class="grand-total-cell">추정 매출</th>` + years.map(y => `<th class="text-center">${y}년</th>`).join('') + `</tr></thead><tbody>`;
+                    let html = `<div class="sheet-wrapper"><div class="spreadsheet-container"><table class="sheet-table"><thead><tr>${getStickyHeader()}<th style="min-width:130px; font-weight:700; font-size:0.85rem;" class="grand-total-cell">누적 수익</th><th style="min-width:120px; font-weight:700; font-size:0.85rem;" class="grand-total-cell">추정 매출</th>` + years.map(y => `<th class="text-center">${y}년</th>`).join('') + `</tr></thead><tbody>`;
                     let grandTotal = 0, grandSales = 0, yearTotals = {}; years.forEach(y => yearTotals[y] = 0);
                     genreList.forEach(gObj => {
                         const isWebtoonG = gObj.name && gObj.name.includes('웹툰');
@@ -4767,7 +4812,7 @@
                         const salesCellG = isWebtoonG ? `<td class="text-right pr-2 text-slate-400 text-sm" style="background:#fafafa;">-</td>` : `<td class="text-right pr-2 text-slate-500 text-sm" style="background:#fafafa;">${currencySymbol}${formatCurrency(gSales)}</td>`;
                         html += `<tr><td class="sticky-col pl-6 font-bold text-slate-700">${gObj.name}</td><td class="text-center font-bold text-[0.85rem] grand-total-cell" style="background:#f1f5f9; border-color:#e2e8f0;">${currencySymbol}${formatCurrency(gCumulative)}</td>${salesCellG}` + years.map(y => `<td class="text-right pr-2 text-slate-500 text-sm">${currencySymbol}${formatCurrency(gYearly[y])}</td>`).join('') + `</tr>`;
                     });
-                    html += `</tbody><tfoot><tr class="bg-slate-100/50"><td class="sticky-col text-center font-bold text-slate-600 text-sm">총합</td><td class="text-center font-bold text-[0.85rem] grand-total-cell">${currencySymbol}${formatCurrency(grandTotal)}</td><td class="text-right pr-2 font-bold grand-total-cell">${currencySymbol}${formatCurrency(grandSales)}</td>` + years.map(y => `<td class="text-right pr-2 font-bold grand-total-cell">${currencySymbol}${formatCurrency(yearTotals[y])}</td>`).join('') + `</tr></tfoot></table></div>`;
+                    html += `</tbody></table></div></div><div class="sheet-footer-outer"><div class="sheet-footer-inner"><table class="sheet-table"><tbody><tr class="bg-slate-100/50"><td class="sticky-col text-center font-bold text-slate-600 text-sm">총합</td><td class="text-center font-bold text-[0.85rem] grand-total-cell">${currencySymbol}${formatCurrency(grandTotal)}</td><td class="text-right pr-2 font-bold grand-total-cell">${currencySymbol}${formatCurrency(grandSales)}</td>` + years.map(y => `<td class="text-right pr-2 font-bold grand-total-cell">${currencySymbol}${formatCurrency(yearTotals[y])}</td>`).join('') + `</tr></tbody></table></div></div>`;
                     section.innerHTML += html; container.appendChild(section);
                 } else {
                     const genre = currentGenreTab, gWorks = sortedWorks(masterWorks.filter(w => w.genre === genre && w.title.toLowerCase().includes(searchTerm)));
@@ -4776,7 +4821,7 @@
                     const showSalesCol = !(currentGenreTab && currentGenreTab.includes('웹툰'));
                     const salesHeaderTotal = showSalesCol ? `<th style="min-width:120px; font-weight:700;" class="grand-total-cell">추정 매출</th>` : '';
                     // 총합계 뷰: 작품 정보 칸 너비를 기존(약 260px)의 60% 수준(156px)으로 축소
-                    let html = `<div class="spreadsheet-container"><table class="sheet-table"><thead><tr><th class="sticky-col text-left pl-6" style="width:156px;min-width:156px;">작품 정보</th><th style="min-width:130px; font-weight:700;" class="grand-total-cell">누적 수익</th>${salesHeaderTotal}` + years.map(y => `<th class="text-center">${y}년</th>`).join('') + `</tr></thead><tbody>`;
+                    let html = `<div class="sheet-wrapper"><div class="spreadsheet-container"><table class="sheet-table"><thead><tr><th class="sticky-col text-center px-6" style="width:156px;min-width:156px;">작품 정보</th><th style="min-width:130px; font-weight:700;" class="grand-total-cell">누적 수익</th>${salesHeaderTotal}` + years.map(y => `<th class="text-center">${y}년</th>`).join('') + `</tr></thead><tbody>`;
                     let totalCumulative = 0, totalSalesAll = 0, totalYearly = {}; years.forEach(y => totalYearly[y] = 0);
                     gWorks.forEach(w => {
                         let wCumulative = 0, wYearly = {}; years.forEach(y => { wYearly[y] = 0; for(let m=1; m<=12; m++) { const val = (monthlyData[`${y}-${String(m).padStart(2,'0')}`] || {})[w.id] || 0; wYearly[y] += val; } wCumulative += wYearly[y]; });
@@ -4789,14 +4834,14 @@
                         html += `<tr><td class="sticky-col pl-6" style="min-width:156px;overflow:hidden;"><div class="font-bold text-slate-700 text-sm truncate w-full mb-1" title="${w.title}">${w.title}</div><div class="text-[11px] text-slate-400 flex items-center">${(currentGenreTab === '웹툰' ? (w.studio || '-') : w.publisher)} | ${dateDisplay}${advHtml}</div></td><td class="text-center font-bold text-[0.85rem] grand-total-cell" style="background:#f1f5f9; border-color:#e2e8f0;">${currencySymbol}${formatCurrency(wCumulative)}</td>${salesCell}` + years.map(y => `<td class="text-right pr-2 text-slate-600 text-sm">${currencySymbol}${formatCurrency(wYearly[y])}</td>`).join('') + `</tr>`;
                     });
                     const salesFootTotal = showSalesCol ? `<td class="text-right pr-2 font-bold grand-total-cell">${currencySymbol}${formatCurrency(totalSalesAll)}</td>` : '';
-                    html += `</tbody><tfoot><tr class="bg-slate-100/50"><td class="sticky-col text-center font-bold text-slate-600 text-sm" style="width:156px;min-width:156px;">총합</td><td class="text-center font-bold grand-total-cell">${currencySymbol}${formatCurrency(totalCumulative)}</td>${salesFootTotal}` + years.map(y => `<td class="text-right pr-2 font-bold grand-total-cell">${currencySymbol}${formatCurrency(totalYearly[y])}</td>`).join('') + `</tr></tfoot></table></div>`;
+                    html += `</tbody></table></div></div><div class="sheet-footer-outer"><div class="sheet-footer-inner"><table class="sheet-table"><tbody><tr class="bg-slate-100/50"><td class="sticky-col text-center font-bold text-slate-600 text-sm" style="width:156px;min-width:156px;">총합</td><td class="text-center font-bold grand-total-cell">${currencySymbol}${formatCurrency(totalCumulative)}</td>${salesFootTotal}` + years.map(y => `<td class="text-right pr-2 font-bold grand-total-cell">${currencySymbol}${formatCurrency(totalYearly[y])}</td>`).join('') + `</tr></tbody></table></div></div>`;
                     section.innerHTML += html; container.appendChild(section);
                 }
             } else {
                 const months = Array.from({length: 12}, (_, i) => `${currentYear}-${String(i+1).padStart(2, '0')}`);
                 if (currentGenreTab === '종합') {
                     const section = document.createElement('div'); section.innerHTML = `<h4 class="text-sm font-bold text-slate-500 mb-4 pl-2 border-l-4" style="border-color:var(--primary)">연간 장르별 정산 요약</h4>`;
-                    let html = `<div class="spreadsheet-container"><table class="sheet-table"><thead><tr>${getStickyHeader()}` + months.map(m => `<th class="text-center">${parseInt(m.split('-')[1])}월</th>`).join('') + `<th class="genre-total-row" style="min-width:135px;">연간 합계</th></tr></thead><tbody>`;
+                    let html = `<div class="sheet-wrapper"><div class="spreadsheet-container"><table class="sheet-table"><thead><tr>${getStickyHeader()}` + months.map(m => `<th class="text-center">${parseInt(m.split('-')[1])}월</th>`).join('') + `<th class="genre-total-row text-center" style="min-width:135px;">연간 합계</th></tr></thead><tbody>`;
                     let grandTotal = 0, monthlyTotals = Array(12).fill(0);
                     genreList.forEach(gObj => {
                         let rowTotal = 0; html += `<tr><td class="sticky-col pl-6 font-bold text-slate-700">${gObj.name}</td>`;
@@ -4806,12 +4851,12 @@
                         });
                         html += `<td class="genre-total-row pr-4" style="min-width:135px;">${currencySymbol}${formatCurrency(rowTotal)}</td></tr>`; grandTotal += rowTotal;
                     });
-                    html += `</tbody><tfoot><tr class="bg-slate-100/50"><td class="sticky-col text-center font-bold text-slate-600 text-sm">월별 총합</td>` + monthlyTotals.map(val => `<td class="text-right pr-2 font-bold grand-total-cell">${currencySymbol}${formatCurrency(val)}</td>`).join('') + `<td class="text-right pr-4 font-bold grand-total-cell" style="min-width:135px;">${currencySymbol}${formatCurrency(grandTotal)}</td></tr></tfoot></table></div>`;
+                    html += `</tbody></table></div></div><div class="sheet-footer-outer"><div class="sheet-footer-inner"><table class="sheet-table"><tbody><tr class="bg-slate-100/50"><td class="sticky-col text-center font-bold text-slate-600 text-sm">월별 총합</td>` + monthlyTotals.map(val => `<td class="text-right pr-2 font-bold grand-total-cell">${currencySymbol}${formatCurrency(val)}</td>`).join('') + `<td class="text-right pr-4 font-bold grand-total-cell" style="min-width:135px;">${currencySymbol}${formatCurrency(grandTotal)}</td></tr></tbody></table></div></div>`;
                     section.innerHTML += html; container.appendChild(section);
                 } else {
                     const gWorks = sortedWorks(masterWorks.filter(w => w.genre === currentGenreTab && w.title.toLowerCase().includes(searchTerm)));
                     const section = document.createElement('div'); section.innerHTML = `<h4 class="text-sm font-bold text-slate-500 mb-4 pl-2 border-l-4" style="border-color:var(--primary)">${currentGenreTab} 상세 입력 <span class="text-slate-400 font-normal">(${gWorks.length})</span></h4>`;
-                    let html = `<div class="spreadsheet-container"><table class="sheet-table"><thead><tr>${getStickyHeader()}` + months.map(m => `<th class="text-center">${parseInt(m.split('-')[1])}월</th>`).join('') + `<th class="genre-total-row" style="min-width:135px;">합계</th></tr></thead><tbody>`;
+                    let html = `<div class="sheet-wrapper"><div class="spreadsheet-container"><table class="sheet-table"><thead><tr>${getStickyHeader()}` + months.map(m => `<th class="text-center">${parseInt(m.split('-')[1])}월</th>`).join('') + `<th class="genre-total-row text-center" style="min-width:135px;">합계</th></tr></thead><tbody>`;
                     gWorks.forEach(w => {
                         const dateDisplay = getDateDisplay(w);
                         const advAmt2 = w.advanceAmount ? Number(w.advanceAmount).toLocaleString()+'만원' : '';
@@ -4823,12 +4868,47 @@
                         });
                         html += `<td id="work-total-${w.id}" class="genre-total-row pr-4" style="min-width:135px;">0</td></tr>`;
                     });
-                    html += `</tbody><tfoot><tr class="bg-slate-100/50"><td class="sticky-col text-center font-bold text-slate-600 text-sm">월별 총합</td>` + months.map(m => `<td id="genre-month-total-${currentGenreTab}-${m}" class="text-right pr-2 font-bold grand-total-cell">0</td>`).join('') + `<td id="genre-total-all-${currentGenreTab}" class="text-right pr-4 font-bold grand-total-cell" style="min-width:135px;">0</td></tr></tfoot></table></div>`;
+                    html += `</tbody></table></div></div><div class="sheet-footer-outer"><div class="sheet-footer-inner"><table class="sheet-table"><tbody><tr class="bg-slate-100/50"><td class="sticky-col text-center font-bold text-slate-600 text-sm">월별 총합</td>` + months.map(m => `<td id="genre-month-total-${currentGenreTab}-${m}" class="text-right pr-2 font-bold grand-total-cell">0</td>`).join('') + `<td id="genre-total-all-${currentGenreTab}" class="text-right pr-4 font-bold grand-total-cell" style="min-width:135px;">0</td></tr></tbody></table></div></div>`;
                     section.innerHTML += html; container.appendChild(section);
                     setTimeout(updateSheetTotals, 0);
                 }
             }
+            requestAnimationFrame(fitSpreadsheetHeight);
+            requestAnimationFrame(syncSheetFooters);
         }
+        // 표 바깥(페이지) 스크롤이 절대 생기지 않도록, 표의 실제 남은 세로 공간을 계산해서
+        // .spreadsheet-container의 max-height를 매번 정확히 맞춰준다.
+        function fitSpreadsheetHeight() {
+            const el = document.querySelector('#genre-sheets-container .spreadsheet-container');
+            if (!el) return;
+            el.style.maxHeight = 'none'; // 표 아래 실제 여백을 재기 위해 잠시 제한 해제
+            const top = el.getBoundingClientRect().top;
+            const afterSpace = document.documentElement.scrollHeight - (el.getBoundingClientRect().bottom + window.scrollY);
+            const h = window.innerHeight - top - afterSpace;
+            el.style.maxHeight = Math.max(h, 200) + 'px';
+        }
+        window.addEventListener('resize', () => {
+            const recordsTab = document.getElementById('tab-records');
+            if (recordsTab && recordsTab.classList.contains('active')) fitSpreadsheetHeight();
+        });
+        // 스크롤되는 표(.spreadsheet-container)와 그 아래 항상 보이는 총합 바(.sheet-footer-inner)의
+        // 세로 스크롤바 너비 차이를 보정하고, 가로 스크롤 위치를 서로 맞춰준다.
+        function syncSheetFooters() {
+            document.querySelectorAll('.sheet-wrapper').forEach(wrapper => {
+                const body = wrapper.querySelector('.spreadsheet-container');
+                const footerOuter = wrapper.nextElementSibling && wrapper.nextElementSibling.classList.contains('sheet-footer-outer') ? wrapper.nextElementSibling : null;
+                const footerInner = footerOuter ? footerOuter.querySelector('.sheet-footer-inner') : null;
+                if (!body || !footerOuter || !footerInner) return;
+                const scrollbarW = body.offsetWidth - body.clientWidth;
+                footerOuter.style.paddingRight = scrollbarW + 'px';
+                footerInner.scrollLeft = body.scrollLeft;
+                if (!body.dataset.footerSynced) {
+                    body.dataset.footerSynced = '1';
+                    body.addEventListener('scroll', () => { footerInner.scrollLeft = body.scrollLeft; });
+                }
+            });
+        }
+        window.addEventListener('resize', () => requestAnimationFrame(syncSheetFooters));
         function updateSheetTotals() {
             if (currentGenreTab === '종합' || currentYear === 'total') return;
             const months = Array.from({length: 12}, (_, i) => `${currentYear}-${String(i+1).padStart(2, '0')}`);
@@ -4844,8 +4924,7 @@
             });
         }
         function renderMasterWorksList() {
-            const container = document.getElementById('master-works-by-genre-container'), tabsContainer = document.getElementById('library-tabs'), badge = document.getElementById('total-works-badge'); 
-            const tabs = ['전체', ...genreList.map(g => g.name)];
+            const container = document.getElementById('master-works-by-genre-container'), tabsContainer = document.getElementById('library-tabs'), badge = document.getElementById('total-works-badge');             const tabs = ['전체', ...genreList.map(g => g.name)];
             tabsContainer.innerHTML = tabs.map(t => `<button onclick="switchLibraryTab('${t}')" class="px-3 py-1.5 text-xs font-bold rounded-lg transition-all mb-1 ${currentLibraryTab === t ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-400 hover:bg-slate-50'}">${t}</button>`).join('');
             container.innerHTML = ""; let worksToShow = currentLibraryTab === '전체' ? [...masterWorks] : masterWorks.filter(w => w.genre === currentLibraryTab);
             const sortOrder = ['BL 장편', '현로 장편', '현로 초단', 'BL 초단', '웹툰'];
@@ -4936,7 +5015,34 @@
                     </div>
                 </div>`;
             });
+            requestAnimationFrame(fitWorksPanelsHeight);
         }
+        // 작품 등록 탭: 왼쪽 폼 카드 / 오른쪽 목록 카드의 높이를 실제 남은 뷰포트 공간에 맞춰
+        // 정확히 계산해서 페이지 전체 스크롤이 생기지 않도록 한다.
+        function fitWorksPanelsHeight() {
+            const leftCard = document.getElementById('work-form-card');
+            const rightPanel = document.getElementById('works-right-panel');
+            const rightCard = rightPanel ? rightPanel.querySelector('.glass-card') : null;
+            if (!leftCard || !rightPanel) return;
+            const tab = document.getElementById('tab-works');
+            if (!tab || !tab.classList.contains('active')) return;
+            const listScroller = document.querySelector('#master-works-by-genre-container')?.parentElement;
+            const savedScroll = listScroller ? listScroller.scrollTop : 0;
+            leftCard.style.height = 'auto';
+            rightPanel.style.height = 'auto';
+            if (rightCard) rightCard.style.height = 'auto';
+            // 카드 위쪽(뷰포트 기준)부터 화면 맨 아래까지 남는 공간에서 살짝 여유(20px)만 빼서 높이 확정
+            const top = leftCard.getBoundingClientRect().top;
+            const h = Math.max(Math.floor(window.innerHeight - top - 20), 300);
+            leftCard.style.height = h + 'px';
+            rightPanel.style.height = h + 'px';
+            if (rightCard) rightCard.style.height = h + 'px';
+            if (listScroller) listScroller.scrollTop = savedScroll;
+        }
+        window.addEventListener('resize', () => {
+            const worksTab = document.getElementById('tab-works');
+            if (worksTab && worksTab.classList.contains('active')) fitWorksPanelsHeight();
+        });
         function deleteWork(id) { 
             if(confirm("삭제하시겠습니까?")) { 
                 // 본편 + 외전의 자동 태스크 모두 제거

@@ -2524,6 +2524,12 @@
 
         // [NEW] 집필/스케줄 UI 상태
         let writeCalDate = new Date();
+        // [FIX] contactSortMode를 원래 있던 자리(스크립트 훨씬 아래쪽)보다 훨씬 앞으로 옮김.
+        // 원래 위치에 있으면, 초기 데이터 로딩(hydrateFromParsed)이 이 변수를 아직 선언되기도 전에
+        // 참조하게 되어 "ReferenceError: Cannot access 'contactSortMode' before initialization"로
+        // 매번 로딩이 중간에 멈춰버리고, 그 이후 항목(집필 일정/글자수 기록/장르 목록/연락처 등)이
+        // 전부 빈 기본값으로 남아버리는 문제가 있었음. 선언을 로딩 코드보다 앞으로 옮겨서 해결.
+        let contactSortMode = 'date'; // 'date' or 'penName' or 'manual'
         let taskCalDate = new Date();
         let writeGenreFilter = '전체';
         let taskGenreFilter = '전체';
@@ -5362,7 +5368,7 @@
         }
 
         // ════════ 컨택 관리 ════════
-        let contactSortMode = 'date'; // 'date' or 'penName' or 'manual'
+        // contactSortMode는 이제 스크립트 상단에서 선언됨 (로딩 순서 버그 수정)
         let contactDragSrcId = null;
 
         function setContactSort(mode) {

@@ -2575,7 +2575,7 @@
                     String(d.getHours()).padStart(2, '0') +
                     String(d.getMinutes()).padStart(2, '0');
 
-                // ── 로컬 회전 백업 (5개) ──
+                // ── 로컬 회전 백업 (10개) ──
                 const localDir = path.dirname(dataFilePath);
                 const listLocalBackups = () => fs.readdirSync(localDir)
                     .filter(f => f.startsWith(BACKUP_PREFIX) && f.endsWith('.json'))
@@ -2592,11 +2592,11 @@
                 const localBackupPath = path.join(localDir, BACKUP_PREFIX + stamp + '.json');
                 if (!fs.existsSync(localBackupPath)) fs.copyFileSync(dataFilePath, localBackupPath);
                 localExisting = listLocalBackups();
-                while (localExisting.length > 5) {
+                while (localExisting.length > 10) {
                     try { fs.unlinkSync(path.join(localDir, localExisting.shift())); } catch (e) {}
                 }
 
-                // ── 구글드라이브 회전 백업 (5개) ──
+                // ── 구글드라이브 회전 백업 (10개) ──
                 if (fs.existsSync(TARGET_DIR)) {
                     try {
                         const listGdriveBackups = () => fs.readdirSync(TARGET_DIR)
@@ -2605,7 +2605,7 @@
                         const gdriveBackupPath = path.join(TARGET_DIR, GDRIVE_BACKUP_PREFIX + stamp + '.json');
                         if (!fs.existsSync(gdriveBackupPath)) fs.copyFileSync(dataFilePath, gdriveBackupPath);
                         let gdriveExisting = listGdriveBackups();
-                        while (gdriveExisting.length > 5) {
+                        while (gdriveExisting.length > 10) {
                             try { fs.unlinkSync(path.join(TARGET_DIR, gdriveExisting.shift())); } catch (e) {}
                         }
                     } catch (e) { console.error('구글드라이브 회전 백업 실패', e); }
@@ -7768,6 +7768,38 @@
         function purgeOrphanSchedules() {
             let changed = false;
             const validWorkIds = new Set(masterWorks.map(w => w.id));
+
+            // [FIX] 한 번에 대량으로 지워지는 걸 막기 위한 안전장치.
+            // 원래 의도는 "삭제된 작품에 딸린 낱개 일정 정리"인데, 작품 ID가 통째로 바뀌는 것 같은
+            // 비정상 상황에서는 멀쩡한 일정 전체가 "고아"로 오판되어 한꺼번에 날아갈 수 있었음.
+            // → 한 번에 지워지는 양이 기존의 절반을 넘으면(그리고 원래 개수가 충분히 많으면),
+            //    실제로 지우지 않고 콘솔에만 경고를 남기고 건너뜀.
+            const countScheduleArr = (obj) => Object.values(obj || {}).reduce((n, arr) => n + (Array.isArray(arr) ? arr.length : 0), 0);
+            const countDailyWorks = (obj) => Object.values(obj || {}).reduce((n, day) => n + Object.keys(day?.works || {}).length, 0);
+
+            const beforeWriteCount = countScheduleArr(writeSchedules);
+            const beforeTaskCount = countScheduleArr(taskSchedules);
+            const beforeDailyCount = countDailyWorks(writerDailyData);
+
+            // 얼마나 지워질지 미리 계산 (실제로 지우기 전에)
+            const wouldKeepWrite = Object.values(writeSchedules).reduce((n, arr) => n + arr.filter(s => isScheduleWorkValid(s.workId)).length, 0);
+            const wouldKeepTask = Object.values(taskSchedules).reduce((n, arr) => n + arr.filter(t => {
+                if (!t.workId) return true;
+                if (!isScheduleWorkValid(t.workId)) return false;
+                if (t.extraId) { const w = resolveWorkItem(t.workId).work; if (!w?.extras?.some(e => e.id === t.extraId)) return false; }
+                return true;
+            }).length, 0);
+            const wouldKeepDaily = Object.values(writerDailyData).reduce((n, day) => n + Object.keys(day?.works || {}).filter(wk => isScheduleWorkValid(wk)).length, 0);
+
+            const tooMuchWriteLoss = beforeWriteCount >= 10 && wouldKeepWrite < beforeWriteCount * 0.5;
+            const tooMuchTaskLoss = beforeTaskCount >= 10 && wouldKeepTask < beforeTaskCount * 0.5;
+            const tooMuchDailyLoss = beforeDailyCount >= 10 && wouldKeepDaily < beforeDailyCount * 0.5;
+
+            if (tooMuchWriteLoss || tooMuchTaskLoss || tooMuchDailyLoss) {
+                console.error('[Purge] 정리 보류: 한 번에 지워지는 집필/작업 일정·글자수 기록이 너무 많음(절반 이상) → 작품 ID 불일치 가능성. 실제 삭제는 건너뜀.',
+                    { beforeWriteCount, wouldKeepWrite, beforeTaskCount, wouldKeepTask, beforeDailyCount, wouldKeepDaily });
+                return false;
+            }
 
             // 집필 관리 일정
             Object.keys(writeSchedules).forEach(date => {

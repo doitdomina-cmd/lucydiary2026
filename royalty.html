@@ -9487,6 +9487,24 @@
             const provider = new firebase.auth.GoogleAuthProvider();
             let cloudReady = false, cloudTimer = null;
 
+            // [FIX] 오래 방치된 세션이 옛날 데이터를 들고 있다가 실수로 저장/업로드하는 걸 막기 위한 자동 로그아웃.
+            // 마지막 활동 이후 IDLE_LOGOUT_MS(기본 6시간)가 지났으면, 다시 열었을 때 자동으로 로그아웃시켜서
+            // 반드시 새로 로그인 → 클라우드에서 완전히 새 데이터를 받아오도록 강제함.
+            const IDLE_LOGOUT_MS = 6 * 60 * 60 * 1000; // 6시간
+            const LAST_ACTIVE_KEY = 'cloudLastActive_v6';
+            function markCloudActive(){ try { localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now())); } catch(e){} }
+            function checkIdleAndMaybeSignOut(){
+                try {
+                    const last = Number(localStorage.getItem(LAST_ACTIVE_KEY) || 0);
+                    if (last && (Date.now() - last) > IDLE_LOGOUT_MS) {
+                        console.log('[Cloud] 오랫동안 사용 안 함 → 자동 로그아웃 (다시 로그인하면 최신 데이터를 새로 받아옵니다)');
+                        cloudReady = false;
+                        auth.signOut().catch(()=>{});
+                    }
+                } catch(e) {}
+            }
+            checkIdleAndMaybeSignOut();
+
             const overlay = document.createElement('div');
             overlay.id = 'cloudOverlay';
             overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#f5f7fa;display:flex;align-items:center;justify-content:center;font-family:-apple-system,sans-serif;';
@@ -9517,6 +9535,32 @@
 
             function applyAndRender(parsed){ hydrateFromParsed(parsed); try { setTheme(activeTheme); } catch(e){} try { updateUI(); } catch(e){} }
             function closeOverlay(){ const o = document.getElementById('cloudOverlay'); if (o) o.remove(); }
+            function countScheduleItems(obj){
+                if (!obj || typeof obj !== 'object') return 0;
+                let n = 0;
+                for (const k in obj) { if (Array.isArray(obj[k])) n += obj[k].length; }
+                return n;
+            }
+            // [FIX] 클라우드에 올리기 전에, 지금 올리려는 데이터가 클라우드에 이미 있는 데이터보다
+            // 눈에 띄게 부실하지 않은지 확인. (예: 이 기기가 아직 로딩이 덜 된 상태로 저장을 시도하는 경우 방지)
+            // 부실하면 업로드를 건너뛰고 콘솔에 경고만 남김 — 좋은 클라우드 데이터를 보호하기 위함.
+            function isPushSuspicious(dataToSave, cloudParsed){
+                if (!cloudParsed) return false; // 클라우드에 기존 데이터가 없으면 비교 불필요
+                const localWorks = Array.isArray(dataToSave.masterWorks) ? dataToSave.masterWorks.length : 0;
+                const cloudWorks = Array.isArray(cloudParsed.masterWorks) ? cloudParsed.masterWorks.length : 0;
+                const localDays = dataToSave.writerDailyData ? Object.keys(dataToSave.writerDailyData).length : 0;
+                const cloudDays = cloudParsed.writerDailyData ? Object.keys(cloudParsed.writerDailyData).length : 0;
+                const localWriteSched = countScheduleItems(dataToSave.writeSchedules);
+                const cloudWriteSched = countScheduleItems(cloudParsed.writeSchedules);
+                const localTaskSched = countScheduleItems(dataToSave.taskSchedules);
+                const cloudTaskSched = countScheduleItems(cloudParsed.taskSchedules);
+
+                if (cloudWorks >= 5 && localWorks < cloudWorks * 0.5) return true;
+                if (cloudDays >= 10 && localDays < cloudDays * 0.5) return true;
+                if (cloudWriteSched >= 10 && localWriteSched < cloudWriteSched * 0.5) return true;
+                if (cloudTaskSched >= 10 && localTaskSched < cloudTaskSched * 0.5) return true;
+                return false;
+            }
             function cloudPayload(dataObj){
                 // 클라우드엔 표지 이미지(coverImage) + 계약서 파일(contractFile) + webtoonSubs(별도 doc) 제외 → 용량 대폭 축소
                 const clone = Object.assign({}, dataObj);
@@ -9535,19 +9579,31 @@
             }
             function cloudSaveNow(dataToSave){
                 if (!window.__cloudDocRef) return;
-                // 메인 데이터 저장
-                const payload = cloudPayload(dataToSave);
-                if (payload.length > 1000000) { console.error('클라우드 저장 보류: 데이터가 1MB를 초과 (' + payload.length + ')'); return; }
-                window.__cloudDocRef.set({ payload: payload, _savedAt: Date.now() }).catch(e => console.error('클라우드 저장 실패', e));
-                // webtoonSubs 별도 doc에 저장
-                if (window.__cloudSubsRef) {
-                    const subsPayload = JSON.stringify({ webtoonSubs: dataToSave.webtoonSubs || {}, webtoonSubOrder: dataToSave.webtoonSubOrder || [] });
-                    if (subsPayload.length <= 1000000) {
-                        window.__cloudSubsRef.set({ payload: subsPayload, _savedAt: Date.now() }).catch(e => console.error('webtoonSubs 클라우드 저장 실패', e));
-                    } else {
-                        console.error('webtoonSubs 1MB 초과 (' + subsPayload.length + ')');
+                // [FIX] 업로드 전, 클라우드에 있는 기존 데이터와 비교해서 지금 올리려는 데이터가
+                // 눈에 띄게 부실하면(예: 이 기기가 아직 다 로딩 안 된 상태) 업로드를 건너뜀
+                window.__cloudDocRef.get().then(snap => {
+                    let cloudParsed = null;
+                    try {
+                        if (snap.exists && snap.data() && snap.data().payload) cloudParsed = JSON.parse(snap.data().payload);
+                    } catch(e) {}
+                    if (isPushSuspicious(dataToSave, cloudParsed)) {
+                        console.error('[Cloud] 업로드 보류: 로컬 데이터가 클라우드보다 눈에 띄게 부실함 (작품 수/글자수 기록/집필·작업 일정 급감 감지)');
+                        return;
                     }
-                }
+                    // 메인 데이터 저장
+                    const payload = cloudPayload(dataToSave);
+                    if (payload.length > 1000000) { console.error('클라우드 저장 보류: 데이터가 1MB를 초과 (' + payload.length + ')'); return; }
+                    window.__cloudDocRef.set({ payload: payload, _savedAt: Date.now() }).then(markCloudActive).catch(e => console.error('클라우드 저장 실패', e));
+                    // webtoonSubs 별도 doc에 저장
+                    if (window.__cloudSubsRef) {
+                        const subsPayload = JSON.stringify({ webtoonSubs: dataToSave.webtoonSubs || {}, webtoonSubOrder: dataToSave.webtoonSubOrder || [] });
+                        if (subsPayload.length <= 1000000) {
+                            window.__cloudSubsRef.set({ payload: subsPayload, _savedAt: Date.now() }).catch(e => console.error('webtoonSubs 클라우드 저장 실패', e));
+                        } else {
+                            console.error('webtoonSubs 1MB 초과 (' + subsPayload.length + ')');
+                        }
+                    }
+                }).catch(e => console.error('[Cloud] 업로드 전 비교 조회 실패', e));
             }
             window.cloudSave = function(dataToSave){
                 if (!cloudReady || !window.__cloudDocRef) return;
@@ -9592,12 +9648,14 @@
                         // webtoonSubs 탭 강제 재렌더 (탭이 이미 열려있는 경우 대비)
                         try { if (typeof renderWebtoonSubsList === 'function') renderWebtoonSubsList(); } catch(e) {}
                         cloudReady = true;
+                        markCloudActive();
                         closeOverlay();
                     } else {
                         document.getElementById('cloudLoginBtn').style.display = 'none';
                         document.getElementById('cloudImport').style.display = 'block';
                         setMsg(user.email + ' 로그인됨');
                         cloudReady = true;
+                        markCloudActive();
                     }
                 }).catch(e => { console.error('[Cloud] 불러오기 오류:', e); setMsg('불러오기 오류: ' + e.message); });
             });

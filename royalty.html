@@ -575,6 +575,7 @@
                                     <div class="p-1.5 rounded-lg bg-emerald-50 text-emerald-400 text-xs"><i class="fa-solid fa-chart-pie"></i></div>
                                 </div>
                                 <h3 id="stat-avg-year" class="text-xl font-bold text-slate-600">₩ 0</h3>
+                                <p id="stat-avg-year-pretax" class="text-[12px] text-slate-400 font-normal mt-0.5">세전 ₩ 0</p>
                             </div>
                         </div>
                         <div class="stat-card border-l-4" style="border-left-color: #60a5fa">
@@ -604,6 +605,7 @@
                                     <div class="p-1.5 rounded-lg bg-blue-50 text-blue-400 text-xs"><i class="fa-solid fa-clock-rotate-left"></i></div>
                                 </div>
                                 <h3 id="stat-prev-year-profit" class="text-xl font-bold text-slate-600">₩ 0</h3>
+                                <p id="stat-prev-year-pretax" class="text-[12px] text-slate-400 font-normal mt-0.5">세전 ₩ 0</p>
                             </div>
                         </div>
                         <div class="stat-card border-l-4" style="border-left-color: #fb7185">
@@ -628,11 +630,20 @@
                             </div>
                             <div class="border-t border-slate-100 my-2"></div>
                             <div class="mt-2">
-                                <div class="flex justify-between items-start mb-1">
-                                    <div><p class="text-[11px] font-bold text-slate-400 uppercase">Last Month</p><p class="text-xs text-slate-500"><span id="stat-prev-month-label"></span> 순수익</p></div>
+                                <div class="flex justify-between items-start mb-2">
+                                    <p class="text-[11px] font-bold text-slate-400 uppercase">Last Month</p>
                                     <div class="p-1.5 rounded-lg bg-rose-50 text-rose-400 text-xs"><i class="fa-solid fa-clock-rotate-left"></i></div>
                                 </div>
-                                <h3 id="stat-prev-month-profit" class="text-xl font-bold text-slate-600">₩ 0</h3>
+                                <div class="mb-4">
+                                    <p class="text-xs text-slate-500"><span id="stat-prev-month-label"></span> 순수익</p>
+                                    <h3 id="stat-prev-month-profit" class="text-lg font-bold text-slate-600">₩ 0</h3>
+                                    <p id="stat-prev-month-pretax" class="text-[12px] text-slate-400 font-normal mt-0.5">세전 ₩ 0</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-slate-500"><span id="stat-prev-month2-label"></span> 순수익</p>
+                                    <h3 id="stat-prev-month2-profit" class="text-lg font-bold text-slate-600">₩ 0</h3>
+                                    <p id="stat-prev-month2-pretax" class="text-[12px] text-slate-400 font-normal mt-0.5">세전 ₩ 0</p>
+                                </div>
                             </div>
                         </div>
                         <div class="stat-card border-l-4" style="border-left-color: #a78bfa">
@@ -8621,13 +8632,15 @@
 
         function updateDashboardStats() {
             let totalProfit = 0, totalSales = 0, yearProfit = 0, yearSales = 0, thisMonthProfit = 0, thisMonthSales = 0;
-            let prevYearProfit = 0, prevMonthProfit = 0;
+            let prevYearProfit = 0, prevMonthProfit = 0, prevMonth2Profit = 0;
             const genreStats = {}, workStats = {}, workStatsByYear = {}, monthlyStats = Array(12).fill(0).map(() => ({})); const yearTotals = {}; years.forEach(y => yearTotals[y] = {}); const now = new Date(); 
             const targetDashYear = now.getFullYear() + dashYearOffset, targetMonthDate = new Date(now.getFullYear(), now.getMonth() + dashMonthOffset, 1), targetDashMonthKey = `${targetMonthDate.getFullYear()}-${String(targetMonthDate.getMonth() + 1).padStart(2,'0')}`;
             const prevDashYear = targetDashYear - 1;
             const prevMonthDate = new Date(targetMonthDate.getFullYear(), targetMonthDate.getMonth() - 1, 1);
             const prevMonthKey = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2,'0')}`;
-            Object.entries(monthlyData).forEach(([mKey, data]) => { const parts = mKey.split('-'); if (parts.length !== 2) return; const y = parseInt(parts[0]), m = parseInt(parts[1]); Object.entries(data).forEach(([wId, val]) => { const w = masterWorks.find(x => x.id === wId); if (w) { const sales = calculateGrossSales(val, w.rate); totalProfit += val; totalSales += sales; genreStats[w.genre] = (genreStats[w.genre] || 0) + val; workStats[wId] = (workStats[wId] || 0) + (Number(val)||0); if (!workStatsByYear[y]) workStatsByYear[y] = {}; workStatsByYear[y][wId] = (workStatsByYear[y][wId] || 0) + (Number(val)||0); if (yearTotals[y]) yearTotals[y][w.genre] = (yearTotals[y][w.genre] || 0) + val; if (y === targetDashYear) { monthlyStats[m-1][w.genre] = (monthlyStats[m-1][w.genre] || 0) + val; yearProfit += val; yearSales += sales; } if (y === prevDashYear) { prevYearProfit += val; } if (mKey === targetDashMonthKey) { thisMonthProfit += val; thisMonthSales += sales; } if (mKey === prevMonthKey) { prevMonthProfit += val; } } }); });
+            const prevMonth2Date = new Date(targetMonthDate.getFullYear(), targetMonthDate.getMonth() - 2, 1);
+            const prevMonth2Key = `${prevMonth2Date.getFullYear()}-${String(prevMonth2Date.getMonth() + 1).padStart(2,'0')}`;
+            Object.entries(monthlyData).forEach(([mKey, data]) => { const parts = mKey.split('-'); if (parts.length !== 2) return; const y = parseInt(parts[0]), m = parseInt(parts[1]); Object.entries(data).forEach(([wId, val]) => { const w = masterWorks.find(x => x.id === wId); if (w) { const sales = calculateGrossSales(val, w.rate); totalProfit += val; totalSales += sales; genreStats[w.genre] = (genreStats[w.genre] || 0) + val; workStats[wId] = (workStats[wId] || 0) + (Number(val)||0); if (!workStatsByYear[y]) workStatsByYear[y] = {}; workStatsByYear[y][wId] = (workStatsByYear[y][wId] || 0) + (Number(val)||0); if (yearTotals[y]) yearTotals[y][w.genre] = (yearTotals[y][w.genre] || 0) + val; if (y === targetDashYear) { monthlyStats[m-1][w.genre] = (monthlyStats[m-1][w.genre] || 0) + val; yearProfit += val; yearSales += sales; } if (y === prevDashYear) { prevYearProfit += val; } if (mKey === targetDashMonthKey) { thisMonthProfit += val; thisMonthSales += sales; } if (mKey === prevMonthKey) { prevMonthProfit += val; } if (mKey === prevMonth2Key) { prevMonth2Profit += val; } } }); });
             document.getElementById('stat-total').innerText = `₩ ${formatCurrency(totalProfit)}`; const _sts=document.getElementById('stat-total-sales'); if(_sts) _sts.innerText = `₩ ${formatCurrency(totalSales)}`; document.getElementById('stat-year-profit').innerText = `₩ ${formatCurrency(yearProfit)}`; const _sys=document.getElementById('stat-year-sales'); if(_sys) _sys.innerText = `₩ ${formatCurrency(yearSales)}`; document.getElementById('dashboard-year-label').innerText = targetDashYear; document.getElementById('dashboard-month-label').innerText = dashMonthOffset === 0 ? "이번 달" : `${targetMonthDate.getFullYear()}년 ${targetMonthDate.getMonth() + 1}월`; document.getElementById('stat-month-profit').innerText = `₩ ${formatCurrency(thisMonthProfit)}`; const _sms=document.getElementById('stat-month-sales'); if(_sms) _sms.innerText = `₩ ${formatCurrency(thisMonthSales)}`; document.getElementById('stat-works-count').innerText = masterWorks.length; const _nonWt=masterWorks.filter(w=>!(w.genre&&w.genre.includes('웹툰')));
             const _totalVols=_nonWt.reduce((s,w)=>s+(parseInt(w.volumes)||1)+(w.extras||[]).length,0);
             const _pubNonWt=_nonWt.filter(w=>!w.isPending);
@@ -8640,6 +8653,10 @@
             const _pyp = document.getElementById('stat-prev-year-profit'); if (_pyp) _pyp.innerText = `₩ ${formatCurrency(prevYearProfit)}`;
             const _pml = document.getElementById('stat-prev-month-label'); if (_pml) _pml.innerText = `${prevMonthDate.getFullYear()}년 ${prevMonthDate.getMonth()+1}월`;
             const _pmp = document.getElementById('stat-prev-month-profit'); if (_pmp) _pmp.innerText = `₩ ${formatCurrency(prevMonthProfit)}`;
+            if(document.getElementById('stat-prev-month-pretax')) document.getElementById('stat-prev-month-pretax').innerText = `세전 ₩ ${formatCurrency(Math.round(prevMonthProfit / 0.967))}`;
+            const _pml2 = document.getElementById('stat-prev-month2-label'); if (_pml2) _pml2.innerText = `${prevMonth2Date.getFullYear()}년 ${prevMonth2Date.getMonth()+1}월`;
+            const _pmp2 = document.getElementById('stat-prev-month2-profit'); if (_pmp2) _pmp2.innerText = `₩ ${formatCurrency(prevMonth2Profit)}`;
+            if(document.getElementById('stat-prev-month2-pretax')) document.getElementById('stat-prev-month2-pretax').innerText = `세전 ₩ ${formatCurrency(Math.round(prevMonth2Profit / 0.967))}`;
             // 연 평균 순수익: 데이터가 있는 연도 수로 나누기
             const yearsWithData = new Set();
             Object.keys(monthlyData).forEach(k => { const y = k.split('-')[0]; if (y) yearsWithData.add(y); });
@@ -8648,6 +8665,8 @@
             if(document.getElementById('stat-total-pretax')) document.getElementById('stat-total-pretax').innerText = `세전 ₩ ${formatCurrency(Math.round(totalProfit / 0.967))}`;
             if(document.getElementById('stat-year-pretax')) document.getElementById('stat-year-pretax').innerText = `세전 ₩ ${formatCurrency(Math.round(yearProfit / 0.967))}`;
             if(document.getElementById('stat-month-pretax')) document.getElementById('stat-month-pretax').innerText = `세전 ₩ ${formatCurrency(Math.round(thisMonthProfit / 0.967))}`;
+            if(document.getElementById('stat-avg-year-pretax')) document.getElementById('stat-avg-year-pretax').innerText = `세전 ₩ ${formatCurrency(Math.round(avgYearProfit / 0.967))}`;
+            if(document.getElementById('stat-prev-year-pretax')) document.getElementById('stat-prev-year-pretax').innerText = `세전 ₩ ${formatCurrency(Math.round(prevYearProfit / 0.967))}`;
             const genreCounts = {}; genreList.forEach(g => genreCounts[g.name] = 0); masterWorks.forEach(w => { if (genreCounts[w.genre] !== undefined) genreCounts[w.genre]++; });
             const genreCountList = document.getElementById('genre-count-list'); if (genreCountList) genreCountList.innerHTML = genreList.map(g => {
                 const count = genreCounts[g.name] || 0; if (count === 0) return '';

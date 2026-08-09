@@ -1,0 +1,2372 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>에피소드 기획 보드</title>
+    <!-- Google Fonts (실제 로딩) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700;800&family=Nanum+Myeongjo:wght@400;700;800&family=KoPub+Batang:wght@300;500&display=swap" rel="stylesheet">
+    <!-- Pretendard -->
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- html2canvas for Image Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        [contenteditable]:focus, input:focus, select:focus, textarea:focus { outline: none; box-shadow: none; }
+        
+        /* Drag and Drop 시각적 피드백 */
+        .dragging { opacity: 0.5; border: 2px dashed #3b82f6 !important; }
+        .drag-over { border-top: 4px solid #3b82f6 !important; }
+        
+        /* 보드 목록 Drag and Drop 피드백 */
+        .board-dragging { opacity: 0.4; }
+        .board-drag-over { border-top: 2px solid #3b82f6 !important; padding-top: 2px !important; }
+        .folder-drag-over { background-color: rgba(59, 130, 246, 0.05) !important; outline: 1px dashed #3b82f6 !important; border-radius: 0.25rem; }
+        
+        /* 카드 Hover 시 툴 노출 */
+        .card-wrapper .card-tools { display: none; }
+        .card-wrapper:hover .card-tools { display: flex; }
+
+        /* 서식 적용을 위한 기본 에디터 스타일 */
+        .rich-editor { min-height: 80px; font-size: 10.5pt; line-height: 1.6; }
+        .rich-editor blockquote { border-left: 3px solid #ccc; padding-left: 8px; color: #666; margin: 4px 0; }
+
+        /* 빈 에디터 플레이스홀더 처리 */
+        .empty-editor:before { content: attr(data-placeholder); color: #9ca3af; pointer-events: none; display: block; }
+
+        /* 테마 시스템 CSS (채도를 낮춘 Muted 톤) */
+        body[data-theme="green"] .theme-panel { background-color: #f4f6f4 !important; border-color: #e3e8e4 !important; }
+        body[data-theme="green"] .theme-canvas { background-color: #eef1ef !important; }
+        body[data-theme="pink"] .theme-panel { background-color: #fdf8f9 !important; border-color: #eedce0 !important; }
+        body[data-theme="pink"] .theme-canvas { background-color: #f7f0f2 !important; }
+
+        /* 메모 탭 버튼 스타일 트위크 */
+        .memo-tab-btn { transition: all 0.2s; }
+        .memo-tab-active { background-color: #eff6ff; border-color: #93c5fd; color: #1d4ed8; font-weight: 700; }
+
+        /* 활성 카드 강조 (더 명확하게) */
+        .card-wrapper.active-card {
+            box-shadow: 0 0 0 2.5px #3b82f6, 0 4px 16px rgba(59,130,246,0.18) !important;
+            z-index: 10;
+        }
+
+        /* 검색 하이라이트 */
+        .search-highlight {
+            background: #fef08a;
+            border-radius: 2px;
+        }
+
+        /* 카드 복사 버튼 */
+        .card-copy-btn {
+            transition: all 0.15s;
+        }
+
+        /* 메모 탭 편집 모드 */
+        .tab-edit-input {
+            background: white;
+            border: 1px solid #93c5fd;
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-size: 10px;
+            width: 80px;
+            outline: none;
+        }
+
+        /* 트랙 색상 칩 */
+        .track-color-chip {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            cursor: pointer;
+            border: 1px solid rgba(0,0,0,0.1);
+            flex-shrink: 0;
+        }
+
+        /* 카드 체크리스트 */
+        .checklist-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            color: #4b5563;
+            padding: 1px 0;
+        }
+        .checklist-item input[type="checkbox"] {
+            cursor: pointer;
+            accent-color: #3b82f6;
+        }
+        .checklist-item .check-done { text-decoration: line-through; color: #9ca3af; }
+
+        /* 검색 패널 */
+        #search-panel {
+            transition: all 0.2s ease;
+        }
+
+        /* 카드 삭제 확인 토스트 */
+        #delete-toast {
+            transition: all 0.2s ease;
+        }
+
+        /* 툴바 버튼 활성 상태 표시 */
+        .toolbar-btn-active {
+            background: #eff6ff !important;
+            color: #2563eb !important;
+        }
+
+        /* Undo/Redo 버튼 비활성 */
+        .undo-btn:disabled, .redo-btn:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+
+        /* Row header 색상 */
+        .row-color-bg-red { background-color: #fee2e2 !important; }
+        .row-color-bg-orange { background-color: #ffedd5 !important; }
+        .row-color-bg-yellow { background-color: #fef9c3 !important; }
+        .row-color-bg-green { background-color: #dcfce7 !important; }
+        .row-color-bg-blue { background-color: #dbeafe !important; }
+        .row-color-bg-purple { background-color: #f3e8ff !important; }
+        .row-color-bg-pink { background-color: #fce7f3 !important; }
+        .row-color-bg-gray { background-color: #f3f4f6 !important; }
+
+        /* 왼쪽 사이드바 애니메이션 */
+        .sidebar-left {
+            transition: width 0.25s ease, opacity 0.25s ease, padding 0.25s ease;
+            overflow: hidden;
+        }
+        .sidebar-left.collapsed {
+            width: 0 !important;
+            opacity: 0;
+            padding: 0;
+            pointer-events: none;
+        }
+
+        /* 집필 모드 플로팅 보드 패널 */
+        #writing-mode-panel {
+            position: fixed;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 1700px;
+            height: calc(100vh - 60px);
+            background: #fcfcfc;
+            border-radius: 12px;
+            box-shadow: 0 16px 60px rgba(0,0,0,0.35);
+            z-index: 8500;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #334155;
+            overflow: hidden;
+            min-width: 400px;
+            min-height: 300px;
+            resize: both;
+        }
+        #writing-mode-panel.hidden { display: none !important; }
+        #writing-mode-panel .wmp-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 7px 16px;
+            background: #1e293b;
+            border-radius: 12px 12px 0 0;
+            cursor: default;
+            user-select: none;
+            flex-shrink: 0;
+            gap: 8px;
+            height: 44px;
+        }
+        #writing-mode-panel .wmp-board-area {
+            flex: 1;
+            overflow: auto;
+            position: relative;
+            background: #fcfcfc;
+            cursor: default;
+        }
+        #writing-mode-panel .wmp-board-area.panning {
+            cursor: grabbing !important;
+        }
+        /* 집필 모드일 때 뒤 화면 완전히 숨김 - 배경 검정으로 덮기 */
+        body.writing-mode-active {
+            background: #1a1a2e !important;
+        }
+        body.writing-mode-active > *:not(#writing-mode-panel):not(#save-indicator):not(#delete-toast) {
+            display: none !important;
+        }
+
+        /* 구 집필 모드 위젯 (대체됨) */
+        #writing-mode-widget {
+            position: fixed;
+            top: 60px;
+            right: 20px;
+            width: 420px;
+            min-height: 300px;
+            max-height: 80vh;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.22);
+            z-index: 9000;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #e5e7eb;
+            resize: both;
+            overflow: hidden;
+        }
+        #writing-mode-widget.hidden { display: none !important; }
+        #writing-mode-widget .wm-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: #f8fafc;
+            border-bottom: 1px solid #e5e7eb;
+            border-radius: 12px 12px 0 0;
+            cursor: move;
+            user-select: none;
+            flex-shrink: 0;
+        }
+        #writing-mode-widget .wm-editor {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            outline: none;
+            line-height: 1.8;
+            min-height: 200px;
+        }
+        #writing-mode-widget .wm-footer {
+            padding: 6px 12px;
+            border-top: 1px solid #e5e7eb;
+            background: #f8fafc;
+            border-radius: 0 0 12px 12px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+    </style>
+</head>
+<body data-theme="default" class="flex h-screen w-full bg-gray-50 font-sans text-sm text-gray-800 overflow-hidden transition-colors duration-300" style="font-family: 'Pretendard', sans-serif;">
+
+    <!-- 로컬 저장 상태 인디케이터 -->
+    <div id="save-indicator" class="fixed top-3 right-4 text-xs font-bold px-3 py-1.5 rounded-full shadow-sm bg-white border border-gray-200 z-50 transition-opacity duration-300 opacity-0 pointer-events-none flex items-center">
+    </div>
+
+    <!-- 카드 삭제 확인 토스트 (Undo 지원) -->
+    <div id="delete-toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs font-bold px-4 py-2.5 rounded-full shadow-xl z-[9999] hidden flex items-center gap-3">
+        <span id="delete-toast-msg">카드가 삭제됩니다.</span>
+        <button id="delete-undo-btn" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-full text-[11px] transition-colors">되돌리기</button>
+    </div>
+
+    <!-- 전체 검색 패널 -->
+    <div id="search-panel" class="fixed top-14 left-1/2 -translate-x-1/2 bg-white border border-gray-200 shadow-2xl rounded-xl z-[100] w-[480px] hidden">
+        <div class="p-3 flex items-center gap-2 border-b border-gray-100">
+            <i data-lucide="search" class="w-4 h-4 text-gray-400 shrink-0"></i>
+            <input id="search-input" type="text" placeholder="제목, 내용, 장소 검색..." class="flex-1 text-sm outline-none text-gray-800 bg-transparent" oninput="window.doSearch(this.value)" onkeydown="if(event.key==='Escape') window.closeSearch()">
+            <button onclick="window.closeSearch()" class="text-gray-400 hover:text-gray-600 p-1 rounded">
+                <i data-lucide="x" class="w-3.5 h-3.5"></i>
+            </button>
+        </div>
+        <div id="search-results" class="max-h-80 overflow-y-auto p-2 text-xs text-gray-500">
+            <span class="p-2 block">검색어를 입력하세요.</span>
+        </div>
+    </div>
+
+    <!-- Left Sidebar Toggle Button (always visible) -->
+    <button id="left-sidebar-toggle" onclick="window.toggleLeftSidebar()" 
+            class="fixed left-0 top-1/2 -translate-y-1/2 z-30 bg-white border border-gray-200 shadow-md rounded-r-lg w-5 h-12 flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200"
+            title="왼쪽 패널 접기/펼치기" style="display:none;">
+        <i data-lucide="chevron-left" id="left-toggle-icon" class="w-3.5 h-3.5"></i>
+    </button>
+
+    <!-- 집필 모드 플로팅 보드 패널 -->
+    <div id="writing-mode-panel" class="hidden">
+        <div class="wmp-header" id="wmp-drag-handle">
+            <div class="flex items-center gap-3">
+                <i data-lucide="pen-line" class="w-4 h-4 text-indigo-300"></i>
+                <span class="text-sm font-bold text-white tracking-wide">집필 모드</span>
+                <span id="wmp-board-name" class="text-xs text-slate-400 font-normal"></span>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="blend" class="w-3.5 h-3.5 text-slate-400"></i>
+                    <span class="text-[11px] text-slate-400">투명도</span>
+                    <input type="range" min="15" max="100" value="100" id="wmp-opacity-slider"
+                           oninput="window.setWritingPanelOpacity(this.value)"
+                           class="w-24 accent-indigo-400 cursor-pointer">
+                    <span id="wmp-opacity-val" class="text-[11px] text-slate-300 w-8 text-right">100%</span>
+                </div>
+                <div class="w-px h-4 bg-slate-600"></div>
+                <!-- 확대/축소 -->
+                <div class="flex items-center gap-2">
+                    <button onclick="window.wmpZoom(-0.1)" class="text-slate-300 hover:text-white p-1 rounded hover:bg-slate-600 transition-colors">
+                        <i data-lucide="zoom-out" class="w-3.5 h-3.5"></i>
+                    </button>
+                    <span id="wmp-zoom-text" class="text-[11px] text-slate-300 w-9 text-center font-bold">100%</span>
+                    <button onclick="window.wmpZoom(0.1)" class="text-slate-300 hover:text-white p-1 rounded hover:bg-slate-600 transition-colors">
+                        <i data-lucide="zoom-in" class="w-3.5 h-3.5"></i>
+                    </button>
+                    <button onclick="window.wmpZoomReset()" class="text-[10px] text-slate-400 hover:text-white font-medium px-1.5 py-0.5 rounded hover:bg-slate-600 transition-colors">초기화</button>
+                </div>
+                <div class="w-px h-4 bg-slate-600"></div>
+                <div class="flex items-center gap-2 text-slate-400 text-[11px]">
+                    <i data-lucide="mouse-pointer-2" class="w-3.5 h-3.5"></i>
+                    <span>우클릭 드래그 이동 · 우하단 모서리 크기 조절</span>
+                </div>
+                <div class="w-px h-4 bg-slate-600"></div>
+                <button onclick="window.closeWritingMode()"
+                        class="flex items-center gap-1.5 text-slate-300 hover:text-white bg-slate-700 hover:bg-red-600 px-3 py-1.5 rounded text-xs font-bold transition-colors">
+                    <i data-lucide="x" class="w-3.5 h-3.5"></i> 집필 모드 종료
+                </button>
+            </div>
+        </div>
+        <!-- 보드 복사본이 렌더되는 영역 -->
+        <div class="wmp-board-area" id="wmp-board-area">
+            <div id="wmp-zoom-container" style="transform-origin: top left; transition: transform 0.15s;">
+                <div class="p-8 pb-16">
+                    <div id="wmp-doc-title" class="text-3xl font-bold text-gray-800 mb-6 px-1"></div>
+                    <div id="wmp-board-container" class="flex flex-col border-t border-l border-gray-200 bg-white shadow-sm w-max min-w-full"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Left Sidebar -->
+
+    <div class="theme-panel sidebar-left w-56 bg-white border-r border-gray-200 flex flex-col shrink-0 z-20 shadow-sm relative transition-colors duration-300" id="left-sidebar">
+        <div class="p-4 font-bold text-lg border-b border-gray-100 flex items-center justify-between text-gray-800">
+            <div class="flex items-center gap-2">
+                <i data-lucide="book-open" class="w-5 h-5 text-gray-600"></i> 작업 공간
+            </div>
+            <button onclick="window.toggleLeftSidebar()" class="text-gray-400 hover:text-blue-600 p-1 rounded transition-colors" title="패널 접기">
+                <i data-lucide="panel-left-close" class="w-4 h-4"></i>
+            </button>
+        </div>
+        
+        <div class="p-2 flex-1 overflow-y-auto border-b border-gray-100 custom-scrollbar flex flex-col relative">
+            <div class="flex items-center justify-between p-2 hover:bg-black/5 rounded text-gray-600 group cursor-pointer mb-3" onclick="window.createNewBoard()">
+                <span class="flex items-center gap-2 text-xs font-semibold"><i data-lucide="layout" class="w-4 h-4"></i> 새 시놉시스 생성</span>
+                <button class="text-gray-400 hover:text-blue-600 p-1 rounded hover:bg-black/5" title="새 보드 생성">
+                    <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                </button>
+            </div>
+            
+            <!-- 진행 중인 플롯 목록 -->
+            <div class="flex flex-col flex-1 min-h-[45%] max-h-[60%]">
+                <div class="pt-2 pb-2 px-2 text-[14px] font-extrabold text-gray-600 tracking-wide border-b border-gray-100 mb-2">진행 중 시놉시스</div>
+                <div id="board-list-active" class="space-y-0.5 overflow-y-auto custom-scrollbar flex-1" ondragover="window.handleBoardDragOver(event)" ondrop="window.handleBoardDrop(event, null, 'active')">
+                </div>
+            </div>
+
+            <!-- 완결 시놉시스 보관함 -->
+            <div class="mt-2 pt-4 border-t border-gray-200 flex flex-col flex-1 min-h-[30%]">
+                <div class="pb-2 px-2 text-[14px] font-extrabold text-gray-600 tracking-wide border-b border-gray-100 mb-2 cursor-pointer flex items-center justify-between hover:text-gray-800 transition-colors" 
+                     onclick="window.toggleCompletedFolder()"
+                     ondragover="window.handleBoardDragOverFolder(event)" 
+                     ondrop="window.handleBoardDrop(event, null, 'completed')">
+                    <span>완결 시놉시스 보관함</span>
+                    <i data-lucide="chevron-down" id="completed-folder-icon" class="w-4 h-4 text-gray-400 transition-transform duration-300"></i>
+                </div>
+                <div id="board-list-completed" class="space-y-0.5 overflow-y-auto custom-scrollbar transition-all duration-300 hidden flex-1 mt-1" ondragover="window.handleBoardDragOverFolder(event)" ondragleave="window.handleBoardDragLeaveFolder(event)" ondrop="window.handleBoardDrop(event, null, 'completed')">
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Management (Bottom) -->
+        <div class="p-4 border-t border-gray-100 flex flex-col gap-3 text-[11px] text-gray-500 font-medium">
+            <!-- Theme Selection -->
+            <div class="mb-1 pb-3 border-b border-gray-100 border-dashed flex justify-between items-center">
+                <span class="block text-[10px] font-bold text-gray-400 tracking-wider">테마 색상</span>
+                <div class="flex gap-2">
+                    <button onclick="window.setTheme('default')" class="w-4 h-4 rounded-full bg-gray-200 border border-gray-300 hover:scale-110 transition-transform shadow-sm" title="기본 (회색)"></button>
+                    <button onclick="window.setTheme('green')" class="w-4 h-4 rounded-full bg-[#eef1ef] border border-[#e3e8e4] hover:scale-110 transition-transform shadow-sm" title="차분한 녹색"></button>
+                    <button onclick="window.setTheme('pink')" class="w-4 h-4 rounded-full bg-[#f7f0f2] border border-[#eedce0] hover:scale-110 transition-transform shadow-sm" title="차분한 분홍"></button>
+                </div>
+            </div>
+            
+            <!-- Export Actions -->
+            <div class="flex items-center gap-1.5">
+                <button onclick="window.exportText()" class="flex-1 flex items-center justify-center gap-1 py-1.5 bg-gray-100 hover:bg-blue-50 text-gray-600 hover:text-blue-600 rounded font-bold transition-colors">
+                    <i data-lucide="file-output" class="w-3.5 h-3.5"></i> 텍스트
+                </button>
+                <button onclick="window.exportImage()" class="flex-1 flex items-center justify-center gap-1 py-1.5 bg-gray-100 hover:bg-blue-50 text-gray-600 hover:text-blue-600 rounded font-bold transition-colors">
+                    <i data-lucide="camera" class="w-3.5 h-3.5"></i> 이미지
+                </button>
+            </div>
+            
+            <!-- Data Management -->
+            <div class="flex items-center justify-between pt-1 text-[10px]">
+                <button onclick="window.exportData()" class="hover:text-gray-800 transition-colors" title="수동 파일 백업">백업</button>
+                <span class="text-gray-300">|</span>
+                <button onclick="document.getElementById('import-file').click()" class="hover:text-gray-800 transition-colors" title="수동 백업본 불러오기">불러오기</button>
+                <span class="text-gray-300">|</span>
+                <button onclick="window.triggerSave(true)" class="text-blue-600 hover:text-blue-800 font-bold transition-colors" title="G드라이브 강제 동기화">강제</button>
+                <span class="text-gray-300">|</span>
+                <button onclick="window.resetData()" class="text-gray-400 hover:text-red-500 transition-colors">초기화</button>
+            </div>
+            <input type="file" id="import-file" accept=".json" class="hidden" onchange="window.importData(event)">
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="flex-1 flex flex-col min-w-0 bg-[#fcfcfc] relative">
+        <!-- Top Toolbar -->
+        <div class="theme-panel top-toolbar h-12 bg-white border-b border-gray-200 flex items-center justify-between px-4 shrink-0 z-10 shadow-sm transition-colors duration-300">
+            <!-- Left: Text Formatting -->
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2 text-gray-600 border-r border-gray-200/60 pr-4">
+                    <select onchange="window.formatText('formatBlock', this.value)" class="bg-transparent cursor-pointer hover:text-gray-900 text-sm outline-none">
+                        <option value="div">본문</option>
+                        <option value="H1">제목 1</option>
+                        <option value="H2">제목 2</option>
+                        <option value="H3">제목 3</option>
+                        <option value="BLOCKQUOTE">인용구</option>
+                    </select>
+                    <span class="text-gray-300">|</span>
+                    <select id="font-select" onchange="window.formatText('fontName', this.value)" class="bg-transparent cursor-pointer hover:text-gray-900 text-sm w-24 outline-none">
+                        <option value="Pretendard, sans-serif">Pretendard</option>
+                        <option value="'KoPub Batang', serif">바탕체</option>
+                        <option value="'Nanum Gothic', sans-serif">나눔고딕</option>
+                        <option value="'Nanum Myeongjo', serif">나눔명조</option>
+                    </select>
+                    <span class="text-gray-300">|</span>
+                    <select id="font-size-select" onchange="window.formatText('fontSizeExact', this.value)" class="bg-transparent cursor-pointer hover:text-gray-900 text-sm outline-none">
+                        <option value="10pt">10 pt</option>
+                        <option value="10.5pt" selected>10.5 pt</option>
+                        <option value="11pt">11 pt</option>
+                        <option value="12pt">12 pt</option>
+                        <option value="14pt">14 pt</option>
+                    </select>
+                    <span class="text-gray-300">|</span>
+                    
+                    <!-- Custom Color Palette Dropdown -->
+                    <div class="relative flex items-center">
+                        <button id="color-picker-btn" onclick="window.toggleTextColorPalette()" class="w-6 h-6 rounded flex items-center justify-center hover:bg-black/5 transition-colors border border-transparent hover:border-gray-200 shadow-none hover:shadow-sm" title="글자 색상">
+                            <div id="current-text-color-indicator" class="w-3.5 h-3.5 rounded-full bg-black border border-gray-200"></div>
+                        </button>
+                        
+                        <div id="text-color-palette" class="absolute top-full mt-2 left-0 bg-white border border-gray-200 shadow-lg rounded-md p-2 z-50 hidden w-max">
+                            <div class="grid grid-cols-5 gap-1.5">
+                                <button onclick="window.applyTextColor('#000000')" class="w-5 h-5 rounded bg-[#000000] border border-gray-200 hover:scale-110 transition-transform" title="검정"></button>
+                                <button onclick="window.applyTextColor('#ffffff')" class="w-5 h-5 rounded bg-[#ffffff] border border-gray-200 hover:scale-110 transition-transform" title="흰색"></button>
+                                <button onclick="window.applyTextColor('#ef4444')" class="w-5 h-5 rounded bg-[#ef4444] border border-gray-200 hover:scale-110 transition-transform" title="빨강"></button>
+                                <button onclick="window.applyTextColor('#3b82f6')" class="w-5 h-5 rounded bg-[#3b82f6] border border-gray-200 hover:scale-110 transition-transform" title="파랑"></button>
+                                <button onclick="window.applyTextColor('#22c55e')" class="w-5 h-5 rounded bg-[#22c55e] border border-gray-200 hover:scale-110 transition-transform" title="초록"></button>
+                                <button onclick="window.applyTextColor('#a855f7')" class="w-5 h-5 rounded bg-[#a855f7] border border-gray-200 hover:scale-110 transition-transform" title="보라"></button>
+                                <button onclick="window.applyTextColor('#eab308')" class="w-5 h-5 rounded bg-[#eab308] border border-gray-200 hover:scale-110 transition-transform" title="노랑"></button>
+                                <button onclick="window.applyTextColor('#f97316')" class="w-5 h-5 rounded bg-[#f97316] border border-gray-200 hover:scale-110 transition-transform" title="주황"></button>
+                                <button onclick="window.applyTextColor('#84cc16')" class="w-5 h-5 rounded bg-[#84cc16] border border-gray-200 hover:scale-110 transition-transform" title="연두"></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3 text-gray-600 border-r border-gray-200/60 pr-4">
+                    <button onclick="window.formatText('bold')" class="hover:text-gray-900 p-1 rounded hover:bg-black/5" title="굵게"><i data-lucide="bold" class="w-4 h-4"></i></button>
+                    <button onclick="window.formatText('italic')" class="hover:text-gray-900 p-1 rounded hover:bg-black/5" title="기울임"><i data-lucide="italic" class="w-4 h-4"></i></button>
+                    <button onclick="window.formatText('underline')" class="hover:text-gray-900 p-1 rounded hover:bg-black/5" title="밑줄"><i data-lucide="underline" class="w-4 h-4"></i></button>
+                    <button onclick="window.formatText('strikeThrough')" class="hover:text-gray-900 p-1 rounded hover:bg-black/5" title="취소선"><i data-lucide="strikethrough" class="w-4 h-4"></i></button>
+                </div>
+                <div class="flex items-center gap-3 text-gray-600 border-r border-gray-200/60 pr-4">
+                    <button onclick="window.formatText('justifyLeft')" class="hover:text-gray-900 p-1 rounded hover:bg-black/5"><i data-lucide="align-left" class="w-4 h-4"></i></button>
+                    <button onclick="window.formatText('justifyCenter')" class="hover:text-gray-900 p-1 rounded hover:bg-black/5"><i data-lucide="align-center" class="w-4 h-4"></i></button>
+                    <button onclick="window.formatText('justifyRight')" class="hover:text-gray-900 p-1 rounded hover:bg-black/5"><i data-lucide="align-right" class="w-4 h-4"></i></button>
+                </div>
+                <!-- Undo / Redo 버튼 -->
+                <div class="flex items-center gap-2 text-gray-600">
+                    <button id="undo-btn" onclick="window.undoAction()" class="undo-btn hover:text-gray-900 p-1 rounded hover:bg-black/5 disabled:opacity-30" title="되돌리기 (Ctrl+Z)" disabled>
+                        <i data-lucide="undo-2" class="w-4 h-4"></i>
+                    </button>
+                    <button id="redo-btn" onclick="window.redoAction()" class="redo-btn hover:text-gray-900 p-1 rounded hover:bg-black/5 disabled:opacity-30" title="다시실행 (Ctrl+Y)" disabled>
+                        <i data-lucide="redo-2" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right: Board Controls -->
+            <div class="flex items-center gap-3 pl-4 border-l border-gray-200 border-opacity-50">
+                <!-- 검색 버튼 -->
+                <button onclick="window.openSearch()" class="flex items-center gap-1.5 text-xs text-gray-500 hover:text-blue-600 px-2.5 py-1 bg-gray-100 hover:bg-blue-50 rounded-full border border-gray-200 transition-colors font-medium" title="전체 검색 (Ctrl+F)">
+                    <i data-lucide="search" class="w-3.5 h-3.5"></i> 검색
+                </button>
+                <div class="flex items-center gap-1.5 mr-2 bg-gray-100/50 px-3 py-1 rounded-full border border-gray-200/50">
+                    <span class="text-[11px] text-gray-500 font-bold">총 글자수</span>
+                    <span id="board-total-words" class="text-[13px] font-bold text-blue-600">0</span>
+                    <span class="text-[11px] text-gray-500 font-bold">자</span>
+                </div>
+                <div class="w-px h-5 bg-gray-300 mx-1"></div>
+                <div class="flex items-center gap-2 text-gray-600" title="카드 너비(크기) 조절">
+                    <i data-lucide="move-horizontal" class="w-4 h-4"></i>
+                    <input type="range" min="250" max="800" step="10" value="400" oninput="window.changeCardSize(this.value)" id="card-size-slider" class="w-20 accent-gray-500 cursor-pointer">
+                    <span id="card-size-text" class="text-xs font-semibold w-10 text-center">400px</span>
+                </div>
+                <div class="w-px h-5 bg-gray-300 mx-1"></div>
+                <button onclick="window.toggleRightSidebar()" class="hover:bg-black/5 hover:text-blue-600 p-1.5 rounded text-gray-500 transition-colors" title="우측 도구창 열기/닫기">
+                    <i data-lucide="panel-right-open" id="sidebar-icon" class="w-5 h-5"></i>
+                </button>
+                <div class="w-px h-5 bg-gray-300 mx-1"></div>
+                <button onclick="window.toggleWritingMode()" id="writing-mode-btn" class="flex items-center gap-1.5 text-xs px-2.5 py-1 bg-gray-100 hover:bg-indigo-50 text-gray-500 hover:text-indigo-600 rounded-full border border-gray-200 transition-colors font-medium" title="집필 모드 (선택한 카드를 위젯으로 띄우기)">
+                    <i data-lucide="pen-line" class="w-3.5 h-3.5"></i> 집필 모드
+                </button>
+            </div>
+        </div>
+
+        <!-- Board Canvas Wrapper -->
+        <div class="theme-canvas flex-1 overflow-auto relative p-8 bg-[#fcfcfc] transition-colors duration-300 select-none" id="canvas-wrapper">
+            <div id="zoom-container" class="origin-top-left transition-transform duration-200 w-max min-w-full pr-8 pb-8">
+                <input type="text" id="doc-title" value="" oninput="window.updateCurrentBoardTitle(this.value)" spellcheck="false" class="text-3xl font-bold mb-6 bg-transparent border-none w-full text-gray-800 min-w-[400px]" placeholder="시놉시스 제목을 입력하세요">
+                
+                <div id="board-container" class="flex flex-col border-t border-l border-gray-200 bg-white shadow-sm w-max min-w-full">
+                </div>
+            </div>
+        </div>
+
+        <!-- Zoom Controls -->
+        <div class="absolute bottom-6 right-6 flex items-center bg-white border border-gray-200 shadow-lg rounded-full px-3 py-1.5 gap-3 z-30">
+            <button onclick="window.changeZoom(-0.1)" class="text-gray-500 hover:text-gray-800"><i data-lucide="zoom-out" class="w-4 h-4"></i></button>
+            <span id="zoom-level-text" class="text-xs font-semibold w-10 text-center">100%</span>
+            <button onclick="window.changeZoom(0.1)" class="text-gray-500 hover:text-gray-800"><i data-lucide="zoom-in" class="w-4 h-4"></i></button>
+            <div class="w-px h-4 bg-gray-300 mx-1"></div>
+            <button onclick="window.resetZoom()" class="text-xs text-gray-500 hover:text-gray-800 font-medium">초기화</button>
+        </div>
+    </div>
+
+    <!-- Right Sidebar (Tools) -->
+    <div id="right-sidebar" class="theme-panel sidebar-right w-64 bg-white border-l border-gray-200 flex flex-col shrink-0 h-full overflow-y-auto z-20 shadow-sm relative transition-all duration-300 ease-in-out">
+        
+        <!-- Timeline Setting (Tracks) -->
+        <div class="p-4 border-b border-gray-100 bg-white">
+            <div class="flex items-center justify-between">
+                <span class="text-xs text-gray-600 font-bold flex items-center gap-1.5">
+                    <i data-lucide="clock" class="w-3.5 h-3.5"></i> 트랙 수 조절
+                </span>
+                <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded p-0.5 shadow-sm">
+                    <button onclick="window.removeRow()" class="w-6 h-6 rounded flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors"><i data-lucide="minus" class="w-3 h-3"></i></button>
+                    <span id="track-count" class="text-xs font-bold w-5 text-center text-blue-600">0</span>
+                    <button onclick="window.addRow()" class="w-6 h-6 rounded flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors"><i data-lucide="plus" class="w-3 h-3"></i></button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Marker & Filter -->
+        <div class="p-4 border-b border-gray-100">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="text-xs font-bold text-gray-500 flex items-center gap-1"><i data-lucide="bookmark" class="w-3 h-3"></i> 마커 스탬프</h3>
+            </div>
+            <div class="grid grid-cols-4 gap-2 mb-3">
+                <div onclick="window.toggleMarker('pin')" class="flex flex-col items-center gap-1 cursor-pointer hover:bg-black/5 p-2 rounded border border-transparent hover:border-gray-200 transition-all"><i data-lucide="pin" class="w-5 h-5 text-red-500"></i><span class="text-[10px] text-gray-600">핀</span></div>
+                <div onclick="window.toggleMarker('star')" class="flex flex-col items-center gap-1 cursor-pointer hover:bg-black/5 p-2 rounded border border-transparent hover:border-gray-200 transition-all"><i data-lucide="star" class="w-5 h-5 text-yellow-500"></i><span class="text-[10px] text-gray-600">중요</span></div>
+                <div onclick="window.toggleMarker('heart')" class="flex flex-col items-center gap-1 cursor-pointer hover:bg-black/5 p-2 rounded border border-transparent hover:border-gray-200 transition-all"><i data-lucide="heart" class="w-5 h-5 text-red-500"></i><span class="text-[10px] text-gray-600">씬</span></div>
+                <div onclick="window.toggleMarker('alert-circle')" class="flex flex-col items-center gap-1 cursor-pointer hover:bg-black/5 p-2 rounded border border-transparent hover:border-gray-200 transition-all"><i data-lucide="alert-circle" class="w-5 h-5 text-green-500"></i><span class="text-[10px] text-gray-600">수정</span></div>
+            </div>
+            
+            <!-- Filter Section -->
+            <div class="pt-3 border-t border-gray-100 border-dashed">
+                <span class="text-[10px] font-bold text-gray-400 mb-2 block tracking-wider">마커 필터링 (모아보기)</span>
+                <div class="flex gap-1.5">
+                    <button onclick="window.toggleFilter('heart')" id="filter-btn-heart" class="flex-1 py-1 text-[11px] rounded border border-gray-200 flex items-center justify-center gap-1 text-gray-500 transition-colors"><i data-lucide="heart" class="w-3 h-3 text-red-500"></i> 씬 점검</button>
+                    <button onclick="window.toggleFilter('alert-circle')" id="filter-btn-alert-circle" class="flex-1 py-1 text-[11px] rounded border border-gray-200 flex items-center justify-center gap-1 text-gray-500 transition-colors"><i data-lucide="alert-circle" class="w-3 h-3 text-green-500"></i> 수정 점검</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Color Palette -->
+        <div class="p-4 border-b border-gray-100">
+            <h3 class="text-xs font-bold text-gray-500 mb-3 flex items-center gap-1">
+                <i data-lucide="palette" class="w-3 h-3"></i> 컬러 분류
+            </h3>
+            <div id="palette-grid" class="flex flex-wrap gap-2.5 mb-2">
+            </div>
+            <button onclick="window.changeCardColor('bg-white')" class="w-full mt-4 py-1.5 text-[11px] font-medium border border-gray-200 text-gray-500 hover:text-gray-800 hover:bg-black/5 rounded transition-colors">
+                선택 카드 색상 빼기
+            </button>
+        </div>
+
+        <!-- 체크리스트 섹션 -->
+        <div class="p-4 border-b border-gray-100">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-xs font-bold text-gray-500 flex items-center gap-1">
+                    <i data-lucide="check-square" class="w-3 h-3"></i> 씬 체크리스트
+                </h3>
+                <button onclick="window.addChecklistItem()" class="text-[10px] text-blue-500 hover:text-blue-700 font-bold flex items-center gap-0.5">
+                    <i data-lucide="plus" class="w-3 h-3"></i> 추가
+                </button>
+            </div>
+            <div id="checklist-container" class="space-y-1 text-xs text-gray-500">
+                <span class="text-[11px] text-gray-400">카드를 선택하면 체크리스트를 편집할 수 있어요.</span>
+            </div>
+        </div>
+
+        <!-- Memo Section (Tabs & Textarea) -->
+        <div class="p-4 flex-1 flex flex-col min-h-[300px] bg-black/5">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-xs font-bold text-gray-500 flex items-center gap-1">
+                    <i data-lucide="file-key-2" class="w-3 h-3"></i> 설정 및 기획 메모
+                </h3>
+                <button onclick="window.editMemoTabs()" class="text-[10px] text-gray-400 hover:text-blue-600 font-bold flex items-center gap-0.5" title="탭 이름 커스터마이징">
+                    <i data-lucide="pencil" class="w-3 h-3"></i>
+                </button>
+            </div>
+            
+            <!-- Memo Tabs -->
+            <div class="flex flex-wrap gap-1 mb-2" id="memo-tabs">
+                <!-- JS에서 동적 렌더링 -->
+            </div>
+
+            <textarea id="board-memo" oninput="window.updateBoardMemo(this.value)" spellcheck="false" class="w-full flex-1 resize-none bg-white border border-gray-200/60 rounded p-2 text-xs text-gray-700 outline-none focus:border-gray-300 transition-all custom-scrollbar shadow-sm" placeholder="내용을 입력하세요."></textarea>
+        </div>
+    </div>
+
+    <!-- Node.js + IndexedDB 하이브리드 로직 -->
+    <script>
+// --- Node.js File System 세팅 (Electron 전용) ---
+let fs, pathModule, os;
+let isNodeEnvironment = false;
+let TARGET_DIR = '';
+let targetFilePath = '';
+
+try {
+    fs = require('fs');
+    pathModule = require('path');
+    os = require('os');
+    isNodeEnvironment = true;
+
+    if (os.platform() === 'win32') {
+        TARGET_DIR = 'G:\\내 드라이브\\백업\\시놉시스 파일';
+    } else if (os.platform() === 'darwin') {
+        TARGET_DIR = '/Users/lucy/Library/CloudStorage/GoogleDrive-doitdomina@gmail.com/내 드라이브/백업/시놉시스 파일';
+    }
+
+    targetFilePath = pathModule.join(TARGET_DIR, '시놉시스_자동백업_데이터.json');
+} catch(e) {
+    console.warn("Node.js API 연동 실패 (일반 브라우저 환경에서 실행됨)");
+}
+
+        // --- Utility ---
+        const escapeHtml = (unsafe) => {
+            if (unsafe == null) return '';
+            return String(unsafe)
+                 .replace(/&/g, "&amp;")
+                 .replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;")
+                 .replace(/"/g, "&quot;")
+                 .replace(/'/g, "&#039;");
+        };
+
+        const generateId = () => 'id_' + Date.now() + Math.random().toString(36).substr(2, 9);
+
+        // --- IndexedDB ---
+        const DB_NAME = 'PlotBoardLocalDB';
+        const STORE_NAME = 'workspaces';
+        let db = null;
+        let dbInitialized = false;
+
+        function initLocalDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, 1);
+                request.onerror = (event) => reject(event.target.error);
+                request.onsuccess = (event) => {
+                    db = event.target.result;
+                    dbInitialized = true;
+                    resolve(db);
+                };
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                    }
+                };
+            });
+        }
+
+        function loadFromLocalDB() {
+            return new Promise((resolve, reject) => {
+                if (!db) return resolve(null);
+                const transaction = db.transaction([STORE_NAME], 'readonly');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.get('main_save');
+                request.onsuccess = (event) => resolve(request.result ? request.result.data : null);
+                request.onerror = () => resolve(null);
+            });
+        }
+
+        function saveToLocalDB(dataToSave) {
+            return new Promise((resolve, reject) => {
+                if (!db) return resolve();
+                const transaction = db.transaction([STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.put({ id: 'main_save', data: dataToSave });
+                request.onsuccess = () => {
+                    // 마지막으로 열었던 보드 ID도 함께 저장
+                    const t2 = db.transaction([STORE_NAME], 'readwrite');
+                    const s2 = t2.objectStore(STORE_NAME);
+                    s2.put({ id: 'last_workspace_id', data: window.currentWorkspaceId });
+                    resolve();
+                };
+                request.onerror = (event) => reject(event.target.error);
+            });
+        }
+
+        function loadLastWorkspaceId() {
+            return new Promise((resolve) => {
+                if (!db) return resolve(null);
+                const transaction = db.transaction([STORE_NAME], 'readonly');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.get('last_workspace_id');
+                request.onsuccess = () => resolve(request.result ? request.result.data : null);
+                request.onerror = () => resolve(null);
+            });
+        }
+
+        // --- 데이터 정규화 (구버전 호환) ---
+        const DEFAULT_MEMO_TABS = [
+            { id: 'mainMale', label: '남자주인공' },
+            { id: 'mainFemale', label: '여자주인공' },
+            { id: 'subChar', label: '조연' },
+            { id: 'background', label: '배경' },
+            { id: 'synopsis', label: '시놉시스' },
+            { id: 'keyDevice', label: '주요장치' },
+            { id: 'general', label: '메모' },
+        ];
+
+        const memoTabPlaceholders = {
+            mainMale: '남자주인공의 성격, 외모, 배경, 설정 등을 기록하세요.',
+            mainFemale: '여자주인공의 성격, 외모, 배경, 설정 등을 기록하세요.',
+            subChar: '중요 조연 및 주변 인물들의 관계와 설정을 기록하세요.',
+            background: '작품의 핵심 세계관, 공간적/시간적 배경을 기록하세요.',
+            synopsis: '전체 줄거리와 기승전결 뼈대를 요약 기록하세요.',
+            keyDevice: '작품 내 중요한 복선, 키워드, 소품 등을 기록하세요.',
+            general: '자유로운 아이디어나 추가 메모를 기록하세요.'
+        };
+
+        function normalizeData(data) {
+            if (!Array.isArray(data)) return [];
+            data.forEach(w => {
+                if (!w.status) w.status = 'active';
+                if (!w.cardWidth) w.cardWidth = 400;
+                if (!w.globalFontSize) w.globalFontSize = '10.5pt';
+                if (!w.globalFontFamily) w.globalFontFamily = '';
+                if (!w.memos || typeof w.memos !== 'object') {
+                    const oldMemo = (typeof w.memo === 'string') ? w.memo : '';
+                    w.memos = { mainMale: '', mainFemale: '', subChar: '', background: '', synopsis: '', keyDevice: '', general: oldMemo };
+                }
+                // 메모 탭 커스터마이징 초기화
+                if (!w.memoTabs) {
+                    w.memoTabs = JSON.parse(JSON.stringify(DEFAULT_MEMO_TABS));
+                }
+                // 카드별 체크리스트 초기화
+                (w.data || []).forEach(row => {
+                    (row.cards || []).forEach(card => {
+                        if (!card.checklist) card.checklist = [];
+                        if (!card.rowColor) card.rowColor = 'gray';
+                        if (!card.cardFontSize) card.cardFontSize = '';
+                    });
+                    if (!row.color) row.color = 'gray';
+                });
+            });
+            return data;
+        }
+
+        // ========== Undo / Redo 시스템 ==========
+        const MAX_HISTORY = 50;
+        let undoStack = [];
+        let redoStack = [];
+        let _skipHistory = false;
+
+        function pushHistory() {
+            if (_skipHistory) return;
+            const snapshot = JSON.stringify(window.workspaces);
+            // 같은 상태면 스킵
+            if (undoStack.length > 0 && undoStack[undoStack.length - 1] === snapshot) return;
+            undoStack.push(snapshot);
+            if (undoStack.length > MAX_HISTORY) undoStack.shift();
+            redoStack = [];
+            updateUndoRedoUI();
+        }
+
+        function updateUndoRedoUI() {
+            const undoBtn = document.getElementById('undo-btn');
+            const redoBtn = document.getElementById('redo-btn');
+            if (undoBtn) undoBtn.disabled = undoStack.length === 0;
+            if (redoBtn) redoBtn.disabled = redoStack.length === 0;
+        }
+
+        window.undoAction = () => {
+            if (undoStack.length === 0) return;
+            const current = JSON.stringify(window.workspaces);
+            redoStack.push(current);
+            const prev = undoStack.pop();
+            _skipHistory = true;
+            window.workspaces = normalizeData(JSON.parse(prev));
+            // currentWorkspaceId 유효성 확인
+            if (!window.workspaces.find(w => w.id === window.currentWorkspaceId)) {
+                window.currentWorkspaceId = window.workspaces[0]?.id;
+            }
+            renderAll();
+            window.triggerSave();
+            _skipHistory = false;
+            updateUndoRedoUI();
+        };
+
+        window.redoAction = () => {
+            if (redoStack.length === 0) return;
+            const current = JSON.stringify(window.workspaces);
+            undoStack.push(current);
+            const next = redoStack.pop();
+            _skipHistory = true;
+            window.workspaces = normalizeData(JSON.parse(next));
+            if (!window.workspaces.find(w => w.id === window.currentWorkspaceId)) {
+                window.currentWorkspaceId = window.workspaces[0]?.id;
+            }
+            renderAll();
+            window.triggerSave();
+            _skipHistory = false;
+            updateUndoRedoUI();
+        };
+
+        // ========== 삭제 토스트 (Soft Delete) ==========
+        let _deletedCardCache = null; // { card, rowId, cardIdx }
+        let _deleteToastTimer = null;
+
+        function showDeleteToast(cardData, rowId, cardIdx) {
+            _deletedCardCache = { card: JSON.parse(JSON.stringify(cardData)), rowId, cardIdx };
+            const toast = document.getElementById('delete-toast');
+            const msg = document.getElementById('delete-toast-msg');
+            msg.textContent = `"${cardData.title || '제목 없음'}" 카드가 삭제됩니다.`;
+            toast.classList.remove('hidden');
+            toast.classList.add('flex');
+
+            if (_deleteToastTimer) clearTimeout(_deleteToastTimer);
+            _deleteToastTimer = setTimeout(() => {
+                hideDeleteToast();
+                _deletedCardCache = null;
+            }, 4000);
+        }
+
+        function hideDeleteToast() {
+            const toast = document.getElementById('delete-toast');
+            toast.classList.add('hidden');
+            toast.classList.remove('flex');
+        }
+
+        document.getElementById('delete-undo-btn').addEventListener('click', () => {
+            if (!_deletedCardCache) return;
+            clearTimeout(_deleteToastTimer);
+            hideDeleteToast();
+            const data = window.getCurrentBoard().data;
+            const row = data.find(r => r.id === _deletedCardCache.rowId);
+            if (row) {
+                row.cards.splice(_deletedCardCache.cardIdx, 0, _deletedCardCache.card);
+                renderAll();
+                window.triggerSave();
+            }
+            _deletedCardCache = null;
+        });
+
+        // ========== 전체 검색 ==========
+        window.openSearch = () => {
+            const panel = document.getElementById('search-panel');
+            panel.classList.remove('hidden');
+            document.getElementById('search-input').focus();
+            document.getElementById('search-input').value = '';
+            document.getElementById('search-results').innerHTML = '<span class="p-2 block text-xs text-gray-400">검색어를 입력하세요.</span>';
+            if (window.lucide) window.lucide.createIcons({ el: panel });
+        };
+
+        window.closeSearch = () => {
+            document.getElementById('search-panel').classList.add('hidden');
+            // 하이라이트 제거
+            document.querySelectorAll('.search-highlight').forEach(el => {
+                el.outerHTML = el.innerHTML;
+            });
+        };
+
+        window.doSearch = (query) => {
+            const resultsEl = document.getElementById('search-results');
+            if (!query || query.length < 1) {
+                resultsEl.innerHTML = '<span class="p-2 block text-xs text-gray-400">검색어를 입력하세요.</span>';
+                return;
+            }
+            const q = query.toLowerCase();
+            const results = [];
+
+            window.workspaces.forEach(board => {
+                (board.data || []).forEach((row, rIdx) => {
+                    (row.cards || []).forEach((card, cIdx) => {
+                        const titleMatch = (card.title || '').toLowerCase().includes(q);
+                        const locMatch = (card.location || '').toLowerCase().includes(q);
+                        const contentText = card.content ? card.content.replace(/<[^>]+>/g, '') : '';
+                        const contentMatch = contentText.toLowerCase().includes(q);
+                        if (titleMatch || locMatch || contentMatch) {
+                            results.push({ board, row, card, rIdx, cIdx });
+                        }
+                    });
+                });
+            });
+
+            if (results.length === 0) {
+                resultsEl.innerHTML = '<span class="p-2 block text-xs text-gray-400">검색 결과가 없습니다.</span>';
+                return;
+            }
+
+            resultsEl.innerHTML = results.map(r => `
+                <div onclick="window.jumpToCard('${r.board.id}', '${r.card.id}')" 
+                     class="flex items-start gap-2 p-2 rounded-lg hover:bg-blue-50 cursor-pointer transition-colors group">
+                    <i data-lucide="file-text" class="w-3.5 h-3.5 text-gray-400 shrink-0 mt-0.5"></i>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-xs font-bold text-gray-700 truncate">${escapeHtml(r.card.title || '제목 없음')}</div>
+                        <div class="text-[10px] text-gray-400 truncate">${escapeHtml(r.board.title)} › ${escapeHtml(r.row.title || 'Track ' + (r.rIdx+1))} ${r.card.location ? '· ' + escapeHtml(r.card.location) : ''}</div>
+                    </div>
+                </div>
+            `).join('');
+            if (window.lucide) window.lucide.createIcons({ el: resultsEl });
+        };
+
+        window.jumpToCard = (boardId, cardId) => {
+            window.closeSearch();
+            if (window.currentWorkspaceId !== boardId) {
+                window.currentWorkspaceId = boardId;
+                window.activeCardId = null;
+                renderAll();
+            }
+            setTimeout(() => {
+                window.selectCard(cardId);
+                const cardEl = document.querySelector(`.card-wrapper[data-card-id="${cardId}"]`);
+                if (cardEl) cardEl.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+            }, 100);
+        };
+
+        // ========== 체크리스트 ==========
+        window.addChecklistItem = () => {
+            if (!window.activeCardId) { alert('카드를 먼저 선택하세요.'); return; }
+            const result = findCardAndRow(window.activeCardId);
+            if (result) {
+                pushHistory();
+                if (!result.card.checklist) result.card.checklist = [];
+                result.card.checklist.push({ id: generateId(), text: '', done: false });
+                renderChecklist(result.card);
+                window.triggerSave();
+            }
+        };
+
+        function renderChecklist(card) {
+            const container = document.getElementById('checklist-container');
+            if (!card || !card.checklist || card.checklist.length === 0) {
+                container.innerHTML = '<span class="text-[11px] text-gray-400">카드를 선택하면 체크리스트를 편집할 수 있어요.</span>';
+                return;
+            }
+            container.innerHTML = card.checklist.map((item, idx) => `
+                <div class="checklist-item" id="check-item-${item.id}">
+                    <input type="checkbox" ${item.done ? 'checked' : ''} onchange="window.toggleCheckItem('${card.id}', '${item.id}', this.checked)">
+                    <input type="text" value="${escapeHtml(item.text)}" placeholder="할 일 입력..." 
+                           class="flex-1 bg-transparent border-none outline-none text-[11px] ${item.done ? 'line-through text-gray-400' : 'text-gray-700'}"
+                           oninput="window.updateCheckItem('${card.id}', '${item.id}', this.value)"
+                           onkeydown="if(event.key==='Enter'){window.addChecklistItem()}"
+                           >
+                    <button onclick="window.removeCheckItem('${card.id}', '${item.id}')" class="text-gray-300 hover:text-red-400 transition-colors">
+                        <i data-lucide="x" class="w-3 h-3"></i>
+                    </button>
+                </div>
+            `).join('');
+            if (window.lucide) window.lucide.createIcons({ el: container });
+        }
+
+        window.toggleCheckItem = (cardId, itemId, done) => {
+            const result = findCardAndRow(cardId);
+            if (result) {
+                const item = result.card.checklist.find(i => i.id === itemId);
+                if (item) { item.done = done; renderChecklist(result.card); window.triggerSave(); }
+            }
+        };
+
+        window.updateCheckItem = (cardId, itemId, text) => {
+            const result = findCardAndRow(cardId);
+            if (result) {
+                const item = result.card.checklist.find(i => i.id === itemId);
+                if (item) { item.text = text; window.triggerSave(); }
+            }
+        };
+
+        window.removeCheckItem = (cardId, itemId) => {
+            pushHistory();
+            const result = findCardAndRow(cardId);
+            if (result) {
+                result.card.checklist = result.card.checklist.filter(i => i.id !== itemId);
+                renderChecklist(result.card);
+                window.triggerSave();
+            }
+        };
+
+        // ========== 트랙 색상 ==========
+        const ROW_COLORS = [
+            { key: 'gray', label: '기본', cls: 'bg-gray-100' },
+            { key: 'red', label: '발단', cls: 'bg-red-100' },
+            { key: 'orange', label: '전개', cls: 'bg-orange-100' },
+            { key: 'yellow', label: '위기', cls: 'bg-yellow-100' },
+            { key: 'green', label: '절정', cls: 'bg-green-100' },
+            { key: 'blue', label: '결말', cls: 'bg-blue-100' },
+            { key: 'purple', label: '기타', cls: 'bg-purple-100' },
+            { key: 'pink', label: '기타2', cls: 'bg-pink-100' },
+        ];
+
+        function getRowColorCls(key) {
+            return (ROW_COLORS.find(c => c.key === key) || ROW_COLORS[0]).cls;
+        }
+
+        window.cycleRowColor = (rowId) => {
+            pushHistory();
+            const row = window.getCurrentBoard().data.find(r => r.id === rowId);
+            if (!row) return;
+            const keys = ROW_COLORS.map(c => c.key);
+            const curIdx = keys.indexOf(row.color || 'gray');
+            row.color = keys[(curIdx + 1) % keys.length];
+            renderAll();
+            window.triggerSave();
+        };
+
+        // ========== 카드 복사 ==========
+        window.duplicateCard = (cardId) => {
+            pushHistory();
+            const data = window.getCurrentBoard().data;
+            for (let r of data) {
+                const idx = r.cards.findIndex(c => c.id === cardId);
+                if (idx !== -1) {
+                    const original = r.cards[idx];
+                    const copy = JSON.parse(JSON.stringify(original));
+                    copy.id = generateId();
+                    copy.title = (copy.title || '') + ' (복사)';
+                    copy.checklist = (copy.checklist || []).map(item => ({ ...item, id: generateId() }));
+                    r.cards.splice(idx + 1, 0, copy);
+                    renderAll();
+                    window.triggerSave();
+                    return;
+                }
+            }
+        };
+
+        // ========== 메모 탭 커스터마이징 ==========
+        window.editMemoTabs = () => {
+            const board = window.getCurrentBoard();
+            if (!board) return;
+            const tabs = board.memoTabs || JSON.parse(JSON.stringify(DEFAULT_MEMO_TABS));
+            const newLabels = prompt(
+                '탭 이름을 쉼표로 구분해서 입력하세요 (최대 7개):\n현재: ' + tabs.map(t => t.label).join(', '),
+                tabs.map(t => t.label).join(', ')
+            );
+            if (newLabels === null) return;
+            const parts = newLabels.split(',').map(s => s.trim()).filter(Boolean).slice(0, 7);
+            if (parts.length === 0) return;
+
+            pushHistory();
+            board.memoTabs = parts.map((label, i) => ({
+                id: tabs[i] ? tabs[i].id : generateId(),
+                label
+            }));
+            // 새 탭 id에 대한 memos 키 초기화
+            board.memoTabs.forEach(t => {
+                if (!(t.id in board.memos)) board.memos[t.id] = '';
+            });
+            window.activeMemoTab = board.memoTabs[0].id;
+            renderAll();
+            window.triggerSave();
+        };
+
+        function renderMemoTabs(board) {
+            const tabsEl = document.getElementById('memo-tabs');
+            if (!tabsEl || !board) return;
+            const tabs = board.memoTabs || DEFAULT_MEMO_TABS;
+            tabsEl.innerHTML = tabs.map(t => `
+                <button onclick="window.switchMemoTab('${t.id}')" id="tab-${t.id}" 
+                        class="memo-tab-btn px-2 py-1 text-[10px] rounded border bg-white border-gray-200 text-gray-600 hover:bg-gray-50">
+                    ${escapeHtml(t.label)}
+                </button>
+            `).join('');
+            // 활성 탭 강조
+            tabsEl.querySelectorAll('.memo-tab-btn').forEach(btn => {
+                if (btn.id === `tab-${window.activeMemoTab}`) {
+                    btn.classList.add('memo-tab-active');
+                    btn.classList.remove('bg-white', 'border-gray-200', 'text-gray-600');
+                }
+            });
+        }
+
+        // ========== Auto Save ==========
+        let saveTimeout = null;
+        
+        window.triggerSave = function(force = false) {
+            showSaveIndicator('loading');
+            if (saveTimeout) clearTimeout(saveTimeout);
+            const delay = force ? 0 : 1000;
+            
+            saveTimeout = setTimeout(async () => {
+                try {
+                    const cleanDataStr = JSON.stringify(window.workspaces, null, 2);
+                    let gDriveSuccess = false;
+                    if (isNodeEnvironment) {
+                        if (!fs.existsSync(TARGET_DIR)) {
+                            try { fs.mkdirSync(TARGET_DIR, { recursive: true }); } catch(e) {}
+                        }
+                        if (fs.existsSync(TARGET_DIR)) {
+                            await fs.promises.writeFile(targetFilePath, cleanDataStr, 'utf8');
+                            gDriveSuccess = true;
+                            showSaveIndicator('gdrive_success');
+                        }
+                    }
+                    if (dbInitialized) {
+                        await saveToLocalDB(JSON.parse(cleanDataStr));
+                        if(!gDriveSuccess) showSaveIndicator('local_success');
+                    }
+                } catch (e) {
+                    console.error("Save error", e);
+                    showSaveIndicator('error');
+                }
+            }, delay);
+        };
+
+        function showSaveIndicator(state) {
+            const ind = document.getElementById('save-indicator');
+            if(!ind) return;
+            ind.classList.remove('opacity-0');
+            if (state === 'loading') {
+                ind.innerHTML = `<i data-lucide="loader" class="w-3.5 h-3.5 inline-block mr-1.5 text-blue-500 animate-spin"></i> <span class="text-blue-600">동기화 중...</span>`;
+            } else if (state === 'gdrive_success') {
+                ind.innerHTML = `<i data-lucide="cloud-check" class="w-3.5 h-3.5 inline-block mr-1.5 text-blue-600"></i> <span class="text-blue-700">G드라이브 동기화 완료</span>`;
+                setTimeout(() => ind.classList.add('opacity-0'), 2500);
+            } else if (state === 'local_success') {
+                ind.innerHTML = `<i data-lucide="check-circle" class="w-3.5 h-3.5 inline-block mr-1.5 text-green-500"></i> <span class="text-green-600">PC 로컬 임시저장</span>`;
+                setTimeout(() => ind.classList.add('opacity-0'), 2500);
+            } else {
+                ind.innerHTML = `<i data-lucide="alert-circle" class="w-3.5 h-3.5 inline-block mr-1.5 text-red-500"></i> <span class="text-red-600">저장 에러 (확인 요망)</span>`;
+            }
+            if(window.lucide) window.lucide.createIcons({el: ind});
+        }
+
+        // --- Global State ---
+        window.workspaces = [
+            {
+                id: generateId(),
+                title: '단행본 플롯 기획 (예시)',
+                cardWidth: 400,
+                memos: { mainMale: '', mainFemale: '', subChar: '', background: '', synopsis: '', keyDevice: '', general: '' },
+                memoTabs: JSON.parse(JSON.stringify(DEFAULT_MEMO_TABS)),
+                status: 'active',
+                data: [
+                    {
+                        id: generateId(),
+                        title: '발단',
+                        color: 'red',
+                        cards: [
+                            { id: generateId(), title: '장면 1', location: '호텔 연회장', estWords: '3000', content: '시작되는 씬의 간략한 상황 묘사를 작성합니다.', color: 'bg-white', markers: ['heart'], checklist: [] },
+                            { id: generateId(), title: '장면 2', location: '주인공 오피스텔', estWords: '2500', content: '다음 씬으로 넘어가는 과정을 씁니다.', color: 'bg-white', markers: [], checklist: [] }
+                        ]
+                    },
+                    {
+                        id: generateId(),
+                        title: '전개',
+                        color: 'orange',
+                        cards: [
+                            { id: generateId(), title: '', location: '', estWords: '', content: '', color: 'bg-white', markers: [], checklist: [] }
+                        ]
+                    }
+                ]
+            }
+        ];
+
+        window.currentWorkspaceId = window.workspaces[0].id;
+        window.activeCardId = null;
+        window.activeFilter = null; 
+        window.draggedCardObj = null;
+        window.draggedFromRowId = null;
+        window.draggedBoardId = null;
+        window.isCompletedFolderOpen = false;
+        window.zoomLevel = 1;
+        window.isRightSidebarVisible = true;
+        window.isPanning = false;
+        window.startX = 0; window.startY = 0; window.scrollLeft = 0; window.scrollTop = 0;
+        window.activeMemoTab = 'mainMale';
+
+        const colors = [
+            { class: 'bg-red-50', viewClass: 'bg-red-300' },
+            { class: 'bg-blue-50', viewClass: 'bg-blue-300' },
+            { class: 'bg-green-50', viewClass: 'bg-green-300' },
+            { class: 'bg-orange-50', viewClass: 'bg-orange-300' },
+            { class: 'bg-pink-50', viewClass: 'bg-pink-300' },
+            { class: 'bg-purple-50', viewClass: 'bg-purple-300' },
+        ];
+
+        const markerColors = {
+            'pin': 'text-red-500',
+            'star': 'text-yellow-500',
+            'heart': 'text-red-500',
+            'alert-circle': 'text-green-500'
+        };
+
+        window.getCurrentBoard = () => window.workspaces.find(w => w.id === window.currentWorkspaceId);
+
+        window.setTheme = (themeName) => {
+            document.body.setAttribute('data-theme', themeName);
+        };
+
+        window.exportData = () => {
+            try {
+                const dataStr = JSON.stringify(window.workspaces, null, 2);
+                const blob = new Blob([dataStr], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `plot_backup_${new Date().getTime()}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (err) {
+                alert("백업 중 오류가 발생했습니다.");
+            }
+        };
+
+        window.importData = (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    if (Array.isArray(importedData) && importedData.length > 0 && importedData[0].id) {
+                        pushHistory();
+                        window.workspaces = normalizeData(importedData);
+                        window.currentWorkspaceId = window.workspaces[0].id;
+                        window.activeCardId = null;
+                        window.activeFilter = null;
+                        renderAll();
+                        window.triggerSave(true);
+                    } else {
+                        alert("유효한 백업 파일이 아닙니다.");
+                    }
+                } catch (err) {
+                    alert("파일을 읽는 중 오류가 발생했습니다.");
+                }
+                event.target.value = ''; 
+            };
+            reader.readAsText(file);
+        };
+
+        window.resetData = () => {
+            if (confirm("모든 보드 및 카드 데이터가 삭제됩니다. 초기화하시겠습니까? (이 작업은 되돌릴 수 없습니다.)")) {
+                pushHistory();
+                window.workspaces = [];
+                window.createNewBoard(); 
+            }
+        };
+
+        window.exportText = () => {
+            const board = window.getCurrentBoard();
+            if(!board) return;
+            let text = `[기획 보드: ${board.title}]\n=========================================\n\n`;
+            (board.data || []).forEach((row, rIdx) => {
+                text += `■ ${row.title || `트랙 ${rIdx+1}`}\n-----------------------------------------\n`;
+                (row.cards || []).forEach((card, cIdx) => {
+                    text += `\n[ ${card.title || `장면 ${cIdx+1}`} ]\n`;
+                    if(card.location) text += `* 장소: ${card.location}\n`;
+                    if(card.estWords) text += `* 예상 자수: ${card.estWords}자\n`;
+                    text += `\n`;
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = card.content.replace(/<br\s*[\/]?>/gi, "\n").replace(/<\/p>/gi, "\n").replace(/<\/div>/gi, "\n");
+                    let plainText = tempDiv.innerText || tempDiv.textContent;
+                    text += `${plainText.trim()}\n\n`;
+                    if (card.checklist && card.checklist.length > 0) {
+                        text += `[체크리스트]\n`;
+                        card.checklist.forEach(item => {
+                            text += `  ${item.done ? '[v]' : '[ ]'} ${item.text}\n`;
+                        });
+                        text += '\n';
+                    }
+                });
+                text += `\n`;
+            });
+            const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${board.title}_원고추출_${new Date().getTime()}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        };
+
+        window.exportImage = () => {
+            const board = window.getCurrentBoard();
+            if(!board) return;
+            const originalZoom = window.zoomLevel;
+            if(window.zoomLevel !== 1) window.resetZoom();
+            document.querySelectorAll('input, textarea').forEach(el => {
+                if(el.tagName.toLowerCase() === 'input') el.setAttribute('value', el.value);
+                else if(el.tagName.toLowerCase() === 'textarea') el.innerHTML = el.value; 
+            });
+            setTimeout(() => {
+                const targetElement = document.getElementById('zoom-container');
+                html2canvas(targetElement, {
+                    scale: 2, 
+                    backgroundColor: document.body.getAttribute('data-theme') === 'green' ? '#eef1ef' : 
+                                     (document.body.getAttribute('data-theme') === 'pink' ? '#f7f0f2' : '#fcfcfc'),
+                    useCORS: true,
+                    onclone: function(clonedDoc) {
+                        clonedDoc.querySelectorAll('input[type="text"]').forEach(input => {
+                            const div = clonedDoc.createElement('div');
+                            div.textContent = input.value || input.placeholder;
+                            div.className = input.className;
+                            div.style.cssText = input.style.cssText;
+                            div.style.display = 'flex';
+                            div.style.alignItems = 'center';
+                            div.style.whiteSpace = 'nowrap';
+                            div.style.overflow = 'hidden';
+                            if (input.classList.contains('text-right')) div.style.justifyContent = 'flex-end';
+                            if (input.classList.contains('text-center')) div.style.justifyContent = 'center';
+                            input.parentNode.replaceChild(div, input);
+                        });
+                        clonedDoc.querySelectorAll('textarea').forEach(ta => {
+                            if(ta.id === 'board-memo') return; 
+                            const div = clonedDoc.createElement('div');
+                            div.innerHTML = ta.value.replace(/\n/g, '<br>') || ta.placeholder;
+                            div.className = ta.className;
+                            div.style.cssText = ta.style.cssText;
+                            ta.parentNode.replaceChild(div, ta);
+                        });
+                    }
+                }).then(canvas => {
+                    const link = document.createElement('a');
+                    link.download = `${board.title}_시놉캡처_${new Date().getTime()}.png`;
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                    if(originalZoom !== 1) { window.zoomLevel = originalZoom; window.changeZoom(0); }
+                }).catch(err => {
+                    alert('이미지 추출 중 오류가 발생했습니다.');
+                    console.error(err);
+                });
+            }, 150);
+        };
+
+        window.changeCardSize = (val) => {
+            const width = parseInt(val);
+            const board = window.getCurrentBoard();
+            if(board) { board.cardWidth = width; window.triggerSave(); }
+            document.getElementById('card-size-text').textContent = width + 'px';
+            document.querySelectorAll('.card-wrapper, .add-card-btn').forEach(el => { el.style.width = width + 'px'; });
+        };
+
+        window.toggleLeftSidebar = () => {
+            const sidebar = document.getElementById('left-sidebar');
+            const toggleBtn = document.getElementById('left-sidebar-toggle');
+            const icon = document.getElementById('left-toggle-icon');
+            const isCollapsed = sidebar.classList.contains('collapsed');
+            if (isCollapsed) {
+                sidebar.classList.remove('collapsed');
+                toggleBtn.style.display = 'none';
+            } else {
+                sidebar.classList.add('collapsed');
+                toggleBtn.style.display = 'flex';
+                if(icon) icon.setAttribute('data-lucide', 'chevron-right');
+            }
+            if(window.lucide) window.lucide.createIcons();
+        };
+
+        // ========== 집필 모드 (별도 창) ==========
+        window.isWritingModeOpen = false;
+
+        window.toggleWritingMode = () => {
+            window.isWritingModeOpen ? window.closeWritingMode() : window.openWritingMode();
+        };
+
+        window.openWritingMode = () => {
+            const board = window.getCurrentBoard();
+            if (!board) return;
+            window.isWritingModeOpen = true;
+
+            // 저장된 창 크기/위치 불러오기
+            let bounds = {};
+            try { bounds = JSON.parse(localStorage.getItem('wmp_bounds') || '{}'); } catch(e) {}
+
+            // IPC로 main.js에 새 창 열기 요청
+            try {
+                const { ipcRenderer } = require('electron');
+                ipcRenderer.send('open-writing-mode', {
+                    boardData: board,
+                    boardTitle: board.title || '',
+                    cardWidth: board.cardWidth || 400,
+                    globalFontSize: board.globalFontSize || '10.5pt',
+                    globalFontFamily: board.globalFontFamily || '',
+                    width:  bounds.width,
+                    height: bounds.height,
+                    x: bounds.x,
+                    y: bounds.y
+                });
+
+                // 창 크기/위치 저장 수신
+                ipcRenderer.removeAllListeners('save-writing-bounds');
+                ipcRenderer.on('save-writing-bounds', (ev, b) => {
+                    try { localStorage.setItem('wmp_bounds', JSON.stringify(b)); } catch(e) {}
+                });
+            } catch(e) {
+                alert('Electron 환경에서만 집필 모드를 사용할 수 있습니다.');
+                window.isWritingModeOpen = false;
+            }
+        };
+
+        window.closeWritingMode = () => {
+            window.isWritingModeOpen = false;
+            try {
+                const { ipcRenderer } = require('electron');
+                ipcRenderer.send('close-writing-mode');
+            } catch(e) {}
+        };
+
+        function initWritingModeWidget() {
+            // IPC 방식으로 교체됨 — 별도 창(writing.html)에서 처리
+        }
+
+        window.toggleRightSidebar = () => {
+            const sidebar = document.getElementById('right-sidebar');
+            const icon = document.getElementById('sidebar-icon');
+            window.isRightSidebarVisible = !window.isRightSidebarVisible;
+            if (window.isRightSidebarVisible) {
+                sidebar.classList.remove('hidden');
+                icon.setAttribute('data-lucide', 'panel-right-open');
+            } else {
+                sidebar.classList.add('hidden');
+                icon.setAttribute('data-lucide', 'panel-right-close');
+            }
+            if(window.lucide) window.lucide.createIcons();
+        };
+
+        window.toggleCompletedFolder = () => {
+            const folder = document.getElementById('board-list-completed');
+            const icon = document.getElementById('completed-folder-icon');
+            window.isCompletedFolderOpen = !window.isCompletedFolderOpen;
+            if (window.isCompletedFolderOpen) {
+                folder.classList.remove('hidden');
+                icon.style.transform = 'rotate(180deg)';
+            } else {
+                folder.classList.add('hidden');
+                icon.style.transform = 'rotate(0deg)';
+            }
+        };
+
+        window.toggleTextColorPalette = () => {
+            document.getElementById('text-color-palette').classList.toggle('hidden');
+        };
+
+        window.applyTextColor = (color) => {
+            window.formatText('foreColor', color);
+            document.getElementById('current-text-color-indicator').style.backgroundColor = color;
+            document.getElementById('text-color-palette').classList.add('hidden');
+        };
+
+        // 집필 모드 → 본 창 폰트 반영 전용. IPC를 다시 보내지 않아 무한 루프를 끊는다.
+        window._applyFontNoIpc = (kind, value) => {
+          try {
+            const board = window.getCurrentBoard();
+            if (!board) return;
+            const isSize = (kind === 'fontSize');
+            const attr   = isSize ? 'size' : 'face';
+            const cssKey = isSize ? 'font-size' : 'font-family';
+            const styleProp = isSize ? 'fontSize' : 'fontFamily';
+
+            document.querySelectorAll('.rich-editor[id^="editor-"]').forEach(editor => {
+                Array.from(editor.querySelectorAll(`font[${attr}]`)).forEach(el => {
+                    el.removeAttribute(attr);
+                    if (!el.getAttribute('style') && !el.getAttribute('color') &&
+                        !el.getAttribute('size') && !el.getAttribute('face')) {
+                        el.replaceWith(...Array.from(el.childNodes));
+                    }
+                });
+                Array.from(editor.querySelectorAll(`[style*="${cssKey}"]`)).forEach(el => {
+                    el.style[styleProp] = '';
+                    const st = el.getAttribute('style');
+                    if (!st || !st.trim()) el.removeAttribute('style');
+                });
+                editor.style[styleProp] = value;
+            });
+
+            (board.data || []).forEach(row => {
+                (row.cards || []).forEach(card => {
+                    if (isSize) card.cardFontSize = value;
+                    if (!card.content) return;
+                    const tmp = document.createElement('div');
+                    tmp.innerHTML = card.content;
+                    Array.from(tmp.querySelectorAll(`font[${attr}]`)).forEach(el => {
+                        el.removeAttribute(attr);
+                        if (!el.getAttribute('style') && !el.getAttribute('color') &&
+                            !el.getAttribute('size') && !el.getAttribute('face')) {
+                            el.replaceWith(...Array.from(el.childNodes));
+                        }
+                    });
+                    Array.from(tmp.querySelectorAll(`[style*="${cssKey}"]`)).forEach(el => {
+                        el.style[styleProp] = '';
+                        const st = el.getAttribute('style');
+                        if (!st || !st.trim()) el.removeAttribute('style');
+                    });
+                    card.content = tmp.innerHTML;
+                });
+            });
+            window.triggerSave();
+          } catch (err) {
+            console.error('[_applyFontNoIpc]', kind, value, err);
+          }
+        };
+
+        window.formatText = (command, value = null) => {
+            // 폰트 사이즈: 현재 보드 전체 카드 일괄 변경
+            if (command === 'fontSizeExact') {
+                const board = window.getCurrentBoard();
+                if (!board) return;
+                board.globalFontSize = value;
+                document.querySelectorAll('.rich-editor[id^="editor-"]').forEach(editor => {
+                    editor.style.fontSize = value;
+                    editor.querySelectorAll('font[size]').forEach(el => {
+                        el.removeAttribute('size');
+                        if (!el.getAttribute('style') && !el.getAttribute('color') && !el.getAttribute('face')) {
+                            el.replaceWith(...el.childNodes);
+                        }
+                    });
+                    editor.querySelectorAll('[style*="font-size"]').forEach(el => {
+                        el.style.fontSize = '';
+                        if (!el.getAttribute('style') || !el.getAttribute('style').trim()) el.removeAttribute('style');
+                    });
+                });
+                (board.data || []).forEach(row => {
+                    (row.cards || []).forEach(card => {
+                        card.cardFontSize = value;
+                        if (card.content) {
+                            const tmp = document.createElement('div');
+                            tmp.innerHTML = card.content;
+                            tmp.querySelectorAll('font[size]').forEach(el => {
+                                el.removeAttribute('size');
+                                if (!el.getAttribute('style') && !el.getAttribute('color') && !el.getAttribute('face')) el.replaceWith(...el.childNodes);
+                            });
+                            tmp.querySelectorAll('[style*="font-size"]').forEach(el => {
+                                el.style.fontSize = '';
+                                if (!el.getAttribute('style').trim()) el.removeAttribute('style');
+                            });
+                            card.content = tmp.innerHTML;
+                        }
+                    });
+                });
+                // 집필 모드 창에 폰트 크기 변경 전달
+                try { require('electron').ipcRenderer.send('writing-font-changed', { fontSize: value }); } catch(e) {}
+                window.triggerSave();
+                return;
+            }
+            // 폰트 글자체: 현재 보드 전체 카드 일괄 변경
+            if (command === 'fontName') {
+                const board = window.getCurrentBoard();
+                if (!board) return;
+                board.globalFontFamily = value;
+                document.querySelectorAll('.rich-editor[id^="editor-"]').forEach(editor => {
+                    editor.style.fontFamily = value;
+                    editor.querySelectorAll('font[face]').forEach(el => {
+                        el.removeAttribute('face');
+                        if (!el.getAttribute('style') && !el.getAttribute('color') && !el.getAttribute('size')) el.replaceWith(...el.childNodes);
+                    });
+                    editor.querySelectorAll('[style*="font-family"]').forEach(el => {
+                        el.style.fontFamily = '';
+                        if (!el.getAttribute('style') || !el.getAttribute('style').trim()) el.removeAttribute('style');
+                    });
+                });
+                (board.data || []).forEach(row => {
+                    (row.cards || []).forEach(card => {
+                        if (card.content) {
+                            const tmp = document.createElement('div');
+                            tmp.innerHTML = card.content;
+                            tmp.querySelectorAll('font[face]').forEach(el => {
+                                el.removeAttribute('face');
+                                if (!el.getAttribute('style') && !el.getAttribute('color') && !el.getAttribute('size')) el.replaceWith(...el.childNodes);
+                            });
+                            tmp.querySelectorAll('[style*="font-family"]').forEach(el => {
+                                el.style.fontFamily = '';
+                                if (!el.getAttribute('style').trim()) el.removeAttribute('style');
+                            });
+                            card.content = tmp.innerHTML;
+                        }
+                    });
+                });
+                // 집필 모드 창에 폰트 변경 전달
+                try { require('electron').ipcRenderer.send('writing-font-changed', { fontFamily: value }); } catch(e) {}
+                window.triggerSave();
+                return;
+            }
+            // formatBlock은 반드시 활성 에디터에만 적용
+            if (command === 'formatBlock') {
+                const editor = window.activeCardId ? document.getElementById(`editor-${window.activeCardId}`) : null;
+                if (!editor) return;
+                editor.focus();
+                document.execCommand(command, false, value);
+                return;
+            }
+            document.execCommand(command, false, value);
+            if(window.activeCardId) {
+                const editor = document.getElementById(`editor-${window.activeCardId}`);
+                if(editor) editor.focus();
+            }
+        };
+
+        window.createNewBoard = () => {
+            pushHistory();
+            const newBoard = {
+                id: generateId(),
+                title: '새 에피소드',
+                cardWidth: 400,
+                memos: { mainMale: '', mainFemale: '', subChar: '', background: '', synopsis: '', keyDevice: '', general: '' },
+                memoTabs: JSON.parse(JSON.stringify(DEFAULT_MEMO_TABS)),
+                status: 'active',
+                data: [
+                    { id: generateId(), title: '', color: 'gray', cards: [{ id: generateId(), title: '', location: '', estWords: '', content: '', color: 'bg-white', markers: [], checklist: [] }] }
+                ]
+            };
+            window.workspaces.push(newBoard);
+            window.currentWorkspaceId = newBoard.id;
+            window.activeCardId = null;
+            window.activeFilter = null;
+            window.activeMemoTab = newBoard.memoTabs[0].id;
+            window.resetZoom();
+            renderAll();
+            window.triggerSave();
+        };
+
+        window.switchBoard = (id) => {
+            if (window.currentWorkspaceId === id) return; 
+            window.currentWorkspaceId = id;
+            window.activeCardId = null;
+            window.activeFilter = null;
+            const board = window.getCurrentBoard();
+            if (board && board.memoTabs) window.activeMemoTab = board.memoTabs[0].id;
+            window.resetZoom();
+            renderAll();
+        };
+
+        window.deleteBoard = (id, event) => {
+            event.stopPropagation(); 
+            if(!confirm('이 시놉시스 보드를 완전히 삭제하시겠습니까? (복구 불가)')) return;
+            pushHistory();
+            window.workspaces = window.workspaces.filter(w => w.id !== id);
+            if (window.workspaces.length === 0) {
+                window.createNewBoard(); 
+            } else {
+                if (window.currentWorkspaceId === id) {
+                    window.switchBoard(window.workspaces[0].id);
+                } else {
+                    renderAll();
+                }
+                window.triggerSave(true);
+            }
+        };
+
+        window.updateCurrentBoardTitle = (title) => {
+            const board = window.getCurrentBoard();
+            if(board) {
+                board.title = title;
+                renderBoardList();
+                if(window.lucide) window.lucide.createIcons(); 
+                window.triggerSave();
+            }
+        };
+
+        window.switchMemoTab = (tabId) => {
+            window.activeMemoTab = tabId;
+            const board = window.getCurrentBoard();
+            if(board) {
+                const textarea = document.getElementById('board-memo');
+                textarea.value = (board.memos && board.memos[tabId]) ? board.memos[tabId] : '';
+                const placeholder = memoTabPlaceholders[tabId] || '내용을 입력하세요.';
+                textarea.placeholder = placeholder;
+            }
+            document.querySelectorAll('.memo-tab-btn').forEach(btn => {
+                if (btn.id === `tab-${tabId}`) {
+                    btn.classList.add('memo-tab-active');
+                    btn.classList.remove('bg-white', 'border-gray-200', 'text-gray-600');
+                } else {
+                    btn.classList.remove('memo-tab-active');
+                    btn.classList.add('bg-white', 'border-gray-200', 'text-gray-600');
+                }
+            });
+        };
+
+        window.updateBoardMemo = (content) => {
+            const board = window.getCurrentBoard();
+            if(board) {
+                if(!board.memos) board.memos = {};
+                board.memos[window.activeMemoTab] = content;
+                window.triggerSave();
+            }
+        };
+
+        // --- Drag & Drop for Boards ---
+        window.handleBoardDragStart = (e, id) => {
+            window.draggedBoardId = id;
+            e.dataTransfer.effectAllowed = 'move';
+            e.target.classList.add('board-dragging');
+        };
+
+        window.handleBoardDragOver = (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            const boardEl = e.target.closest('.group');
+            if (boardEl && window.draggedBoardId && boardEl.dataset?.id !== window.draggedBoardId) {
+                boardEl.classList.add('board-drag-over');
+            }
+        };
+
+        window.handleBoardDragOverFolder = (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            document.getElementById('board-list-completed').classList.add('folder-drag-over');
+            if (!window.isCompletedFolderOpen) window.toggleCompletedFolder();
+        };
+
+        window.handleBoardDragLeaveFolder = (e) => {
+            document.getElementById('board-list-completed').classList.remove('folder-drag-over');
+        };
+
+        window.handleBoardDrop = (e, targetId, targetStatus) => {
+            e.preventDefault();
+            e.stopPropagation();
+            document.querySelectorAll('.group').forEach(el => el.classList.remove('board-dragging', 'board-drag-over'));
+            document.getElementById('board-list-completed').classList.remove('folder-drag-over');
+            if (!window.draggedBoardId) return;
+            const fromIndex = window.workspaces.findIndex(w => w.id === window.draggedBoardId);
+            if (fromIndex === -1) return;
+            window.workspaces[fromIndex].status = targetStatus;
+            if (targetId && targetId !== window.draggedBoardId) {
+                const toIndex = window.workspaces.findIndex(w => w.id === targetId);
+                if (toIndex !== -1) {
+                    const [movedBoard] = window.workspaces.splice(fromIndex, 1);
+                    const adjustedToIndex = window.workspaces.findIndex(w => w.id === targetId); 
+                    window.workspaces.splice(adjustedToIndex, 0, movedBoard);
+                }
+            }
+            window.draggedBoardId = null;
+            renderAll();
+            window.triggerSave();
+        };
+
+        // --- Board UI Actions ---
+        window.selectCard = (id) => {
+            window.activeCardId = id;
+            document.querySelectorAll('.card-wrapper').forEach(el => {
+                const isActive = el.dataset.cardId === id;
+                el.classList.toggle('active-card', isActive);
+            });
+            // 체크리스트 업데이트
+            const result = findCardAndRow(id);
+            if (result) renderChecklist(result.card);
+        };
+
+        const findCardAndRow = (cardId) => {
+            const board = window.getCurrentBoard();
+            if (!board) return null;
+            const data = board.data;
+            for (let r of data) {
+                let cardIdx = r.cards.findIndex(c => c.id === cardId);
+                if (cardIdx !== -1) return { row: r, card: r.cards[cardIdx], cardIdx };
+            }
+            return null;
+        };
+
+        window.updateCardTitle = (id, value) => {
+            const result = findCardAndRow(id);
+            if(result) { result.card.title = value; window.triggerSave(); }
+        };
+
+        window.updateCardLocation = (id, value) => {
+            const result = findCardAndRow(id);
+            if(result) { result.card.location = value; window.triggerSave(); }
+        };
+
+        window.updateCardEstWords = (id, value) => {
+            const result = findCardAndRow(id);
+            if(result) {
+                result.card.estWords = value;
+                updateRowTotalDOM(result.row.id);
+                updateBoardTotalDOM();
+                window.triggerSave();
+            }
+        };
+
+        window.updateCardContent = (id, htmlContent) => {
+            const result = findCardAndRow(id);
+            if(result) { result.card.content = htmlContent; window.triggerSave(); }
+        };
+
+        window.updateRowTitle = (id, value) => {
+            const row = window.getCurrentBoard().data.find(r => r.id === id);
+            if(row) { row.title = value; window.triggerSave(); }
+        };
+
+        window.toggleMarker = (markerIcon) => {
+            if (!window.activeCardId) return alert('마커를 추가할 카드를 먼저 선택하세요.');
+            pushHistory();
+            const result = findCardAndRow(window.activeCardId);
+            if (result) {
+                const card = result.card;
+                const idx = card.markers.indexOf(markerIcon);
+                if (idx > -1) card.markers.splice(idx, 1);
+                else card.markers.push(markerIcon);
+                const markersContainer = document.getElementById(`markers-${card.id}`);
+                if(markersContainer) {
+                    markersContainer.innerHTML = card.markers.map(m => {
+                        const colorClass = markerColors[m] || 'text-gray-500';
+                        return `<i data-lucide="${m}" class="w-4 h-4 ${colorClass} drop-shadow-sm"></i>`;
+                    }).join('');
+                    if(window.lucide) window.lucide.createIcons(); 
+                }
+                applyFilterDOM(); 
+                window.triggerSave();
+            }
+        };
+
+        window.toggleFilter = (markerIcon) => {
+            window.activeFilter = window.activeFilter === markerIcon ? null : markerIcon;
+            document.querySelectorAll('[id^="filter-btn-"]').forEach(btn => {
+                btn.classList.remove('bg-blue-50', 'border-blue-300', 'font-bold');
+                btn.classList.add('text-gray-500', 'border-gray-200');
+            });
+            if (window.activeFilter) {
+                const btn = document.getElementById(`filter-btn-${window.activeFilter}`);
+                if(btn) {
+                    btn.classList.remove('text-gray-500', 'border-gray-200');
+                    btn.classList.add('bg-blue-50', 'border-blue-300', 'font-bold');
+                }
+            }
+            applyFilterDOM();
+        };
+
+        window.addRow = () => {
+            pushHistory();
+            window.getCurrentBoard().data.push({
+                id: generateId(), title: '', color: 'gray', cards: [{ id: generateId(), title: '', location: '', estWords: '', content: '', color: 'bg-white', markers: [], checklist: [] }]
+            });
+            renderAll();
+            window.triggerSave();
+        };
+
+        window.removeRow = () => {
+            const data = window.getCurrentBoard().data;
+            if (data.length > 1) {
+                if(confirm('마지막 트랙(행)을 삭제하시겠습니까? 포함된 모든 카드가 삭제됩니다.')) {
+                    pushHistory();
+                    data.pop();
+                    renderAll();
+                    window.triggerSave();
+                }
+            } else {
+                alert('최소 1개의 트랙이 필요합니다.');
+            }
+        };
+
+        window.addCardToRow = (rowId) => {
+            pushHistory();
+            const row = window.getCurrentBoard().data.find(r => r.id === rowId);
+            if(row) {
+                const newId = generateId();
+                row.cards.push({ id: newId, title: '', location: '', estWords: '', content: '', color: 'bg-white', markers: [], checklist: [] });
+                renderAll();
+                window.triggerSave();
+                setTimeout(() => {
+                    window.selectCard(newId);
+                    const editor = document.getElementById(`editor-${newId}`);
+                    if(editor) editor.focus();
+                }, 50);
+            }
+        };
+
+        window.deleteCard = (id) => {
+            const data = window.getCurrentBoard().data;
+            for (let r of data) {
+                const idx = r.cards.findIndex(c => c.id === id);
+                if (idx !== -1) {
+                    pushHistory();
+                    const [removed] = r.cards.splice(idx, 1);
+                    if(window.activeCardId === id) window.activeCardId = null;
+                    renderAll();
+                    window.triggerSave();
+                    // 토스트로 되돌리기 제공
+                    showDeleteToast(removed, r.id, idx);
+                    return;
+                }
+            }
+        };
+
+        window.changeZoom = (delta) => {
+            window.zoomLevel += delta;
+            if (window.zoomLevel < 0.5) window.zoomLevel = 0.5;
+            if (window.zoomLevel > 2.0) window.zoomLevel = 2.0;
+            document.getElementById('zoom-container').style.transform = `scale(${window.zoomLevel})`;
+            document.getElementById('zoom-level-text').textContent = Math.round(window.zoomLevel * 100) + '%';
+        };
+
+        window.resetZoom = () => {
+            window.zoomLevel = 1;
+            window.changeZoom(0);
+        };
+
+        window.changeCardColor = (colorClass) => {
+            if (!window.activeCardId) return;
+            pushHistory();
+            const result = findCardAndRow(window.activeCardId);
+            if (result) {
+                result.card.color = colorClass;
+                renderAll(); 
+                window.triggerSave();
+            }
+        };
+
+        // --- Drag & Drop for Cards ---
+        window.handleCardDragStart = (e, cardId, rowId) => {
+            window.draggedFromRowId = rowId;
+            const result = findCardAndRow(cardId);
+            window.draggedCardObj = result.card;
+            e.dataTransfer.effectAllowed = 'move';
+            const cardElement = document.querySelector(`.card-wrapper[data-card-id="${cardId}"]`);
+            setTimeout(() => cardElement.classList.add('opacity-30'), 0);
+        };
+
+        window.handleCardDragOver = (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; };
+        window.handleCardDragEnter = (e) => {
+            e.preventDefault();
+            const cardEl = e.target.closest('.card-wrapper');
+            if (cardEl && cardEl.dataset.cardId !== (window.draggedCardObj ? window.draggedCardObj.id : '')) {
+                cardEl.classList.add('drag-over');
+            }
+        };
+        window.handleCardDragLeave = (e) => {
+            const cardEl = e.target.closest('.card-wrapper');
+            if (cardEl) cardEl.classList.remove('drag-over');
+        };
+
+        window.handleCardDrop = (e, targetCardId, targetRowId) => {
+            e.preventDefault();
+            e.stopPropagation();
+            document.querySelectorAll('.card-wrapper').forEach(el => { el.classList.remove('opacity-30', 'drag-over'); });
+            if (!window.draggedCardObj || window.draggedCardObj.id === targetCardId) return;
+            pushHistory();
+            const data = window.getCurrentBoard().data;
+            const sourceRow = data.find(r => r.id === window.draggedFromRowId);
+            const sourceIdx = sourceRow.cards.findIndex(c => c.id === window.draggedCardObj.id);
+            sourceRow.cards.splice(sourceIdx, 1);
+            const targetRow = data.find(r => r.id === targetRowId);
+            const targetIdx = targetRow.cards.findIndex(c => c.id === targetCardId);
+            targetRow.cards.splice(targetIdx, 0, window.draggedCardObj);
+            window.draggedCardObj = null;
+            renderAll();
+            window.triggerSave();
+        };
+
+        window.handleCardDropToEmptyRow = (e, targetRowId) => {
+            e.preventDefault();
+            document.querySelectorAll('.card-wrapper').forEach(el => { el.classList.remove('opacity-30', 'drag-over'); });
+            if (!window.draggedCardObj) return;
+            pushHistory();
+            const data = window.getCurrentBoard().data;
+            const sourceRow = data.find(r => r.id === window.draggedFromRowId);
+            const sourceIdx = sourceRow.cards.findIndex(c => c.id === window.draggedCardObj.id);
+            sourceRow.cards.splice(sourceIdx, 1);
+            const targetRow = data.find(r => r.id === targetRowId);
+            targetRow.cards.push(window.draggedCardObj);
+            window.draggedCardObj = null;
+            renderAll();
+            window.triggerSave();
+        };
+
+        // --- Render functions ---
+        function renderBoardList() {
+            const listActive = document.getElementById('board-list-active');
+            const listCompleted = document.getElementById('board-list-completed');
+            listActive.innerHTML = ''; listCompleted.innerHTML = '';
+
+            window.workspaces.forEach(w => {
+                if(!w.status) w.status = 'active'; 
+                const isActive = w.id === window.currentWorkspaceId;
+                const iconColor = isActive ? 'text-gray-700' : 'text-gray-400 group-hover:text-gray-500';
+                const textStyle = isActive ? 'text-gray-800 font-bold' : 'text-gray-500';
+                const bgStyle = isActive ? 'bg-gray-200' : 'hover:bg-black/5';
+                const iconName = w.status === 'completed' ? 'book' : 'book-open';
+
+                const boardHtml = `
+                    <div onclick="window.switchBoard('${w.id}')"
+                         draggable="true" 
+                         ondragstart="window.handleBoardDragStart(event, '${w.id}')"
+                         ondragover="window.handleBoardDragOver(event)"
+                         ondrop="window.handleBoardDrop(event, '${w.id}', '${w.status}')"
+                         class="group flex items-center justify-between p-2 rounded cursor-pointer transition-colors ${bgStyle} mb-0.5"
+                         data-id="${w.id}">
+                        <div class="flex items-center gap-2 overflow-hidden flex-1 pointer-events-none">
+                            <i data-lucide="${iconName}" class="w-3.5 h-3.5 ${iconColor} shrink-0 transition-colors"></i>
+                            <span class="truncate text-xs ${textStyle}">${escapeHtml(w.title) || '제목 없음'}</span>
+                        </div>
+                        <button onclick="window.deleteBoard('${w.id}', event)" class="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 transition-opacity shrink-0 ml-1 cursor-pointer" title="보드 삭제">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        </button>
+                    </div>
+                `;
+                if (w.status === 'completed') listCompleted.insertAdjacentHTML('beforeend', boardHtml);
+                else listActive.insertAdjacentHTML('beforeend', boardHtml);
+            });
+        }
+
+        function renderBoard() {
+            const board = window.getCurrentBoard();
+            if (!board) return; 
+
+            const currentWidth = board.cardWidth || 400;
+            document.getElementById('doc-title').value = board.title || '';
+
+            // 폰트 사이즈 드롭다운 동기화
+            const fsSel = document.getElementById('font-size-select');
+            if (fsSel && board.globalFontSize) {
+                fsSel.value = board.globalFontSize;
+            }
+            // 폰트 글자체 드롭다운 동기화
+            const ffSel = document.getElementById('font-select');
+            if (ffSel && board.globalFontFamily) {
+                ffSel.value = board.globalFontFamily;
+            }
+            
+            // 메모 탭 렌더링
+            renderMemoTabs(board);
+            window.switchMemoTab(window.activeMemoTab);
+
+            const container = document.getElementById('board-container');
+            container.innerHTML = '';
+
+            (board.data || []).forEach((row, index) => {
+                const rowTotalWords = (row.cards || []).reduce((sum, card) => {
+                    const val = card.estWords ? String(card.estWords).replace(/[^0-9]/g, '') : '0';
+                    return sum + (parseInt(val) || 0);
+                }, 0);
+
+                const rowColorCls = getRowColorCls(row.color || 'gray');
+                // 색상 칩 색상
+                const chipColorMap = {
+                    gray: '#e5e7eb', red: '#fca5a5', orange: '#fdba74', yellow: '#fde68a',
+                    green: '#86efac', blue: '#93c5fd', purple: '#d8b4fe', pink: '#f9a8d4'
+                };
+                const chipColor = chipColorMap[row.color || 'gray'] || '#e5e7eb';
+
+                let cardsHtml = (row.cards || []).map(card => {
+                    const isActive = window.activeCardId === card.id;
+                    const markersHtml = (card.markers || []).map(m => {
+                        const colorClass = markerColors[m] || 'text-gray-500';
+                        return `<i data-lucide="${m}" class="w-4 h-4 ${colorClass} drop-shadow-sm"></i>`;
+                    }).join('');
+                    const checkDone = (card.checklist || []).filter(i => i.done).length;
+                    const checkTotal = (card.checklist || []).length;
+                    const checkBadge = checkTotal > 0 ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full ${checkDone === checkTotal ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'}">${checkDone}/${checkTotal}</span>` : '';
+                    
+                    return `
+                        <div class="card-wrapper relative flex flex-col border-r border-b border-gray-200 aspect-[4/3] ${card.color || 'bg-white'} ${isActive ? 'active-card' : ''} transition-all duration-200 bg-opacity-90 shrink-0" 
+                             style="width: ${currentWidth}px;"
+                             data-card-id="${card.id}" data-row-id="${row.id}"
+                             onclick="window.selectCard('${card.id}')"
+                             ondragover="window.handleCardDragOver(event)"
+                             ondragenter="window.handleCardDragEnter(event)"
+                             ondragleave="window.handleCardDragLeave(event)"
+                             ondrop="window.handleCardDrop(event, '${card.id}', '${row.id}')">
+                            
+                            <div class="card-tools absolute -top-3 -right-3 flex gap-1 z-20">
+                                <button class="w-6 h-6 bg-white border border-gray-200 text-gray-400 rounded-full flex items-center justify-center shadow hover:text-blue-500 cursor-grab active:cursor-grabbing"
+                                        draggable="true" 
+                                        ondragstart="window.handleCardDragStart(event, '${card.id}', '${row.id}')" title="드래그하여 이동">
+                                    <i data-lucide="grip-horizontal" class="w-3 h-3"></i>
+                                </button>
+                                <button onclick="window.duplicateCard('${card.id}'); event.stopPropagation();" class="w-6 h-6 bg-white border border-gray-200 text-gray-400 rounded-full flex items-center justify-center shadow hover:text-blue-500 transition-colors" title="카드 복사">
+                                    <i data-lucide="copy" class="w-3 h-3"></i>
+                                </button>
+                                <button onclick="window.deleteCard('${card.id}'); event.stopPropagation();" class="w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center shadow hover:bg-red-600 transition-colors" title="삭제">
+                                    <i data-lucide="x" class="w-3 h-3"></i>
+                                </button>
+                            </div>
+
+                            <div class="p-2 border-b border-gray-100 bg-white/60 relative min-h-[44px] flex flex-col justify-center">
+                                <div class="flex items-center w-full gap-1.5">
+                                    <div class="flex gap-1 items-center shrink-0" id="markers-${card.id}">${markersHtml}</div>
+                                    <input type="text" value="${escapeHtml(card.title)}" oninput="window.updateCardTitle('${card.id}', this.value)" spellcheck="false" style="flex: 4;" class="min-w-0 text-[14px] text-gray-900 bg-transparent border-none outline-none font-bold py-1 px-1 placeholder-gray-400 hover:bg-black/5 focus:bg-white focus:ring-1 focus:ring-gray-200 rounded transition-all" placeholder="장면 제목">
+                                    <input type="text" value="${escapeHtml(card.location)}" oninput="window.updateCardLocation('${card.id}', this.value)" spellcheck="false" style="flex: 2.5;" class="min-w-0 text-[13px] text-gray-700 bg-transparent border-none outline-none py-1 px-1 font-medium placeholder-gray-400 text-right hover:bg-black/5 focus:bg-white focus:ring-1 focus:ring-gray-200 rounded transition-all" placeholder="장소">
+                                    <input type="text" value="${escapeHtml(card.estWords)}" oninput="window.updateCardEstWords('${card.id}', this.value)" spellcheck="false" style="flex: 1;" class="min-w-0 text-[13px] text-blue-600 bg-transparent border-none outline-none py-1 px-1 placeholder-gray-400 text-right hover:bg-blue-50 focus:bg-white focus:ring-1 focus:ring-blue-200 rounded transition-all" placeholder="글자수">
+                                    ${checkBadge}
+                                </div>
+                            </div>
+                            
+                            <div class="flex-1 p-3 overflow-y-auto custom-scrollbar">
+                                <div id="editor-${card.id}" contenteditable="true" spellcheck="false"
+                                     oninput="window.updateCardContent('${card.id}', this.innerHTML)" 
+                                     onfocus="window.selectCard('${card.id}')"
+                                     class="rich-editor w-full h-full outline-none leading-relaxed text-gray-800" 
+                                     style="font-size:${board.globalFontSize || card.cardFontSize || '10.5pt'};${board.globalFontFamily ? 'font-family:' + board.globalFontFamily + ';' : ''}"
+                                     data-placeholder="">${card.content || ''}</div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                cardsHtml += `
+                    <div class="add-card-btn flex flex-col items-center justify-center border-r border-b border-gray-200 bg-gray-50/50 aspect-[4/3] hover:bg-blue-50 hover:text-blue-500 text-gray-300 cursor-pointer transition-colors group shrink-0"
+                         style="width: ${currentWidth}px;"
+                         onclick="window.addCardToRow('${row.id}')"
+                         ondragover="window.handleCardDragOver(event)"
+                         ondrop="window.handleCardDropToEmptyRow(event, '${row.id}')">
+                        <i data-lucide="plus" class="w-8 h-8 group-hover:scale-110 transition-transform"></i>
+                        <span class="text-xs mt-2 font-medium opacity-0 group-hover:opacity-100 transition-opacity">장면 추가</span>
+                    </div>
+                `;
+
+                const rowHtml = `
+                    <div class="flex flex-row w-full bg-white border-gray-200 group/row relative min-w-max">
+                        <div class="w-24 shrink-0 border-r border-b border-gray-200 flex flex-col items-center justify-center p-2 ${rowColorCls} relative">
+                            <div class="absolute top-1.5 left-2 flex items-center gap-1">
+                                <span class="text-[10px] text-gray-400 font-bold">Track ${index + 1}</span>
+                                <button onclick="window.cycleRowColor('${row.id}')" title="트랙 색상 변경" 
+                                        style="background-color:${chipColor};"
+                                        class="track-color-chip hover:scale-125 transition-transform"></button>
+                            </div>
+                            <textarea oninput="window.updateRowTitle('${row.id}', this.value)" spellcheck="false" class="w-full text-center outline-none bg-transparent text-gray-700 font-bold text-sm resize-none h-20 mt-4 leading-tight overflow-hidden" placeholder="행 이름">${escapeHtml(row.title)}</textarea>
+                            <div id="row-total-${row.id}" class="text-[11px] text-gray-600 font-bold mt-1 bg-white/70 px-3 py-1 rounded-full text-center whitespace-nowrap shadow-none min-w-[64px] flex items-center justify-center" title="총 예상 글자 수">${rowTotalWords.toLocaleString()}자</div>
+                        </div>
+                        <div class="flex-1 flex flex-row">
+                            ${cardsHtml}
+                        </div>
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', rowHtml);
+            });
+
+            if(document.getElementById('track-count')) {
+                document.getElementById('track-count').textContent = board.data.length;
+            }
+            updateBoardTotalDOM();
+            applyFilterDOM(); 
+            
+            document.querySelectorAll('[contenteditable]').forEach(el => {
+                if(el.innerHTML.trim() === '' || el.innerHTML === '<br>') el.classList.add('empty-editor');
+                el.addEventListener('input', function() {
+                    if(this.innerHTML.trim() === '' || this.innerHTML === '<br>') this.classList.add('empty-editor');
+                    else this.classList.remove('empty-editor');
+                });
+            });
+        }
+
+        function updateBoardTotalDOM() {
+            const board = window.getCurrentBoard();
+            if (!board) return;
+            let total = 0;
+            (board.data || []).forEach(row => {
+                (row.cards || []).forEach(card => {
+                    const val = card.estWords ? String(card.estWords).replace(/[^0-9]/g, '') : '0';
+                    total += (parseInt(val) || 0);
+                });
+            });
+            const topTotalSpan = document.getElementById('board-total-words');
+            if (topTotalSpan) topTotalSpan.textContent = total.toLocaleString();
+        }
+
+        function updateRowTotalDOM(rowId) {
+            const row = window.getCurrentBoard().data.find(r => r.id === rowId);
+            if (row) {
+                const total = (row.cards || []).reduce((sum, card) => {
+                    const val = card.estWords ? String(card.estWords).replace(/[^0-9]/g, '') : '0';
+                    return sum + (parseInt(val) || 0);
+                }, 0);
+                const totalSpan = document.getElementById(`row-total-${rowId}`);
+                if (totalSpan) totalSpan.textContent = total.toLocaleString() + '자';
+            }
+        }
+
+        function applyFilterDOM() {
+            document.querySelectorAll('.card-wrapper').forEach(el => {
+                if (!window.activeFilter) {
+                    el.classList.remove('opacity-20', 'grayscale');
+                } else {
+                    const cardId = el.dataset.cardId;
+                    const result = findCardAndRow(cardId);
+                    if (result && (result.card.markers || []).includes(window.activeFilter)) {
+                        el.classList.remove('opacity-20', 'grayscale');
+                    } else {
+                        el.classList.add('opacity-20', 'grayscale');
+                    }
+                }
+            });
+        }
+
+        function renderPalette() {
+            const palette = document.getElementById('palette-grid');
+            palette.innerHTML = '';
+            colors.forEach(color => {
+                palette.insertAdjacentHTML('beforeend', `
+                    <div class="flex items-center justify-center">
+                        <button onclick="window.changeCardColor('${color.class}')" class="w-6 h-6 rounded border border-gray-200 shadow-sm hover:scale-110 transition-transform ${color.viewClass}"></button>
+                    </div>
+                `);
+            });
+        }
+
+        function renderAll() {
+            renderBoardList();
+            renderBoard();
+            const board = window.getCurrentBoard();
+            const currentWidth = board ? (board.cardWidth || 400) : 400;
+            const slider = document.getElementById('card-size-slider');
+            const text = document.getElementById('card-size-text');
+            if (slider && text) {
+                slider.value = currentWidth;
+                text.textContent = currentWidth + 'px';
+            }
+            window.toggleFilter(window.activeFilter); 
+            updateUndoRedoUI();
+            if(window.lucide) window.lucide.createIcons();
+        }
+
+        function initCanvasPanning() {
+            const wrapper = document.getElementById('canvas-wrapper');
+            wrapper.addEventListener('contextmenu', e => {
+                if(e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA' && !e.target.hasAttribute('contenteditable')) {
+                    e.preventDefault();
+                }
+            });
+            wrapper.addEventListener('mousedown', e => {
+                if (e.button === 2) { 
+                    window.isPanning = true; wrapper.style.cursor = 'grabbing';
+                    window.startX = e.pageX - wrapper.offsetLeft; window.startY = e.pageY - wrapper.offsetTop;
+                    window.scrollLeft = wrapper.scrollLeft; window.scrollTop = wrapper.scrollTop;
+                }
+            });
+            wrapper.addEventListener('mouseleave', () => { window.isPanning = false; wrapper.style.cursor = 'default'; });
+            wrapper.addEventListener('mouseup', e => {
+                if (e.button === 2) { window.isPanning = false; wrapper.style.cursor = 'default'; }
+            });
+            wrapper.addEventListener('mousemove', e => {
+                if (!window.isPanning) return;
+                e.preventDefault();
+                const x = e.pageX - wrapper.offsetLeft; const y = e.pageY - wrapper.offsetTop;
+                wrapper.scrollLeft = window.scrollLeft - (x - window.startX) * 1.5;
+                wrapper.scrollTop = window.scrollTop - (y - window.startY) * 1.5;
+            });
+            
+            // 팔레트 밖 클릭 시 닫기
+            document.addEventListener('click', (e) => {
+                const palette = document.getElementById('text-color-palette');
+                const btn = document.getElementById('color-picker-btn');
+                if (palette && !palette.classList.contains('hidden') && !palette.contains(e.target) && !btn.contains(e.target)) {
+                    palette.classList.add('hidden');
+                }
+                // 검색 패널 외부 클릭 시 닫기
+                const searchPanel = document.getElementById('search-panel');
+                const searchInput = document.getElementById('search-input');
+                if (searchPanel && !searchPanel.classList.contains('hidden') &&
+                    !searchPanel.contains(e.target) && !e.target.closest('[onclick*="openSearch"]')) {
+                    window.closeSearch();
+                }
+            });
+            
+            document.addEventListener('dragleave', (e) => {
+                if(e.target.closest('.group')) e.target.closest('.group').classList.remove('board-drag-over');
+            });
+
+            // ========== 단축키 ==========
+            document.addEventListener('keydown', (e) => {
+                const tag = document.activeElement.tagName;
+                const isEditing = ['INPUT', 'TEXTAREA'].includes(tag) || document.activeElement.hasAttribute('contenteditable');
+
+                // Ctrl+Z: Undo
+                if (e.ctrlKey && e.key === 'z' && !e.shiftKey && !isEditing) {
+                    e.preventDefault();
+                    window.undoAction();
+                }
+                // Ctrl+Y / Ctrl+Shift+Z: Redo
+                if ((e.ctrlKey && e.key === 'y') || (e.ctrlKey && e.shiftKey && e.key === 'z')) {
+                    if (!isEditing) { e.preventDefault(); window.redoAction(); }
+                }
+                // Ctrl+F: 검색
+                if (e.ctrlKey && e.key === 'f') {
+                    e.preventDefault();
+                    window.openSearch();
+                }
+                // Escape: 검색 닫기
+                if (e.key === 'Escape') {
+                    window.closeSearch();
+                }
+            });
+        }
+
+        async function loadInitialData() {
+            if (isNodeEnvironment && fs.existsSync(targetFilePath)) {
+                try {
+                    const fileData = await fs.promises.readFile(targetFilePath, 'utf8');
+                    const parsedData = JSON.parse(fileData);
+                    if (parsedData && parsedData.length > 0) {
+                        console.log("G드라이브에서 데이터를 성공적으로 불러왔습니다.");
+                        return parsedData;
+                    }
+                } catch(e) {
+                    console.error("G드라이브 파일 읽기 실패:", e);
+                }
+            }
+            console.log("로컬 DB에서 데이터를 불러옵니다.");
+            return await loadFromLocalDB();
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            renderPalette();
+            initCanvasPanning();
+            initWritingModeWidget();
+
+            // 집필 모드에서 폰트 변경 시 본 보드에도 동기화
+            try {
+                const { ipcRenderer } = require('electron');
+                ipcRenderer.on('font-changed-from-writing', (e, { fontSize, fontFamily }) => {
+                    const board = window.getCurrentBoard();
+                    if (!board) return;
+                    // 주의: 여기서 window.formatText()를 호출하면 그 안에서 다시
+                    // ipcRenderer.send('writing-font-changed')가 실행되어 main.js가
+                    // 또 이 이벤트를 돌려보내는 무한 루프가 발생한다(브라우저에선 require가
+                    // 없어 send가 실패하므로 루프가 안 생기지만 Electron exe에선 멈춤).
+                    // 따라서 IPC를 재전송하지 않는 _applyFontNoIpc로 직접 적용한다.
+                    if (fontSize)   { board.globalFontSize   = fontSize;   window._applyFontNoIpc('fontSize', fontSize); }
+                    if (fontFamily) { board.globalFontFamily = fontFamily; window._applyFontNoIpc('fontFamily', fontFamily); }
+                    // 드롭다운 동기화
+                    const fsSel = document.getElementById('font-size-select');
+                    const ffSel = document.getElementById('font-select');
+                    if (fsSel && fontSize)   fsSel.value = fontSize;
+                    if (ffSel && fontFamily) ffSel.value = fontFamily;
+                });
+            } catch(e) {}
+            
+            try {
+                await initLocalDB();
+                const savedData = await loadInitialData();
+                const lastId = await loadLastWorkspaceId();
+                if (savedData && savedData.length > 0) {
+                    _skipHistory = true;
+                    window.workspaces = normalizeData(savedData);
+                    // 마지막으로 열었던 보드가 있으면 복원, 없으면 첫 번째
+                    const restored = lastId && window.workspaces.find(w => w.id === lastId);
+                    window.currentWorkspaceId = restored ? lastId : window.workspaces[0].id;
+                    const board = window.getCurrentBoard();
+                    if (board && board.memoTabs) window.activeMemoTab = board.memoTabs[0].id;
+                    _skipHistory = false;
+                }
+            } catch (err) {
+                console.error("Data Load Error:", err);
+            }
+            
+            renderAll();
+        });
+
+    </script>
+</body>
+</html>

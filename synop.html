@@ -4,18 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>에피소드 기획 보드</title>
-    <!-- Google Fonts (실제 로딩) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700;800&family=Nanum+Myeongjo:wght@400;700;800&family=KoPub+Batang:wght@300;500&display=swap" rel="stylesheet">
-    <!-- Pretendard -->
-    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- html2canvas for Image Export -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- 로컬 폰트 (Pretendard / 나눔고딕 / 나눔명조) -->
+    <link rel="stylesheet" href="fonts/fonts.css">
+    <!-- Tailwind (정적 빌드, 오프라인) -->
+    <link rel="stylesheet" href="vendor/tailwind.css">
+    <!-- Lucide Icons (로컬) -->
+    <script src="vendor/lucide.min.js"></script>
+    <!-- html2canvas (로컬) -->
+    <script src="vendor/html2canvas.min.js"></script>
+    <!-- Firebase (실시간 동기화용, CDN) -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
     <style>
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
@@ -152,107 +152,26 @@
             pointer-events: none;
         }
 
-        /* 집필 모드 플로팅 보드 패널 */
-        #writing-mode-panel {
-            position: fixed;
-            top: 40px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 1700px;
-            height: calc(100vh - 60px);
-            background: #fcfcfc;
-            border-radius: 12px;
-            box-shadow: 0 16px 60px rgba(0,0,0,0.35);
-            z-index: 8500;
-            display: flex;
-            flex-direction: column;
-            border: 1px solid #334155;
-            overflow: hidden;
-            min-width: 400px;
-            min-height: 300px;
-            resize: both;
+        /* 오른쪽 사이드바 애니메이션 */
+        .sidebar-right {
+            transition: width 0.25s ease, opacity 0.25s ease, padding 0.25s ease;
+            overflow-y: auto;
+            overflow-x: hidden;
         }
-        #writing-mode-panel.hidden { display: none !important; }
-        #writing-mode-panel .wmp-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 7px 16px;
-            background: #1e293b;
-            border-radius: 12px 12px 0 0;
-            cursor: default;
-            user-select: none;
-            flex-shrink: 0;
-            gap: 8px;
-            height: 44px;
-        }
-        #writing-mode-panel .wmp-board-area {
-            flex: 1;
-            overflow: auto;
-            position: relative;
-            background: #fcfcfc;
-            cursor: default;
-        }
-        #writing-mode-panel .wmp-board-area.panning {
-            cursor: grabbing !important;
-        }
-        /* 집필 모드일 때 뒤 화면 완전히 숨김 - 배경 검정으로 덮기 */
-        body.writing-mode-active {
-            background: #1a1a2e !important;
-        }
-        body.writing-mode-active > *:not(#writing-mode-panel):not(#save-indicator):not(#delete-toast) {
-            display: none !important;
+        .sidebar-right.collapsed {
+            width: 0 !important;
+            opacity: 0;
+            padding: 0;
+            pointer-events: none;
         }
 
-        /* 구 집필 모드 위젯 (대체됨) */
-        #writing-mode-widget {
-            position: fixed;
-            top: 60px;
-            right: 20px;
-            width: 420px;
-            min-height: 300px;
-            max-height: 80vh;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 8px 40px rgba(0,0,0,0.22);
-            z-index: 9000;
-            display: flex;
-            flex-direction: column;
-            border: 1px solid #e5e7eb;
-            resize: both;
-            overflow: hidden;
-        }
-        #writing-mode-widget.hidden { display: none !important; }
-        #writing-mode-widget .wm-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 8px 12px;
-            background: #f8fafc;
-            border-bottom: 1px solid #e5e7eb;
-            border-radius: 12px 12px 0 0;
-            cursor: move;
-            user-select: none;
-            flex-shrink: 0;
-        }
-        #writing-mode-widget .wm-editor {
-            flex: 1;
-            padding: 16px;
-            overflow-y: auto;
-            outline: none;
-            line-height: 1.8;
-            min-height: 200px;
-        }
-        #writing-mode-widget .wm-footer {
-            padding: 6px 12px;
-            border-top: 1px solid #e5e7eb;
-            background: #f8fafc;
-            border-radius: 0 0 12px 12px;
-            flex-shrink: 0;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
+        /* 우측 사이드바 섹션 개별 접기(아코디언) */
+        .rs-head { padding: 4px 2px; }
+        .rs-head:hover { background: rgba(0,0,0,0.025); border-radius: 6px; }
+        .rs-body.collapsed { display: none; }
+        .rs-chevron { transition: transform 0.2s ease; }
+        .rs-chevron.collapsed { transform: rotate(-90deg); }
+
     </style>
 </head>
 <body data-theme="default" class="flex h-screen w-full bg-gray-50 font-sans text-sm text-gray-800 overflow-hidden transition-colors duration-300" style="font-family: 'Pretendard', sans-serif;">
@@ -281,6 +200,116 @@
         </div>
     </div>
 
+    <!-- GitHub 동기화 설정 모달 -->
+    <div id="github-sync-modal" class="fixed inset-0 bg-black/40 z-[200] hidden items-center justify-center">
+        <div class="bg-white rounded-xl shadow-2xl w-[420px] p-5">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-2 font-bold text-gray-800">
+                    <i data-lucide="github" class="w-4 h-4"></i> GitHub 동기화 설정
+                </div>
+                <button onclick="window.closeGithubSyncModal()" class="text-gray-400 hover:text-gray-600">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+            <div class="space-y-2.5 text-xs">
+                <div>
+                    <label class="block text-gray-500 mb-1 font-bold">Personal Access Token</label>
+                    <input id="gh-token" type="password" placeholder="ghp_..." class="w-full border border-gray-200 rounded px-2 py-1.5 outline-none focus:border-blue-400">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-gray-500 mb-1 font-bold">저장소 소유자</label>
+                        <input id="gh-owner" type="text" placeholder="예: mygithubid" class="w-full border border-gray-200 rounded px-2 py-1.5 outline-none focus:border-blue-400">
+                    </div>
+                    <div>
+                        <label class="block text-gray-500 mb-1 font-bold">저장소 이름</label>
+                        <input id="gh-repo" type="text" placeholder="예: my-synopsis-data" class="w-full border border-gray-200 rounded px-2 py-1.5 outline-none focus:border-blue-400">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-gray-500 mb-1 font-bold">브랜치</label>
+                        <input id="gh-branch" type="text" placeholder="main" class="w-full border border-gray-200 rounded px-2 py-1.5 outline-none focus:border-blue-400">
+                    </div>
+                    <div>
+                        <label class="block text-gray-500 mb-1 font-bold">파일 경로</label>
+                        <input id="gh-path" type="text" placeholder="data/synopsis.json" class="w-full border border-gray-200 rounded px-2 py-1.5 outline-none focus:border-blue-400">
+                    </div>
+                </div>
+                <label class="flex items-center gap-1.5 text-gray-500 font-bold pt-0.5">
+                    <input id="gh-autosync" type="checkbox" class="accent-blue-500">
+                    저장할 때마다 자동으로 GitHub에도 올리기
+                </label>
+                <div id="gh-status" class="text-[11px] text-gray-400 min-h-[16px]"></div>
+            </div>
+            <div class="flex items-center gap-2 mt-4">
+                <button onclick="window.saveGithubSyncSettings()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded py-2 font-bold text-xs">저장</button>
+                <button onclick="window.manualGithubPull()" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded py-2 font-bold text-xs">지금 불러오기</button>
+                <button onclick="window.manualGithubPush()" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded py-2 font-bold text-xs">지금 올리기</button>
+            </div>
+            <div class="text-[10px] text-gray-400 mt-3 leading-relaxed">
+                토큰은 이 PC에만 로컬로 저장되고(<span class="font-mono">~/.episode-board/github-sync.json</span>) 저장소에는 올라가지 않습니다. Contents 읽기/쓰기 권한이 있는 GitHub Personal Access Token이 필요합니다.<br>
+                동시 편집용 실시간 협업이 아니라 "PC를 옮길 때 최신 데이터를 불러오는" 방식입니다 — 두 PC를 동시에 열어놓고 편집하면 나중에 저장한 쪽이 이전 내용을 덮어씁니다.
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase 동기화 설정 모달 -->
+    <div id="firebase-sync-modal" class="fixed inset-0 bg-black/40 z-[200] hidden items-center justify-center">
+        <div class="bg-white rounded-xl shadow-2xl w-[440px] p-5">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-2 font-bold text-gray-800">
+                    <i data-lucide="flame" class="w-4 h-4 text-orange-500"></i> Firebase 동기화 설정
+                </div>
+                <button onclick="window.closeFirebaseSyncModal()" class="text-gray-400 hover:text-gray-600">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+            <div class="space-y-2.5 text-xs">
+                <div>
+                    <label class="block text-gray-500 mb-1 font-bold">Web API Key</label>
+                    <input id="fb-apikey" type="password" placeholder="AIzaSy..." class="w-full border border-gray-200 rounded px-2 py-1.5 outline-none focus:border-orange-400">
+                </div>
+                <div>
+                    <label class="block text-gray-500 mb-1 font-bold">프로젝트 ID</label>
+                    <input id="fb-projectid" type="text" placeholder="예: my-synopsis-12345" class="w-full border border-gray-200 rounded px-2 py-1.5 outline-none focus:border-orange-400">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-gray-500 mb-1 font-bold">컬렉션 이름</label>
+                        <input id="fb-collection" type="text" placeholder="episodeBoards" class="w-full border border-gray-200 rounded px-2 py-1.5 outline-none focus:border-orange-400">
+                    </div>
+                    <div>
+                        <label class="block text-gray-500 mb-1 font-bold">문서 ID</label>
+                        <input id="fb-docid" type="text" placeholder="main" class="w-full border border-gray-200 rounded px-2 py-1.5 outline-none focus:border-orange-400">
+                    </div>
+                </div>
+                <label class="flex items-center gap-1.5 text-gray-500 font-bold pt-0.5">
+                    <input id="fb-autosync" type="checkbox" class="accent-orange-500">
+                    실시간 동기화 사용 (저장 시 자동 업로드 + 다른 PC 변경사항 즉시 반영)
+                </label>
+                <div id="fb-google-status" class="text-[11px] bg-gray-50 border border-gray-100 rounded px-2 py-1.5"></div>
+                <div id="fb-status" class="text-[11px] text-gray-400 min-h-[16px]"></div>
+            </div>
+            <div class="flex items-center gap-2 mt-4">
+                <button onclick="window.saveFirebaseSyncSettings()" class="flex-1 bg-orange-500 hover:bg-orange-600 text-white rounded py-2 font-bold text-xs">저장</button>
+                <button onclick="window.manualFirebasePull()" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded py-2 font-bold text-xs">지금 불러오기</button>
+                <button onclick="window.manualFirebasePush()" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded py-2 font-bold text-xs">지금 올리기</button>
+            </div>
+            <div class="text-[10px] text-gray-400 mt-3 leading-relaxed">
+                <b>사전 준비 (Firebase 콘솔에서 1회만):</b><br>
+                1) console.firebase.google.com 에서 프로젝트 생성 → Firestore Database 만들기(프로덕션 모드)<br>
+                2) Authentication → Sign-in method 에서 <b>익명(Anonymous)</b> 과 <b>Google</b> 둘 다 로그인 사용 설정<br>
+                3) Firestore 규칙을 아래처럼 설정:<br>
+                <span class="block bg-gray-50 border border-gray-100 rounded p-1.5 mt-1 font-mono text-[9px] leading-snug">rules_version = '2';<br>service cloud.firestore {<br>&nbsp;match /databases/{db}/documents {<br>&nbsp;&nbsp;match /{doc=**} { allow read, write: if request.auth != null; }<br>&nbsp;}<br>}</span>
+                4) 프로젝트 설정 → 웹 앱 추가에서 API Key와 프로젝트 ID 확인<br><br>
+                <b>로그인 방식:</b> 데스크탑 앱은 자동으로 내부 인증되어 별도 로그인이 필요 없습니다. 온라인(깃허브 페이지) 버전은 보안을 위해 <b>구글 계정 로그인</b>이 필요합니다 — 위 상태 칸의 "구글로 로그인" 버튼을 눌러 한 번 로그인하면 이후에는 이 브라우저에서 자동으로 로그인 상태가 유지됩니다.<br><br>
+                <b>실시간 동기화를 켜면:</b> 이 PC나 다른 PC에서 저장하는 즉시 서로 화면에 반영됩니다. 다만 데이터를 통째로 하나의 문서로 주고받는 방식이라, <b>같은 카드를 두 PC에서 동시에 입력 중</b>이면 나중에 저장되는 쪽이 이깁니다(줄 단위 병합 아님). 한쪽이 입력 중일 때 상대방 변경사항이 오면 바로 덮어쓰지 않고 입력이 끝난 뒤 자동 반영합니다.<br>
+                키/설정은 이 PC(또는 이 브라우저)에만 로컬로 저장됩니다.
+            </div>
+        </div>
+    </div>
+
     <!-- Left Sidebar Toggle Button (always visible) -->
     <button id="left-sidebar-toggle" onclick="window.toggleLeftSidebar()" 
             class="fixed left-0 top-1/2 -translate-y-1/2 z-30 bg-white border border-gray-200 shadow-md rounded-r-lg w-5 h-12 flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200"
@@ -288,57 +317,12 @@
         <i data-lucide="chevron-left" id="left-toggle-icon" class="w-3.5 h-3.5"></i>
     </button>
 
-    <!-- 집필 모드 플로팅 보드 패널 -->
-    <div id="writing-mode-panel" class="hidden">
-        <div class="wmp-header" id="wmp-drag-handle">
-            <div class="flex items-center gap-3">
-                <i data-lucide="pen-line" class="w-4 h-4 text-indigo-300"></i>
-                <span class="text-sm font-bold text-white tracking-wide">집필 모드</span>
-                <span id="wmp-board-name" class="text-xs text-slate-400 font-normal"></span>
-            </div>
-            <div class="flex items-center gap-4">
-                <div class="flex items-center gap-2">
-                    <i data-lucide="blend" class="w-3.5 h-3.5 text-slate-400"></i>
-                    <span class="text-[11px] text-slate-400">투명도</span>
-                    <input type="range" min="15" max="100" value="100" id="wmp-opacity-slider"
-                           oninput="window.setWritingPanelOpacity(this.value)"
-                           class="w-24 accent-indigo-400 cursor-pointer">
-                    <span id="wmp-opacity-val" class="text-[11px] text-slate-300 w-8 text-right">100%</span>
-                </div>
-                <div class="w-px h-4 bg-slate-600"></div>
-                <!-- 확대/축소 -->
-                <div class="flex items-center gap-2">
-                    <button onclick="window.wmpZoom(-0.1)" class="text-slate-300 hover:text-white p-1 rounded hover:bg-slate-600 transition-colors">
-                        <i data-lucide="zoom-out" class="w-3.5 h-3.5"></i>
-                    </button>
-                    <span id="wmp-zoom-text" class="text-[11px] text-slate-300 w-9 text-center font-bold">100%</span>
-                    <button onclick="window.wmpZoom(0.1)" class="text-slate-300 hover:text-white p-1 rounded hover:bg-slate-600 transition-colors">
-                        <i data-lucide="zoom-in" class="w-3.5 h-3.5"></i>
-                    </button>
-                    <button onclick="window.wmpZoomReset()" class="text-[10px] text-slate-400 hover:text-white font-medium px-1.5 py-0.5 rounded hover:bg-slate-600 transition-colors">초기화</button>
-                </div>
-                <div class="w-px h-4 bg-slate-600"></div>
-                <div class="flex items-center gap-2 text-slate-400 text-[11px]">
-                    <i data-lucide="mouse-pointer-2" class="w-3.5 h-3.5"></i>
-                    <span>우클릭 드래그 이동 · 우하단 모서리 크기 조절</span>
-                </div>
-                <div class="w-px h-4 bg-slate-600"></div>
-                <button onclick="window.closeWritingMode()"
-                        class="flex items-center gap-1.5 text-slate-300 hover:text-white bg-slate-700 hover:bg-red-600 px-3 py-1.5 rounded text-xs font-bold transition-colors">
-                    <i data-lucide="x" class="w-3.5 h-3.5"></i> 집필 모드 종료
-                </button>
-            </div>
-        </div>
-        <!-- 보드 복사본이 렌더되는 영역 -->
-        <div class="wmp-board-area" id="wmp-board-area">
-            <div id="wmp-zoom-container" style="transform-origin: top left; transition: transform 0.15s;">
-                <div class="p-8 pb-16">
-                    <div id="wmp-doc-title" class="text-3xl font-bold text-gray-800 mb-6 px-1"></div>
-                    <div id="wmp-board-container" class="flex flex-col border-t border-l border-gray-200 bg-white shadow-sm w-max min-w-full"></div>
-                </div>
-            </div>
-        </div>
-    </div>
+    <!-- Right Sidebar Toggle Button (펼치기용, 접혔을 때만 노출) -->
+    <button id="right-sidebar-toggle" onclick="window.toggleRightSidebar()"
+            class="fixed right-0 top-1/2 -translate-y-1/2 z-30 bg-white border border-gray-200 shadow-md rounded-l-lg w-5 h-12 flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200"
+            title="오른쪽 도구창 펼치기" style="display:none;">
+        <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+    </button>
 
     <!-- Left Sidebar -->
 
@@ -413,6 +397,15 @@
                 <span class="text-gray-300">|</span>
                 <button onclick="window.resetData()" class="text-gray-400 hover:text-red-500 transition-colors">초기화</button>
             </div>
+            <div class="flex items-center justify-center gap-3 pt-1.5 text-[10px] border-t border-gray-100 mt-1">
+                <button onclick="window.openGithubSyncModal()" class="flex items-center gap-1 text-gray-500 hover:text-gray-800 transition-colors font-bold" title="GitHub로 여러 PC 동기화">
+                    <i data-lucide="github" class="w-3 h-3"></i> GitHub
+                </button>
+                <span class="text-gray-300">|</span>
+                <button onclick="window.openFirebaseSyncModal()" class="flex items-center gap-1 text-orange-500 hover:text-orange-700 transition-colors font-bold" title="Firebase로 여러 PC 동기화">
+                    <i data-lucide="flame" class="w-3 h-3"></i> Firebase
+                </button>
+            </div>
             <input type="file" id="import-file" accept=".json" class="hidden" onchange="window.importData(event)">
         </div>
     </div>
@@ -434,7 +427,7 @@
                     <span class="text-gray-300">|</span>
                     <select id="font-select" onchange="window.formatText('fontName', this.value)" class="bg-transparent cursor-pointer hover:text-gray-900 text-sm w-24 outline-none">
                         <option value="Pretendard, sans-serif">Pretendard</option>
-                        <option value="'KoPub Batang', serif">바탕체</option>
+                        <option value="'KoPub Batang', 'Nanum Myeongjo', serif">바탕체</option>
                         <option value="'Nanum Gothic', sans-serif">나눔고딕</option>
                         <option value="'Nanum Myeongjo', serif">나눔명조</option>
                     </select>
@@ -600,8 +593,40 @@
                     <i data-lucide="plus" class="w-3 h-3"></i> 추가
                 </button>
             </div>
-            <div id="checklist-container" class="space-y-1 text-xs text-gray-500">
-                <span class="text-[11px] text-gray-400">카드를 선택하면 체크리스트를 편집할 수 있어요.</span>
+            <div id="checklist-container" class="space-y-1 text-xs text-gray-500"></div>
+        </div>
+
+        <!-- 회차별 분량 설계 -->
+        <div class="p-4 border-b border-gray-100">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-xs font-bold text-gray-500 flex items-center gap-1">
+                    <i data-lucide="layers" class="w-3 h-3"></i> 회차별 분량
+                </h3>
+                <div class="flex items-center gap-1 text-[10px] text-gray-400">
+                    <span>목표</span>
+                    <input type="number" id="episode-target-input" min="500" step="100" value="5500"
+                           oninput="window.updateEpisodeTarget(this.value)"
+                           class="w-16 bg-gray-50 border border-gray-200 rounded px-1 py-0.5 text-[11px] text-gray-700 text-right outline-none focus:border-indigo-300">
+                    <span>자</span>
+                </div>
+            </div>
+            <div id="episode-summary" class="space-y-2 text-xs"></div>
+        </div>
+
+        <!-- 복선 / 떡밥 추적 -->
+        <div class="p-4 border-b border-gray-100">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-xs font-bold text-gray-500 flex items-center gap-1">
+                    <i data-lucide="anchor" class="w-3 h-3"></i> 복선 · 떡밥
+                </h3>
+                <button onclick="window.addForeshadow()" class="text-[10px] text-amber-600 hover:text-amber-700 font-bold flex items-center gap-0.5">
+                    <i data-lucide="plus" class="w-3 h-3"></i> 추가
+                </button>
+            </div>
+            <div id="foreshadow-editor" class="space-y-1 mb-3"></div>
+            <div class="pt-2 border-t border-dashed border-gray-100">
+                <span class="text-[10px] font-bold text-gray-400 mb-1.5 block tracking-wider">작품 전체 복선 현황</span>
+                <div id="foreshadow-summary" class="space-y-1 text-[11px] text-gray-500"></div>
             </div>
         </div>
 
@@ -649,6 +674,500 @@ try {
 } catch(e) {
     console.warn("Node.js API 연동 실패 (일반 브라우저 환경에서 실행됨)");
 }
+
+// --- GitHub 동기화 (여러 PC간 데이터 이어쓰기용) ---
+let ghConfigPath = '';
+if (isNodeEnvironment) {
+    try {
+        const ghConfigDir = pathModule.join(os.homedir(), '.episode-board');
+        if (!fs.existsSync(ghConfigDir)) fs.mkdirSync(ghConfigDir, { recursive: true });
+        ghConfigPath = pathModule.join(ghConfigDir, 'github-sync.json');
+    } catch (e) { console.warn('GitHub 설정 폴더 생성 실패:', e); }
+}
+
+let githubConfig = null; // { token, owner, repo, branch, path, autoSync, sha }
+
+function loadGithubConfig() {
+    if (ghConfigPath) {
+        try {
+            if (!fs.existsSync(ghConfigPath)) return null;
+            return JSON.parse(fs.readFileSync(ghConfigPath, 'utf8'));
+        } catch (e) { return null; }
+    }
+    // 브라우저(GitHub Pages 등, 파일시스템 없음)에서는 localStorage로 대신 저장
+    try {
+        const raw = localStorage.getItem('gh-sync-config');
+        return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+}
+
+function saveGithubConfig(cfg) {
+    if (ghConfigPath) {
+        try { fs.writeFileSync(ghConfigPath, JSON.stringify(cfg, null, 2), 'utf8'); }
+        catch (e) { console.warn('GitHub 설정 저장 실패:', e); }
+        return;
+    }
+    try { localStorage.setItem('gh-sync-config', JSON.stringify(cfg)); }
+    catch (e) { console.warn('GitHub 설정 저장 실패:', e); }
+}
+
+function ghUrl(cfg) {
+    const encodedPath = cfg.path.split('/').filter(Boolean).map(encodeURIComponent).join('/');
+    return `https://api.github.com/repos/${encodeURIComponent(cfg.owner)}/${encodeURIComponent(cfg.repo)}/contents/${encodedPath}`;
+}
+function ghHeaders(cfg) {
+    return { 'Authorization': `token ${cfg.token}`, 'Accept': 'application/vnd.github+json' };
+}
+
+// GitHub 저장소에서 최신 데이터를 가져온다
+async function githubPull(cfg) {
+    const res = await fetch(`${ghUrl(cfg)}?ref=${encodeURIComponent(cfg.branch || 'main')}`, { headers: ghHeaders(cfg) });
+    if (res.status === 404) return { notFound: true };
+    if (res.status === 401 || res.status === 403) throw new Error(`GitHub 인증 실패 (HTTP ${res.status}) - 토큰/권한을 확인하세요.`);
+    if (!res.ok) throw new Error(`GitHub 불러오기 실패 (HTTP ${res.status})`);
+    const json = await res.json();
+    cfg.sha = json.sha;
+    saveGithubConfig(cfg);
+    const text = Buffer.from(json.content, 'base64').toString('utf8');
+    return { data: JSON.parse(text) };
+}
+
+// GitHub 저장소에 현재 데이터를 커밋한다 (sha 충돌 시 최신 sha로 1회 재시도)
+async function githubPush(cfg, dataStr) {
+    const body = {
+        message: `자동 동기화 - ${new Date().toLocaleString('ko-KR')}`,
+        content: Buffer.from(dataStr, 'utf8').toString('base64'),
+        branch: cfg.branch || 'main'
+    };
+    if (cfg.sha) body.sha = cfg.sha;
+
+    let res = await fetch(ghUrl(cfg), {
+        method: 'PUT',
+        headers: { ...ghHeaders(cfg), 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    });
+
+    if (res.status === 409 || res.status === 422) {
+        const latest = await fetch(`${ghUrl(cfg)}?ref=${encodeURIComponent(cfg.branch || 'main')}`, { headers: ghHeaders(cfg) });
+        if (latest.ok) {
+            const j = await latest.json();
+            body.sha = j.sha;
+            res = await fetch(ghUrl(cfg), {
+                method: 'PUT',
+                headers: { ...ghHeaders(cfg), 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+        }
+    }
+    if (res.status === 401 || res.status === 403) throw new Error(`GitHub 인증 실패 (HTTP ${res.status}) - 토큰/권한을 확인하세요.`);
+    if (!res.ok) {
+        const t = await res.text().catch(() => '');
+        throw new Error(`GitHub 저장 실패 (HTTP ${res.status}) ${t.slice(0, 200)}`);
+    }
+    const json = await res.json();
+    cfg.sha = json.content.sha;
+    saveGithubConfig(cfg);
+}
+
+function ghSetStatus(msg, kind) {
+    const el = document.getElementById('gh-status');
+    if (!el) return;
+    const colors = { info: 'text-gray-400', ok: 'text-green-600', warn: 'text-orange-500', err: 'text-red-500' };
+    el.textContent = msg;
+    el.className = `text-[11px] min-h-[16px] ${colors[kind] || colors.info}`;
+}
+
+window.openGithubSyncModal = function () {
+    const cfg = loadGithubConfig() || {};
+    document.getElementById('gh-token').value = cfg.token || '';
+    document.getElementById('gh-owner').value = cfg.owner || '';
+    document.getElementById('gh-repo').value = cfg.repo || '';
+    document.getElementById('gh-branch').value = cfg.branch || 'main';
+    document.getElementById('gh-path').value = cfg.path || 'data/synopsis.json';
+    document.getElementById('gh-autosync').checked = !!cfg.autoSync;
+    ghSetStatus('', 'info');
+    const modal = document.getElementById('github-sync-modal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    if (window.lucide) window.lucide.createIcons({ el: modal });
+};
+window.closeGithubSyncModal = function () {
+    const modal = document.getElementById('github-sync-modal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+};
+window.saveGithubSyncSettings = function () {
+    const prev = loadGithubConfig() || {};
+    const cfg = {
+        token: document.getElementById('gh-token').value.trim(),
+        owner: document.getElementById('gh-owner').value.trim(),
+        repo: document.getElementById('gh-repo').value.trim(),
+        branch: document.getElementById('gh-branch').value.trim() || 'main',
+        path: document.getElementById('gh-path').value.trim() || 'data/synopsis.json',
+        autoSync: document.getElementById('gh-autosync').checked,
+        sha: prev.sha || null
+    };
+    if (!cfg.token || !cfg.owner || !cfg.repo) {
+        ghSetStatus('토큰, 소유자, 저장소 이름은 필수입니다.', 'err');
+        return false;
+    }
+    githubConfig = cfg;
+    saveGithubConfig(cfg);
+    ghSetStatus('저장되었습니다.', 'ok');
+    return true;
+};
+window.manualGithubPull = async function () {
+    if (!window.saveGithubSyncSettings()) return;
+    try {
+        ghSetStatus('불러오는 중...', 'info');
+        const result = await githubPull(githubConfig);
+        if (result.notFound) { ghSetStatus('저장소에 아직 파일이 없습니다. "지금 올리기"로 먼저 업로드하세요.', 'warn'); return; }
+        if (!result.data || !Array.isArray(result.data) || result.data.length === 0) { ghSetStatus('불러온 데이터가 비어있어 적용하지 않았습니다.', 'warn'); return; }
+        _skipHistory = true;
+        window.workspaces = normalizeData(result.data);
+        window.currentWorkspaceId = window.workspaces[0].id;
+        _skipHistory = false;
+        renderAll();
+        if (dbInitialized) await saveToLocalDB(window.workspaces);
+        ghSetStatus('불러오기 완료! (현재 화면의 데이터를 덮어썼습니다)', 'ok');
+    } catch (e) {
+        console.error(e);
+        ghSetStatus(e.message || '불러오기 실패', 'err');
+    }
+};
+window.manualGithubPush = async function () {
+    if (!window.saveGithubSyncSettings()) return;
+    try {
+        ghSetStatus('올리는 중...', 'info');
+        const dataStr = JSON.stringify(window.workspaces, null, 2);
+        await githubPush(githubConfig, dataStr);
+        ghSetStatus('올리기 완료!', 'ok');
+    } catch (e) {
+        console.error(e);
+        ghSetStatus(e.message || '올리기 실패', 'err');
+    }
+};
+
+// --- Firebase 동기화 (Firebase JS SDK, 익명/구글 인증 + 실시간 리스너) ---
+// 기본 프로젝트 설정값 (사용자가 별도로 설정하지 않아도 자동으로 이 값으로 동기화됩니다)
+const DEFAULT_FIREBASE_CONFIG = {
+    apiKey: "AIzaSyC1I0GQHJ4U5t0bIgWyXWlKT6pZZMZh2yI",
+    projectId: "syno-eb309",
+    collection: "episodeBoards",
+    docId: "main",
+    autoSync: true
+};
+let fbConfigPath = '';
+if (isNodeEnvironment) {
+    try {
+        const fbConfigDir = pathModule.join(os.homedir(), '.episode-board');
+        if (!fs.existsSync(fbConfigDir)) fs.mkdirSync(fbConfigDir, { recursive: true });
+        fbConfigPath = pathModule.join(fbConfigDir, 'firebase-sync.json');
+    } catch (e) { console.warn('Firebase 설정 폴더 생성 실패:', e); }
+}
+
+let firebaseConfig = null; // { apiKey, projectId, collection, docId, autoSync, clientId }
+let fbApp = null, fbAuthObj = null, fbDb = null, fbUnsub = null, fbEditWatcher = null;
+let fbPendingRemote = null; // 편집 중일 때 잠시 보류해두는 원격 변경사항
+let fbApplyingRemote = false; // 원격 데이터 반영 중 재귀 저장 방지용
+
+function loadFirebaseConfig() {
+    let stored = null;
+    if (fbConfigPath) {
+        try {
+            if (fs.existsSync(fbConfigPath)) stored = JSON.parse(fs.readFileSync(fbConfigPath, 'utf8'));
+        } catch (e) { stored = null; }
+    } else {
+        try {
+            const raw = localStorage.getItem('fb-sync-config');
+            stored = raw ? JSON.parse(raw) : null;
+        } catch (e) { stored = null; }
+    }
+    // 저장된 설정이 없으면 기본값(코드에 내장된 apiKey/프로젝트ID)을 사용
+    if (!stored || !stored.apiKey || !stored.projectId) {
+        return { ...DEFAULT_FIREBASE_CONFIG, ...(stored || {}) };
+    }
+    return stored;
+}
+function saveFirebaseConfig(cfg) {
+    if (fbConfigPath) {
+        try { fs.writeFileSync(fbConfigPath, JSON.stringify(cfg, null, 2), 'utf8'); }
+        catch (e) { console.warn('Firebase 설정 저장 실패:', e); }
+        return;
+    }
+    try { localStorage.setItem('fb-sync-config', JSON.stringify(cfg)); }
+    catch (e) { console.warn('Firebase 설정 저장 실패:', e); }
+}
+function fbGetClientId(cfg) {
+    if (cfg.clientId) return cfg.clientId;
+    cfg.clientId = 'client_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    saveFirebaseConfig(cfg);
+    return cfg.clientId;
+}
+
+// 브라우저(온라인 버전)에서 최초 1회 auth 상태가 정해질 때까지 기다림 (새로고침 시 로그인 세션 자동 복원 대기)
+let _fbAuthReadyPromise = null;
+function fbWaitAuthReady() {
+    if (!_fbAuthReadyPromise) {
+        _fbAuthReadyPromise = new Promise(resolve => {
+            const unsub = fbAuthObj.onAuthStateChanged(user => {
+                unsub();
+                resolve(user);
+            });
+        });
+    }
+    return _fbAuthReadyPromise;
+}
+
+// 로그인 상태가 바뀔 때마다 동기화 모달의 상태 표시를 갱신 + 로그인되면 자동 동기화가 켜져있으면 재연결
+function fbUpdateAuthUI(user) {
+    if (fbAuthObj && user === undefined) user = fbAuthObj.currentUser;
+    const box = document.getElementById('fb-google-status');
+    if (box && !isNodeEnvironment) {
+        if (user && !user.isAnonymous) {
+            box.innerHTML = `<span class="text-green-600 font-bold">${esc ? esc(user.displayName || user.email || '로그인됨') : (user.displayName || user.email || '로그인됨')}</span> 로 로그인됨 · <button onclick="window.fbGoogleSignOut()" class="text-gray-400 underline hover:text-gray-600">로그아웃</button>`;
+        } else {
+            box.innerHTML = `<span class="text-orange-500 font-bold">로그인 필요</span> · <button onclick="window.fbGoogleSignIn()" class="text-blue-500 underline hover:text-blue-700">구글로 로그인</button>`;
+        }
+    }
+    if (!isNodeEnvironment && user && !user.isAnonymous) {
+        const cfg = loadFirebaseConfig();
+        if (cfg && cfg.apiKey && cfg.projectId && cfg.autoSync) fbStartRealtimeSync(cfg);
+    } else if (!isNodeEnvironment && !user) {
+        fbStopRealtimeSync();
+    }
+}
+
+// Firebase 앱 초기화. 데스크탑(Electron)은 익명 로그인, 브라우저(온라인 버전)는 구글 로그인 필요.
+async function fbConnect(cfg) {
+    if (typeof firebase === 'undefined') {
+        throw new Error('Firebase SDK를 불러오지 못했습니다. 인터넷 연결을 확인하세요.');
+    }
+    if (!fbApp) {
+        fbApp = (firebase.apps || []).find(a => a.name === 'episodeBoardApp')
+            || firebase.initializeApp({ apiKey: cfg.apiKey, projectId: cfg.projectId }, 'episodeBoardApp');
+        fbAuthObj = fbApp.auth();
+        fbDb = fbApp.firestore();
+        if (!isNodeEnvironment) {
+            try { await fbAuthObj.setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch (e) {}
+            fbAuthObj.onAuthStateChanged(fbUpdateAuthUI);
+        }
+    }
+
+    if (isNodeEnvironment) {
+        // 데스크탑: 익명 인증 (기기 내부 로그인 유지 전용, 사용자 구분 없음)
+        if (!fbAuthObj.currentUser) {
+            try { await fbAuthObj.signInAnonymously(); }
+            catch (e) { throw new Error(`Firebase 인증 실패 - API Key/익명 로그인 설정을 확인하세요. (${e.code || e.message})`); }
+        }
+    } else {
+        // 브라우저(온라인 버전): 구글 로그인 필요. 새로고침 시 세션이 있으면 자동 복원, 없으면 로그인 요청.
+        const user = await fbWaitAuthReady();
+        if (!user) {
+            throw new Error('구글 로그인이 필요합니다. Firebase 동기화 설정에서 "구글로 로그인" 버튼을 눌러주세요.');
+        }
+    }
+    return fbDb;
+}
+
+// 브라우저에서 구글 계정으로 로그인 (버튼 클릭 등 사용자 동작에서 호출해야 팝업이 차단되지 않음)
+window.fbGoogleSignIn = async function () {
+    try {
+        if (!fbApp) {
+            const cfg = loadFirebaseConfig() || {};
+            if (!cfg.apiKey || !cfg.projectId) { fbSetStatus('먼저 API Key / 프로젝트 ID를 입력하고 저장하세요.', 'err'); return; }
+            fbApp = (firebase.apps || []).find(a => a.name === 'episodeBoardApp')
+                || firebase.initializeApp({ apiKey: cfg.apiKey, projectId: cfg.projectId }, 'episodeBoardApp');
+            fbAuthObj = fbApp.auth();
+            fbDb = fbApp.firestore();
+            try { await fbAuthObj.setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch (e) {}
+            fbAuthObj.onAuthStateChanged(fbUpdateAuthUI);
+        }
+        const provider = new firebase.auth.GoogleAuthProvider();
+        await fbAuthObj.signInWithPopup(provider);
+        fbSetStatus('구글 로그인 완료!', 'ok');
+    } catch (e) {
+        console.error(e);
+        fbSetStatus(`구글 로그인 실패 (${e.code || e.message})`, 'err');
+    }
+};
+window.fbGoogleSignOut = async function () {
+    try { if (fbAuthObj) await fbAuthObj.signOut(); fbSetStatus('로그아웃 되었습니다.', 'info'); }
+    catch (e) { console.error(e); }
+};
+
+function fbDocRef(cfg) {
+    return fbDb.collection(cfg.collection || 'episodeBoards').doc(cfg.docId || 'main');
+}
+
+async function firestorePull(cfg) {
+    await fbConnect(cfg);
+    const snap = await fbDocRef(cfg).get();
+    if (!snap.exists) return { notFound: true };
+    const d = snap.data();
+    if (!d || !d.data) return { notFound: true };
+    return { data: JSON.parse(d.data) };
+}
+
+async function firestorePush(cfg, dataStr) {
+    await fbConnect(cfg);
+    await fbDocRef(cfg).set({
+        data: dataStr,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        clientId: fbGetClientId(cfg)
+    }, { merge: true });
+}
+
+// 지금 사용자가 뭔가 입력 중인지 (원격 데이터를 바로 덮어쓰면 타이핑 중인 내용을 날릴 수 있어서 체크)
+function fbIsUserEditing() {
+    const el = document.activeElement;
+    if (!el) return false;
+    return el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName);
+}
+
+function fbApplyRemoteData(data) {
+    if (!data || !Array.isArray(data) || data.length === 0) return;
+    fbApplyingRemote = true;
+    _skipHistory = true;
+    const activeId = window.currentWorkspaceId;
+    window.workspaces = normalizeData(data);
+    window.currentWorkspaceId = (activeId && window.workspaces.find(w => w.id === activeId)) ? activeId : window.workspaces[0].id;
+    _skipHistory = false;
+    renderAll();
+    if (dbInitialized) saveToLocalDB(window.workspaces);
+    fbApplyingRemote = false;
+}
+
+function fbShowSyncToast(msg) {
+    const ind = document.getElementById('save-indicator');
+    if (!ind) return;
+    ind.classList.remove('opacity-0');
+    ind.innerHTML = `<i data-lucide="refresh-cw" class="w-3.5 h-3.5 inline-block mr-1.5 text-orange-500"></i> <span class="text-orange-600">${esc ? esc(msg) : msg}</span>`;
+    if (window.lucide) window.lucide.createIcons({ el: ind });
+    setTimeout(() => ind.classList.add('opacity-0'), 3000);
+}
+
+// 실시간 리스너 시작: 다른 PC가 Firebase에 저장하는 즉시 이 함수가 반응한다
+function fbStartRealtimeSync(cfg) {
+    fbConnect(cfg).then(() => {
+        if (fbUnsub) { fbUnsub(); fbUnsub = null; }
+        fbUnsub = fbDocRef(cfg).onSnapshot(snap => {
+            if (!snap.exists) return;
+            const d = snap.data();
+            if (!d || !d.data) return;
+            if (d.clientId === fbGetClientId(cfg)) return; // 내가 방금 올린 변경사항 에코 → 무시
+            let parsed;
+            try { parsed = JSON.parse(d.data); } catch (e) { return; }
+
+            if (fbIsUserEditing()) {
+                // 편집 중이면 바로 덮어쓰지 않고 보류, 편집이 끝나면 자동 반영
+                fbPendingRemote = parsed;
+                fbShowSyncToast('다른 PC에서 변경사항 도착 (편집 마치면 반영)');
+                if (!fbEditWatcher) {
+                    fbEditWatcher = setInterval(() => {
+                        if (fbPendingRemote && !fbIsUserEditing()) {
+                            const p = fbPendingRemote; fbPendingRemote = null;
+                            fbApplyRemoteData(p);
+                            fbShowSyncToast('다른 PC의 변경사항을 반영했습니다');
+                        }
+                    }, 1200);
+                }
+            } else {
+                fbApplyRemoteData(parsed);
+                fbShowSyncToast('다른 PC의 변경사항을 반영했습니다');
+            }
+        }, err => console.warn('Firebase 실시간 리스너 오류:', err));
+    }).catch(e => console.warn('Firebase 실시간 연결 실패:', e));
+}
+function fbStopRealtimeSync() {
+    if (fbUnsub) { fbUnsub(); fbUnsub = null; }
+    if (fbEditWatcher) { clearInterval(fbEditWatcher); fbEditWatcher = null; }
+    fbPendingRemote = null;
+}
+
+function fbSetStatus(msg, kind) {
+    const el = document.getElementById('fb-status');
+    if (!el) return;
+    const colors = { info: 'text-gray-400', ok: 'text-green-600', warn: 'text-orange-500', err: 'text-red-500' };
+    el.textContent = msg;
+    el.className = `text-[11px] min-h-[16px] ${colors[kind] || colors.info}`;
+}
+
+window.openFirebaseSyncModal = function () {
+    const cfg = loadFirebaseConfig() || {};
+    document.getElementById('fb-apikey').value = cfg.apiKey || '';
+    document.getElementById('fb-projectid').value = cfg.projectId || '';
+    document.getElementById('fb-collection').value = cfg.collection || 'episodeBoards';
+    document.getElementById('fb-docid').value = cfg.docId || 'main';
+    document.getElementById('fb-autosync').checked = !!cfg.autoSync;
+    fbSetStatus('', 'info');
+    const modal = document.getElementById('firebase-sync-modal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    if (window.lucide) window.lucide.createIcons({ el: modal });
+    const gStatus = document.getElementById('fb-google-status');
+    if (isNodeEnvironment) {
+        gStatus.innerHTML = '<span class="text-gray-400">데스크탑 앱: 자동으로 내부 인증되어 별도 로그인이 필요 없습니다.</span>';
+    } else if (fbAuthObj) {
+        fbUpdateAuthUI();
+    } else {
+        gStatus.innerHTML = '<span class="text-orange-500 font-bold">로그인 필요</span> · <button onclick="window.fbGoogleSignIn()" class="text-blue-500 underline hover:text-blue-700">구글로 로그인</button>';
+    }
+};
+window.closeFirebaseSyncModal = function () {
+    const modal = document.getElementById('firebase-sync-modal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+};
+window.saveFirebaseSyncSettings = function () {
+    const prev = loadFirebaseConfig() || {};
+    const cfg = {
+        apiKey: document.getElementById('fb-apikey').value.trim(),
+        projectId: document.getElementById('fb-projectid').value.trim(),
+        collection: document.getElementById('fb-collection').value.trim() || 'episodeBoards',
+        docId: document.getElementById('fb-docid').value.trim() || 'main',
+        autoSync: document.getElementById('fb-autosync').checked,
+        clientId: prev.clientId || null
+    };
+    if (!cfg.apiKey || !cfg.projectId) {
+        fbSetStatus('API Key와 프로젝트 ID는 필수입니다.', 'err');
+        return false;
+    }
+    firebaseConfig = cfg;
+    saveFirebaseConfig(cfg);
+    fbSetStatus('저장되었습니다.', 'ok');
+
+    if (cfg.autoSync) fbStartRealtimeSync(cfg);
+    else fbStopRealtimeSync();
+    return true;
+};
+window.manualFirebasePull = async function () {
+    if (!window.saveFirebaseSyncSettings()) return;
+    try {
+        fbSetStatus('불러오는 중...', 'info');
+        const result = await firestorePull(firebaseConfig);
+        if (result.notFound) { fbSetStatus('저장소에 아직 문서가 없습니다. "지금 올리기"로 먼저 업로드하세요.', 'warn'); return; }
+        if (!result.data || !Array.isArray(result.data) || result.data.length === 0) { fbSetStatus('불러온 데이터가 비어있어 적용하지 않았습니다.', 'warn'); return; }
+        fbApplyRemoteData(result.data);
+        fbSetStatus('불러오기 완료! (현재 화면의 데이터를 덮어썼습니다)', 'ok');
+    } catch (e) {
+        console.error(e);
+        fbSetStatus(e.message || '불러오기 실패', 'err');
+    }
+};
+window.manualFirebasePush = async function () {
+    if (!window.saveFirebaseSyncSettings()) return;
+    try {
+        fbSetStatus('올리는 중...', 'info');
+        const dataStr = JSON.stringify(window.workspaces, null, 2);
+        await firestorePush(firebaseConfig, dataStr);
+        fbSetStatus('올리기 완료!', 'ok');
+    } catch (e) {
+        console.error(e);
+        fbSetStatus(e.message || '올리기 실패', 'err');
+    }
+};
+
 
         // --- Utility ---
         const escapeHtml = (unsafe) => {
@@ -754,6 +1273,7 @@ try {
                 if (!w.cardWidth) w.cardWidth = 400;
                 if (!w.globalFontSize) w.globalFontSize = '10.5pt';
                 if (!w.globalFontFamily) w.globalFontFamily = '';
+                if (!w.episodeTarget) w.episodeTarget = 5500; // 회차당 목표 글자수
                 if (!w.memos || typeof w.memos !== 'object') {
                     const oldMemo = (typeof w.memo === 'string') ? w.memo : '';
                     w.memos = { mainMale: '', mainFemale: '', subChar: '', background: '', synopsis: '', keyDevice: '', general: oldMemo };
@@ -768,6 +1288,8 @@ try {
                         if (!card.checklist) card.checklist = [];
                         if (!card.rowColor) card.rowColor = 'gray';
                         if (!card.cardFontSize) card.cardFontSize = '';
+                        if (card.episode == null) card.episode = '';      // 회차 번호 (문자열)
+                        if (!Array.isArray(card.foreshadows)) card.foreshadows = []; // [{id,label,role:'plant'|'payoff'}]
                     });
                     if (!row.color) row.color = 'gray';
                 });
@@ -953,6 +1475,7 @@ try {
                 if (!result.card.checklist) result.card.checklist = [];
                 result.card.checklist.push({ id: generateId(), text: '', done: false });
                 renderChecklist(result.card);
+                window.refreshCardMarks(result.card.id);
                 window.triggerSave();
             }
         };
@@ -960,7 +1483,7 @@ try {
         function renderChecklist(card) {
             const container = document.getElementById('checklist-container');
             if (!card || !card.checklist || card.checklist.length === 0) {
-                container.innerHTML = '<span class="text-[11px] text-gray-400">카드를 선택하면 체크리스트를 편집할 수 있어요.</span>';
+                container.innerHTML = '';
                 return;
             }
             container.innerHTML = card.checklist.map((item, idx) => `
@@ -983,7 +1506,7 @@ try {
             const result = findCardAndRow(cardId);
             if (result) {
                 const item = result.card.checklist.find(i => i.id === itemId);
-                if (item) { item.done = done; renderChecklist(result.card); window.triggerSave(); }
+                if (item) { item.done = done; renderChecklist(result.card); window.refreshCardMarks(cardId); window.triggerSave(); }
             }
         };
 
@@ -1001,9 +1524,190 @@ try {
             if (result) {
                 result.card.checklist = result.card.checklist.filter(i => i.id !== itemId);
                 renderChecklist(result.card);
+                window.refreshCardMarks(cardId);
                 window.triggerSave();
             }
         };
+
+        // ========== 회차별 분량 ==========
+        window.updateEpisodeTarget = (value) => {
+            const board = window.getCurrentBoard();
+            if (!board) return;
+            const n = parseInt(String(value).replace(/[^0-9]/g, ''), 10);
+            board.episodeTarget = (n && n > 0) ? n : 5500;
+            renderEpisodeSummary();
+            window.triggerSave();
+        };
+
+        function renderEpisodeSummary() {
+            const el = document.getElementById('episode-summary');
+            if (!el) return;
+            const board = window.getCurrentBoard();
+            if (!board) return;
+            const target = board.episodeTarget || 5500;
+
+            // 회차별 집계
+            const map = {}; // ep -> { words, scenes }
+            (board.data || []).forEach(row => {
+                (row.cards || []).forEach(card => {
+                    const ep = String(card.episode || '').replace(/[^0-9]/g, '');
+                    if (!ep) return;
+                    const w = parseInt(String(card.estWords || '').replace(/[^0-9]/g, ''), 10) || 0;
+                    if (!map[ep]) map[ep] = { words: 0, scenes: 0 };
+                    map[ep].words += w;
+                    map[ep].scenes += 1;
+                });
+            });
+
+            const eps = Object.keys(map).map(Number).sort((a, b) => a - b);
+            if (eps.length === 0) {
+                el.innerHTML = '';
+                return;
+            }
+
+            el.innerHTML = eps.map(ep => {
+                const { words, scenes } = map[ep];
+                const pct = Math.min(100, Math.round((words / target) * 100));
+                const col = episodeColor(ep) || '#6366f1';
+                const over = words > target;
+                const barColor = over ? '#ef4444' : col;
+                return `
+                    <div>
+                        <div class="flex items-center justify-between mb-0.5">
+                            <span class="font-bold flex items-center gap-1" style="color:${col}">
+                                <span class="inline-block w-2 h-2 rounded-full" style="background:${col}"></span>${ep}화
+                                <span class="text-[10px] text-gray-400 font-normal">· ${scenes}장면</span>
+                            </span>
+                            <span class="text-[10px] font-bold ${over ? 'text-red-500' : 'text-gray-500'}">${words.toLocaleString()} / ${target.toLocaleString()}</span>
+                        </div>
+                        <div class="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                            <div class="h-full rounded-full transition-all" style="width:${pct}%;background:${barColor}"></div>
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+
+        // ========== 복선 / 떡밥 ==========
+        const FORESHADOW_ROLES = {
+            plant:  { label: '던짐', icon: '🌱', cls: 'bg-emerald-100 text-emerald-700' },
+            payoff: { label: '회수', icon: '✅', cls: 'bg-blue-100 text-blue-700' }
+        };
+
+        window.addForeshadow = () => {
+            if (!window.activeCardId) { alert('카드를 먼저 선택하세요.'); return; }
+            const result = findCardAndRow(window.activeCardId);
+            if (!result) return;
+            pushHistory();
+            if (!Array.isArray(result.card.foreshadows)) result.card.foreshadows = [];
+            result.card.foreshadows.push({ id: generateId(), label: '', role: 'plant' });
+            renderForeshadowEditor(result.card);
+            window.refreshCardMarks(result.card.id);
+            window.triggerSave();
+        };
+
+        function renderForeshadowEditor(card) {
+            const el = document.getElementById('foreshadow-editor');
+            if (!el) return;
+            if (!card) {
+                el.innerHTML = '';
+                return;
+            }
+            const list = card.foreshadows || [];
+            if (list.length === 0) {
+                el.innerHTML = '';
+                return;
+            }
+            el.innerHTML = list.map(f => {
+                const r = FORESHADOW_ROLES[f.role] || FORESHADOW_ROLES.plant;
+                return `
+                <div class="flex items-center gap-1">
+                    <button onclick="window.toggleForeshadowRole('${card.id}','${f.id}')" title="던짐 ↔ 회수 전환"
+                            class="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${r.cls} hover:opacity-80 transition-opacity">${r.icon} ${r.label}</button>
+                    <input type="text" value="${escapeHtml(f.label)}" placeholder="복선 이름 (예: 어머니의 반지)"
+                           class="flex-1 min-w-0 bg-transparent border-b border-gray-200 outline-none text-[11px] text-gray-700 focus:border-amber-300 py-0.5"
+                           oninput="window.updateForeshadow('${card.id}','${f.id}', this.value)"
+                           onkeydown="if(event.key==='Enter'){window.addForeshadow()}">
+                    <button onclick="window.removeForeshadow('${card.id}','${f.id}')" class="shrink-0 text-gray-300 hover:text-red-400 transition-colors">
+                        <i data-lucide="x" class="w-3 h-3"></i>
+                    </button>
+                </div>`;
+            }).join('');
+            if (window.lucide) window.lucide.createIcons({ el });
+        }
+
+        window.updateForeshadow = (cardId, fId, value) => {
+            const result = findCardAndRow(cardId);
+            if (!result) return;
+            const f = (result.card.foreshadows || []).find(x => x.id === fId);
+            if (f) { f.label = value; renderForeshadowSummary(); window.triggerSave(); }
+        };
+
+        window.toggleForeshadowRole = (cardId, fId) => {
+            const result = findCardAndRow(cardId);
+            if (!result) return;
+            const f = (result.card.foreshadows || []).find(x => x.id === fId);
+            if (f) {
+                f.role = (f.role === 'plant') ? 'payoff' : 'plant';
+                renderForeshadowEditor(result.card);
+                renderForeshadowSummary();
+                window.triggerSave();
+            }
+        };
+
+        window.removeForeshadow = (cardId, fId) => {
+            pushHistory();
+            const result = findCardAndRow(cardId);
+            if (!result) return;
+            result.card.foreshadows = (result.card.foreshadows || []).filter(x => x.id !== fId);
+            renderForeshadowEditor(result.card);
+            renderForeshadowSummary();
+            window.refreshCardMarks(cardId);
+            window.triggerSave();
+        };
+
+        function renderForeshadowSummary() {
+            const el = document.getElementById('foreshadow-summary');
+            if (!el) return;
+            const board = window.getCurrentBoard();
+            if (!board) return;
+
+            // 라벨(대소문자/공백 무시)별로 묶기
+            const groups = {}; // key -> { label, plant:[cards], payoff:[cards] }
+            (board.data || []).forEach(row => {
+                (row.cards || []).forEach(card => {
+                    (card.foreshadows || []).forEach(f => {
+                        const label = (f.label || '').trim();
+                        if (!label) return;
+                        const key = label.toLowerCase();
+                        if (!groups[key]) groups[key] = { label, plant: [], payoff: [] };
+                        (f.role === 'payoff' ? groups[key].payoff : groups[key].plant).push(card);
+                    });
+                });
+            });
+
+            const keys = Object.keys(groups);
+            if (keys.length === 0) {
+                el.innerHTML = '';
+                return;
+            }
+
+            el.innerHTML = keys.map(k => {
+                const g = groups[k];
+                const hasPlant = g.plant.length > 0;
+                const hasPayoff = g.payoff.length > 0;
+                let status, color;
+                if (hasPlant && hasPayoff) { status = '✅ 회수완료'; color = 'text-blue-600'; }
+                else if (hasPlant && !hasPayoff) { status = '🌱 미회수'; color = 'text-amber-600'; }
+                else { status = '⚠️ 회수만 있음'; color = 'text-red-500'; }
+                const jumpCard = (hasPlant ? g.plant[0] : g.payoff[0]);
+                return `
+                    <div class="flex items-center justify-between gap-2 cursor-pointer hover:bg-amber-50 rounded px-1 py-0.5"
+                         onclick="window.jumpToCard('${board.id}','${jumpCard.id}')" title="해당 장면으로 이동">
+                        <span class="truncate text-gray-700">${escapeHtml(g.label)}</span>
+                        <span class="shrink-0 font-bold ${color}">${status}</span>
+                    </div>`;
+            }).join('');
+        }
 
         // ========== 트랙 색상 ==========
         const ROW_COLORS = [
@@ -1044,6 +1748,7 @@ try {
                     copy.id = generateId();
                     copy.title = (copy.title || '') + ' (복사)';
                     copy.checklist = (copy.checklist || []).map(item => ({ ...item, id: generateId() }));
+                    copy.foreshadows = (copy.foreshadows || []).map(f => ({ ...f, id: generateId() }));
                     r.cards.splice(idx + 1, 0, copy);
                     renderAll();
                     window.triggerSave();
@@ -1100,7 +1805,49 @@ try {
 
         // ========== Auto Save ==========
         let saveTimeout = null;
-        
+
+        // 원자적 저장 + 롤링 백업
+        // - 임시파일(.tmp)에 먼저 쓰고 rename으로 교체 → 쓰기 도중 죽어도 본파일이 깨지지 않음
+        // - 내용이 직전과 달라졌을 때만 백업을 회전(.bak1 ~ .bakN) → 동일 저장 스팸 방지
+        const MAX_BACKUPS = 15;
+        // 파일 존재 여부를 비동기로 확인 (동기 existsSync는 렌더러 스레드를 멈추게 하므로 사용하지 않음)
+        async function fileExistsAsync(p) {
+            try { await fs.promises.access(p); return true; }
+            catch(e) { return false; }
+        }
+
+        async function safeSaveWithBackup(filePath, dataStr) {
+            // 변경 여부 확인
+            let prev = null;
+            try {
+                prev = await fs.promises.readFile(filePath, 'utf8');
+            } catch(e) { prev = null; }
+
+            // 내용 동일하면 쓰기 자체를 건너뜀
+            if (prev === dataStr) return;
+
+            // 본파일이 이미 있으면(=직전 상태가 존재) 백업 회전
+            if (prev !== null) {
+                try {
+                    for (let i = MAX_BACKUPS - 1; i >= 1; i--) {
+                        const src = `${filePath}.bak${i}`;
+                        const dst = `${filePath}.bak${i + 1}`;
+                        try { await fs.promises.rename(src, dst); } catch(e) {} // 없으면(ENOENT) 그냥 넘어감
+                    }
+                    await fs.promises.copyFile(filePath, `${filePath}.bak1`);
+                } catch(e) { console.warn('백업 회전 실패(저장은 계속):', e); }
+            }
+
+            // 원자적 쓰기: tmp → rename
+            const tmpPath = `${filePath}.tmp`;
+            await fs.promises.writeFile(tmpPath, dataStr, 'utf8');
+            await fs.promises.rename(tmpPath, filePath);
+        }
+
+        // TARGET_DIR이 한 번 확인/생성되면 매번 다시 물어보지 않도록 캐시
+        // (existsSync를 저장할 때마다 부르면 클라우드 동기화 폴더에서 매번 지연이 생길 수 있음)
+        let _targetDirReady = false;
+
         window.triggerSave = function(force = false) {
             showSaveIndicator('loading');
             if (saveTimeout) clearTimeout(saveTimeout);
@@ -1111,11 +1858,14 @@ try {
                     const cleanDataStr = JSON.stringify(window.workspaces, null, 2);
                     let gDriveSuccess = false;
                     if (isNodeEnvironment) {
-                        if (!fs.existsSync(TARGET_DIR)) {
-                            try { fs.mkdirSync(TARGET_DIR, { recursive: true }); } catch(e) {}
+                        if (!_targetDirReady) {
+                            if (!(await fileExistsAsync(TARGET_DIR))) {
+                                try { await fs.promises.mkdir(TARGET_DIR, { recursive: true }); } catch(e) {}
+                            }
+                            _targetDirReady = await fileExistsAsync(TARGET_DIR);
                         }
-                        if (fs.existsSync(TARGET_DIR)) {
-                            await fs.promises.writeFile(targetFilePath, cleanDataStr, 'utf8');
+                        if (_targetDirReady) {
+                            await safeSaveWithBackup(targetFilePath, cleanDataStr);
                             gDriveSuccess = true;
                             showSaveIndicator('gdrive_success');
                         }
@@ -1123,6 +1873,28 @@ try {
                     if (dbInitialized) {
                         await saveToLocalDB(JSON.parse(cleanDataStr));
                         if(!gDriveSuccess) showSaveIndicator('local_success');
+                    }
+
+                    // GitHub 자동 동기화 (설정되어 있고 자동 동기화가 켜진 경우에만)
+                    if (githubConfig && githubConfig.token && githubConfig.autoSync) {
+                        try {
+                            await githubPush(githubConfig, cleanDataStr);
+                            showSaveIndicator('github_success');
+                        } catch (e) {
+                            console.warn('GitHub 자동 동기화 실패:', e);
+                            showSaveIndicator('github_error');
+                        }
+                    }
+
+                    // Firebase 자동 동기화 (설정되어 있고 자동 동기화가 켜진 경우에만)
+                    if (firebaseConfig && firebaseConfig.apiKey && firebaseConfig.autoSync) {
+                        try {
+                            await firestorePush(firebaseConfig, cleanDataStr);
+                            showSaveIndicator('firebase_success');
+                        } catch (e) {
+                            console.warn('Firebase 자동 동기화 실패:', e);
+                            showSaveIndicator('firebase_error');
+                        }
                     }
                 } catch (e) {
                     console.error("Save error", e);
@@ -1143,6 +1915,18 @@ try {
             } else if (state === 'local_success') {
                 ind.innerHTML = `<i data-lucide="check-circle" class="w-3.5 h-3.5 inline-block mr-1.5 text-green-500"></i> <span class="text-green-600">PC 로컬 임시저장</span>`;
                 setTimeout(() => ind.classList.add('opacity-0'), 2500);
+            } else if (state === 'github_success') {
+                ind.innerHTML = `<i data-lucide="github" class="w-3.5 h-3.5 inline-block mr-1.5 text-gray-700"></i> <span class="text-gray-700">GitHub 동기화 완료</span>`;
+                setTimeout(() => ind.classList.add('opacity-0'), 2500);
+            } else if (state === 'github_error') {
+                ind.innerHTML = `<i data-lucide="cloud-off" class="w-3.5 h-3.5 inline-block mr-1.5 text-orange-500"></i> <span class="text-orange-600">GitHub 동기화 실패 (로컬엔 저장됨)</span>`;
+                setTimeout(() => ind.classList.add('opacity-0'), 3500);
+            } else if (state === 'firebase_success') {
+                ind.innerHTML = `<i data-lucide="flame" class="w-3.5 h-3.5 inline-block mr-1.5 text-orange-500"></i> <span class="text-orange-600">Firebase 동기화 완료</span>`;
+                setTimeout(() => ind.classList.add('opacity-0'), 2500);
+            } else if (state === 'firebase_error') {
+                ind.innerHTML = `<i data-lucide="cloud-off" class="w-3.5 h-3.5 inline-block mr-1.5 text-orange-500"></i> <span class="text-orange-600">Firebase 동기화 실패 (로컬엔 저장됨)</span>`;
+                setTimeout(() => ind.classList.add('opacity-0'), 3500);
             } else {
                 ind.innerHTML = `<i data-lucide="alert-circle" class="w-3.5 h-3.5 inline-block mr-1.5 text-red-500"></i> <span class="text-red-600">저장 에러 (확인 요망)</span>`;
             }
@@ -1208,6 +1992,14 @@ try {
             'heart': 'text-red-500',
             'alert-circle': 'text-green-500'
         };
+
+        // 회차별 식별 색상 (같은 화끼리 같은 색 띠로 묶어보기)
+        const EPISODE_PALETTE = ['#6366f1','#0ea5e9','#10b981','#f59e0b','#ef4444','#ec4899','#8b5cf6','#14b8a6','#f97316','#64748b'];
+        function episodeColor(ep) {
+            const n = parseInt(String(ep).replace(/[^0-9]/g, ''), 10);
+            if (!n) return null;
+            return EPISODE_PALETTE[(n - 1) % EPISODE_PALETTE.length];
+        }
 
         window.getCurrentBoard = () => window.workspaces.find(w => w.id === window.currentWorkspaceId);
 
@@ -1435,13 +2227,16 @@ try {
         window.toggleRightSidebar = () => {
             const sidebar = document.getElementById('right-sidebar');
             const icon = document.getElementById('sidebar-icon');
+            const edgeBtn = document.getElementById('right-sidebar-toggle');
             window.isRightSidebarVisible = !window.isRightSidebarVisible;
             if (window.isRightSidebarVisible) {
-                sidebar.classList.remove('hidden');
-                icon.setAttribute('data-lucide', 'panel-right-open');
+                sidebar.classList.remove('collapsed');
+                if (icon) icon.setAttribute('data-lucide', 'panel-right-open');
+                if (edgeBtn) edgeBtn.style.display = 'none';
             } else {
-                sidebar.classList.add('hidden');
-                icon.setAttribute('data-lucide', 'panel-right-close');
+                sidebar.classList.add('collapsed');
+                if (icon) icon.setAttribute('data-lucide', 'panel-right-close');
+                if (edgeBtn) edgeBtn.style.display = 'flex';
             }
             if(window.lucide) window.lucide.createIcons();
         };
@@ -1765,7 +2560,7 @@ try {
             });
             // 체크리스트 업데이트
             const result = findCardAndRow(id);
-            if (result) renderChecklist(result.card);
+            if (result) { renderChecklist(result.card); renderForeshadowEditor(result.card); }
         };
 
         const findCardAndRow = (cardId) => {
@@ -1795,8 +2590,20 @@ try {
                 result.card.estWords = value;
                 updateRowTotalDOM(result.row.id);
                 updateBoardTotalDOM();
+                renderEpisodeSummary();
                 window.triggerSave();
             }
+        };
+
+        window.updateCardEpisode = (id, value) => {
+            const result = findCardAndRow(id);
+            if (!result) return;
+            result.card.episode = value;
+            const wrapper = document.querySelector(`.card-wrapper[data-card-id="${id}"]`);
+            const col = episodeColor(value);
+            if (wrapper) wrapper.style.borderTop = col ? `3px solid ${col}` : '';
+            renderEpisodeSummary();
+            window.triggerSave();
         };
 
         window.updateCardContent = (id, htmlContent) => {
@@ -1809,6 +2616,26 @@ try {
             if(row) { row.title = value; window.triggerSave(); }
         };
 
+        // 카드 헤더의 마커 + 복선/체크리스트 마크를 한 번에 다시 그림
+        window.refreshCardMarks = (cardId) => {
+            const result = findCardAndRow(cardId);
+            if (!result) return;
+            const card = result.card;
+            const cont = document.getElementById(`markers-${cardId}`);
+            if (!cont) return;
+            let html = (card.markers || []).map(m => {
+                const colorClass = markerColors[m] || 'text-gray-500';
+                return `<i data-lucide="${m}" class="w-4 h-4 ${colorClass} drop-shadow-sm"></i>`;
+            }).join('');
+            const fsCount = (card.foreshadows || []).length;
+            const checkTotal = (card.checklist || []).length;
+            const checkDone = (card.checklist || []).filter(i => i.done).length;
+            if (fsCount > 0) html += `<i data-lucide="anchor" class="w-3.5 h-3.5 text-amber-500 shrink-0" title="복선 ${fsCount}개"></i>`;
+            if (checkTotal > 0) html += `<i data-lucide="list-checks" class="w-3.5 h-3.5 shrink-0 ${checkDone === checkTotal ? 'text-green-500' : 'text-indigo-400'}" title="씬 체크리스트 ${checkDone}/${checkTotal}"></i>`;
+            cont.innerHTML = html;
+            if (window.lucide) window.lucide.createIcons({ el: cont });
+        };
+
         window.toggleMarker = (markerIcon) => {
             if (!window.activeCardId) return alert('마커를 추가할 카드를 먼저 선택하세요.');
             pushHistory();
@@ -1818,14 +2645,7 @@ try {
                 const idx = card.markers.indexOf(markerIcon);
                 if (idx > -1) card.markers.splice(idx, 1);
                 else card.markers.push(markerIcon);
-                const markersContainer = document.getElementById(`markers-${card.id}`);
-                if(markersContainer) {
-                    markersContainer.innerHTML = card.markers.map(m => {
-                        const colorClass = markerColors[m] || 'text-gray-500';
-                        return `<i data-lucide="${m}" class="w-4 h-4 ${colorClass} drop-shadow-sm"></i>`;
-                    }).join('');
-                    if(window.lucide) window.lucide.createIcons(); 
-                }
+                window.refreshCardMarks(card.id);
                 applyFilterDOM(); 
                 window.triggerSave();
             }
@@ -1875,7 +2695,7 @@ try {
             const row = window.getCurrentBoard().data.find(r => r.id === rowId);
             if(row) {
                 const newId = generateId();
-                row.cards.push({ id: newId, title: '', location: '', estWords: '', content: '', color: 'bg-white', markers: [], checklist: [] });
+                row.cards.push({ id: newId, title: '', location: '', estWords: '', content: '', color: 'bg-white', markers: [], checklist: [], episode: '', foreshadows: [] });
                 renderAll();
                 window.triggerSave();
                 setTimeout(() => {
@@ -2061,6 +2881,8 @@ try {
 
                 let cardsHtml = (row.cards || []).map(card => {
                     const isActive = window.activeCardId === card.id;
+                    const epColor = episodeColor(card.episode);
+                    const epStyle = epColor ? `border-top:3px solid ${epColor};` : '';
                     const markersHtml = (card.markers || []).map(m => {
                         const colorClass = markerColors[m] || 'text-gray-500';
                         return `<i data-lucide="${m}" class="w-4 h-4 ${colorClass} drop-shadow-sm"></i>`;
@@ -2068,10 +2890,16 @@ try {
                     const checkDone = (card.checklist || []).filter(i => i.done).length;
                     const checkTotal = (card.checklist || []).length;
                     const checkBadge = checkTotal > 0 ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full ${checkDone === checkTotal ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'}">${checkDone}/${checkTotal}</span>` : '';
+                    const fsCount = (card.foreshadows || []).length;
+                    // 카드에 달린 표시 마크 (한눈에 보이도록 제목 옆에)
+                    const fsMark = fsCount > 0
+                        ? `<i data-lucide="anchor" class="w-3.5 h-3.5 text-amber-500 shrink-0" title="복선 ${fsCount}개"></i>` : '';
+                    const clMark = checkTotal > 0
+                        ? `<i data-lucide="list-checks" class="w-3.5 h-3.5 shrink-0 ${checkDone === checkTotal ? 'text-green-500' : 'text-indigo-400'}" title="씬 체크리스트 ${checkDone}/${checkTotal}"></i>` : '';
                     
                     return `
                         <div class="card-wrapper relative flex flex-col border-r border-b border-gray-200 aspect-[4/3] ${card.color || 'bg-white'} ${isActive ? 'active-card' : ''} transition-all duration-200 bg-opacity-90 shrink-0" 
-                             style="width: ${currentWidth}px;"
+                             style="width: ${currentWidth}px;${epStyle}"
                              data-card-id="${card.id}" data-row-id="${row.id}"
                              onclick="window.selectCard('${card.id}')"
                              ondragover="window.handleCardDragOver(event)"
@@ -2095,9 +2923,10 @@ try {
 
                             <div class="p-2 border-b border-gray-100 bg-white/60 relative min-h-[44px] flex flex-col justify-center">
                                 <div class="flex items-center w-full gap-1.5">
-                                    <div class="flex gap-1 items-center shrink-0" id="markers-${card.id}">${markersHtml}</div>
+                                    <div class="flex gap-1 items-center shrink-0" id="markers-${card.id}">${markersHtml}${fsMark}${clMark}</div>
                                     <input type="text" value="${escapeHtml(card.title)}" oninput="window.updateCardTitle('${card.id}', this.value)" spellcheck="false" style="flex: 4;" class="min-w-0 text-[14px] text-gray-900 bg-transparent border-none outline-none font-bold py-1 px-1 placeholder-gray-400 hover:bg-black/5 focus:bg-white focus:ring-1 focus:ring-gray-200 rounded transition-all" placeholder="장면 제목">
                                     <input type="text" value="${escapeHtml(card.location)}" oninput="window.updateCardLocation('${card.id}', this.value)" spellcheck="false" style="flex: 2.5;" class="min-w-0 text-[13px] text-gray-700 bg-transparent border-none outline-none py-1 px-1 font-medium placeholder-gray-400 text-right hover:bg-black/5 focus:bg-white focus:ring-1 focus:ring-gray-200 rounded transition-all" placeholder="장소">
+                                    <input type="text" value="${escapeHtml(card.episode)}" oninput="window.updateCardEpisode('${card.id}', this.value)" spellcheck="false" style="flex: 0.9;${epColor ? 'color:' + epColor + ';' : ''}" class="min-w-0 w-9 text-[12px] font-bold bg-transparent border-none outline-none py-1 px-1 placeholder-gray-300 text-right hover:bg-black/5 focus:bg-white focus:ring-1 focus:ring-indigo-200 rounded transition-all" title="회차" placeholder="화">
                                     <input type="text" value="${escapeHtml(card.estWords)}" oninput="window.updateCardEstWords('${card.id}', this.value)" spellcheck="false" style="flex: 1;" class="min-w-0 text-[13px] text-blue-600 bg-transparent border-none outline-none py-1 px-1 placeholder-gray-400 text-right hover:bg-blue-50 focus:bg-white focus:ring-1 focus:ring-blue-200 rounded transition-all" placeholder="글자수">
                                     ${checkBadge}
                                 </div>
@@ -2226,6 +3055,19 @@ try {
                 slider.value = currentWidth;
                 text.textContent = currentWidth + 'px';
             }
+            // 회차 목표 글자수 입력 동기화
+            const epTargetInput = document.getElementById('episode-target-input');
+            if (epTargetInput && board) epTargetInput.value = board.episodeTarget || 5500;
+            // 회차/복선 패널 갱신
+            renderEpisodeSummary();
+            renderForeshadowSummary();
+            // 보드 전환 시 선택 카드가 없으면 복선 에디터 초기화
+            if (window.activeCardId) {
+                const r = findCardAndRow(window.activeCardId);
+                renderForeshadowEditor(r ? r.card : null);
+            } else {
+                renderForeshadowEditor(null);
+            }
             window.toggleFilter(window.activeFilter); 
             updateUndoRedoUI();
             if(window.lucide) window.lucide.createIcons();
@@ -2277,6 +3119,17 @@ try {
                 if(e.target.closest('.group')) e.target.closest('.group').classList.remove('board-drag-over');
             });
 
+            // ========== 붙여넣기: 서식/배경 없이 텍스트만 ==========
+            document.addEventListener('paste', (e) => {
+                const editor = e.target.closest && e.target.closest('[contenteditable]');
+                if (!editor) return;
+                e.preventDefault();
+                const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+                const html = text.split('\n').map(line => escapeHtml(line)).join('<br>');
+                document.execCommand('insertHTML', false, html);
+                editor.dispatchEvent(new Event('input', { bubbles: true }));
+            });
+
             // ========== 단축키 ==========
             document.addEventListener('keydown', (e) => {
                 const tag = document.activeElement.tagName;
@@ -2303,8 +3156,87 @@ try {
             });
         }
 
+        // 우측 사이드바 각 섹션을 헤더 클릭으로 접었다 펼 수 있게 변환 (메모 섹션 제외)
+        function initCollapsibleSections() {
+            const sb = document.getElementById('right-sidebar');
+            if (!sb) return;
+            let saved = {};
+            try { saved = JSON.parse(localStorage.getItem('rs_collapsed') || '{}'); } catch(e) {}
+
+            Array.from(sb.children).forEach(sec => {
+                if (sec.nodeType !== 1 || sec.dataset.rsInit) return;
+                // 메모(설정·기획) 섹션은 항상 펼쳐둠 (글쓰기 영역)
+                if (sec.querySelector('#board-memo')) return;
+                const origHeader = sec.firstElementChild;
+                if (!origHeader) return;
+                const titleEl = origHeader.querySelector('h3, span');
+                const key = titleEl ? titleEl.textContent.trim() : ('sec' + Array.from(sb.children).indexOf(sec));
+
+                sec.dataset.rsInit = '1';
+
+                // 본문 = 헤더 이후 모든 형제 → rs-body로 이동
+                const body = document.createElement('div');
+                body.className = 'rs-body';
+                while (origHeader.nextSibling) body.appendChild(origHeader.nextSibling);
+
+                // 헤더 바 구성: [원래 헤더(flex-1)] [chevron]
+                const head = document.createElement('div');
+                head.className = 'rs-head flex items-center justify-between gap-2 cursor-pointer select-none';
+                sec.insertBefore(head, origHeader);
+                head.appendChild(origHeader);
+                origHeader.style.flex = '1 1 auto';
+                origHeader.style.marginBottom = '0';
+                const chev = document.createElement('i');
+                chev.setAttribute('data-lucide', 'chevron-down');
+                chev.className = 'rs-chevron w-4 h-4 text-gray-400 shrink-0';
+                head.appendChild(chev);
+                sec.appendChild(body);
+
+                const setState = (collapsed) => {
+                    body.classList.toggle('collapsed', collapsed);
+                    chev.classList.toggle('collapsed', collapsed);
+                };
+                head.addEventListener('click', (e) => {
+                    if (e.target.closest('button, input, select, textarea, a')) return;
+                    const collapsed = !body.classList.contains('collapsed');
+                    setState(collapsed);
+                    try {
+                        const st = JSON.parse(localStorage.getItem('rs_collapsed') || '{}');
+                        st[key] = collapsed;
+                        localStorage.setItem('rs_collapsed', JSON.stringify(st));
+                    } catch(e) {}
+                });
+                setState(!!saved[key]);
+            });
+            if (window.lucide) window.lucide.createIcons({ el: sb });
+        }
+
         async function loadInitialData() {
-            if (isNodeEnvironment && fs.existsSync(targetFilePath)) {
+            firebaseConfig = loadFirebaseConfig();
+            if (firebaseConfig && firebaseConfig.apiKey && firebaseConfig.projectId) {
+                try {
+                    const result = await firestorePull(firebaseConfig);
+                    if (!result.notFound && result.data && result.data.length > 0) {
+                        console.log("Firebase에서 데이터를 성공적으로 불러왔습니다.");
+                        return result.data;
+                    }
+                } catch (e) {
+                    console.warn("Firebase 불러오기 실패 → 다른 저장소로 대체합니다:", e);
+                }
+            }
+            githubConfig = loadGithubConfig();
+            if (githubConfig && githubConfig.token && githubConfig.owner && githubConfig.repo) {
+                try {
+                    const result = await githubPull(githubConfig);
+                    if (!result.notFound && result.data && result.data.length > 0) {
+                        console.log("GitHub에서 데이터를 성공적으로 불러왔습니다.");
+                        return result.data;
+                    }
+                } catch (e) {
+                    console.warn("GitHub 불러오기 실패 → 로컬/G드라이브 데이터로 대체합니다:", e);
+                }
+            }
+            if (isNodeEnvironment && await fileExistsAsync(targetFilePath)) {
                 try {
                     const fileData = await fs.promises.readFile(targetFilePath, 'utf8');
                     const parsedData = JSON.parse(fileData);
@@ -2313,7 +3245,20 @@ try {
                         return parsedData;
                     }
                 } catch(e) {
-                    console.error("G드라이브 파일 읽기 실패:", e);
+                    console.error("G드라이브 파일 읽기 실패 → 백업 시도:", e);
+                    // 본파일이 깨졌으면 최신 백업(.bak1 → .bakN) 순서로 복구 시도
+                    for (let i = 1; i <= MAX_BACKUPS; i++) {
+                        const bak = `${targetFilePath}.bak${i}`;
+                        if (!fs.existsSync(bak)) continue;
+                        try {
+                            const d = JSON.parse(await fs.promises.readFile(bak, 'utf8'));
+                            if (d && d.length > 0) {
+                                console.warn(`백업본(${bak})에서 복구했습니다.`);
+                                setTimeout(() => alert(`자동저장 파일이 손상되어 백업본(.bak${i})에서 복구했습니다.\n작업 내용을 확인 후 저장하세요.`), 500);
+                                return d;
+                            }
+                        } catch(e2) {}
+                    }
                 }
             }
             console.log("로컬 DB에서 데이터를 불러옵니다.");
@@ -2363,8 +3308,16 @@ try {
             } catch (err) {
                 console.error("Data Load Error:", err);
             }
+
+            // Firebase 실시간 동기화가 켜져 있으면 리스너 시작
+            try {
+                if (firebaseConfig && firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.autoSync) {
+                    fbStartRealtimeSync(firebaseConfig);
+                }
+            } catch (e) { console.warn('Firebase 실시간 동기화 시작 실패:', e); }
             
             renderAll();
+            initCollapsibleSections();
         });
 
     </script>

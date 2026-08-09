@@ -182,6 +182,10 @@
     <div id="save-indicator" class="fixed top-3 right-4 text-xs font-bold px-3 py-1.5 rounded-full shadow-sm bg-white border border-gray-200 z-50 transition-opacity duration-300 opacity-0 pointer-events-none flex items-center">
     </div>
 
+    <!-- 온라인(구글) 로그인 배지: 브라우저에서 Firestore 실시간 동기화를 쓰려면 여기서 로그인해야 함 -->
+    <div id="fb-login-badge" class="hidden fixed top-3 right-40 text-xs font-bold px-3 py-1.5 rounded-full shadow-sm bg-white border border-gray-200 z-50 flex items-center gap-1.5">
+    </div>
+
     <!-- 카드 삭제 확인 토스트 (Undo 지원) -->
     <div id="delete-toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs font-bold px-4 py-2.5 rounded-full shadow-xl z-[9999] hidden flex items-center gap-3">
         <span id="delete-toast-msg">카드가 삭제됩니다.</span>
@@ -802,7 +806,7 @@ function fbWaitAuthReady() {
     return _fbAuthReadyPromise;
 }
 
-// 로그인 상태가 바뀔 때마다 동기화 모달의 상태 표시를 갱신 + 로그인되면 자동 동기화가 켜져있으면 재연결
+// 로그인 상태가 바뀔 때마다 동기화 모달 + 상단 로그인 배지 표시를 갱신 + 로그인되면 자동 동기화가 켜져있으면 재연결
 function fbUpdateAuthUI(user) {
     if (fbAuthObj && user === undefined) user = fbAuthObj.currentUser;
     const box = document.getElementById('fb-google-status');
@@ -813,6 +817,17 @@ function fbUpdateAuthUI(user) {
             box.innerHTML = `<span class="text-orange-500 font-bold">로그인 필요</span> · <button onclick="window.fbGoogleSignIn()" class="text-blue-500 underline hover:text-blue-700">구글로 로그인</button>`;
         }
     }
+    const badge = document.getElementById('fb-login-badge');
+    if (badge && !isNodeEnvironment) {
+        if (user && !user.isAnonymous) {
+            badge.innerHTML = `<i data-lucide="cloud" class="w-3.5 h-3.5 text-green-600"></i> <span class="text-green-700 font-bold">${esc ? esc(user.displayName || user.email || '로그인됨') : (user.displayName || user.email || '로그인됨')}</span> <button onclick="window.fbGoogleSignOut()" class="text-gray-400 underline hover:text-gray-600 ml-1">로그아웃</button>`;
+            badge.classList.remove('hidden');
+        } else {
+            badge.innerHTML = `<i data-lucide="cloud-off" class="w-3.5 h-3.5 text-orange-500"></i> <button onclick="window.fbGoogleSignIn()" class="text-orange-600 font-bold underline hover:text-orange-700">구글 로그인 (온라인 동기화)</button>`;
+            badge.classList.remove('hidden');
+        }
+        if (window.lucide) window.lucide.createIcons({ el: badge });
+    }
     if (!isNodeEnvironment && user && !user.isAnonymous) {
         const cfg = loadFirebaseConfig();
         if (cfg && cfg.apiKey && cfg.projectId && cfg.autoSync) fbStartRealtimeSync(cfg);
@@ -820,6 +835,8 @@ function fbUpdateAuthUI(user) {
         fbStopRealtimeSync();
     }
 }
+
+let _fbAuthListenerAttached = false;
 
 // Firebase 앱 초기화. 데스크탑(Electron)은 익명 로그인, 브라우저(온라인 버전)는 구글 로그인 필요.
 async function fbConnect(cfg) {
@@ -831,10 +848,12 @@ async function fbConnect(cfg) {
             || firebase.initializeApp({ apiKey: cfg.apiKey, projectId: cfg.projectId, authDomain: cfg.authDomain || (cfg.projectId + '.firebaseapp.com') }, 'episodeBoardApp');
         fbAuthObj = fbApp.auth();
         fbDb = fbApp.firestore();
+        if (!_fbAuthListenerAttached) {
+            _fbAuthListenerAttached = true;
+            fbAuthObj.onAuthStateChanged(fbUpdateAuthUI);
+        }
         if (!isNodeEnvironment) {
             try { await fbAuthObj.setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch (e) {}
-            // 구글 로그인 리디렉션에서 방금 돌아온 경우 결과를 처리 (에러가 있으면 콘솔에만 남김)
-            try { await fbAuthObj.getRedirectResult(); } catch (e) { console.warn('구글 로그인 리디렉션 오류:', e); }
         }
     }
 
@@ -846,12 +865,12 @@ async function fbConnect(cfg) {
         }
     } else {
         // 브라우저(온라인 버전): 구글 로그인 필요. 세션이 있으면 자동 복원.
-        // 세션이 없으면 버튼 없이 자동으로 구글 로그인 화면으로 이동했다가 곧바로 돌아옵니다.
+        // 세션이 없으면 자동으로 리디렉션하지 않고, 화면 우상단 배지의 "구글 로그인" 버튼을
+        // 사용자가 직접 클릭해야 팝업으로 로그인이 진행된다 (자동 리디렉션은 브라우저의 서드파티
+        // 저장소 차단 정책 때문에 무한 로그인 루프를 유발할 수 있어 제거함).
         const user = await fbWaitAuthReady();
         if (!user) {
-            const provider = new firebase.auth.GoogleAuthProvider();
-            await fbAuthObj.signInWithRedirect(provider); // 페이지 이동 시작 → 이후 코드는 실행되지 않음
-            throw new Error('구글 로그인 화면으로 이동 중...');
+            throw new Error('LOGIN_REQUIRED');
         }
     }
     return fbDb;
@@ -868,7 +887,10 @@ window.fbGoogleSignIn = async function () {
             fbAuthObj = fbApp.auth();
             fbDb = fbApp.firestore();
             try { await fbAuthObj.setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch (e) {}
-            fbAuthObj.onAuthStateChanged(fbUpdateAuthUI);
+            if (!_fbAuthListenerAttached) {
+                _fbAuthListenerAttached = true;
+                fbAuthObj.onAuthStateChanged(fbUpdateAuthUI);
+            }
         }
         const provider = new firebase.auth.GoogleAuthProvider();
         await fbAuthObj.signInWithPopup(provider);

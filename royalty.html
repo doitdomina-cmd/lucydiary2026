@@ -946,7 +946,7 @@
                                             <input type="number" id="new-work-advance-amount" placeholder="예) 300" class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100">
                                         </div>
                                         <div>
-                                            <label class="text-sm font-bold text-slate-600 ml-1 mb-1 block">선인세 입금월</label>
+                                            <label id="new-work-advance-date-label" class="text-sm font-bold text-slate-600 ml-1 mb-1 block">선인세 예정일</label>
                                             <input type="month" id="new-work-advance-date" class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100">
                                         </div>
                                     </div>
@@ -1230,7 +1230,12 @@
                                 <!-- 통계 패널 -->
                                 <div class="bg-slate-50 rounded-2xl p-4 text-center border border-slate-100 flex flex-col gap-7">
                                     <div>
-                                        <h4 id="w-workTitleDisplay" class="text-sm font-bold text-slate-600 mb-2 leading-snug">작품을 선택하세요</h4>
+                                        <div class="flex items-center justify-center gap-1.5 mb-2">
+                                            <h4 id="w-workTitleDisplay" class="text-sm font-bold text-slate-600 leading-snug">작품을 선택하세요</h4>
+                                            <button type="button" onclick="openWriteCounterResetModal(document.getElementById('w-dailyWorkSelector').value)" class="text-slate-300 hover:text-rose-500 transition-colors shrink-0" title="지금부터 카운터 (누적 글자수 기록은 유지하고 진행률만 원하는 날짜부터 다시 세기)">
+                                                <i class="fa-solid fa-rotate-left text-[11px]"></i>
+                                            </button>
+                                        </div>
                                         <div class="relative w-28 h-28 mx-auto">
                                             <canvas id="w-workTotalChart"></canvas>
                                             <div id="w-workTotalPerCenter" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 font-black text-lg text-slate-700">0%</div>
@@ -1304,6 +1309,24 @@
     <!-- 컨택 추가/수정 모달 -->
     <!-- 상세 기록 입력 미니창 -->
 
+    <!-- [NEW] 집필 카운터 리셋 모달 -->
+    <div id="write-counter-reset-modal" class="modal-overlay">
+        <div class="modal-content max-w-sm w-full">
+            <div class="flex justify-between items-center mb-5">
+                <h3 class="text-base font-bold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-rotate-left text-rose-500"></i> 지금부터 카운터</h3>
+                <button onclick="closeWriteCounterResetModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <div class="space-y-4">
+                <p class="text-xs text-slate-500 leading-relaxed">선택한 날짜부터 카운터를 0자로 다시 셉니다.<br>· 그 전에 기록된 글자수는 통계에 그대로 남습니다.<br>· 집필 관리에 표시되는 누적/진행률과, 달력에 보이는 누적 목표(괄호 안 숫자)가 선택한 날짜부터 새로 쌓입니다.</p>
+                <div>
+                    <label class="text-xs font-bold text-slate-500 block mb-1.5">리셋 기준 날짜</label>
+                    <input type="date" id="write-counter-reset-date-input" class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-rose-100 transition-all">
+                </div>
+                <button onclick="confirmWriteCounterReset()" class="w-full py-2.5 rounded-xl text-sm font-bold text-white bg-rose-500 hover:bg-rose-600 transition-all">이 날짜부터 0자로 리셋</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 집필 관리 설정 모달 -->
     <div id="write-settings-modal" class="modal-overlay">
         <div class="modal-content max-w-sm w-full">
@@ -1340,24 +1363,14 @@
                 <!-- 카드 색상 -->
                 <div>
                     <label class="text-xs font-bold text-slate-400 uppercase block mb-2">카드 색상</label>
-                    <div class="space-y-2">
-                        <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200">
-                            <span class="text-sm text-slate-600 font-medium">기본 (집필)</span>
-                            <input type="color" id="write-color-default" value="#F9F8F6" class="w-8 h-8 rounded-lg border border-slate-200 cursor-pointer p-0.5" oninput="updateWriteColors()">
-                        </div>
-                        <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200">
-                            <span class="text-sm text-slate-600 font-medium">작교</span>
-                            <input type="color" id="write-color-correction" value="#FBC3C1" class="w-8 h-8 rounded-lg border border-slate-200 cursor-pointer p-0.5" oninput="updateWriteColors()">
-                        </div>
-                        <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200">
-                            <span class="text-sm text-slate-600 font-medium">시놉시스</span>
-                            <input type="color" id="write-color-synopsis" value="#BBD5DA" class="w-8 h-8 rounded-lg border border-slate-200 cursor-pointer p-0.5" oninput="updateWriteColors()">
-                        </div>
-                        <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200">
-                            <span class="text-sm text-slate-600 font-medium">기타</span>
-                            <input type="color" id="write-color-other" value="#F2EAE0" class="w-8 h-8 rounded-lg border border-slate-200 cursor-pointer p-0.5" oninput="updateWriteColors()">
-                        </div>
+                    <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200 mb-2">
+                        <span class="text-sm text-slate-600 font-medium">기본 (집필)</span>
+                        <input type="color" id="write-color-default" value="#F9F8F6" class="w-8 h-8 rounded-lg border border-slate-200 cursor-pointer p-0.5" oninput="updateWriteColors()">
                     </div>
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase block mb-2">분류별 카드 색상</label>
+                    <div id="write-category-color-list" class="space-y-1.5 max-h-64 overflow-y-auto custom-scrollbar pr-1"></div>
                 </div>
             </div>
         </div>
@@ -1626,6 +1639,10 @@
                         <label class="text-xs font-bold text-slate-500 ml-1 mb-1 block">MG</label>
                         <input type="number" id="wtm-mg" placeholder="예: 500" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100">
                     </div>
+                    <div>
+                        <label class="text-xs font-bold text-slate-500 ml-1 mb-1 block">MG 예정일</label>
+                        <input type="month" id="wtm-mg-date" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100">
+                    </div>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
@@ -1637,7 +1654,7 @@
                         <input type="number" id="wtm-webtoon-rate" placeholder="예: 70" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100">
                     </div>
                 </div>
-                <p class="text-[10px] text-slate-400 -mt-2 ml-1">계약일·런칭일·MG·RS·비율은 '작품 등록'과 서로 연동돼요.</p>
+                <p class="text-[10px] text-slate-400 -mt-2 ml-1">계약일·런칭일·MG·MG 예정일·RS·비율은 '작품 등록'과 서로 연동돼요.</p>
                 <div>
                     <label class="text-sm font-bold text-slate-500 ml-1 mb-1 block"><i class="fa-solid fa-link mr-1" style="color:var(--primary)"></i>캐릭터 가이드 전달 예정일</label>
                     <div class="flex items-center gap-3">
@@ -2735,19 +2752,14 @@
                     <select id="write-work-select" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:border-emerald-400 transition-all"></select>
                 </div>
                 
-                <div class="flex gap-4 flex-wrap">
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" id="write-is-correction" class="w-4 h-4 accent-emerald-500" onchange="toggleWriteType('correction', this.checked)">
-                        <span class="text-sm font-bold text-slate-700">✅ 작교</span>
-                    </label>
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" id="write-is-synopsis" class="w-4 h-4 accent-emerald-500" onchange="toggleWriteType('synopsis', this.checked)">
-                        <span class="text-sm font-bold text-slate-700">💡 시놉시스</span>
-                    </label>
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" id="write-is-other" class="w-4 h-4 accent-emerald-500" onchange="toggleWriteType('other', this.checked)">
-                        <span class="text-sm font-bold text-slate-700">📝 기타</span>
-                    </label>
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="text-sm font-bold text-slate-600">분류 선택</label>
+                        <button type="button" onclick="openWriteCategoryManager()" title="분류 항목 설정" class="text-slate-400 hover:text-emerald-500 transition-colors px-1"><i class="fa-solid fa-gear"></i></button>
+                    </div>
+                    <select id="write-category-select" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:border-emerald-400" onchange="toggleWriteType(this.value)">
+                        <option value="">✏️ 집필 목표</option>
+                    </select>
                 </div>
 
                 <div id="write-goal-container">
@@ -2756,7 +2768,7 @@
                 </div>
 
                 <div id="write-memo-container" class="hidden">
-                    <label id="write-memo-label" class="text-sm font-bold text-slate-600 block mb-1">작교/시놉시스 메모 (선택)</label>
+                    <label id="write-memo-label" class="text-sm font-bold text-slate-600 block mb-1">분류 메모 (선택)</label>
                     <input type="text" id="write-memo-input" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:border-emerald-400" placeholder="수정 사항이나 내용을 메모하세요">
                 </div>
 
@@ -2866,6 +2878,42 @@
         </div>
     </div>
 
+    <!-- [NEW] 집필 관리 분류 항목 관리 모달 (스케줄 관리와 동일한 방식이지만 독립적으로 연동됨) -->
+    <div id="write-category-manager-modal" class="modal-overlay">
+        <div class="modal-content h-auto max-h-[85vh] flex flex-col">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-lg font-bold text-slate-700">집필 분류 항목 관리</h3>
+                <button onclick="closeWriteCategoryManager()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-times text-xl"></i></button>
+            </div>
+
+            <div class="bg-slate-50 rounded-xl p-4 mb-6 border border-slate-100">
+                <div class="grid grid-cols-4 gap-2">
+                    <div class="col-span-3">
+                        <label class="text-[10px] font-bold text-slate-400 ml-1 mb-1 block">분류명</label>
+                        <input type="text" id="new-write-category-input" class="w-full p-2 rounded-lg border text-sm outline-none focus:border-emerald-400" placeholder="예: 표지 시안 확인">
+                    </div>
+                    <div class="flex items-end">
+                        <button id="btn-add-update-write-category" onclick="addNewWriteCategory()" class="w-full h-[38px] bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 shadow-sm transition-all">추가</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="overflow-y-auto flex-1 custom-scrollbar border border-slate-100 rounded-xl">
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-slate-50 text-slate-500 font-bold text-xs sticky top-0">
+                        <tr>
+                            <th class="px-4 py-2 w-10 text-center">이동</th>
+                            <th class="px-4 py-2">이름</th>
+                            <th class="px-4 py-2 w-20 text-center">관리</th>
+                        </tr>
+                    </thead>
+                    <tbody id="write-category-manager-list" class="divide-y divide-slate-50"></tbody>
+                </table>
+            </div>
+            <p class="text-xs text-slate-400 mt-3">※ 순서를 드래그로 바꿀 수 있어요. 이름을 바꾸면 해당 분류로 저장된 기존 집필 기록도 자동으로 함께 변경돼요. 이 분류는 스케줄 관리의 분류와는 별개로 관리돼요.</p>
+        </div>
+    </div>
+
     <input type="file" id="cover-upload-input" accept="image/*" class="hidden" onchange="processCoverImage(this)">
 
     <div id="cover-crop-modal" class="modal-overlay">
@@ -2924,7 +2972,7 @@
         }
 
         // 기존 데이터 구조
-        let masterWorks = [], monthlyData = {}, years = [2024, 2025, 2026], publisherData = {}, analysisData = {}, publisherSortOrder = [], genreList = [], editingGenreIndex = null, genreBadgeOpacity = 0.25, taskCategoryList = [], editingTaskCategoryIndex = null, isSheetLocked = false, contacts = [], penNames = [], submissions = [], webtoonSubs = {}, webtoonSubOrder = [], incomeGoals = {}, taxSettings = {}, taxGoalMemos = {}, charGoals = {}, taxGoalItems = {}, webtoonManage = {};
+        let masterWorks = [], monthlyData = {}, years = [2024, 2025, 2026], publisherData = {}, analysisData = {}, publisherSortOrder = [], genreList = [], editingGenreIndex = null, genreBadgeOpacity = 0.25, taskCategoryList = [], editingTaskCategoryIndex = null, writeCategoryList = [], editingWriteCategoryIndex = null, isSheetLocked = false, contacts = [], penNames = [], submissions = [], webtoonSubs = {}, webtoonSubOrder = [], incomeGoals = {}, taxSettings = {}, taxGoalMemos = {}, charGoals = {}, taxGoalItems = {}, webtoonManage = {};
         let webtoonCardSettings = { differentiatePublished: true, publishedColor: '#f7f5f0', penBarStyle: 'rounded', labelColor1: '#64748b', labelColor2: '#64748b', valueColors: { studio: '#1e293b', contract: '#1e293b', rsrate: '#1e293b', mg: '#1e293b', charguide: '#1e293b', cashsheet: '#1e293b', ep1conti: '#1e293b', illustrator: '#1e293b' } };
         let penNameColorOverrides = {};
         let webtoonViewFilter = 'all'; // 'all' | 'published' | 'upcoming' | 'pen'
@@ -2964,6 +3012,12 @@
         // [NEW] 집필/스케줄 데이터 구조
         let writeSchedules = {};
         let taskSchedules = {};
+        // [NEW] 집필 카운터 초기화 기준점 — storageKey별로 "이 값까지는 카운터에서 뺀다"를 저장.
+        // 실제 글자수 기록(writerDailyData)은 그대로 두고, 진행률/카운터 표시만 0부터 다시 세게 하기 위함.
+        let writeCounterBase = {};
+        // [NEW] 카운터 리셋 시점의 날짜 — storageKey별로 저장. 집필관리 달력의 누적 목표 블록(cumulativeGoalMap)
+        // 계산 시, 이 날짜 이전에 등록된 목표 블록은 누적에서 제외해서 리셋 시점부터 0자로 다시 쌓이게 함.
+        let writeCounterResetDate = {};
 
         // UI 상태
         let activeTheme = localStorage.getItem('theme_v6') || 'mint';
@@ -2994,9 +3048,6 @@
             fontSize: 12,
             fillOpacity: 0.25,
             colorDefault: '#F9F8F6',
-            colorCorrection: '#FBC3C1',
-            colorSynopsis: '#BBD5DA',
-            colorOther: '#F2EAE0',
             emptyDayChars: 6000
         };
         let taskCardSettings = {
@@ -3012,6 +3063,9 @@
         };
         // [NEW] 웹툰 관리 탭과 이름으로 자동 연동되는 특수 분류 — 이름을 바꾸거나 삭제하면 연동이 끊어짐
         const PROTECTED_TASK_CATEGORIES = ['웹툰 캐릭터 가이드 전달', '표지 제안서 전달'];
+
+        // [NEW] 집필 관리 분류 색상 (스케줄 관리와는 독립적으로 관리됨)
+        const WRITE_COLORS = { "작교": "#FBC3C1", "시놉시스": "#BBD5DA", "기타": "#F2EAE0" };
 
         // ── 회전 백업: 덮어쓰기 직전 현재 파일을 스냅샷으로 보관 (최근 5개 유지) ──
         // 백업 위치: 로컬 홈 폴더 + 구글드라이브 백업 폴더
@@ -3084,8 +3138,8 @@
                     const dataToSave = { 
                         masterWorks, monthlyData, years, publisherData, analysisData, 
                         publisherSortOrder, publisherCardSortOrder, publisherViewMode, genreList, genreBadgeOpacity, tableFontSettings, crosshairSettings,
-                        writeSchedules, taskSchedules, contacts, penNames, widgetSettingsData, writeCardSettings, taskCardSettings, taskColors: TASK_COLORS, taskCategoryList,
-                        writerWorks, writerDailyData, writerGlobalDailyGoal, submissions, webtoonSubs, webtoonSubOrder, incomeGoals, taxSettings, taxGoalMemos, charGoals, writerLastWorkKey, taxGoalItems, contactSortMode, webtoonManage, webtoonCardSettings, penNameColorOverrides, webtoonViewFilter, webtoonSortMode, workManage, workManageCardSettings, workManageViewFilter, workManageSortMode
+                        writeSchedules, taskSchedules, contacts, penNames, widgetSettingsData, writeCardSettings, taskCardSettings, taskColors: TASK_COLORS, taskCategoryList, writeColors: WRITE_COLORS, writeCategoryList,
+                        writerWorks, writerDailyData, writerGlobalDailyGoal, writeCounterBase, writeCounterResetDate, submissions, webtoonSubs, webtoonSubOrder, incomeGoals, taxSettings, taxGoalMemos, charGoals, writerLastWorkKey, taxGoalItems, contactSortMode, webtoonManage, webtoonCardSettings, penNameColorOverrides, webtoonViewFilter, webtoonSortMode, workManage, workManageCardSettings, workManageViewFilter, workManageSortMode
                     };
                     const jsonStr = JSON.stringify(dataToSave, null, 2);
 
@@ -3168,9 +3222,13 @@
             if (parsed.taskCardSettings) Object.assign(taskCardSettings, parsed.taskCardSettings);
             if (parsed.taskColors) Object.assign(TASK_COLORS, parsed.taskColors);
             taskCategoryList = parsed.taskCategoryList || [];
+            if (parsed.writeColors) Object.assign(WRITE_COLORS, parsed.writeColors);
+            writeCategoryList = parsed.writeCategoryList || [];
             if (parsed.writerWorks) writerWorks = parsed.writerWorks;
             if (parsed.writerDailyData) writerDailyData = parsed.writerDailyData;
             if (parsed.writerGlobalDailyGoal) writerGlobalDailyGoal = parsed.writerGlobalDailyGoal;
+            writeCounterBase = parsed.writeCounterBase || {};
+            writeCounterResetDate = parsed.writeCounterResetDate || {};
             if (parsed.writerLastWorkKey !== undefined && parsed.writerLastWorkKey !== null) {
                 writerLastWorkKey = parsed.writerLastWorkKey;
                 try { localStorage.setItem('writerLastWorkKey_v6', writerLastWorkKey); } catch(e) {}
@@ -3219,6 +3277,23 @@
         migrateTaskCategoryName('표지제안서 전달', '표지 제안서 전달');
         migrateTaskCategoryName('표지 가이드 전달', '표지 제안서 전달');
         migrateTaskCategoryName('캐시트 전달', '웹툰 캐릭터 가이드 전달');
+
+        // [NEW] 예전 방식(작교/시놉시스/기타 체크박스)으로 저장된 집필 기록을 새 분류(category) 방식으로 자동 이전
+        (function migrateWriteTypeToCategory() {
+            let changed = false;
+            Object.keys(writeSchedules).forEach(dateStr => {
+                (writeSchedules[dateStr] || []).forEach(s => {
+                    if (s.category === undefined) {
+                        if (s.isCorrection) s.category = '작교';
+                        else if (s.isSynopsis) s.category = '시놉시스';
+                        else if (s.isOther) s.category = '기타';
+                        else s.category = '';
+                        changed = true;
+                    }
+                });
+            });
+            if (changed) save(true);
+        })();
         // 출판사 '업데이트' 날짜에서 31일 옵션을 없애고 '말일'로 통일했으므로, 예전에 31로 저장된 값을 마이그레이션
         (function migrateUpdateDay31ToLastDay() {
             let changed = false;
@@ -3244,6 +3319,14 @@
             // 공백 차이 등으로 같은 분류명이 중복 저장된 경우 자동 정리 (첫 항목만 남김)
             const cleanedCatList = taskCategoryList.map(c => (c || '').trim()).filter((c, idx, arr) => c && arr.indexOf(c) === idx);
             if (cleanedCatList.length !== taskCategoryList.length) { taskCategoryList = cleanedCatList; save(true); }
+        }
+
+        if (writeCategoryList.length === 0) {
+            writeCategoryList = Object.keys(WRITE_COLORS);
+            save(true);
+        } else {
+            const cleanedWriteCatList = writeCategoryList.map(c => (c || '').trim()).filter((c, idx, arr) => c && arr.indexOf(c) === idx);
+            if (cleanedWriteCatList.length !== writeCategoryList.length) { writeCategoryList = cleanedWriteCatList; save(true); }
         }
 
         if (!years.includes(currentYear)) { years.push(currentYear); years.sort((a,b)=>a-b); }
@@ -3583,10 +3666,10 @@
         function downloadBackup() { 
             const data = { 
                 masterWorks, monthlyData, years, publisherData, analysisData, publisherSortOrder, publisherCardSortOrder, publisherViewMode, genreList, theme: localStorage.getItem('theme_v6'), customColor: localStorage.getItem('custom_color_v6'), genreBadgeOpacity, bgMain: localStorage.getItem('bg_main_v6'), tableFontSettings, crosshairSettings, 
-                writeSchedules, taskSchedules, writeCardSettings, taskCardSettings, taskColors: TASK_COLORS, taskCategoryList,
+                writeSchedules, taskSchedules, writeCardSettings, taskCardSettings, taskColors: TASK_COLORS, taskCategoryList, writeColors: WRITE_COLORS, writeCategoryList,
                 contacts, penNames, widgetSettingsData, submissions, webtoonSubs, webtoonSubOrder, contactSortMode, webtoonViewFilter, webtoonSortMode,
                 // [FIX] 글자수 관리 탭 데이터가 백업에서 빠져있던 문제 수정 — 아래 항목들이 누락되어 있었음
-                writerWorks, writerDailyData, writerGlobalDailyGoal, writerLastWorkKey,
+                writerWorks, writerDailyData, writerGlobalDailyGoal, writeCounterBase, writeCounterResetDate, writerLastWorkKey,
                 incomeGoals, taxSettings, taxGoalMemos, taxGoalItems, charGoals, webtoonManage, webtoonCardSettings, penNameColorOverrides, workManage, workManageCardSettings, workManageViewFilter, workManageSortMode
             }; 
             const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'}); 
@@ -3678,7 +3761,7 @@
         function updateGenreSelectOptions() { const select = document.getElementById('new-work-genre'); if(select) { select.innerHTML = genreList.map(g => `<option value="${g.name}">${g.name}</option>`).join(''); toggleStudioInput(); } }
         function updateTitleDatalist() { const datalist = document.getElementById('existing-titles-list'); if(!datalist) return; const titles = [...new Set(masterWorks.map(w => w.title))].sort(); datalist.innerHTML = titles.map(t => `<option value="${t}">`).join(''); }
         function updatePublisherDatalist() { const datalist = document.getElementById('publisher-list'); if(!datalist) return; const allPublishers = [...new Set([...masterWorks.map(w => w.publisher), ...masterWorks.map(w => w.settlementPublisher), ...Object.keys(publisherData)])].filter(p => p && p !== '-').sort(); datalist.innerHTML = allPublishers.map(pub => `<option value="${pub}">`).join(''); }
-        function updateStudioDatalist() { const datalist = document.getElementById('studio-list'); if(!datalist) return; const allStudios = [...new Set([...masterWorks.map(w => w.studio), ...Object.keys(publisherData)])].filter(s => s && s !== '-').sort(); datalist.innerHTML = allStudios.map(s => `<option value="${s}">`).join(''); }
+        function updateStudioDatalist() { const datalist = document.getElementById('studio-list'); if(!datalist) return; const allStudios = [...new Set(masterWorks.map(w => w.studio))].filter(s => s && s !== '-').sort(); datalist.innerHTML = allStudios.map(s => `<option value="${s}">`).join(''); }
         function autoFillPublisher(val) { const work = masterWorks.find(w => w.title === val); if(work) { document.getElementById('new-work-publisher').value = work.publisher; } }
         function setupCustomAutocomplete() {
             const input = document.getElementById('new-work-title'); const dropdown = document.getElementById('custom-title-dropdown'); if (!input || !dropdown) return;
@@ -4799,17 +4882,14 @@
             return '<span style="color:#3b82f6;font-weight:400;">출간 예정</span>';
         }
         function sortKeyDate(w) {
-            // 정렬 우선순위:
-            // 1. 출간완료 (오늘 이전)           → "1_YYYY-MM-DD"
-            // 2. 미래확정 or 월있는예정 → 날짜순 → "2_YYYY-MM-DD" (같은 그룹, 날짜로 섞임)
-            // 3. 출간예정 + 월 없음              → "3_9999-12-31"
-            const today = new Date().toISOString().slice(0, 10);
-            if (!w.isPending) {
-                const d = w.publishDate || '0000-00-00';
-                return d <= today ? '1_' + d : '2_' + d;
-            }
-            if (w.pendingMonth) return '2_' + w.pendingMonth + '-01';
-            return '3_9999-12-31';
+            // 정렬 우선순위 (오름차순 비교용 문자열 키):
+            // 1. 실제 출간일이 있거나(완료/확정), 월까지 정해진 출간 예정 → 날짜순으로 최우선 정렬
+            // 2. 위 날짜 정보가 전혀 없으면 → 계약일이 빠른 순
+            // 3. 계약일마저 없으면 → 맨 뒤
+            if (!w.isPending && w.publishDate) return '1_' + w.publishDate;
+            if (w.isPending && w.pendingMonth) return '1_' + w.pendingMonth + '-01';
+            if (w.contractDate) return '2_' + w.contractDate;
+            return '3_9999-99-99';
         }
         function toggleNewWorkDate(checkbox) {
             const dateInput = document.getElementById('new-work-date');
@@ -4855,6 +4935,8 @@
                 if (webtoonDates) webtoonDates.classList.remove('hidden');
                 if (pubRateRow) pubRateRow.className = 'grid grid-cols-1 gap-3';
                 if (datesRow) datesRow.className = 'hidden';
+                const advDateLabel = document.getElementById('new-work-advance-date-label');
+                if (advDateLabel) advDateLabel.textContent = 'MG 예정일';
                 // 웹툰 날짜 → 실제 필드 동기화
                 const wtDate = document.getElementById('new-work-date-webtoon');
                 const mainDate = document.getElementById('new-work-date');
@@ -4875,6 +4957,8 @@
                 if (webtoonDates) webtoonDates.classList.add('hidden');
                 if (pubRateRow) pubRateRow.className = 'grid grid-cols-2 gap-3';
                 if (datesRow) datesRow.className = 'hidden';
+                const advDateLabel = document.getElementById('new-work-advance-date-label');
+                if (advDateLabel) advDateLabel.textContent = '선인세 예정일';
             }
         }
         function toggleEditStudioInput(id) { const genre = document.getElementById(`edit-genre-${id}`).value; const studioInput = document.getElementById(`edit-studio-${id}`); if (genre.includes('웹툰')) { studioInput.classList.remove('hidden'); } else { studioInput.classList.add('hidden'); } }
@@ -5810,6 +5894,7 @@
             return emptyText || '';
         }
         // 이 작품에 월별 정산(monthlyData)에 금액이 처음 찍힌 달을 'YY.MM' 형식으로 반환 (MG 입금월 표시용)
+        // → 정산 관리에서 실제로 금액을 입력한 달을 기준으로 표시 (수동 입력한 advanceDate는 표시에 사용하지 않음)
         function getMgDepositLabel(workId) {
             const months = Object.keys(monthlyData)
                 .filter(k => monthlyData[k] && monthlyData[k][workId] && Number(monthlyData[k][workId]) !== 0)
@@ -5977,6 +6062,7 @@
             document.getElementById('wtm-launch-pending-month').value = w.pendingMonth || '';
             toggleWtmLaunchPending(!!w.isPending);
             document.getElementById('wtm-mg').value = w.advanceAmount || '';
+            document.getElementById('wtm-mg-date').value = w.advanceDate || '';
             document.getElementById('wtm-rs').value = w.rs || '';
             document.getElementById('wtm-webtoon-rate').value = w.webtoonRate || '';
             document.getElementById('wtm-charguide-date').value = getWebtoonCharGuideDate(workId) || '';
@@ -6028,6 +6114,7 @@
                 w.pendingMonth = isPending ? document.getElementById('wtm-launch-pending-month').value : '';
                 const mgVal = document.getElementById('wtm-mg').value;
                 w.advanceAmount = mgVal ? Number(mgVal) : '';
+                w.advanceDate = document.getElementById('wtm-mg-date').value.trim();
                 const rsVal = document.getElementById('wtm-rs').value;
                 const wrVal = document.getElementById('wtm-webtoon-rate').value;
                 w.rs = rsVal !== '' ? parseFloat(rsVal) : null;
@@ -9163,10 +9250,8 @@
             document.getElementById('write-fill-opacity').value = Math.round(s.fillOpacity * 100);
             document.getElementById('write-fill-opacity-val').textContent = Math.round(s.fillOpacity * 100) + '%';
             document.getElementById('write-color-default').value = s.colorDefault;
-            document.getElementById('write-color-correction').value = s.colorCorrection;
-            document.getElementById('write-color-synopsis').value = s.colorSynopsis;
-            document.getElementById('write-color-other').value = s.colorOther;
             document.getElementById('write-empty-day-chars').value = s.emptyDayChars ?? 6000;
+            renderWriteCategoryColorList();
             document.getElementById('write-settings-modal').classList.add('open');
         }
         function closeWriteSettings() { document.getElementById('write-settings-modal').classList.remove('open'); }
@@ -9182,14 +9267,26 @@
         }
         function updateWriteColors() {
             writeCardSettings.colorDefault = document.getElementById('write-color-default').value;
-            writeCardSettings.colorCorrection = document.getElementById('write-color-correction').value;
-            writeCardSettings.colorSynopsis = document.getElementById('write-color-synopsis').value;
-            writeCardSettings.colorOther = document.getElementById('write-color-other').value;
             save(true); renderWriteCalendar();
         }
         function updateWriteEmptyDayChars(val) {
             const n = Math.max(0, parseInt(val) || 0);
             writeCardSettings.emptyDayChars = n;
+            save(true); renderWriteCalendar();
+        }
+        // [NEW] 집필 분류별 카드 색상 설정 목록 렌더 (스케줄 관리와 동일한 방식, 독립적으로 동작)
+        function renderWriteCategoryColorList() {
+            const container = document.getElementById('write-category-color-list');
+            if (!container) return;
+            container.innerHTML = writeCategoryList.map(cat => `
+                <div class="flex items-center justify-between p-2 bg-slate-50 rounded-xl border border-slate-200">
+                    <span class="text-sm text-slate-600 font-medium">${cat}</span>
+                    <input type="color" value="${WRITE_COLORS[cat] || '#94a3b8'}" class="w-8 h-8 rounded-lg border border-slate-200 cursor-pointer p-0.5" oninput="updateWriteCategoryColor('${cat}', this.value)">
+                </div>
+            `).join('');
+        }
+        function updateWriteCategoryColor(cat, value) {
+            WRITE_COLORS[cat] = value;
             save(true); renderWriteCalendar();
         }
 
@@ -9480,7 +9577,7 @@
                 // 전체 일정을 순회하여 작품별로 목표 분량을 모음
                 Object.entries(writeSchedules).forEach(([dateStr, schedules]) => {
                     schedules.forEach(s => {
-                        if (!s.isCorrection && !s.isSynopsis && !s.isOther) {
+                        if (!s.category) {
                             if (!workStats[s.workId]) workStats[s.workId] = { total: 0, items: [] };
                             const g = Number(s.goal) || 0;
                             workStats[s.workId].total += g;
@@ -9497,13 +9594,23 @@
                         if (a.date !== b.date) return a.date.localeCompare(b.date);
                         return a.id.localeCompare(b.id);
                     });
-                    
+
+                    // [NEW] "지금부터 카운터" 리셋 시점이 있으면, 그 날짜 이전에 등록된 목표 블록은
+                    // 누적 계산에서 제외하고, 리셋일부터 등록된 블록만 0자부터 다시 누적한다.
+                    const resetDate = writeCounterResetDate[workId];
+                    let items = stats.items;
+                    let resetTotal = stats.total;
+                    if (resetDate) {
+                        items = stats.items.filter(item => item.date >= resetDate);
+                        resetTotal = items.reduce((sum, item) => sum + item.goal, 0);
+                    }
+
                     let currentSum = 0;
-                    stats.items.forEach(item => {
+                    items.forEach(item => {
                         const start = currentSum; // 이 블록 시작점 (이전까지 누적)
                         currentSum += item.goal;
                         // 각 블록의 고유 id를 키로 시작점, 누적치, 총합계 저장
-                        map[item.id] = { start: start, cumulative: currentSum, total: stats.total, count: stats.items.length };
+                        map[item.id] = { start: start, cumulative: currentSum, total: resetTotal, count: items.length };
                     });
                 });
                 return map;
@@ -9519,15 +9626,11 @@
                 const titleForDisplay = resolved.displayTitle;
                 let content = '';
                 
-                if (s.isCorrection || s.isSynopsis || s.isOther) {
-                    let prefix;
-                    if (s.isSynopsis) prefix = '[시놉]';
-                    else if (s.isCorrection) prefix = '[작교]';
-                    else if (s.isOther) prefix = s.memo ? `[${s.memo}]` : '[기타]';
+                if (s.category) {
+                    const prefix = `[${s.category}]`;
                     let opacity = s.isCompleted ? 'opacity-50' : '';
-                    const showMemoLine = s.memo && !(s.isOther);
                     content = `<div class="font-bold text-slate-700 ${opacity}" style="white-space:normal; word-break:break-word;">${prefix} ${titleForDisplay}</div>
-                               ${showMemoLine ? `<div class="text-[10px] text-slate-500 ${opacity}" style="white-space:normal; word-break:break-word;">${s.memo}</div>` : ''}`;
+                               ${s.memo ? `<div class="text-[10px] text-slate-500 ${opacity}" style="white-space:normal; word-break:break-word;">${s.memo}</div>` : ''}`;
                 } else {
                     let opacity = s.isCompleted ? 'opacity-50' : '';
                     let goalData = cumulativeGoalMap[s.id];
@@ -9568,14 +9671,10 @@
                 const fillColor = s._fillColor || color;
                 const wcs = writeCardSettings;
 
-                // 작교/시놉/기타는 설정 색상으로 전체 채움
+                // 분류가 있으면 해당 분류의 설정 색상으로 전체 채움 (분류별 색상은 WRITE_COLORS에서 관리)
                 let cardBg = '';
-                if (s.isCorrection) {
-                    cardBg = `background: ${wcs.colorCorrection};`;
-                } else if (s.isSynopsis) {
-                    cardBg = `background: ${wcs.colorSynopsis};`;
-                } else if (s.isOther) {
-                    cardBg = `background: ${wcs.colorOther};`;
+                if (s.category) {
+                    cardBg = `background: ${WRITE_COLORS[s.category] || '#94a3b8'};`;
                 } else if (fillPct > 0) {
                     cardBg = `background: linear-gradient(to right, ${hexToRgba(fillColor, wcs.fillOpacity)} ${fillPct}%, ${wcs.colorDefault} ${fillPct}%);`;
                 } else {
@@ -9601,7 +9700,7 @@
             }, 'openWriteModal', dragEvents, (daySchedules, dateStr) => {
                 // 그날 등록된 집필 블록의 goal 합산만 (실제 기록 사용 안 함)
                 return daySchedules.reduce((total, s) => {
-                    if (s.isCorrection || s.isSynopsis || s.isOther) return total;
+                    if (s.category) return total;
                     if (!isScheduleWorkValid(s.workId)) return total;   // 삭제된 작품의 글자수는 합산 제외
                     return total + (Number(s.goal) || 0);
                 }, 0);
@@ -9618,7 +9717,7 @@
                 Object.entries(writeSchedules).forEach(([dateStr, schedules]) => {
                     if (!dateStr.startsWith(moStr)) return;
                     schedules.forEach(s => {
-                        if (!s.isCorrection && !s.isSynopsis && !s.isOther) {
+                        if (!s.category) {
                             if (!isScheduleWorkValid(s.workId)) return;   // 삭제된 작품의 글자수는 합계 제외
                             monthGoalSum += Number(s.goal) || 0;
                         }
@@ -9861,31 +9960,28 @@
         let currentEditWriteDate = null;
         let currentEditWriteId = null;
 
-        function toggleWriteType(type, isChecked) {
+        function toggleWriteType(category) {
             const goalCont = document.getElementById('write-goal-container');
             const memoCont = document.getElementById('write-memo-container');
             const memoLabel = document.getElementById('write-memo-label');
-            const corrCb = document.getElementById('write-is-correction');
-            const synopCb = document.getElementById('write-is-synopsis');
-            const otherCb = document.getElementById('write-is-other');
 
-            // 라디오처럼 한 번에 하나만
-            if(type === 'correction' && isChecked) { synopCb.checked = false; otherCb.checked = false; }
-            if(type === 'synopsis' && isChecked) { corrCb.checked = false; otherCb.checked = false; }
-            if(type === 'other' && isChecked) { corrCb.checked = false; synopCb.checked = false; }
-
-            if(corrCb.checked || synopCb.checked || otherCb.checked) {
+            if (category) {
                 goalCont.classList.add('hidden');
                 memoCont.classList.remove('hidden');
-                if (memoLabel) {
-                    if (corrCb.checked) memoLabel.textContent = '작교 메모 (선택)';
-                    else if (synopCb.checked) memoLabel.textContent = '시놉시스 메모 (선택)';
-                    else if (otherCb.checked) memoLabel.textContent = '기타 메모 (선택)';
-                }
+                if (memoLabel) memoLabel.textContent = `${category} 메모 (선택)`;
             } else {
                 goalCont.classList.remove('hidden');
                 memoCont.classList.add('hidden');
             }
+        }
+
+        // 🟢 [NEW] 집필 분류(카테고리) 드롭다운 옵션 렌더 — 스케줄 관리와 독립적으로 관리됨
+        function renderWriteCategorySelectOptions() {
+            const select = document.getElementById('write-category-select');
+            if (!select) return;
+            const prevValue = select.value;
+            select.innerHTML = `<option value="">✏️ 집필 목표</option>` + writeCategoryList.map(cat => `<option value="${cat}">${cat}</option>`).join('');
+            select.value = writeCategoryList.includes(prevValue) ? prevValue : "";
         }
 
         function openWriteModal(dateStr) {
@@ -9899,15 +9995,14 @@
             renderWriteModalWorkSelect();
             document.getElementById('write-work-select').value = "";
             
-            document.getElementById('write-is-correction').checked = false;
-            document.getElementById('write-is-synopsis').checked = false;
-            document.getElementById('write-is-other').checked = false;
+            renderWriteCategorySelectOptions();
+            document.getElementById('write-category-select').value = "";
             document.getElementById('write-goal-input').value = "4000";
             document.getElementById('write-memo-input').value = "";
             document.getElementById('write-is-completed').checked = false;
             document.getElementById('write-complete-container').classList.add('hidden');
             document.getElementById('write-delete-btn').classList.add('hidden');
-            toggleWriteType('correction', false);
+            toggleWriteType('');
             
             document.getElementById('write-schedule-modal').classList.add('open');
         }
@@ -9925,14 +10020,13 @@
             renderWriteModalWorkSelect();
             document.getElementById('write-work-select').value = item.workId;
             
-            document.getElementById('write-is-correction').checked = item.isCorrection;
-            document.getElementById('write-is-synopsis').checked = item.isSynopsis;
-            document.getElementById('write-is-other').checked = !!item.isOther;
+            renderWriteCategorySelectOptions();
+            document.getElementById('write-category-select').value = item.category || "";
             document.getElementById('write-goal-input').value = item.goal || 4000;
             document.getElementById('write-memo-input').value = item.memo || "";
             document.getElementById('write-is-completed').checked = item.isCompleted;
             
-            toggleWriteType(item.isCorrection ? 'correction' : (item.isSynopsis ? 'synopsis' : (item.isOther ? 'other' : '')), true);
+            toggleWriteType(item.category || '');
             
             document.getElementById('write-complete-container').classList.remove('hidden');
             document.getElementById('write-delete-btn').classList.remove('hidden');
@@ -9945,9 +10039,7 @@
         function saveWriteSchedule() {
             const dateStr = currentEditWriteDate;
             const workId = document.getElementById('write-work-select').value;
-            const isCorrection = document.getElementById('write-is-correction').checked;
-            const isSynopsis = document.getElementById('write-is-synopsis').checked;
-            const isOther = document.getElementById('write-is-other').checked;
+            const category = document.getElementById('write-category-select').value;
             const goal = parseInt(document.getElementById('write-goal-input').value) || 0;
             const memo = document.getElementById('write-memo-input').value;
             const isCompleted = document.getElementById('write-is-completed').checked;
@@ -9959,15 +10051,127 @@
             if(currentEditWriteId) {
                 const idx = writeSchedules[dateStr].findIndex(s => s.id === currentEditWriteId);
                 if(idx > -1) {
-                    writeSchedules[dateStr][idx] = { id: currentEditWriteId, date: dateStr, workId, isCorrection, isSynopsis, isOther, goal, memo, isCompleted };
+                    writeSchedules[dateStr][idx] = { id: currentEditWriteId, date: dateStr, workId, category, goal, memo, isCompleted };
                 }
             } else {
                 writeSchedules[dateStr].push({
-                    id: 'ws_' + Date.now() + Math.floor(Math.random()*1000), date: dateStr, workId, isCorrection, isSynopsis, isOther, goal, memo, isCompleted
+                    id: 'ws_' + Date.now() + Math.floor(Math.random()*1000), date: dateStr, workId, category, goal, memo, isCompleted
                 });
             }
 
             save(); closeWriteModal(); renderWriteCalendar();
+        }
+
+        // 🟢 [NEW] 집필 분류 항목 관리 (스케줄 관리의 분류 관리와 동일한 방식이지만 서로 연동되지 않음)
+        function openWriteCategoryManager() {
+            renderWriteCategoryManagerList();
+            document.getElementById('write-category-manager-modal').classList.add('open');
+        }
+        function closeWriteCategoryManager() {
+            document.getElementById('write-category-manager-modal').classList.remove('open');
+            editingWriteCategoryIndex = null;
+            document.getElementById('new-write-category-input').value = '';
+            const btn = document.getElementById('btn-add-update-write-category');
+            btn.innerText = '추가';
+            btn.onclick = addNewWriteCategory;
+            // 관리 창에서 바뀐 목록을 집필 목표 모달의 드롭다운과 설정 화면에도 반영
+            renderWriteCategorySelectOptions();
+            renderWriteCategoryColorList();
+        }
+
+        function renderWriteCategoryManagerList() {
+            const list = document.getElementById('write-category-manager-list');
+            if (!list) return;
+            list.innerHTML = writeCategoryList.map((cat, idx) => `
+                <tr class="draggable-write-category cursor-move hover:bg-slate-50" draggable="true" data-index="${idx}">
+                    <td class="px-4 py-3 text-center text-slate-300"><i class="fa-solid fa-grip-vertical"></i></td>
+                    <td class="px-4 py-3 font-medium">${cat}</td>
+                    <td class="px-4 py-3 text-center flex justify-center gap-2">
+                        <button onclick="editWriteCategory(${idx})" class="text-slate-400 hover:text-blue-500 text-xs"><i class="fa-solid fa-pen"></i></button>
+                        <button onclick="removeWriteCategory(${idx})" class="text-slate-400 hover:text-red-500 text-xs"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                </tr>`).join('');
+            addWriteCategoryDragEvents();
+        }
+
+        function addWriteCategoryDragEvents() {
+            let dragSrcCat = null;
+            document.querySelectorAll('.draggable-write-category').forEach(row => {
+                row.addEventListener('dragstart', e => { dragSrcCat = row; row.classList.add('opacity-50'); });
+                row.addEventListener('dragover', e => e.preventDefault());
+                row.addEventListener('drop', e => {
+                    e.preventDefault();
+                    if (dragSrcCat !== row) {
+                        const allRows = [...document.querySelectorAll('.draggable-write-category')];
+                        const srcIdx = allRows.indexOf(dragSrcCat), dstIdx = allRows.indexOf(row);
+                        const movedItem = writeCategoryList.splice(srcIdx, 1)[0];
+                        writeCategoryList.splice(dstIdx, 0, movedItem);
+                        save(); renderWriteCategoryManagerList();
+                    }
+                });
+                row.addEventListener('dragend', () => row.classList.remove('opacity-50'));
+            });
+        }
+
+        function editWriteCategory(idx) {
+            editingWriteCategoryIndex = idx;
+            document.getElementById('new-write-category-input').value = writeCategoryList[idx];
+            const btn = document.getElementById('btn-add-update-write-category');
+            btn.innerText = '수정';
+            btn.onclick = updateWriteCategory;
+        }
+
+        function updateWriteCategory() {
+            const input = document.getElementById('new-write-category-input');
+            const newName = input.value.trim();
+            if (!newName) return;
+            const oldName = writeCategoryList[editingWriteCategoryIndex];
+            if (newName !== oldName && writeCategoryList.some(c => c.trim() === newName)) { alert("이미 있는 분류명이에요."); return; }
+
+            writeCategoryList[editingWriteCategoryIndex] = newName;
+
+            // 색상 설정 키 이전
+            if (WRITE_COLORS[oldName] !== undefined && newName !== oldName) {
+                WRITE_COLORS[newName] = WRITE_COLORS[oldName];
+                delete WRITE_COLORS[oldName];
+            }
+
+            // 기존에 저장된 집필 기록들의 분류명도 함께 변경
+            if (newName !== oldName) {
+                Object.keys(writeSchedules).forEach(dateStr => {
+                    (writeSchedules[dateStr] || []).forEach(s => { if (s.category === oldName) s.category = newName; });
+                });
+            }
+
+            save();
+            editingWriteCategoryIndex = null;
+            input.value = '';
+            const btn = document.getElementById('btn-add-update-write-category');
+            btn.innerText = '추가';
+            btn.onclick = addNewWriteCategory;
+            renderWriteCategoryManagerList();
+            renderWriteCalendar();
+        }
+
+        function addNewWriteCategory() {
+            const input = document.getElementById('new-write-category-input');
+            const name = input.value.trim();
+            if (!name) return;
+            if (writeCategoryList.some(c => c.trim() === name)) { alert("이미 있는 분류명이에요."); return; }
+            writeCategoryList.push(name);
+            if (WRITE_COLORS[name] === undefined) WRITE_COLORS[name] = '#94a3b8';
+            save();
+            input.value = '';
+            renderWriteCategoryManagerList();
+        }
+
+        function removeWriteCategory(idx) {
+            const name = writeCategoryList[idx];
+            if (!confirm("이 분류를 삭제하시겠습니까? (이미 저장된 집필 기록의 분류명은 그대로 남아요)")) return;
+            writeCategoryList.splice(idx, 1);
+            delete WRITE_COLORS[name];
+            save();
+            renderWriteCategoryManagerList();
         }
 
         function deleteWriteSchedule() {
@@ -10334,16 +10538,55 @@
         function writerGetDayGoal(dateStr) {
             const schedules = writeSchedules[dateStr]; if (!schedules) return 0;
             let sum = 0;
-            schedules.forEach(s => { if (!s.isCorrection && !s.isSynopsis && !s.isOther) sum += Number(s.goal) || 0; });
+            schedules.forEach(s => { if (!s.category) sum += Number(s.goal) || 0; });
             return sum;
         }
-        function writerGetWorkTotal(storageKey) {
+        // storageKey의 실제 누적 글자수 합계 (기준점 반영 전 원본 값)
+        // beforeDate를 넘기면 그 날짜 이전(해당 날짜 미포함)까지 기록된 글자수만 합산한다.
+        function writerGetWorkRawTotal(storageKey, beforeDate) {
             let sum = 0;
             for (let date in writerDailyData) {
+                if (beforeDate && date >= beforeDate) continue;
                 const wd = writerGetDayWorkData(date, storageKey);
                 if (wd?.hours) sum += Object.values(wd.hours).reduce((a,b)=>a+(b.diff||0), 0);
             }
             return sum;
+        }
+        // 집필관리 카운터/진행률에 쓰이는 값. "지금부터 카운터" 초기화 기준점을 뺀 값을 반환한다.
+        // (writerDailyData 자체의 글자수 기록은 그대로 유지되고, 여기서 보여지는 진행률만 초기화됨)
+        function writerGetWorkTotal(storageKey) {
+            const raw = writerGetWorkRawTotal(storageKey);
+            const base = writeCounterBase[storageKey] || 0;
+            return Math.max(0, raw - base);
+        }
+        // [NEW] "지금부터 카운터" 리셋 모달 — 기준 날짜를 고를 수 있게 함
+        let writeCounterResetTargetKey = null;
+        function openWriteCounterResetModal(storageKey) {
+            if (!storageKey) { alert('먼저 작품을 선택해주세요.'); return; }
+            writeCounterResetTargetKey = storageKey;
+            const input = document.getElementById('write-counter-reset-date-input');
+            input.value = writeCounterResetDate[storageKey] || getYYYYMMDD(new Date());
+            document.getElementById('write-counter-reset-modal').classList.add('open');
+        }
+        function closeWriteCounterResetModal() {
+            document.getElementById('write-counter-reset-modal').classList.remove('open');
+            writeCounterResetTargetKey = null;
+        }
+        // 선택한 날짜부터 카운터를 0자로 다시 센다. 그 날짜 이전 기록은 통계에 그대로 남기고,
+        // 진행률/누적 표시(writeCounterBase)와 달력의 누적 목표 블록(writeCounterResetDate)을 함께 갱신한다.
+        function confirmWriteCounterReset() {
+            const storageKey = writeCounterResetTargetKey;
+            if (!storageKey) return;
+            const dateStr = document.getElementById('write-counter-reset-date-input').value;
+            if (!dateStr) { alert('날짜를 선택해주세요.'); return; }
+            const baseRaw = writerGetWorkRawTotal(storageKey, dateStr);
+            if (!confirm(`${dateStr}부터 카운터를 0자로 초기화할까요?\n\n· 그 전에 기록된 글자수(${baseRaw.toLocaleString()}자)는 통계에 그대로 남습니다.\n· 집필 관리에 표시되는 누적/진행률과 달력의 누적 목표(괄호 안 숫자)가 이 날짜부터 다시 셉니다.`)) return;
+            writeCounterBase[storageKey] = baseRaw;
+            writeCounterResetDate[storageKey] = dateStr;
+            save();
+            try { writerUpdateDailyStats(true); } catch(e) {}
+            try { renderWriteCalendar(); } catch(e) {}
+            closeWriteCounterResetModal();
         }
         // 하루 작품별 글자수 분해 (도넛 조각/호버용)
         function writerGetDayWorkBreakdown(dateStr) {
@@ -11238,7 +11481,7 @@
                 const moStr2 = `${y}-${String(m+1).padStart(2,'0')}`;
                 Object.entries(writeSchedules).forEach(([dateStr, schedules]) => {
                     if (!dateStr.startsWith(moStr2)) return;
-                    schedules.forEach(s => { if (!s.isCorrection && !s.isSynopsis && !s.isOther) writeGoalSum += Number(s.goal) || 0; });
+                    schedules.forEach(s => { if (!s.category) writeGoalSum += Number(s.goal) || 0; });
                 });
             } catch(e) {}
             const goalPart = writeGoalSum > 0

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Lucy's Space</title>
+<title>Lucy's Space · Photo Diary V4</title>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Noto+Serif+KR:wght@400;500;600;700&family=Nanum+Pen+Script&family=Nanum+Myeongjo:wght@400;700&family=Sunflower:wght@300;500;700&family=Hi+Melody&family=Stylish&family=Gaegu:wght@400;700&family=Montserrat:ital,wght@1,700;1,800&family=Dancing+Script:wght@600;700&family=Sacramento&family=Allura&family=Kaushan+Script&family=Geist+Mono:wght@300;400;500&family=Pretendard:wght@300;400;500;600&display=swap" rel="stylesheet">
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -760,6 +760,15 @@ textarea{line-height:1.65}
 }
 .diary-photo-meta{font-size:.75em;color:var(--t3);line-height:1.45;margin-top:5px}
 .diary-photo-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
+.diary-photo-focus-wrap{margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+.diary-photo-focus-label{font-size:.75em;color:var(--t2);margin-bottom:7px;display:flex;justify-content:space-between;gap:8px}
+.diary-photo-focus-frame{position:relative;width:100%;max-width:260px;aspect-ratio:1.55/1;overflow:hidden;border:1px solid var(--border);border-radius:10px;background:var(--surface);cursor:grab;touch-action:none;user-select:none}
+.diary-photo-focus-frame:active{cursor:grabbing}
+.diary-photo-focus-frame img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
+.diary-photo-focus-frame::after{content:'캘린더에 보일 영역';position:absolute;left:8px;bottom:7px;padding:2px 6px;border-radius:99px;background:rgba(0,0,0,.48);color:#fff;font-size:.64em;pointer-events:none}
+.diary-photo-focus-hint{font-size:.7em;color:var(--t3);margin-top:6px;line-height:1.45}
+.diary-photo-pos-tools{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}
+#lucy-toast{position:fixed;right:22px;bottom:22px;z-index:12000;display:none;max-width:min(360px,calc(100vw - 32px));padding:11px 14px;border-radius:11px;background:color-mix(in srgb,var(--text) 92%,transparent);color:var(--bg);font-size:.82em;box-shadow:0 10px 30px rgba(0,0,0,.18);pointer-events:none}
 
 </style>
 </head>
@@ -2036,8 +2045,10 @@ function renderDiary(){
     var hasDiary=!!(entry&&(entry.text||entry.mood));
     var hasPhoto=!!(entry&&entry.photoUrl);
     var isLR=ri===5, isLC=ci===6;
+    var photoPosX=(entry&&entry.photoPosX!=null)?entry.photoPosX:50;
+    var photoPosY=(entry&&entry.photoPosY!=null)?entry.photoPosY:50;
     var cellBg=hasPhoto
-      ? 'background-image:linear-gradient(color-mix(in srgb,var(--surface) 84%,transparent),color-mix(in srgb,var(--surface) 84%,transparent)),url(&quot;'+entry.photoUrl.replace(/&/g,'&amp;').replace(/"/g,'&quot;')+'&quot;);'
+      ? 'background-image:linear-gradient(color-mix(in srgb,var(--surface) 84%,transparent),color-mix(in srgb,var(--surface) 84%,transparent)),url(&quot;'+entry.photoUrl.replace(/&/g,'&amp;').replace(/"/g,'&quot;')+'&quot;);background-position:'+photoPosX+'% '+photoPosY+'%;'
       : 'background:'+(isT?'var(--al)':hasDiary?'var(--s2)15':'transparent')+';';
     calHtml+='<div class="diary-cell'+(hasPhoto?' diary-has-photo':'')+(ri<=1?' dc-top':'')+'" data-ds="'+ds+'" style="'+
       'min-height:96px;padding:6px 8px;cursor:pointer;'+
@@ -2096,6 +2107,13 @@ function renderDiary(){
 
 
 let pendingDiaryPhoto=null;
+function showLucyToast(msg,ms){var el=document.getElementById('lucy-toast');if(!el){el=document.createElement('div');el.id='lucy-toast';document.body.appendChild(el);}el.textContent=msg;el.style.display='block';clearTimeout(showLucyToast._t);showLucyToast._t=setTimeout(function(){el.style.display='none';},ms||2200);}
+function clampPhotoPos(v){v=Number(v);return Math.max(0,Math.min(100,isFinite(v)?v:50));}
+function ensurePendingPhotoPosition(ds){var e=(S.diaryEntries||{})[ds]||{};if(!pendingDiaryPhoto||pendingDiaryPhoto.ds!==ds){pendingDiaryPhoto={ds:ds,positionOnly:true,posX:e.photoPosX!=null?e.photoPosX:50,posY:e.photoPosY!=null?e.photoPosY:50};}if(pendingDiaryPhoto.posX==null)pendingDiaryPhoto.posX=e.photoPosX!=null?e.photoPosX:50;if(pendingDiaryPhoto.posY==null)pendingDiaryPhoto.posY=e.photoPosY!=null?e.photoPosY:50;return pendingDiaryPhoto;}
+function updateDiaryPhotoFocusUI(ds){var p=ensurePendingPhotoPosition(ds);var img=document.getElementById('diary-photo-focus-img');if(img)img.style.objectPosition=clampPhotoPos(p.posX)+'% '+clampPhotoPos(p.posY)+'%';var thumb=document.getElementById('diary-photo-preview');if(thumb)thumb.style.objectPosition=clampPhotoPos(p.posX)+'% '+clampPhotoPos(p.posY)+'%';var val=document.getElementById('diary-photo-pos-value');if(val)val.textContent=Math.round(clampPhotoPos(p.posX))+'% · '+Math.round(clampPhotoPos(p.posY))+'%';}
+function setDiaryPhotoPosition(ds,x,y){var p=ensurePendingPhotoPosition(ds);p.posX=clampPhotoPos(x);p.posY=clampPhotoPos(y);p.positionOnly=!p.blob&&!p.remove;updateDiaryPhotoFocusUI(ds);}
+function nudgeDiaryPhotoPosition(ds,dx,dy){var p=ensurePendingPhotoPosition(ds);setDiaryPhotoPosition(ds,(p.posX==null?50:p.posX)+dx,(p.posY==null?50:p.posY)+dy);}
+function bindDiaryPhotoDrag(ds){var frame=document.getElementById('diary-photo-focus-frame');if(!frame)return;var dragging=false,lastX=0,lastY=0;frame.addEventListener('pointerdown',function(e){dragging=true;lastX=e.clientX;lastY=e.clientY;try{frame.setPointerCapture(e.pointerId);}catch(_){}});frame.addEventListener('pointermove',function(e){if(!dragging)return;var p=ensurePendingPhotoPosition(ds),r=frame.getBoundingClientRect();var dx=(e.clientX-lastX)/Math.max(1,r.width)*100,dy=(e.clientY-lastY)/Math.max(1,r.height)*100;lastX=e.clientX;lastY=e.clientY;setDiaryPhotoPosition(ds,(p.posX==null?50:p.posX)-dx,(p.posY==null?50:p.posY)-dy);});function up(){dragging=false;}frame.addEventListener('pointerup',up);frame.addEventListener('pointercancel',up);}
 
 function diaryPhotoPath(ds){
   if(!currentUser) return null;
@@ -2111,7 +2129,7 @@ function compressDiaryPhoto(file){
       var img=new Image();
       img.onerror=function(){reject(new Error('사진을 불러오지 못했어요.'));};
       img.onload=function(){
-        var maxSide=480;
+        var maxSide=360;
         var scale=Math.min(1,maxSide/Math.max(img.naturalWidth,img.naturalHeight));
         var w=Math.max(1,Math.round(img.naturalWidth*scale));
         var h=Math.max(1,Math.round(img.naturalHeight*scale));
@@ -2123,7 +2141,7 @@ function compressDiaryPhoto(file){
         canvas.toBlob(function(blob){
           if(!blob){reject(new Error('사진 압축에 실패했어요.'));return;}
           resolve({blob:blob,width:w,height:h,size:blob.size});
-        },'image/webp',0.50);
+        },'image/webp',0.45);
       };
       img.src=ev.target.result;
     };
@@ -2147,10 +2165,13 @@ async function pickDiaryPhoto(ds,input){
     var packed=await compressDiaryPhoto(file);
     if(pendingDiaryPhoto&&pendingDiaryPhoto.previewUrl) URL.revokeObjectURL(pendingDiaryPhoto.previewUrl);
     var previewUrl=URL.createObjectURL(packed.blob);
-    pendingDiaryPhoto={ds:ds,blob:packed.blob,previewUrl:previewUrl,size:packed.size,width:packed.width,height:packed.height};
+    var oldEntry=(S.diaryEntries||{})[ds]||{}; pendingDiaryPhoto={ds:ds,blob:packed.blob,previewUrl:previewUrl,size:packed.size,width:packed.width,height:packed.height,posX:oldEntry.photoPosX!=null?oldEntry.photoPosX:50,posY:oldEntry.photoPosY!=null?oldEntry.photoPosY:50};
     var img=document.getElementById('diary-photo-preview');
     var empty=document.getElementById('diary-photo-empty');
-    if(img){img.src=previewUrl;img.style.display='block';}
+    if(img){img.src=previewUrl;img.style.display='block';img.style.objectPosition=pendingDiaryPhoto.posX+'% '+pendingDiaryPhoto.posY+'%';}
+    var focusImg=document.getElementById('diary-photo-focus-img');var focusWrap=document.getElementById('diary-photo-focus-wrap');
+    if(focusImg){focusImg.src=previewUrl;focusImg.style.display='block';} if(focusWrap) focusWrap.style.display='block';
+    updateDiaryPhotoFocusUI(ds);
     if(empty) empty.style.display='none';
     if(status) status.textContent='자동 압축 완료 · '+packed.width+'×'+packed.height+' · '+fmtBytes(packed.size);
     var removeBtn=document.getElementById('diary-photo-remove');
@@ -2165,12 +2186,14 @@ async function pickDiaryPhoto(ds,input){
 
 function clearPendingDiaryPhoto(ds){
   if(pendingDiaryPhoto&&pendingDiaryPhoto.previewUrl) URL.revokeObjectURL(pendingDiaryPhoto.previewUrl);
-  pendingDiaryPhoto={ds:ds,remove:true};
+  pendingDiaryPhoto={ds:ds,remove:true,posX:50,posY:50};
   var img=document.getElementById('diary-photo-preview');
+  var focusWrap=document.getElementById('diary-photo-focus-wrap');
   var empty=document.getElementById('diary-photo-empty');
   var status=document.getElementById('diary-photo-status');
   var removeBtn=document.getElementById('diary-photo-remove');
   if(img){img.src='';img.style.display='none';}
+  if(focusWrap) focusWrap.style.display='none';
   if(empty) empty.style.display='flex';
   if(status) status.textContent='사진 없음 · 캘린더에는 기존 배경이 보여요.';
   if(removeBtn) removeBtn.style.display='none';
@@ -2222,20 +2245,34 @@ function openDiaryModal(ds){
   var rawText=entry.text||'';
   var rawTitle=entry.title||'';
   var photoUrl=entry.photoUrl||'';
-  var photoInfo=entry.photoSize?('저장된 사진 · '+fmtBytes(entry.photoSize)):'480px WebP로 자동 압축 · 원본은 저장하지 않아요.';
+  var photoInfo=entry.photoSize?('저장된 사진 · '+fmtBytes(entry.photoSize)):'360px WebP 45%로 자동 압축 · 원본은 저장하지 않아요.';
+  var photoPosX=entry.photoPosX!=null?entry.photoPosX:50;
+  var photoPosY=entry.photoPosY!=null?entry.photoPosY:50;
 
   openMo(label,
     '<div class="diary-photo-upload">'+
       '<div>'+ 
-        '<img id="diary-photo-preview" class="diary-photo-preview" src="'+photoUrl+'" style="display:'+(photoUrl?'block':'none')+'">'+
+        '<img id="diary-photo-preview" class="diary-photo-preview" src="'+photoUrl+'" style="display:'+(photoUrl?'block':'none')+';object-position:'+photoPosX+'% '+photoPosY+'%">'+
         '<div id="diary-photo-empty" class="diary-photo-empty" style="display:'+(photoUrl?'none':'flex')+'">📷</div>'+ 
       '</div>'+ 
       '<div>'+ 
         '<div style="font-size:.86em;font-weight:700">오늘의 사진</div>'+ 
         '<div id="diary-photo-status" class="diary-photo-meta">'+photoInfo+'</div>'+ 
         '<div class="diary-photo-actions">'+ 
-          '<label class="btn bg bsm" style="cursor:pointer">사진 선택<input type="file" accept="image/*" style="display:none" onchange="pickDiaryPhoto(\''+ds+'\',this)"></label>'+ 
-          '<button id="diary-photo-remove" class="btn bg bsm" style="color:var(--red);display:'+(photoUrl?'inline-flex':'none')+'" onclick="clearPendingDiaryPhoto(\''+ds+'\')">사진 지우기</button>'+ 
+          '<label class="btn bg bsm" style="cursor:pointer">사진 선택<input type="file" accept="image/*" style="display:none" data-ds="'+ds+'" onchange="pickDiaryPhoto(this.dataset.ds,this)"></label>'+ 
+          '<button id="diary-photo-remove" class="btn bg bsm" style="color:var(--red);display:'+(photoUrl?'inline-flex':'none')+'" data-ds="'+ds+'" onclick="clearPendingDiaryPhoto(this.dataset.ds)">사진 지우기</button>'+ 
+        '</div>'+ 
+        '<div id="diary-photo-focus-wrap" class="diary-photo-focus-wrap" style="display:'+(photoUrl?'block':'none')+'">'+
+          '<div class="diary-photo-focus-label"><span>배경에 보일 부분</span><span id="diary-photo-pos-value">'+Math.round(photoPosX)+'% · '+Math.round(photoPosY)+'%</span></div>'+ 
+          '<div id="diary-photo-focus-frame" class="diary-photo-focus-frame"><img id="diary-photo-focus-img" src="'+photoUrl+'" style="object-position:'+photoPosX+'% '+photoPosY+'%"></div>'+ 
+          '<div class="diary-photo-focus-hint">사진을 드래그해서 캘린더 칸에 보일 위치를 정해요.</div>'+ 
+          '<div class="diary-photo-pos-tools">'+
+            '<button class="btn bg bsm" type="button" data-ds="'+ds+'" onclick="nudgeDiaryPhotoPosition(this.dataset.ds,0,-10)">↑</button>'+ 
+            '<button class="btn bg bsm" type="button" data-ds="'+ds+'" onclick="nudgeDiaryPhotoPosition(this.dataset.ds,-10,0)">←</button>'+ 
+            '<button class="btn bg bsm" type="button" data-ds="'+ds+'" onclick="setDiaryPhotoPosition(this.dataset.ds,50,50)">중앙</button>'+ 
+            '<button class="btn bg bsm" type="button" data-ds="'+ds+'" onclick="nudgeDiaryPhotoPosition(this.dataset.ds,10,0)">→</button>'+ 
+            '<button class="btn bg bsm" type="button" data-ds="'+ds+'" onclick="nudgeDiaryPhotoPosition(this.dataset.ds,0,10)">↓</button>'+ 
+          '</div>'+ 
         '</div>'+ 
       '</div>'+ 
     '</div>'+ 
@@ -2256,7 +2293,7 @@ function openDiaryModal(ds){
     '<button class="btn bp" id="diary-save-btn">저장</button>'
   );
   document.getElementById('diary-save-btn').onclick=function(){saveDiaryFromModal(ds);};
-  setTimeout(function(){var ta=document.getElementById('diary-ta');if(ta) updateLineNums(ta);},50);
+  setTimeout(function(){var ta=document.getElementById('diary-ta');if(ta) updateLineNums(ta);bindDiaryPhotoDrag(ds);},50);
 }
 
 function getLineNums(text){if(!text) return '1'; return text.split('\n').map(function(_,i){return i+1;}).join('<br>');}
@@ -2301,42 +2338,30 @@ function saveTodayDiaryDirect(ds, text){
   S.diaryEntries[ds].text=text;
   save();
 }
-async function saveDiaryFromModal(ds){
+function saveDiaryFromModal(ds){
   var ta=document.getElementById('diary-ta'),ti=document.getElementById('diary-title-inp');
-  if(!ta) return;
-  var btn=document.getElementById('diary-save-btn');
-  var status=document.getElementById('diary-photo-status');
-  if(btn){btn.disabled=true;btn.textContent='저장 중…';}
-  if(!S.diaryEntries) S.diaryEntries={};
-  if(!S.diaryEntries[ds]) S.diaryEntries[ds]={text:'',mood:'',title:''};
-  var entry=S.diaryEntries[ds];
-  entry.text=ta.value;
-  if(ti) entry.title=ti.value.trim();
-  try{
-    if(pendingDiaryPhoto&&pendingDiaryPhoto.ds===ds){
-      if(pendingDiaryPhoto.remove){
-        if(status) status.textContent='사진 삭제 중…';
-        await deleteDiaryPhotoFile(ds,entry);
-        delete entry.photoUrl;delete entry.photoPath;delete entry.photoSize;
-      }else if(pendingDiaryPhoto.blob){
-        if(status) status.textContent='사진 저장 중…';
-        var uploaded=await uploadDiaryPhoto(ds,pendingDiaryPhoto.blob);
-        entry.photoUrl=uploaded.url;
-        entry.photoPath=uploaded.path;
-        entry.photoSize=uploaded.size;
-      }
-    }
-    save();
-    if(pendingDiaryPhoto&&pendingDiaryPhoto.previewUrl) URL.revokeObjectURL(pendingDiaryPhoto.previewUrl);
-    pendingDiaryPhoto=null;
-    closeMo();render();
-  }catch(e){
-    console.error('Diary photo save error:',e);
-    if(status) status.textContent='사진 저장 실패 · Firebase Storage 설정을 확인해 주세요.';
-    alert('사진 저장에 실패했어요. Firebase Storage가 활성화되어 있고 로그인 사용자가 자신의 사진 폴더에 저장할 수 있는지 확인해 주세요.\n\n'+(e.message||''));
-    if(btn){btn.disabled=false;btn.textContent='저장';}
+  if(!ta)return;
+  if(!S.diaryEntries)S.diaryEntries={};
+  if(!S.diaryEntries[ds])S.diaryEntries[ds]={text:'',mood:'',title:''};
+  var entry=S.diaryEntries[ds];entry.text=ta.value;if(ti)entry.title=ti.value.trim();
+  var photoJob=(pendingDiaryPhoto&&pendingDiaryPhoto.ds===ds)?pendingDiaryPhoto:null;
+  if(photoJob&&photoJob.remove){
+    var oldEntry={photoPath:entry.photoPath,photoUrl:entry.photoUrl};
+    delete entry.photoUrl;delete entry.photoPath;delete entry.photoSize;delete entry.photoPosX;delete entry.photoPosY;
+    save();pendingDiaryPhoto=null;closeMo();render();showLucyToast('일기 저장 완료 · 사진 삭제 중…');
+    deleteDiaryPhotoFile(ds,oldEntry).then(function(){showLucyToast('사진 삭제 완료');}).catch(function(e){console.warn(e);showLucyToast('일기는 저장됐지만 사진 삭제에 실패했어요.',3200);});return;
   }
+  if(photoJob){entry.photoPosX=clampPhotoPos(photoJob.posX==null?50:photoJob.posX);entry.photoPosY=clampPhotoPos(photoJob.posY==null?50:photoJob.posY);}
+  save();pendingDiaryPhoto=null;closeMo();render();
+  if(!photoJob||!photoJob.blob){if(photoJob&&photoJob.previewUrl)URL.revokeObjectURL(photoJob.previewUrl);showLucyToast('일기 저장 완료');return;}
+  showLucyToast('일기 저장 완료 · 사진은 뒤에서 저장 중…',2600);
+  uploadDiaryPhoto(ds,photoJob.blob).then(function(uploaded){
+    if(!S.diaryEntries)S.diaryEntries={};if(!S.diaryEntries[ds])S.diaryEntries[ds]={text:'',mood:'',title:''};
+    var target=S.diaryEntries[ds];target.photoUrl=uploaded.url;target.photoPath=uploaded.path;target.photoSize=uploaded.size;target.photoPosX=clampPhotoPos(photoJob.posX==null?50:photoJob.posX);target.photoPosY=clampPhotoPos(photoJob.posY==null?50:photoJob.posY);save();
+    if(photoJob.previewUrl)URL.revokeObjectURL(photoJob.previewUrl);render();showLucyToast('사진 저장 완료 ✓');
+  }).catch(function(e){console.error('Diary photo background upload error:',e);if(photoJob.previewUrl)URL.revokeObjectURL(photoJob.previewUrl);showLucyToast('일기는 저장됐지만 사진 업로드에 실패했어요.',3600);});
 }
+
 async function delDiaryEntry(ds){
   if(!confirm('이 날의 일기를 삭제할까요?')) return;
   var entry=S.diaryEntries&&S.diaryEntries[ds];

@@ -266,7 +266,7 @@ html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--t
 .sb-sc{flex:0 0 auto}
 .sb-sc::-webkit-scrollbar{width:3px}
 .sb-sc::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
-.sb-sec{padding:14px 8px 8px;display:flex;flex-direction:column;gap:4px}
+.sb-sec{padding:7px 8px 4px;display:flex;flex-direction:column;gap:2px}
 .sb-pj-wrap{flex:1;min-height:0;display:flex;flex-direction:column;margin:6px 10px 10px;background:transparent;border:1px solid var(--border);border-radius:10px;overflow:hidden}
 .sb-pj-hd{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;cursor:pointer;user-select:none;flex-shrink:0;transition:background .15s}
 .sb-pj-hd:hover{background:var(--s2)}
@@ -279,7 +279,7 @@ html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--t
 .sb-pj-wrap.collapsed .sb-pj-body{display:none}
 .sb-pj-body::-webkit-scrollbar{width:0;height:0;display:none}
 .sb-lbl{font-size:0.7143em;font-weight:500;color:var(--t3);letter-spacing:.08em;text-transform:uppercase;padding:0 8px;margin-bottom:4px;display:flex;align-items:center;justify-content:space-between}
-.nav{display:flex;align-items:center;gap:10px;padding:11px 10px;border-radius:var(--rsm);cursor:pointer;color:var(--t2);font-size:0.9643em;border:none;background:none;width:100%;text-align:left;transition:all .15s;font-family:var(--sans)}
+.nav{display:flex;align-items:center;gap:10px;padding:5.5px 10px;border-radius:var(--rsm);cursor:pointer;color:var(--t2);font-size:0.9643em;border:none;background:none;width:100%;text-align:left;transition:all .15s;font-family:var(--sans)}
 .nav:hover{background:var(--s3);color:var(--text)}
 .nav.on{background:var(--al);color:var(--accent)}
 .nav-ic{font-size:1.0714em;width:18px;text-align:center;flex-shrink:0}
@@ -469,6 +469,7 @@ html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--t
 .pj-card:hover{box-shadow:var(--shm);transform:translateY(-2px)}
 .pj-bar{height:4px}
 .pj-body{padding:16px;flex:1;display:flex;flex-direction:column;gap:10px}
+.pj-card:hover .pj-card-del{opacity:1}
 
 /* ── 카드 스타일 피커 (설정) ── */
 .card-style-picker{
@@ -2350,7 +2351,7 @@ function renderProjects(){
   html+='<button class="btn bp bsm" onclick="openPjModal()" style="margin-left:auto">+ 새 프로젝트</button></div>';
   if(filtered.length===0){html+='<div class="empty" style="padding:60px"><div class="ei">🗂️</div>'+(pjFilter?'이 영역의 프로젝트가 없어요':'첫 프로젝트를 만들어 보세요!')+'</div>';}
   else{
-  html+='<div class="pj-list">';
+  html+='<div class="pj-grid">';
     filtered.forEach(p=>{
       const tk=p.tasks||[],dn=tk.filter(t=>t.done).length,pc=tk.length?Math.round(dn/tk.length*100):0;
       const area=areas.find(a=>a.id===p.lifeAreaId);
@@ -2360,11 +2361,17 @@ function renderProjects(){
       if(tk.length>0) metaBits.push(dn+'/'+tk.length+' · '+pc+'%');
       if(area) metaBits.push(area.name);
       if(pjDday!==null) metaBits.push(pjDdayLabel);
-      html+='<div class="pj-row" onclick="go(\'projects\',\''+p.id+'\')">'+
-          '<span class="pj-row-dot">·</span>'+
-          '<span class="pj-row-name">'+(p.emoji?p.emoji+' ':'')+p.name+'</span>'+
-          (metaBits.length?'<span class="pj-row-meta">'+metaBits.join(' · ')+'</span>':'')+
-          '<button class="bi pj-row-del" onclick="event.stopPropagation();delPj(\''+p.id+'\')">✕</button>'+
+      var col=p.color||'#F5C490';
+      html+='<div class="pj-card" onclick="go(\'projects\',\''+p.id+'\')" style="--card-accent:'+col+'">'+
+          '<div class="pj-bar" style="background:'+col+'"></div>'+
+          '<div class="pj-body">'+
+            '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px">'+
+              '<span class="pj-title-text" style="font-weight:600;font-size:1.02em;color:var(--text)">'+(p.emoji?p.emoji+' ':'')+p.name+'</span>'+
+              '<button class="bi pj-card-del" onclick="event.stopPropagation();delPj(\''+p.id+'\')" style="color:var(--t3);flex-shrink:0;opacity:0;transition:opacity .15s">✕</button>'+
+            '</div>'+
+            (tk.length>0?'<div style="height:5px;border-radius:99px;background:var(--s2);overflow:hidden"><div style="height:100%;width:'+pc+'%;background:'+col+';border-radius:99px"></div></div>':'')+
+            (metaBits.length?'<div style="font-size:0.8em;color:var(--t3);font-family:var(--mono)">'+metaBits.join(' · ')+'</div>':'')+
+          '</div>'+
         '</div>';
     });
     html+='</div>';

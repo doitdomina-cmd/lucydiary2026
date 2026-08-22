@@ -455,6 +455,17 @@ html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--t
 .tl3-desc{font-size:0.86em;color:var(--t2);line-height:1.6;margin-top:8px;white-space:pre-line}
 .tl3-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
 .tl3-tag{font-size:0.75em;padding:3px 10px;border-radius:99px;background:var(--al);color:var(--accent);font-weight:500}
+/* 큰 시점: 테두리 카드 */
+.tl3-text-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 16px;box-shadow:var(--sh);transition:box-shadow .15s}
+.tl3-text-card:hover{box-shadow:var(--shm)}
+.tl3-text-card .tl3-editbtns{top:6px;right:6px}
+/* 작은 시점: 동그라미 없이 선으로만 연결, 테두리 없음, 더 작은 글씨 */
+.tl3-year-top-sm{height:24px;line-height:24px;font-size:0.85em;font-weight:600;color:var(--t2);margin-bottom:8px}
+.tl3-connector-sm{width:2px;height:34px;background:var(--border2)}
+.tl3-text-sm{width:100%;box-sizing:border-box;margin-top:10px;padding:0 4px;position:relative;text-align:left;cursor:pointer}
+.tl3-ttitle-sm{font-weight:600;font-size:0.86em;color:var(--text);line-height:1.4}
+.tl3-sub-sm{font-size:0.74em;color:var(--accent);font-weight:600;margin-top:3px;line-height:1.4}
+.tl3-desc-sm{font-size:0.76em;color:var(--t2);line-height:1.5;margin-top:6px;white-space:pre-line}
 .tl3-col-add{cursor:default}
 .tl3-node-add{border-style:dashed;border-color:var(--border2);background:transparent}
 .tl3-connector-add{background:var(--border2)}
@@ -749,6 +760,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     <div class="sb-sec">
       <div class="sb-lbl">Schedule</div>
       <button class="nav on" id="nav-today" onclick="go('today')"><span class="nav-ic" data-color="#F5C842"></span>Today<span class="nav-bd" id="today-bd" style="display:none"></span></button>
+      <button class="nav" id="nav-timeline" onclick="go('timeline')"><span class="nav-ic" data-color="#8FA8D9"></span>Roadmap</button>
       <button class="nav" id="nav-calendar" onclick="go('calendar')"><span class="nav-ic" data-color="#61C0BF"></span>Monthly</button>
       <button class="nav" id="nav-todocal" onclick="go('todocal')"><span class="nav-ic" data-color="#F5A623"></span>To Do</button>
       <button class="nav" id="nav-diary" onclick="go('diary')"><span class="nav-ic" data-color="#B2B0E8"></span>Thanks Diary</button>
@@ -2713,15 +2725,16 @@ function renderTimeline(){
     '<div class="tl3-line"></div>'+
     entries.map(function(e){
       const tagsHtml=(e.tags||[]).map(function(t){return '<span class="tl3-tag">'+esc(t)+'</span>';}).join('');
-      return '<div class="tl3-col" draggable="true" data-id="'+e.id+'" ondragstart="tlDragStart(event)" ondragend="tlDragEnd(event)" ondragover="tlDragOver(event)" ondragleave="tlDragLeave(event)" ondrop="tlDrop(event)">'+
-        '<div class="tl3-year-top">'+esc(e.year)+'</div>'+
-        '<div class="tl3-node"></div>'+
-        '<div class="tl3-connector"></div>'+
-        '<div class="tl3-text" onclick="openTlModal(\''+e.id+'\')">'+
+      const isSmall=e.size==='small';
+      return '<div class="tl3-col'+(isSmall?' tl3-col-small':'')+'" draggable="true" data-id="'+e.id+'" ondragstart="tlDragStart(event)" ondragend="tlDragEnd(event)" ondragover="tlDragOver(event)" ondragleave="tlDragLeave(event)" ondrop="tlDrop(event)">'+
+        '<div class="'+(isSmall?'tl3-year-top-sm':'tl3-year-top')+'">'+esc(e.year)+'</div>'+
+        (isSmall?'':'<div class="tl3-node"></div>')+
+        '<div class="'+(isSmall?'tl3-connector-sm':'tl3-connector')+'"></div>'+
+        '<div class="'+(isSmall?'tl3-text-sm':'tl3-text tl3-text-card')+'" onclick="openTlModal(\''+e.id+'\')">'+
           '<div class="tl3-editbtns"><button class="bi" onclick="event.stopPropagation();openTlModal(\''+e.id+'\')">✏️</button><button class="bi" onclick="event.stopPropagation();delTlEntry(\''+e.id+'\')">✕</button></div>'+
-          (e.title?'<div class="tl3-ttitle">'+esc(e.title)+'</div>':'')+
-          (e.subtitle?'<div class="tl3-sub">'+esc(e.subtitle)+'</div>':'')+
-          (e.desc?'<div class="tl3-desc">'+esc(e.desc)+'</div>':'')+
+          (e.title?'<div class="'+(isSmall?'tl3-ttitle-sm':'tl3-ttitle')+'">'+esc(e.title)+'</div>':'')+
+          (e.subtitle?'<div class="'+(isSmall?'tl3-sub-sm':'tl3-sub')+'">'+esc(e.subtitle)+'</div>':'')+
+          (e.desc?'<div class="'+(isSmall?'tl3-desc-sm':'tl3-desc')+'">'+esc(e.desc)+'</div>':'')+
           (tagsHtml?'<div class="tl3-tags">'+tagsHtml+'</div>':'')+
         '</div>'+
       '</div>';
@@ -2763,9 +2776,23 @@ function editTimelineTitle(){
   save();render();
 }
 
+let selTlSize='big';
+function pickTlSize(sz){
+  selTlSize=sz;
+  var b=document.getElementById('tl-size-big'), s=document.getElementById('tl-size-small');
+  if(b) b.style.cssText='flex:1;'+(sz==='big'?'background:var(--accent);color:#fff;border-color:var(--accent)':'');
+  if(s) s.style.cssText='flex:1;'+(sz==='small'?'background:var(--accent);color:#fff;border-color:var(--accent)':'');
+}
+
 function openTlModal(id){
   const editing=id?(S.timeline||[]).find(x=>x.id===id):null;
+  selTlSize=editing?(editing.size||'big'):'big';
+  var sizeHtml='<div class="fg"><label class="fl">시점 크기</label><div style="display:flex;gap:8px">'+
+    '<button type="button" class="daybtn" id="tl-size-big" onclick="pickTlSize(\'big\')" style="flex:1;'+(selTlSize==='big'?'background:var(--accent);color:#fff;border-color:var(--accent)':'')+'">● 큰 시점</button>'+
+    '<button type="button" class="daybtn" id="tl-size-small" onclick="pickTlSize(\'small\')" style="flex:1;'+(selTlSize==='small'?'background:var(--accent);color:#fff;border-color:var(--accent)':'')+'">— 작은 시점</button>'+
+    '</div><div style="font-size:0.78em;color:var(--t3);margin-top:5px">큰 시점: 동그라미 + 테두리 카드 · 작은 시점: 선으로만 연결, 테두리 없음</div></div>';
   openMo(editing?'시점 수정':'새 시점 추가',
+    sizeHtml+
     '<div class="fg"><label class="fl">연도/시기</label><input class="inp" id="tl-year" placeholder="예: 2026" value="'+(editing?esc(editing.year):'')+'"></div>'+
     '<div class="fg"><label class="fl">제목</label><input class="inp" id="tl-title" placeholder="예: 기반을 만드는 해" value="'+(editing?esc(editing.title):'')+'"></div>'+
     '<div class="fg"><label class="fl">부제</label><input class="inp" id="tl-sub" placeholder="예: 생활 시스템 + 본업 루틴" value="'+(editing?esc(editing.subtitle):'')+'"></div>'+
@@ -2782,13 +2809,14 @@ function saveTlEntry(id){
   const desc=document.getElementById('tl-desc').value.trim();
   const tagsRaw=document.getElementById('tl-tags').value.trim();
   const tags=tagsRaw?tagsRaw.split(',').map(function(t){return t.trim();}).filter(Boolean):[];
+  const size=selTlSize==='small'?'small':'big';
   if(!year&&!title)return;
   if(!S.timeline)S.timeline=[];
   if(id){
     const idx=S.timeline.findIndex(function(x){return x.id===id;});
-    if(idx>-1)S.timeline[idx]=Object.assign({},S.timeline[idx],{year:year,title:title,subtitle:sub,desc:desc,tags:tags});
+    if(idx>-1)S.timeline[idx]=Object.assign({},S.timeline[idx],{year:year,title:title,subtitle:sub,desc:desc,tags:tags,size:size});
   } else {
-    S.timeline.push({id:gid(),year:year,title:title,subtitle:sub,desc:desc,tags:tags});
+    S.timeline.push({id:gid(),year:year,title:title,subtitle:sub,desc:desc,tags:tags,size:size});
   }
   save();closeMo();render();
 }

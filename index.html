@@ -438,26 +438,29 @@ html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--t
 .tl3-title{display:flex;align-items:center;gap:8px;font-size:1.25em;font-weight:700;color:var(--text)}
 .tl3-title-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0}
 .tl3-scroll{overflow-x:auto;padding-bottom:10px;-webkit-overflow-scrolling:touch}
-.tl3-row{position:relative;display:flex;gap:16px;padding:8px 6px 6px;min-width:max-content}
-.tl3-line{position:absolute;left:0;right:0;top:16px;height:2px;background:var(--border);z-index:0}
-.tl3-col{flex:0 0 240px;display:flex;flex-direction:column;align-items:center;position:relative;z-index:1}
+.tl3-row{position:relative;display:flex;gap:10px;padding:8px 6px 6px;min-width:max-content}
+.tl3-line{position:absolute;left:0;right:0;top:48px;height:2px;background:var(--border);z-index:0}
+.tl3-col{flex:0 0 144px;display:flex;flex-direction:column;align-items:center;position:relative;z-index:1;cursor:grab;border-radius:8px;transition:outline .1s}
+.tl3-col.dragging{opacity:.4}
+.tl3-col.drag-over{outline:2px dashed var(--accent);outline-offset:6px}
+.tl3-year-top{height:24px;line-height:24px;font-size:1.15em;font-weight:700;color:var(--text);margin-bottom:8px}
 .tl3-node{width:16px;height:16px;border-radius:50%;background:var(--bg);border:3px solid var(--accent);flex-shrink:0;box-sizing:border-box}
-.tl3-card{width:100%;box-sizing:border-box;margin-top:16px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 18px;transition:box-shadow .15s}
-.tl3-card:hover{box-shadow:var(--shm)}
-.tl3-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:6px}
-.tl3-year{font-weight:700;font-size:1.02em;color:var(--text);line-height:1.4}
-.tl3-editbtns{display:flex;gap:2px;opacity:0;transition:opacity .15s;flex-shrink:0}
-.tl3-card:hover .tl3-editbtns{opacity:1}
+.tl3-connector{width:2px;height:18px;background:var(--border2)}
+.tl3-text{width:100%;box-sizing:border-box;margin-top:10px;padding:0 4px;position:relative;text-align:left;cursor:pointer}
+.tl3-editbtns{position:absolute;top:-4px;right:-2px;display:flex;gap:2px;opacity:0;transition:opacity .15s}
+.tl3-col:hover .tl3-editbtns{opacity:1}
+.tl3-ttitle{font-weight:600;font-size:0.98em;color:var(--text);line-height:1.4}
 .tl3-sub{font-size:0.82em;color:var(--accent);font-weight:600;margin-top:4px;line-height:1.4}
 .tl3-desc{font-size:0.86em;color:var(--t2);line-height:1.6;margin-top:8px;white-space:pre-line}
 .tl3-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
 .tl3-tag{font-size:0.75em;padding:3px 10px;border-radius:99px;background:var(--al);color:var(--accent);font-weight:500}
-.tl3-col-add{justify-content:flex-start}
+.tl3-col-add{cursor:default}
 .tl3-node-add{border-style:dashed;border-color:var(--border2);background:transparent}
-.tl3-add-card{margin-top:16px;width:100%;min-height:96px;border:1.5px dashed var(--border2);border-radius:14px;background:transparent;color:var(--t3);cursor:pointer;font-size:0.9em;font-weight:500;transition:all .15s}
-.tl3-add-card:hover{border-color:var(--accent);color:var(--accent);background:var(--al)}
+.tl3-connector-add{background:var(--border2)}
+.tl3-add-text{margin-top:10px;color:var(--t3);cursor:pointer;font-size:0.9em;font-weight:500;transition:color .15s;text-align:center}
+.tl3-add-text:hover{color:var(--accent)}
 @media(max-width:720px){
-  .tl3-col{flex-basis:210px}
+  .tl3-col{flex-basis:126px}
 }
 .pj-row{display:flex;align-items:center;gap:8px;padding:11px 14px;border-radius:8px;background:var(--s2);cursor:pointer;transition:background .15s;font-size:0.9286em}
 .pj-row:hover{background:var(--s3)}
@@ -2699,13 +2702,13 @@ function renderTimeline(){
     '<div class="tl3-line"></div>'+
     entries.map(function(e){
       const tagsHtml=(e.tags||[]).map(function(t){return '<span class="tl3-tag">'+esc(t)+'</span>';}).join('');
-      return '<div class="tl3-col">'+
+      return '<div class="tl3-col" draggable="true" data-id="'+e.id+'" ondragstart="tlDragStart(event)" ondragend="tlDragEnd(event)" ondragover="tlDragOver(event)" ondragleave="tlDragLeave(event)" ondrop="tlDrop(event)">'+
+        '<div class="tl3-year-top">'+esc(e.year)+'</div>'+
         '<div class="tl3-node"></div>'+
-        '<div class="tl3-card">'+
-          '<div class="tl3-card-top">'+
-            '<div class="tl3-year">'+esc(e.year)+(e.title?' · '+esc(e.title):'')+'</div>'+
-            '<div class="tl3-editbtns"><button class="bi" onclick="openTlModal(\''+e.id+'\')">✏️</button><button class="bi" onclick="delTlEntry(\''+e.id+'\')">✕</button></div>'+
-          '</div>'+
+        '<div class="tl3-connector"></div>'+
+        '<div class="tl3-text" onclick="openTlModal(\''+e.id+'\')">'+
+          '<div class="tl3-editbtns"><button class="bi" onclick="event.stopPropagation();openTlModal(\''+e.id+'\')">✏️</button><button class="bi" onclick="event.stopPropagation();delTlEntry(\''+e.id+'\')">✕</button></div>'+
+          (e.title?'<div class="tl3-ttitle">'+esc(e.title)+'</div>':'')+
           (e.subtitle?'<div class="tl3-sub">'+esc(e.subtitle)+'</div>':'')+
           (e.desc?'<div class="tl3-desc">'+esc(e.desc)+'</div>':'')+
           (tagsHtml?'<div class="tl3-tags">'+tagsHtml+'</div>':'')+
@@ -2713,11 +2716,32 @@ function renderTimeline(){
       '</div>';
     }).join('')+
     '<div class="tl3-col tl3-col-add">'+
+      '<div class="tl3-year-top" style="visibility:hidden">0000</div>'+
       '<div class="tl3-node tl3-node-add"></div>'+
-      '<button class="tl3-add-card" onclick="openTlModal()">+ 새 시점 추가</button>'+
+      '<div class="tl3-connector tl3-connector-add"></div>'+
+      '<div class="tl3-add-text" onclick="openTlModal()">+ 새 시점 추가</div>'+
     '</div>'+
   '</div></div>';
   return html;
+}
+
+// 드래그 앤 드롭 순서 변경
+var _tlDragId=null;
+function tlDragStart(e){_tlDragId=e.currentTarget.dataset.id;e.currentTarget.classList.add('dragging');e.dataTransfer.effectAllowed='move';}
+function tlDragEnd(e){e.currentTarget.classList.remove('dragging');_tlDragId=null;}
+function tlDragOver(e){e.preventDefault();e.currentTarget.classList.add('drag-over');}
+function tlDragLeave(e){e.currentTarget.classList.remove('drag-over');}
+function tlDrop(e){
+  e.preventDefault();e.currentTarget.classList.remove('drag-over');
+  var target=e.currentTarget.dataset.id;
+  if(!_tlDragId||_tlDragId===target)return;
+  var arr=S.timeline||[];
+  var fromIdx=arr.findIndex(function(x){return x.id===_tlDragId;});
+  var toIdx=arr.findIndex(function(x){return x.id===target;});
+  if(fromIdx<0||toIdx<0)return;
+  var item=arr.splice(fromIdx,1)[0];arr.splice(toIdx,0,item);
+  _tlDragId=null;
+  save();render();
 }
 
 function editTimelineTitle(){

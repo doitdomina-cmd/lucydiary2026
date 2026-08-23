@@ -318,9 +318,9 @@ html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--t
 .fl{font-size:0.8571em;color:var(--t2);margin-bottom:5px;display:block}
 
 /* ── MODAL ── */
-.mo{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .2s}
+.mo{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:1000;display:flex;align-items:center;justify-content:center;padding:10px;opacity:0;pointer-events:none;transition:opacity .2s}
 .mo.open{opacity:1;pointer-events:all}
-.md{background:var(--surface);border-radius:16px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.15);transform:translateY(8px);transition:transform .2s}
+.md{background:var(--surface);border-radius:16px;width:100%;max-width:520px;max-height:96vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.15);transform:translateY(8px);transition:transform .2s}
 .mo.open .md{transform:translateY(0)}
 .mh{padding:20px 24px 0;display:flex;align-items:center;justify-content:space-between}
 .mt{font-family:var(--serif);font-size:1.5714em}
@@ -2131,8 +2131,13 @@ function diaryPhotoBoxHtml(ds,url){
   var entry=(S.diaryEntries||{})[ds]||{};
   var px=(pend&&pend.posX!=null)?pend.posX:(entry.photoPosX!=null?entry.photoPosX:50);
   var py=(pend&&pend.posY!=null)?pend.posY:(entry.photoPosY!=null?entry.photoPosY:50);
-  return '<div class="dphoto-drag" data-ds="'+ds+'" style="position:relative;overflow:hidden;border-radius:8px;height:120px;cursor:grab;background:var(--s2)">'+
-      '<img id="diary-photo-img" src="'+url+'" onerror="this.style.display=\'none\';this.insertAdjacentHTML(\'afterend\',\'<div style=&quot;padding:14px;text-align:center;color:var(--t3);font-size:.78em&quot;>사진을 불러오지 못했어요. 다시 선택해 주세요.</div>\')" style="width:100%;height:100%;object-fit:cover;object-position:'+px+'% '+py+'%;display:block;pointer-events:none;user-select:none">'+
+  var d=ds.split('-'), dayNum=d[2]?String(parseInt(d[2],10)):'';
+  // 실제 캘린더 칸과 동일하게: 같은 흰색 덮개(72%) + 칸 비율 + 날짜 숫자까지 그대로 미리보기
+  return '<div class="dphoto-drag" data-ds="'+ds+'" style="position:relative;overflow:hidden;border-radius:8px;'+
+      'border:1px solid var(--border);aspect-ratio:7/5;max-height:150px;cursor:grab;background:var(--surface)">'+
+      '<img id="diary-photo-img" src="'+url+'" onerror="this.style.display=\'none\'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:'+px+'% '+py+'%;display:block;pointer-events:none;user-select:none">'+
+      '<div style="position:absolute;inset:0;background:rgba(255,255,255,.72);pointer-events:none"></div>'+
+      '<div style="position:absolute;top:6px;left:8px;font-size:0.8em;color:var(--text);pointer-events:none">'+dayNum+'</div>'+
       '<div style="position:absolute;bottom:4px;right:6px;font-size:.65em;color:#fff;background:rgba(0,0,0,.45);padding:1px 6px;border-radius:99px;pointer-events:none">드래그로 위치 조정</div>'+
     '</div>';
 }
@@ -2312,7 +2317,7 @@ function openDiaryModal(ds){
   var moodHtml=MOODS.map(function(m){
     var sel=entry.mood===m.v;
     return '<div data-key="mood" data-val="'+m.v+'" data-ds="'+ds+'" onclick="setDiaryMood(this.dataset.ds,this.dataset.val)" style="'+
-      'padding:5px 9px;border-radius:8px;cursor:pointer;font-size:1.1em;'+
+      'padding:2px 6px;border-radius:7px;cursor:pointer;font-size:0.95em;line-height:1.35;'+
       'background:'+(sel?'var(--al)':'transparent')+';'+
       'border:1.5px solid '+(sel?'var(--accent)':'var(--border)')+';transition:all .15s" title="'+m.l+'">'+m.v+'</div>';
   }).join('');
@@ -2321,7 +2326,7 @@ function openDiaryModal(ds){
   var weatherHtml=weathers.map(function(w){
     var sel=entry.weather===w;
     return '<div data-key="weather" data-val="'+w+'" onclick="setDiaryWeather(\''+ds+'\',\''+w+'\')" style="'+
-      'padding:5px 9px;border-radius:8px;cursor:pointer;font-size:1.1em;'+
+      'padding:2px 6px;border-radius:7px;cursor:pointer;font-size:0.95em;line-height:1.35;'+
       'background:'+(sel?'var(--al)':'transparent')+';'+
       'border:1.5px solid '+(sel?'var(--accent)':'var(--border)')+';transition:all .15s">'+w+'</div>';
   }).join('');
@@ -2347,16 +2352,16 @@ function openDiaryModal(ds){
     '</div>';
 
   openMo(label,
-    '<div style="margin-bottom:10px"><div style="font-size:0.8em;color:var(--t3);margin-bottom:6px">기분</div>'+
-    '<div style="display:flex;gap:6px;flex-wrap:wrap">'+moodHtml+'</div></div>'+
-    '<div style="margin-bottom:12px"><div style="font-size:0.8em;color:var(--t3);margin-bottom:6px">날씨</div>'+
-    '<div style="display:flex;gap:6px;flex-wrap:wrap">'+weatherHtml+'</div></div>'+
+    '<div style="margin-bottom:7px"><div style="font-size:0.76em;color:var(--t3);margin-bottom:4px">기분</div>'+
+    '<div style="display:flex;gap:4px;flex-wrap:wrap">'+moodHtml+'</div></div>'+
+    '<div style="margin-bottom:9px"><div style="font-size:0.76em;color:var(--t3);margin-bottom:4px">날씨</div>'+
+    '<div style="display:flex;gap:4px;flex-wrap:wrap">'+weatherHtml+'</div></div>'+
     '<div style="margin-bottom:12px"><input id="diary-title-inp" class="inp" placeholder="제목 (선택)" value="'+esc(rawTitle)+'" style="font-size:1em;font-weight:500;background:transparent;border-color:transparent;border-bottom:1px solid var(--border);border-radius:0;padding:6px 0"></div>'+
     '<div style="position:relative;margin-bottom:14px">'+
       '<div id="diary-line-nums" style="position:absolute;left:0;top:0;width:32px;padding:8px 6px 8px 0;font-family:var(--mono);font-size:0.9286em;color:var(--t3);line-height:1.8;user-select:none;pointer-events:none;text-align:right">'+
         getLineNums(rawText)+
       '</div>'+
-      '<textarea id="diary-ta" style="width:100%;min-height:320px;border:1px solid var(--border);border-radius:8px;padding:8px 12px 8px 44px;font-size:0.9286em;font-family:var(--sans);line-height:1.8;resize:none;background:var(--s2);color:var(--text);outline:none" '+
+      '<textarea id="diary-ta" style="width:100%;height:34vh;min-height:190px;border:1px solid var(--border);border-radius:8px;padding:8px 12px 8px 44px;font-size:0.9286em;font-family:var(--sans);line-height:1.8;resize:vertical;background:var(--s2);color:var(--text);outline:none" '+
       'placeholder="오늘 감사한 일을 적어보세요...\n1. \n2. \n3. " oninput="updateLineNums(this)">'+esc(rawText)+'</textarea>'+
     '</div>'+
     photoHtml,

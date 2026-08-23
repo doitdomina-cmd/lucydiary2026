@@ -1114,7 +1114,7 @@ let S = {
   ],
   health: {
     schedules: [],   // [{id, title, date, memo, done, conditionId}]
-    records: [],     // [{id, date, title, abnormal, normal, action, files, conditionIds:[]}] — conditionIds links a 검진 기록 to 건강 상태 관리 병명(들)
+    records: [],     // [{id, date, title, abnormal, normal, action, note, files, conditionIds:[]}] — conditionIds links a 검진 기록 to 건강 상태 관리 병명(들). note: 진행 메모(구 c.history 병합)
     memo: '',
     memos: [],       // [{id, title, content}]
     inbody: [],      // [{id,date,weight,muscle,fat,bmi,height,timing,note}]
@@ -4655,13 +4655,14 @@ function renderHealth(){
         html+='<details id="'+rid+'" open style="padding:8px 0;border-bottom:1px solid var(--border)">'+
           '<summary style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px">'+
             '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--t3)" stroke-width="1.5" style="flex-shrink:0"><polyline points="2,3 5,7 8,3"/></svg>'+
-            '<span style="font-size:0.88em;font-weight:600;flex:1">'+r.title+'</span>'+
+            '<span style="font-size:0.88em;font-weight:600;flex:1">'+(r.title||'제목 없음')+'</span>'+
             '<span style="font-size:0.75em;color:var(--t3)">'+r.date+'</span>'+
           '</summary>'+
           '<div style="padding:8px 0 2px 18px">'+
             (r.abnormal?'<div style="margin-bottom:6px"><span style="font-size:0.72em;font-weight:600;color:var(--red);background:#fde8e8;padding:1px 6px;border-radius:4px">⚠️ 이상 소견</span><div style="font-size:0.82em;color:var(--t2);margin-top:3px;white-space:pre-wrap">'+r.abnormal+'</div></div>':(!r.abnormal&&!r.normal&&!r.action&&r.memo?'<div style="font-size:0.82em;color:var(--t3);white-space:pre-wrap">'+r.memo+'</div>':''))+
             (r.normal?'<div style="margin-bottom:6px"><span style="font-size:0.72em;font-weight:600;color:#2d8653;background:#e6f4ec;padding:1px 6px;border-radius:4px">✅ 정상 범위</span><div style="font-size:0.82em;color:var(--t2);margin-top:3px;white-space:pre-wrap">'+r.normal+'</div></div>':'')+
             (r.action?'<div style="margin-bottom:6px"><span style="font-size:0.72em;font-weight:600;color:var(--accent);background:var(--al);padding:1px 6px;border-radius:4px">📌 추후 조치</span><div style="font-size:0.82em;color:var(--t2);margin-top:3px;white-space:pre-wrap">'+r.action+'</div></div>':'')+
+            (r.note?'<div style="margin-bottom:6px"><span style="font-size:0.72em;font-weight:600;color:var(--t2);background:var(--s2);padding:1px 6px;border-radius:4px">📝 메모</span><div style="font-size:0.82em;color:var(--t2);margin-top:3px;white-space:pre-wrap">'+r.note+'</div></div>':'')+
           '</div>'+
         '</details>';
       });
@@ -4942,12 +4943,13 @@ function renderHealth(){
               '<div style="font-size:1.1em;font-weight:700;color:var(--text)">'+fmtDateObj(r.date).day+'</div>'+
             '</div>'+
             '<div style="flex:1;min-width:0">'+
-              '<div style="font-size:0.9643em;font-weight:600">'+r.title+'</div>'+
+              '<div style="font-size:0.9643em;font-weight:600">'+(r.title||'제목 없음')+'</div>'+
               ((r.conditionIds&&r.conditionIds.length)?'<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">'+r.conditionIds.map(function(cid){var cc=(S.health.conditions||[]).find(function(x){return x.id===cid;});if(!cc)return'';var ccp=cc.color?{bg:cc.color.bg,text:cc.color.text}:{bg:'var(--s3)',text:'var(--t2)'};return '<span onclick="event.stopPropagation();openCondReport(\''+cc.id+'\')" style="cursor:pointer;font-size:0.7em;font-weight:700;padding:1px 8px;border-radius:99px;background:'+ccp.bg+';color:'+ccp.text+'">'+cc.name+'</span>';}).join('')+'</div>':'')+
               (r.abnormal?'<div style="margin-top:5px"><span style="font-size:0.72em;font-weight:600;color:var(--red);background:#fde8e8;padding:1px 6px;border-radius:4px">⚠️ 이상 소견</span><div style="font-size:0.82em;color:var(--t2);margin-top:3px;white-space:pre-wrap">'+r.abnormal+'</div></div>':'')+
               (r.normal?'<div style="margin-top:5px"><span style="font-size:0.72em;font-weight:600;color:#2d8653;background:#e6f4ec;padding:1px 6px;border-radius:4px">✅ 정상 범위</span><div style="font-size:0.82em;color:var(--t2);margin-top:3px;white-space:pre-wrap">'+r.normal+'</div></div>':'')+
               (r.action?'<div style="margin-top:5px"><span style="font-size:0.72em;font-weight:600;color:var(--accent);background:var(--al);padding:1px 6px;border-radius:4px">📌 추후 조치</span><div style="font-size:0.82em;color:var(--t2);margin-top:3px;white-space:pre-wrap">'+r.action+'</div></div>':'')+
-              (!r.abnormal&&!r.normal&&!r.action&&r.memo?'<div style="font-size:0.82em;color:var(--t3);margin-top:3px;white-space:pre-wrap">'+r.memo+'</div>':'')+
+              (r.note?'<div style="margin-top:5px"><span style="font-size:0.72em;font-weight:600;color:var(--t2);background:var(--s2);padding:1px 6px;border-radius:4px">📝 메모</span><div style="font-size:0.82em;color:var(--t2);margin-top:3px;white-space:pre-wrap">'+r.note+'</div></div>':'')+
+              (!r.abnormal&&!r.normal&&!r.action&&!r.note&&r.memo?'<div style="font-size:0.82em;color:var(--t3);margin-top:3px;white-space:pre-wrap">'+r.memo+'</div>':'')+
               ((r.files&&r.files.length)?'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">'+
                 r.files.map(function(f,fi){
                   if(f.type&&f.type.startsWith('image/')) return '<img src="'+f.data+'" onclick="openHealthFile(\''+r.id+'\','+fi+')" style="width:60px;height:60px;object-fit:cover;border-radius:6px;cursor:pointer;border:1px solid var(--border)">';
@@ -5649,20 +5651,27 @@ function openCondReport(id){
   var cp=c.color?{bg:c.color.bg,text:c.color.text}:condPalette[ci%condPalette.length];
   var allScheds=(S.health.schedules||[]).filter(function(s){return s.conditionId===c.id;}).sort(function(a,b){return a.date.localeCompare(b.date);});
   var upcoming=allScheds.filter(function(s){return !s.done&&dLeft(s.date)>=0;});
-  var linkedRecs=(S.health.records||[]).filter(function(r){return r.conditionIds&&r.conditionIds.indexOf(c.id)!==-1;}).slice().sort(function(a,b){return b.date.localeCompare(a.date);});
+  var linkedRecs=(S.health.records||[]).filter(function(r){return r.conditionIds&&r.conditionIds.indexOf(c.id)!==-1;});
+
+  // ── 관련 검진 기록을 날짜순으로 정리 (진행 기록/메모는 검진 기록에 통합됨) ──
+  var timeline=linkedRecs.slice().sort(function(a,b){return b.date.localeCompare(a.date);}).map(function(r){return {type:'rec',date:r.date,data:r};});
 
   // ── 차트 헤더 (병원 차트 느낌의 정보 박스) ──
-  var body='<div style="display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--s2);margin-bottom:18px">'+
+  var body='<div style="display:flex;gap:22px;align-items:flex-start">'+
+    '<div style="flex:1;min-width:0">'+
+    '<div id="cr-sec-info" style="scroll-margin-top:8px">'+
+    '<div style="display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--s2);margin-bottom:18px">'+
     '<div style="flex:1;min-width:0;padding:10px 14px;border-right:1px solid var(--border)"><div style="font-size:0.68em;font-weight:700;color:var(--t3);letter-spacing:.03em;margin-bottom:4px">관련 과 / 분류</div><div style="font-size:0.92em;font-weight:600;color:'+(c.category?'var(--text)':'var(--t3)')+'">'+(c.category||'미입력')+'</div></div>'+
     '<div style="flex:1;min-width:0;padding:10px 14px;border-right:1px solid var(--border)"><div style="font-size:0.68em;font-weight:700;color:var(--t3);letter-spacing:.03em;margin-bottom:4px">최초 발병일</div><div style="font-size:0.92em;font-weight:600;color:'+(c.onsetDate?'var(--text)':'var(--t3)')+'">'+(c.onsetDate||'미입력')+'</div></div>'+
     '<div style="flex:1;min-width:0;padding:10px 14px"><div style="font-size:0.68em;font-weight:700;color:var(--t3);letter-spacing:.03em;margin-bottom:4px">진단일</div><div style="font-size:0.92em;font-weight:600;color:'+(c.diagDate?'var(--text)':'var(--t3)')+'">'+(c.diagDate||'미입력')+'</div></div>'+
-  '</div>';
+    '</div>';
 
   if(c.note){
     body+='<div style="border-left:3px solid '+cp.text+';background:var(--s2);border-radius:0 10px 10px 0;padding:12px 14px;margin-bottom:20px;font-size:0.86em;color:var(--t2);line-height:1.6;white-space:pre-wrap">'+c.note+'</div>';
   }
+  body+='</div>'; // /cr-sec-info
 
-  body+='<div style="margin-bottom:18px"><div style="font-size:0.8em;font-weight:700;color:var(--t3);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border2);display:flex;align-items:center;gap:5px">📅 검진 예정</div>';
+  body+='<div id="cr-sec-sched" style="margin-bottom:18px;scroll-margin-top:8px"><div style="font-size:0.8em;font-weight:700;color:var(--t3);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border2);display:flex;align-items:center;gap:5px">📅 검진 예정</div>';
   if(!upcoming.length){
     body+='<div style="font-size:0.82em;color:var(--t3);padding:4px 0">예정된 검진이 없어요</div>';
   } else {
@@ -5679,42 +5688,46 @@ function openCondReport(id){
   }
   body+='</div>';
 
-  body+='<div style="margin-bottom:18px"><div style="font-size:0.8em;font-weight:700;color:var(--t3);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border2);display:flex;align-items:center;gap:5px">📋 관련 검진 기록</div>';
-  if(!linkedRecs.length){
-    body+='<div style="font-size:0.82em;color:var(--t3);padding:4px 0">연결된 검진 기록이 없어요. 검진 기록을 추가할 때 이 병명을 선택하면 여기에 표시돼요.</div>';
+  // ── 통합 기록: 검진 기록 + 진행 기록을 한 타임라인으로 ──
+  body+='<div id="cr-sec-records" style="scroll-margin-top:8px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border2)">'+
+    '<div style="font-size:0.8em;font-weight:700;color:var(--t3);display:flex;align-items:center;gap:5px">📋 기록</div>'+
+    '<div style="display:flex;gap:6px">'+
+      '<button class="btn bg bsm" onclick="closeMo();openHealthRecModal(null,\''+c.id+'\')">+ 검진 기록</button>'+
+    '</div>'+
+  '</div>';
+  if(!timeline.length){
+    body+='<div style="font-size:0.82em;color:var(--t3);padding:4px 0">기록이 없어요. "+ 검진 기록"으로 병원 검진 결과나 경과 메모를 남겨보세요.</div>';
   } else {
-    linkedRecs.forEach(function(r){
+    timeline.forEach(function(item){
+      var r=item.data;
       body+='<div style="padding:10px 0;border-bottom:1px solid var(--border)">'+
         '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'+
           '<span style="font-size:0.78em;color:var(--t3);flex-shrink:0">'+r.date+'</span>'+
-          '<span style="font-size:0.88em;font-weight:600;flex:1">'+r.title+'</span>'+
+          '<span style="font-size:0.62em;font-weight:700;color:var(--accent);background:var(--al);padding:1px 6px;border-radius:99px;flex-shrink:0">검진</span>'+
+          '<span style="font-size:0.88em;font-weight:600;flex:1;min-width:0">'+(r.title||'제목 없음')+'</span>'+
+          '<button class="bi" onclick="closeMo();openHealthRecModal(\''+r.id+'\')" style="font-size:0.75em;flex-shrink:0" title="수정">✎</button>'+
         '</div>'+
         (r.abnormal?'<div style="margin-top:4px"><span style="font-size:0.7em;font-weight:600;color:var(--red);background:#fde8e8;padding:1px 6px;border-radius:4px">⚠️ 이상 소견</span><div style="font-size:0.8em;color:var(--t2);margin-top:3px;white-space:pre-wrap">'+r.abnormal+'</div></div>':'')+
         (r.normal?'<div style="margin-top:4px"><span style="font-size:0.7em;font-weight:600;color:#2d8653;background:#e6f4ec;padding:1px 6px;border-radius:4px">✅ 정상 범위</span><div style="font-size:0.8em;color:var(--t2);margin-top:3px;white-space:pre-wrap">'+r.normal+'</div></div>':'')+
         (r.action?'<div style="margin-top:4px"><span style="font-size:0.7em;font-weight:600;color:var(--accent);background:var(--al);padding:1px 6px;border-radius:4px">📌 추후 조치</span><div style="font-size:0.8em;color:var(--t2);margin-top:3px;white-space:pre-wrap">'+r.action+'</div></div>':'')+
+        (r.note?'<div style="margin-top:4px"><span style="font-size:0.7em;font-weight:600;color:var(--t2);background:var(--s2);padding:1px 6px;border-radius:4px">📝 메모</span><div style="font-size:0.8em;color:var(--t2);margin-top:3px;white-space:pre-wrap">'+r.note+'</div></div>':'')+
         (r.files&&r.files.length?'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">'+r.files.map(function(f,fi){return f.type&&f.type.startsWith('image/')?'<img src="'+f.data+'" onclick="openHealthFile(\''+r.id+'\','+fi+')" style="width:44px;height:44px;object-fit:cover;border-radius:6px;cursor:pointer;border:1px solid var(--border)">':'<a href="'+f.data+'" download="'+f.name+'" style="font-size:0.75em;color:var(--accent);padding:3px 7px;border:1px solid var(--border);border-radius:6px;text-decoration:none">📄 '+f.name+'</a>';}).join('')+'</div>':'')+
       '</div>';
     });
   }
-  body+='</div>';
+  body+='</div>'; // /cr-sec-records
 
-  body+='<div><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border2)"><div style="font-size:0.8em;font-weight:700;color:var(--t3);display:flex;align-items:center;gap:5px">📝 진행 기록</div><button class="btn bg bsm" onclick="openCondHistModal(\''+c.id+'\')">+ 기록</button></div>';
-  var hist=(c.history||[]).slice().sort(function(a,b){return b.date.localeCompare(a.date);});
-  if(!hist.length){
-    body+='<div style="font-size:0.82em;color:var(--t3);padding:4px 0">기록이 없어요</div>';
-  } else {
-    hist.forEach(function(h){
-      body+='<div style="display:flex;gap:8px;padding:5px 0;font-size:0.85em;border-bottom:1px solid var(--border)">'+
-        '<span style="color:var(--t3);flex-shrink:0">'+h.date+'</span>'+
-        '<span style="color:var(--t2);flex:1;white-space:pre-wrap">'+h.detail+'</span>'+
-        '<button class="bi" onclick="delCondHist(\''+c.id+'\',\''+h.id+'\');openCondReport(\''+c.id+'\')" style="font-size:0.75em;color:var(--t3)">✕</button>'+
-      '</div>';
-    });
-  }
-  body+='</div>';
+  body+='</div>'; // /left column
 
-  var footer='<button class="btn bg bsm" onclick="closeMo();openHealthRecModal(null,\''+c.id+'\')">+ 검진 기록 연결</button>'+
-    '<button class="btn bg bsm" style="color:var(--red)" onclick="if(confirm(\''+c.name+'을(를) 삭제할까요?\')){delCond(\''+c.id+'\');closeMo();}">삭제</button>';
+  // ── 오른쪽 인덱스 내비게이션 ──
+  body+='<div style="width:88px;flex-shrink:0;position:sticky;top:0;display:flex;flex-direction:column;gap:6px">'+
+    ['기본정보','검진예정','기록'].map(function(label,li){
+      var target=['cr-sec-info','cr-sec-sched','cr-sec-records'][li];
+      return '<button class="btn bg bsm" onclick="var el=document.getElementById(\''+target+'\');if(el)el.scrollIntoView({behavior:\'smooth\',block:\'start\'});" style="width:100%;font-size:0.78em;padding:7px 4px;text-align:center">'+label+'</button>';
+    }).join('')+
+  '</div>';
+
+  var footer='<button class="btn bg bsm" style="color:var(--red)" onclick="if(confirm(\''+c.name+'을(를) 삭제할까요?\')){delCond(\''+c.id+'\');closeMo();}">삭제</button>';
 
   document.getElementById('mo-t').textContent=c.name;
   document.getElementById('mo-b').innerHTML=body;
@@ -5728,9 +5741,9 @@ function openCondReport(id){
   btnWrap.style.cssText='display:flex;gap:6px;align-items:center;margin-left:auto;margin-right:8px';
   btnWrap.innerHTML='<button class="btn bg bsm" onclick="closeMo();openCondModal(\''+c.id+'\')">✎ 정보 수정</button>';
   mh.insertBefore(btnWrap, mh.querySelector('.bi'));
-  // 보고서는 병원 차트 느낌으로 조금 더 넓게
+  // 보고서는 병원 차트 느낌으로 조금 더 넓게 (기존 700px 대비 약 10% 확장)
   var md=document.querySelector('.md');
-  if(md) md.style.maxWidth='700px';
+  if(md) md.style.maxWidth='770px';
   document.getElementById('mo').classList.add('open');
 }
 function openCondHistModal(condId){
@@ -5786,6 +5799,7 @@ function openHealthRecModal(id, presetCondId){
     '<div class="fg"><label class="fl" style="color:var(--red)">⚠️ 이상 소견</label><textarea class="ta" id="hr-abnormal" rows="3" placeholder="">'+(r.abnormal||r.memo||'')+'</textarea></div>'+
     '<div class="fg"><label class="fl" style="color:#2d8653">✅ 정상 범위</label><textarea class="ta" id="hr-normal" rows="2" placeholder="">'+(r.normal||'')+'</textarea></div>'+
     '<div class="fg"><label class="fl" style="color:var(--accent)">📌 추후 조치</label><textarea class="ta" id="hr-action" rows="2" placeholder="">'+(r.action||'')+'</textarea></div>'+
+    '<div class="fg"><label class="fl">📝 메모 (경과, 증상, 크기 변화 등)</label><textarea class="ta" id="hr-note" rows="2" placeholder="">'+(r.note||'')+'</textarea></div>'+
     '<div class="fg"><label class="fl">파일 첨부 (이미지/PDF)</label>'+
       '<label class="btn bg bsm" style="cursor:pointer;display:inline-flex;align-items:center;gap:5px">📎 파일 선택<input type="file" id="hr-f" multiple accept="image/*,.pdf" style="display:none" onchange="previewHealthFiles(this)"></label>'+
       '<div id="hr-preview" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px"></div></div>',
@@ -5874,11 +5888,12 @@ function saveHealthRec(id){
   const abnormal=document.getElementById('hr-abnormal').value.trim();
   const normal=document.getElementById('hr-normal').value.trim();
   const action=document.getElementById('hr-action').value.trim();
+  const note=document.getElementById('hr-note').value.trim();
   if(!t||!d){alert('이름과 날짜를 입력해주세요');return;}
   if(!S.health) S.health={schedules:[],records:[],memo:''};
   const files=window._hrFiles||[];
   const conditionIds=window._hrCondIds||[];
-  const entry={id:id||gid(),title:t,date:d,abnormal,normal,action,files,conditionIds};
+  const entry={id:id||gid(),title:t,date:d,abnormal,normal,action,note,files,conditionIds};
   if(id){const r=S.health.records.find(x=>x.id===id);if(r)Object.assign(r,entry);}
   else S.health.records.push(entry);
   window._hrFiles=[];window._hrCondIds=[];save();closeMo();render();
@@ -6383,35 +6398,45 @@ function openYearReview(Y){
 
 // ═══════════ CALENDAR ═══════════
 let calY=new Date().getFullYear(), calM=new Date().getMonth();
-let calProjectFilter=''; // 월간 달력 프로젝트 필터 (빈 문자열 = 전체보기)
-function setCalProjectFilter(pid){
-  calProjectFilter=pid;
-  var old=document.getElementById('cal-filter-overlay');
-  if(old)old.remove();
-  render();
-}
-function openCalFilterPanel(btn){
-  var old=document.getElementById('cal-filter-overlay');
-  if(old){old.remove();return;} // 이미 열려있으면 토글로 닫기
-  var rect=btn.getBoundingClientRect();
+let calProjectFilter=[]; // 월간 달력 프로젝트 필터 (배열 — 빈 배열 = 전체보기, 복수 선택 가능)
+function calFilterItemsHtml(){
   var projects=window._calFilterProjectsCache||[];
-  var itemsHtml='<div onclick="setCalProjectFilter(\'\')" style="padding:8px 10px;border-radius:6px;cursor:pointer;font-size:0.85em;font-weight:'+(!calProjectFilter?'700':'500')+';background:'+(!calProjectFilter?'var(--al)':'transparent')+';color:'+(!calProjectFilter?'var(--accent)':'var(--text)')+'">전체 보기</div>';
+  var allOn=calProjectFilter.length===0;
+  var html='<div onclick="setCalProjectFilter(\'\')" style="padding:8px 10px;border-radius:6px;cursor:pointer;font-size:0.85em;font-weight:'+(allOn?'600':'400')+';background:'+(allOn?'var(--al)':'transparent')+';color:'+(allOn?'var(--accent)':'var(--text)')+'">전체 보기</div>'+
+    '<div style="height:1px;background:var(--border);margin:4px 2px"></div>';
   if(projects.length===0){
-    itemsHtml+='<div style="padding:8px 10px;font-size:0.8em;color:var(--t3)">이번 달에 표시된 프로젝트가 없어요</div>';
+    html+='<div style="padding:8px 10px;font-size:0.8em;color:var(--t3)">이번 달에 표시된 프로젝트가 없어요</div>';
   } else {
     projects.forEach(function(p){
-      var on=calProjectFilter===p.id;
-      itemsHtml+='<div onclick="setCalProjectFilter(\''+p.id+'\')" style="display:flex;align-items:center;gap:7px;padding:8px 10px;border-radius:6px;cursor:pointer;font-size:0.85em;font-weight:'+(on?'700':'500')+';background:'+(on?'var(--al)':'transparent')+';color:'+(on?'var(--accent)':'var(--text)')+'">'+
+      var on=calProjectFilter.indexOf(p.id)!==-1;
+      html+='<div onclick="setCalProjectFilter(\''+p.id+'\')" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;cursor:pointer;font-size:0.85em;font-weight:'+(on?'600':'400')+';color:var(--text)">'+
+        '<span style="width:15px;height:15px;border-radius:4px;border:1.5px solid '+(on?'var(--accent)':'var(--border2)')+';background:'+(on?'var(--accent)':'transparent')+';flex-shrink:0;display:flex;align-items:center;justify-content:center">'+(on?'<span style="color:#fff;font-size:0.65em">&#10003;</span>':'')+'</span>'+
         '<span style="width:9px;height:9px;border-radius:50%;background:'+p.color+';flex-shrink:0"></span>'+
         '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+p.name+'</span>'+
       '</div>';
     });
   }
+  return html;
+}
+function setCalProjectFilter(pid){
+  if(pid===''){calProjectFilter=[];}
+  else{
+    var idx=calProjectFilter.indexOf(pid);
+    if(idx===-1)calProjectFilter.push(pid); else calProjectFilter.splice(idx,1);
+  }
+  render();
+  var panel=document.getElementById('cal-filter-panel');
+  if(panel)panel.innerHTML=calFilterItemsHtml();
+}
+function openCalFilterPanel(btn){
+  var old=document.getElementById('cal-filter-overlay');
+  if(old){old.remove();return;} // 이미 열려있으면 토글로 닫기
+  var rect=btn.getBoundingClientRect();
   var left=Math.max(8,Math.min(rect.right-190,window.innerWidth-198));
   var overlay=document.createElement('div');
   overlay.id='cal-filter-overlay';
   overlay.style.cssText='position:fixed;inset:0;z-index:1000';
-  overlay.innerHTML='<div onclick="event.stopPropagation()" style="position:absolute;top:'+(rect.bottom+6)+'px;left:'+left+'px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.14);min-width:190px;max-height:280px;overflow-y:auto;padding:6px">'+itemsHtml+'</div>';
+  overlay.innerHTML='<div id="cal-filter-panel" onclick="event.stopPropagation()" style="position:absolute;top:'+(rect.bottom+6)+'px;left:'+left+'px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.14);min-width:190px;max-height:280px;overflow-y:auto;padding:6px">'+calFilterItemsHtml()+'</div>';
   overlay.addEventListener('click',function(e){if(e.target===overlay)overlay.remove();});
   document.body.appendChild(overlay);
 }
@@ -6825,10 +6850,12 @@ function renderCalendar(){
   (S.deadlines||[]).forEach(function(d){if(d.date&&d.date.indexOf(ym)===0&&d.projectId)filterPidSet[d.projectId]=true;});
   var filterProjects=Object.keys(filterPidSet).map(function(pid){return S.projects.find(function(p){return p.id===pid;});}).filter(Boolean);
   // 이번 달에 없는 프로젝트가 선택돼있으면 필터 목록에도 표시해 무엇이 선택된 상태인지 알 수 있게 함
-  if(calProjectFilter&&!filterProjects.some(function(p){return p.id===calProjectFilter;})){
-    var stillSel=S.projects.find(function(p){return p.id===calProjectFilter;});
-    if(stillSel)filterProjects.push(stillSel);
-  }
+  calProjectFilter.forEach(function(fpid){
+    if(!filterProjects.some(function(p){return p.id===fpid;})){
+      var stillSel=S.projects.find(function(p){return p.id===fpid;});
+      if(stillSel)filterProjects.push(stillSel);
+    }
+  });
 
   var cells=[];
   for(var i=sdow-1;i>=0;i--){var pd=prevLast.getDate()-i,pm=calM===0?11:calM-1,py=calM===0?calY-1:calY;cells.push({d:pd,m:pm,y:py,cur:false});}
@@ -6865,7 +6892,7 @@ function renderCalendar(){
     var ds=cell.y+'-'+String(cell.m+1).padStart(2,'0')+'-'+String(cell.d).padStart(2,'0');
     var isT=ds===ts;
     var rodsCell=routinesForDate(ds).filter(function(r){return r.isRz;});
-    if(calProjectFilter) rodsCell=rodsCell.filter(function(r){return r.rzProjectId===calProjectFilter;});
+    if(calProjectFilter.length) rodsCell=rodsCell.filter(function(r){return calProjectFilter.indexOf(r.rzProjectId)!==-1;});
     var routineEvs=rodsCell.map(function(r){
       var pr=r.rzProjectId?S.projects.find(p=>p.id===r.rzProjectId):null;
       return {isRzCell:true,rid:r.id,pid:r.rzProjectId||'',title:(r.time?r.time+' ':'')+r.task,color:pr?pr.color:'var(--accent)'};
@@ -6874,10 +6901,10 @@ function renderCalendar(){
     var dlEvs=cellEvs.filter(function(e){return e.isDl;});
     var healthEvs=cellEvs.filter(function(e){return e.isHealthSched;});
     var otherEvs=cellEvs.filter(function(e){return !e.isDl&&!e.isHealthSched;});
-    if(calProjectFilter){
-      dlEvs=dlEvs.filter(function(e){return e.projectId===calProjectFilter;});
+    if(calProjectFilter.length){
+      dlEvs=dlEvs.filter(function(e){return calProjectFilter.indexOf(e.projectId)!==-1;});
       healthEvs=[]; // 프로젝트에 연결되지 않은 검진 일정은 필터 중엔 숨김
-      otherEvs=otherEvs.filter(function(e){return e.projectId===calProjectFilter;});
+      otherEvs=otherEvs.filter(function(e){return calProjectFilter.indexOf(e.projectId)!==-1;});
     }
     var evs=dlEvs.concat(healthEvs,routineEvs,otherEvs);
     // 호버 툴팁: 그 날의 전체 일정 (마감 → 검진 → 루틴 → 일반 일정 순)
@@ -6895,7 +6922,7 @@ function renderCalendar(){
       var rDone=!!ckMap[r.id];
       tipLines.push((rDone?'✓':'○')+' '+(r.time?r.time+' ':'')+r.task);
     });
-    (evMap[ds]||[]).filter(function(e){return !e.isDl&&!e.isHealthSched&&(!calProjectFilter||e.projectId===calProjectFilter);}).forEach(function(e){
+    (evMap[ds]||[]).filter(function(e){return !e.isDl&&!e.isHealthSched&&(!calProjectFilter.length||calProjectFilter.indexOf(e.projectId)!==-1);}).forEach(function(e){
       tipLines.push('• '+(e.title||''));
     });
     var tipAttr=tipLines.length>0?' data-tip="'+(cell.d+'일&#10;'+tipLines.join('&#10;')).replace(/"/g,'&quot;')+'"':'';
@@ -6985,11 +7012,12 @@ function renderCalendar(){
     '</div>';
   });
 
-  var activeFilterProj=calProjectFilter?S.projects.find(function(p){return p.id===calProjectFilter;}):null;
+  var activeFilterProjs=calProjectFilter.map(function(fpid){return S.projects.find(function(p){return p.id===fpid;});}).filter(Boolean);
   var filterIconSvg='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="4 4 20 4 14 12 14 19 10 21 10 12 4 4"/></svg>';
   window._calFilterProjectsCache=filterProjects;
-  var filterBtnHtml='<button class="btn '+(activeFilterProj?'bp':'bg')+' bsm" onclick="event.stopPropagation();openCalFilterPanel(this)" title="프로젝트별로 보기" style="display:flex;align-items:center;gap:5px">'+
-      filterIconSvg+(activeFilterProj?'<span style="max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+activeFilterProj.name+'</span>':'')+
+  var filterBtnLabel=activeFilterProjs.length===1?'<span style="max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+activeFilterProjs[0].name+'</span>':activeFilterProjs.length>1?'<span>'+activeFilterProjs.length+'개 선택</span>':'';
+  var filterBtnHtml='<button class="btn '+(activeFilterProjs.length?'bp':'bg')+' bsm" onclick="event.stopPropagation();openCalFilterPanel(this)" title="프로젝트별로 보기" style="display:flex;align-items:center;gap:5px">'+
+      filterIconSvg+filterBtnLabel+
     '</button>';
 
   return ''+  
@@ -8864,8 +8892,24 @@ window.addEventListener('popstate', function(e){
   }
 });
 
+// 건강관리: 병명별 "진행 기록(메모)"를 "검진 기록"에 통합 (한 번만 실행)
+function migrateCondHistoryToRecords(){
+  if(!S.health)return;
+  var conds=S.health.conditions||[];
+  var hasHistory=conds.some(function(c){return c.history&&c.history.length;});
+  if(!hasHistory)return;
+  if(!S.health.records)S.health.records=[];
+  conds.forEach(function(c){
+    (c.history||[]).forEach(function(h){
+      S.health.records.push({id:gid(),date:h.date,title:'',abnormal:'',normal:'',action:'',note:h.detail,files:[],conditionIds:[c.id]});
+    });
+    c.history=[];
+  });
+  save();
+}
 function initApp(){
   load();
+  migrateCondHistoryToRecords();
   loadLedger();
   cleanupStaleDiaryPhotos();
   applyTheme(S.theme||'sky');  // 저장된 테마 복원

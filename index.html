@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+=<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -4688,41 +4688,53 @@ function renderHealth(){
   else if(tab==='sched'){
     html+='<div class="card" style="margin-bottom:16px">';
     html+='<div class="ch"><div class="ct">📅 검진 일정</div><button class="btn bp bsm" onclick="openHealthSchedModal()">+ 일정 추가</button></div>';
-    const upcoming=(H.schedules||[]).filter(s=>!s.done).sort((a,b)=>a.date.localeCompare(b.date));
-    const doneList=(H.schedules||[]).filter(s=>s.done);
-    if(upcoming.length===0){
-      html+='<div class="empty" style="padding:14px 0">예정된 검진이 없어요</div>';
-    } else {
-      upcoming.forEach(function(s){
-        var dd=dLeft(s.date),f=fmtDateObj(s.date);
-        var yr=s.date.slice(0,4);
-        var uc=dd<0?'var(--t3)':dd===0?'var(--red)':dd<=30?'var(--accent)':'var(--t2)';
-        var ddLabel=dd<0?'지남':dd===0?'오늘':'D-'+dd;
-        var condName=s.conditionId?((S.health.conditions||[]).find(function(c){return c.id===s.conditionId;})||{}).name:'';
-        html+='<div class="ci" style="align-items:flex-start">'+
-          '<div style="background:var(--s2);border-radius:8px;padding:4px 8px;flex-shrink:0;text-align:center;min-width:48px">'+
-            '<div style="font-size:0.6em;color:var(--t3);font-weight:600">'+yr+'</div>'+
-            '<div style="font-size:0.65em;color:var(--t3);font-weight:600;text-transform:uppercase">'+f.month+'</div>'+
-            '<div style="font-size:1.15em;font-weight:700;color:var(--text);line-height:1.1">'+f.day+'</div>'+
+    function schedRowInner(s){
+      var dd=dLeft(s.date),f=fmtDateObj(s.date);
+      var yr=s.date.slice(0,4);
+      var uc=dd<0?'var(--t3)':dd===0?'var(--red)':dd<=30?'var(--accent)':'var(--t2)';
+      var ddLabel=dd<0?'지남':dd===0?'오늘':'D-'+dd;
+      var condName=s.conditionId?((S.health.conditions||[]).find(function(c){return c.id===s.conditionId;})||{}).name:'';
+      return '<div style="background:var(--s2);border-radius:8px;padding:4px 8px;flex-shrink:0;text-align:center;min-width:48px">'+
+          '<div style="font-size:0.6em;color:var(--t3);font-weight:600">'+yr+'</div>'+
+          '<div style="font-size:0.65em;color:var(--t3);font-weight:600;text-transform:uppercase">'+f.month+'</div>'+
+          '<div style="font-size:1.15em;font-weight:700;color:var(--text);line-height:1.1">'+f.day+'</div>'+
+        '</div>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-size:0.9643em;font-weight:600">'+s.title+'</div>'+
+          '<div style="font-size:0.8em;color:var(--t3);margin-top:3px;display:flex;flex-wrap:wrap;gap:5px">'+
+            (s.hospital?'<span style="padding:1px 7px;border:1px solid var(--border);border-radius:6px">'+s.hospital+'</span>':'')+
+            (condName?'<span style="padding:1px 7px;border:1px solid var(--border);border-radius:6px">'+condName+'</span>':'')+
+            (s.memo?'<span>'+s.memo+'</span>':'')+
           '</div>'+
-          '<div style="flex:1;min-width:0">'+
-            '<div style="font-size:0.9643em;font-weight:600">'+s.title+'</div>'+
-            '<div style="font-size:0.8em;color:var(--t3);margin-top:3px;display:flex;flex-wrap:wrap;gap:5px">'+
-              (s.hospital?'<span style="padding:1px 7px;border:1px solid var(--border);border-radius:6px">'+s.hospital+'</span>':'')+
-              (condName?'<span style="padding:1px 7px;border:1px solid var(--border);border-radius:6px">'+condName+'</span>':'')+
-              (s.memo?'<span>'+s.memo+'</span>':'')+
-            '</div>'+
-          '</div>'+
-          '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">'+
-            '<div style="font-family:var(--mono);font-size:0.85em;font-weight:700;color:'+uc+'">'+ddLabel+'</div>'+
-            '<div style="display:flex;gap:4px">'+
-              '<button class="bi" onclick="completeHealthSched(\''+s.id+'\')" title="완료" style="font-size:0.8em;color:var(--accent)">✓</button>'+
-              '<button class="bi" onclick="editHealthSched(\''+s.id+'\')" style="font-size:0.8em">✎</button>'+
-              '<button class="bi" onclick="delHealthSched(\''+s.id+'\')" style="font-size:0.8em;color:var(--red)">✕</button>'+
-            '</div>'+
+        '</div>'+
+        '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">'+
+          '<div style="font-family:var(--mono);font-size:0.85em;font-weight:700;color:'+uc+'">'+ddLabel+'</div>'+
+          '<div style="display:flex;gap:4px">'+
+            '<button class="bi" onclick="completeHealthSched(\''+s.id+'\')" title="완료" style="font-size:0.8em;color:var(--accent)">✓</button>'+
+            '<button class="bi" onclick="editHealthSched(\''+s.id+'\')" style="font-size:0.8em">✎</button>'+
+            '<button class="bi" onclick="delHealthSched(\''+s.id+'\')" style="font-size:0.8em;color:var(--red)">✕</button>'+
           '</div>'+
         '</div>';
-      });
+    }
+    const activeScheds=(H.schedules||[]).filter(s=>!s.done);
+    const future=activeScheds.filter(s=>dLeft(s.date)>=0).sort((a,b)=>a.date.localeCompare(b.date));
+    const past=activeScheds.filter(s=>dLeft(s.date)<0).sort((a,b)=>b.date.localeCompare(a.date));
+    const doneList=(H.schedules||[]).filter(s=>s.done);
+    if(future.length===0&&past.length===0){
+      html+='<div class="empty" style="padding:14px 0">예정된 검진이 없어요</div>';
+    } else {
+      if(future.length>0){
+        html+='<div style="display:flex;align-items:flex-start;gap:10px;background:var(--al);border:1.5px solid var(--accent);border-radius:10px;padding:12px;margin-bottom:'+(future.length>1||past.length>0?'10px':'0')+'">'+schedRowInner(future[0])+'</div>';
+        future.slice(1).forEach(function(s){
+          html+='<div class="ci" style="align-items:flex-start">'+schedRowInner(s)+'</div>';
+        });
+      }
+      if(past.length>0){
+        html+='<div style="font-size:0.78em;font-weight:700;color:var(--t3);margin:'+(future.length>0?'14px':'0')+' 0 6px;padding-top:'+(future.length>0?'10px':'0')+';border-top:'+(future.length>0?'1px solid var(--border2)':'none')+'">지난 일정</div>';
+        past.forEach(function(s){
+          html+='<div class="ci" style="align-items:flex-start;opacity:0.65">'+schedRowInner(s)+'</div>';
+        });
+      }
     }
     if(doneList.length>0){
       html+='<details style="margin-top:8px"><summary style="font-size:0.82em;color:var(--t3);cursor:pointer;padding:4px 0">✓ 완료한 검진 ('+doneList.length+'개)</summary>';
@@ -4924,7 +4936,14 @@ function renderHealth(){
   // ══ 탭 3: 검진 기록 ══
   else if(tab==='records'){
     html+='<div class="card" style="margin-bottom:16px">';
-    html+='<div class="ch"><div class="ct">📋 검진 기록</div><button class="btn bp bsm" onclick="openHealthRecModal()">+ 기록 추가</button></div>';
+    html+='<div class="ch" style="flex-wrap:wrap;gap:8px">'+
+      '<div class="ct">📋 검진 기록</div>'+
+      '<div style="display:flex;gap:6px;align-items:center">'+
+        '<button class="btn '+(healthRecViewMode==='date'?'bp':'bg')+' bsm" onclick="setHealthRecViewMode(\'date\')">📅 날짜별</button>'+
+        '<button class="btn '+(healthRecViewMode==='cond'?'bp':'bg')+' bsm" onclick="setHealthRecViewMode(\'cond\')">🏷️ 병명별</button>'+
+        '<button class="btn bp bsm" onclick="openHealthRecModal()">+ 기록 추가</button>'+
+      '</div>'+
+    '</div>';
     function hrRecRowHtml(r){
       return '<div class="row-hov" style="padding:10px 0;border-bottom:1px solid var(--border)">'+
           '<div style="display:flex;align-items:flex-start;gap:10px">'+
@@ -4950,11 +4969,14 @@ function renderHealth(){
           '</div>'+
         '</div>';
     }
+    function hrGroupBoxHtml(labelHtml, groupRecs){
+      var b='<div style="border:1px solid var(--border);border-radius:10px;padding:4px 14px;margin-bottom:12px">';
+      b+='<div style="margin:8px 0 2px">'+labelHtml+'</div>';
+      groupRecs.forEach(function(r){b+=hrRecRowHtml(r);});
+      b+='</div>';
+      return b;
+    }
     const recs=(H.records||[]).slice().sort((a,b)=>b.date.localeCompare(a.date));
-    html+='<div style="display:flex;gap:6px;margin-bottom:12px">'+
-      '<button class="btn '+(healthRecViewMode==='date'?'bp':'bg')+' bsm" onclick="setHealthRecViewMode(\'date\')">📅 날짜별</button>'+
-      '<button class="btn '+(healthRecViewMode==='cond'?'bp':'bg')+' bsm" onclick="setHealthRecViewMode(\'cond\')">🏷️ 병명별</button>'+
-    '</div>';
     if(recs.length===0){
       html+='<div class="empty" style="padding:14px 0">검진 기록을 추가해보세요</div>';
     } else if(healthRecViewMode==='cond'){
@@ -4971,11 +4993,30 @@ function renderHealth(){
       var unassigned=recs.filter(function(r){return !r.conditionIds||r.conditionIds.length===0;});
       if(unassigned.length)groups.push({name:'병명 없음',color:{bg:'var(--s2)',text:'var(--t3)'},recs:unassigned});
       groups.forEach(function(g){
-        html+='<div style="margin-bottom:6px"><span style="font-size:0.8em;font-weight:700;padding:2px 10px;border-radius:99px;background:'+g.color.bg+';color:'+g.color.text+'">'+g.name+' · '+g.recs.length+'건</span></div>';
-        g.recs.forEach(function(r){html+=hrRecRowHtml(r);});
+        var label='<span style="font-size:0.8em;font-weight:700;padding:2px 10px;border-radius:99px;background:'+g.color.bg+';color:'+g.color.text+'">'+g.name+' · '+g.recs.length+'건</span>';
+        html+=hrGroupBoxHtml(label,g.recs);
       });
     } else {
-      recs.forEach(function(r){html+=hrRecRowHtml(r);});
+      // 날짜별: 최근 3개월은 각각 별도 박스, 그 이전은 한 박스로 묶음
+      var monthGroups=[];
+      recs.forEach(function(r){
+        var ym=r.date.slice(0,7);
+        var grp=monthGroups[monthGroups.length-1];
+        if(!grp||grp.ym!==ym){grp={ym:ym,recs:[]};monthGroups.push(grp);}
+        grp.recs.push(r);
+      });
+      var recentMonths=monthGroups.slice(0,3);
+      var olderMonths=monthGroups.slice(3);
+      recentMonths.forEach(function(g){
+        var label='<span style="font-size:0.8em;font-weight:700;padding:2px 10px;border-radius:99px;background:var(--al);color:var(--accent)">'+g.ym.slice(0,4)+'년 '+parseInt(g.ym.slice(5,7),10)+'월 · '+g.recs.length+'건</span>';
+        html+=hrGroupBoxHtml(label,g.recs);
+      });
+      if(olderMonths.length){
+        var olderRecs=[];
+        olderMonths.forEach(function(g){olderRecs=olderRecs.concat(g.recs);});
+        var label='<span style="font-size:0.78em;font-weight:600;color:var(--t3)">이전 기록 · '+olderRecs.length+'건</span>';
+        html+=hrGroupBoxHtml(label,olderRecs);
+      }
     }
     html+='</div>';
   }

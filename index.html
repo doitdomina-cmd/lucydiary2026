@@ -660,6 +660,33 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 .empty{text-align:center;padding:28px 20px;color:var(--t3)}
 .diary-cell{position:relative;}
 /* 월 선택 바(Jan~Dec)도 좁아지면 글자가 작아지도록 */
+/* 월 선택 탭: 한 줄로 이어진 인덱스 탭 (테마색 배경 · 선택된 달만 반전) */
+.mtab-wrap{container-type:inline-size;--mtab-fs:13px;--mtab-pad:8px 4px;margin-bottom:0}
+.mtab{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:3px;align-items:end}
+.mtab-item{
+  border-radius:8px 8px 0 0;
+  padding:var(--mtab-pad);
+  cursor:pointer;text-align:center;
+  font-size:var(--mtab-fs);font-weight:700;
+  background:var(--al);
+  color:var(--accent);
+  border:1px solid transparent;border-bottom:none;
+  transition:background .15s,color .15s,padding .15s;
+  min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+}
+.mtab-item:hover{background:color-mix(in srgb,var(--accent) 22%,transparent)}
+.mtab-item.on{
+  background:var(--accent);
+  color:#fff;
+  padding-top:calc(var(--mtab-pad-top, 8px) + 3px);
+  box-shadow:0 -1px 4px rgba(0,0,0,.08);
+}
+@container (max-width: 620px){ .mtab-wrap{--mtab-fs:10px;--mtab-pad:6px 2px} }
+@container (max-width: 470px){ .mtab-wrap{--mtab-fs:8.5px;--mtab-pad:5px 1px} }
+@supports not (container-type: inline-size){
+  @media(max-width:900px){ .mtab-wrap{--mtab-fs:10px;--mtab-pad:6px 2px} }
+  @media(max-width:600px){ .mtab-wrap{--mtab-fs:8.5px;--mtab-pad:5px 1px} }
+}
 .mstrip-wrap{container-type:inline-size;--mstrip-fs:13px;--mstrip-pad:9px 4px}
 @container (max-width: 620px){ .mstrip-wrap{--mstrip-fs:10px;--mstrip-pad:6px 2px} }
 @container (max-width: 470px){ .mstrip-wrap{--mstrip-fs:8.5px;--mstrip-pad:5px 1px} }
@@ -667,7 +694,7 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
   @media(max-width:900px){ .mstrip-wrap{--mstrip-fs:10px;--mstrip-pad:6px 2px} }
   @media(max-width:600px){ .mstrip-wrap{--mstrip-fs:8.5px;--mstrip-pad:5px 1px} }
 }
-.cal-cell{transition:background .1s;cursor:pointer;}
+.cal-cell{transition:background .1s;cursor:pointer;min-width:0;overflow:hidden;}
 /* ── Monthly 달력: 폭이 좁아지면 가로 스크롤 대신 글자가 작아지도록 ── */
 .mcal-wrap{
   container-type:inline-size;
@@ -1733,7 +1760,6 @@ function renderTodayLegacy(){
   return goalBar+
     '<div class="today-wrap">'+
     '<div style="display:flex;flex-direction:column;gap:14px">'+routineCard(viewDate)+
-      '<button class="btn bg" onclick="go(\'timeline\')" style="width:100%;justify-content:center;gap:8px;padding:11px"><span style="font-size:1.05em">🛤️</span> 3년 로드맵 보기</button>'+
     '</div>'+
     '<div class="pj-layout'+(isTdEdit?' pj-editing':'')+'">'+rightGrid+'</div></div>';
 }
@@ -6346,16 +6372,10 @@ function renderTodoCal(){
   const ts=todStr();
 
   // 연도/월 헤더
-  var monthCards='<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:14px;padding-bottom:4px">'+
-    '<div style="display:grid;grid-template-columns:repeat(12,minmax(56px,1fr));gap:4px;min-width:600px">';
+  var monthCards='<div class="mtab-wrap"><div class="mtab">';
   for(var m=0;m<12;m++){
     var isCur=m===todoCalM;
-    monthCards+='<div data-m="'+m+'" onclick="todoCalM=parseInt(this.dataset.m);render()" style="'+
-      'border-radius:8px;padding:9px 4px;cursor:pointer;text-align:center;'+
-      'background:'+(isCur?'var(--accent)':'var(--surface)')+';'+
-      'border:1.5px solid '+(isCur?'var(--accent)':'var(--border)')+';transition:all .2s">'+
-      '<div style="font-size:13px;font-weight:700;color:'+(isCur?'#fff':'var(--accent)')+'">'+MN[m]+'</div>'+
-    '</div>';
+    monthCards+='<div class="mtab-item'+(isCur?' on':'')+'" data-m="'+m+'" onclick="todoCalM=parseInt(this.dataset.m);render()">'+MN[m]+'</div>';
   }
   monthCards+='</div></div>';
 
@@ -6577,19 +6597,10 @@ function renderCalendar(){
   const ts=todStr();
   const ym=calY+'-'+String(calM+1).padStart(2,'0');
 
-  var monthCards='<div class="mstrip-wrap" style="margin-bottom:14px;padding-bottom:4px">'+
-    '<div style="display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px">';
+  var monthCards='<div class="mtab-wrap"><div class="mtab">';
   for(var m=0;m<12;m++){
     var isCur=m===calM;
-    var key=calY+'-'+String(m+1).padStart(2,'0');
-    var evCount=(S.calEvents||[]).filter(e=>e.date&&e.date.startsWith(key)).length;
-    var dlCount=(S.deadlines||[]).filter(d=>d.date&&d.date.startsWith(key)).length;
-    monthCards+='<div data-m="'+m+'" onclick="calM=parseInt(this.dataset.m);render()" style="'+
-      'border-radius:8px;padding:var(--mstrip-pad);cursor:pointer;text-align:center;'+
-      'background:'+(isCur?'var(--accent)':'var(--surface)')+';'+
-      'border:1.5px solid '+(isCur?'var(--accent)':'var(--border)')+';transition:all .2s">'+
-      '<div style="font-size:var(--mstrip-fs);font-weight:700;color:'+(isCur?'#fff':'var(--accent)')+'">'+MN[m]+'</div>'+
-    '</div>';
+    monthCards+='<div class="mtab-item'+(isCur?' on':'')+'" data-m="'+m+'" onclick="calM=parseInt(this.dataset.m);render()">'+MN[m]+'</div>';
   }
   monthCards+='</div></div>';
 
@@ -6618,11 +6629,11 @@ function renderCalendar(){
   });
 
   var calHtml='<div class="mcal-wrap"><div>'+
-    '<div style="display:grid;grid-template-columns:repeat(7,1fr);border-bottom:1px solid var(--border)">';
+    '<div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-bottom:1px solid var(--border)">';
   ['일','월','화','수','목','금','토'].forEach(function(d,i){
     calHtml+='<div style="text-align:center;padding:8px 0;font-size:var(--mcal-dow);font-weight:500;color:'+(i===0?'var(--red)':i===6?'var(--blue)':'var(--t3)')+'">'+d+'</div>';
   });
-  calHtml+='</div><div style="display:grid;grid-template-columns:repeat(7,1fr)">';
+  calHtml+='</div><div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr))">';
 
   for(var idx2=0;idx2<cells.length;idx2++){
     var cell=cells[idx2];
@@ -6678,9 +6689,9 @@ function renderCalendar(){
         var dlDone=!!ev.done;
         calHtml+='<div onclick="event.stopPropagation();calDlToggle(\''+ev.id+'\')" style="display:flex;align-items:center;gap:3px;background:var(--al);color:#555;'+
           'border-left:2px solid '+(dlDone?'var(--border)':'var(--accent)')+';border-radius:0 4px 4px 0;'+
-          'font-size:var(--mcal-ev);padding:var(--mcal-evpad);margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:400;line-height:1.4;cursor:pointer" title="클릭하면 완료 체크">'+
+          'font-size:var(--mcal-ev);padding:var(--mcal-evpad);min-width:0;max-width:100%;margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:400;line-height:1.4;cursor:pointer" title="클릭하면 완료 체크">'+
           '<span style="flex-shrink:0;color:'+(dlDone?'var(--green)':'var(--red)')+';font-weight:700">'+(dlDone?'✓':'🚨')+'</span>'+
-          '<span style="overflow:hidden;text-overflow:ellipsis;'+(dlDone?'text-decoration:line-through;color:var(--t3)':'')+'">'+ev.title+'</span>'+
+          '<span style="overflow:hidden;text-overflow:ellipsis;min-width:0;white-space:nowrap;'+(dlDone?'text-decoration:line-through;color:var(--t3)':'')+'">'+ev.title+'</span>'+
         '</div>';
       } else if(ev.isRzCell) {
         // 루틴 이벤트: 클릭 시 바로 완료 체크
@@ -6688,21 +6699,21 @@ function renderCalendar(){
         var isDone=!!ckMap[ev.rid];
         calHtml+='<div onclick="event.stopPropagation();calRoutineToggle(\''+ev.rid+'\',\''+ds+'\')" style="display:flex;align-items:center;gap:3px;background:'+(ev.color||'var(--accent)')+'14;color:#555;'+
           'border-left:2px solid '+(ev.color||'var(--accent)')+'60;border-radius:0 4px 4px 0;'+
-          'font-size:var(--mcal-ev);padding:var(--mcal-evpad);margin-bottom:2px;overflow:hidden;white-space:nowrap;font-weight:400;line-height:1.4;cursor:pointer" title="클릭하면 완료 체크">'+
+          'font-size:var(--mcal-ev);padding:var(--mcal-evpad);min-width:0;max-width:100%;margin-bottom:2px;overflow:hidden;white-space:nowrap;font-weight:400;line-height:1.4;cursor:pointer" title="클릭하면 완료 체크">'+
           '<span style="flex-shrink:0;color:'+(isDone?'var(--green)':'var(--t3)')+';font-weight:700">'+(isDone?'✓':'○')+'</span>'+
-          '<span style="overflow:hidden;text-overflow:ellipsis;'+(isDone?'text-decoration:line-through;color:var(--t3)':'')+'">'+ev.title+'</span>'+
+          '<span style="overflow:hidden;text-overflow:ellipsis;min-width:0;white-space:nowrap;'+(isDone?'text-decoration:line-through;color:var(--t3)':'')+'">'+ev.title+'</span>'+
         '</div>';
       } else if(ev.isHealthSched) {
         calHtml+='<div style="background:#E8A0A015;color:#555;'+
           'border-left:2px solid #E8A0A090;border-radius:0 4px 4px 0;'+
-          'font-size:var(--mcal-ev);padding:var(--mcal-evpad);margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:400;line-height:1.4;display:flex;align-items:center;gap:3px">'+
+          'font-size:var(--mcal-ev);padding:var(--mcal-evpad);min-width:0;max-width:100%;margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:400;line-height:1.4;display:flex;align-items:center;gap:3px">'+
           '<span style="display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;background:#E8A0A0;border-radius:2px;flex-shrink:0"><svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linejoin="round"><path d="M12 21s-7.5-4.7-10-9.3C.4 8.5 1.5 5 4.7 4.2c2-.5 3.8.4 4.8 1.9l.5.8.5-.8c1-1.5 2.8-2.4 4.8-1.9C22.5 5 23.6 8.5 22 11.7 19.5 16.3 12 21 12 21z"/></svg></span>'+
-          '<span style="overflow:hidden;text-overflow:ellipsis">'+ev.title+'</span>'+
+          '<span style="overflow:hidden;text-overflow:ellipsis;min-width:0;white-space:nowrap">'+ev.title+'</span>'+
         '</div>';
       } else {
         calHtml+='<div onclick="event.stopPropagation();openEvDetailModal(\''+ev.id+'\')" style="background:'+(ev.color||'var(--accent)')+'14;color:#555;'+
           'border-left:2px solid '+(ev.color||'var(--accent)')+'60;border-radius:0 4px 4px 0;'+
-          'font-size:var(--mcal-ev);padding:var(--mcal-evpad);margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:400;line-height:1.4;cursor:pointer">'+
+          'font-size:var(--mcal-ev);padding:var(--mcal-evpad);min-width:0;max-width:100%;margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:400;line-height:1.4;cursor:pointer">'+
           ev.title+'</div>';
       }
     });

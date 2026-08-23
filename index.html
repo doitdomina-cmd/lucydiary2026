@@ -203,7 +203,10 @@ html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--t
 .sb-sc{flex:0 0 auto}
 .sb-sc::-webkit-scrollbar{width:3px}
 .sb-sc::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
-.sb-sec{padding:7px 8px 4px;display:flex;flex-direction:column;gap:2px}
+.sb-sec{padding:0 8px;display:flex;flex-direction:column;gap:0}
+.sb-sec:first-child{padding-top:10px}
+.sb-sec:last-child{padding-bottom:10px}
+.sb-sec+.sb-sec{margin-top:14px}
 .sb-pj-wrap{flex:1;min-height:0;display:flex;flex-direction:column;margin:6px 10px 10px;background:transparent;border:1px solid var(--border);border-radius:8px;overflow:hidden}
 .sb-pj-hd{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;cursor:pointer;user-select:none;flex-shrink:0;transition:background .15s}
 .sb-pj-hd:hover{background:var(--s2)}
@@ -215,8 +218,8 @@ html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--t
 .sb-pj-wrap.collapsed .sb-pj-hd{border-bottom:none}
 .sb-pj-wrap.collapsed .sb-pj-body{display:none}
 .sb-pj-body::-webkit-scrollbar{width:0;height:0;display:none}
-.sb-lbl{font-size:0.7143em;font-weight:500;color:var(--t3);letter-spacing:.08em;text-transform:uppercase;padding:0 8px;margin-bottom:4px;display:flex;align-items:center;justify-content:space-between}
-.nav{display:flex;align-items:center;gap:10px;padding:5.5px 10px;border-radius:var(--rsm);cursor:pointer;color:var(--t2);font-size:0.9643em;border:none;background:none;width:100%;text-align:left;transition:all .15s;font-family:var(--sans)}
+.sb-lbl{font-size:0.7143em;font-weight:500;color:var(--t3);letter-spacing:.08em;text-transform:uppercase;padding:0 8px;margin-bottom:5px;display:flex;align-items:center;justify-content:space-between}
+.nav{display:flex;align-items:center;gap:10px;padding:4px 10px;border-radius:var(--rsm);cursor:pointer;color:var(--t2);font-size:0.9643em;border:none;background:none;width:100%;text-align:left;transition:all .15s;font-family:var(--sans)}
 .nav:hover{background:var(--s3);color:var(--text)}
 .nav.on{background:var(--al);color:var(--accent);font-weight:600;position:relative}
 .nav.on::before{content:"";position:absolute;left:0;top:4px;bottom:4px;width:3px;border-radius:0 3px 3px 0;background:var(--accent)}
@@ -242,8 +245,14 @@ html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--t
 .main{flex:1;overflow:hidden;display:flex;flex-direction:column}
 .topbar{height:48px;background:var(--s2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:12px;flex-shrink:0}
 /* 로드맵(연대기)은 PC에서 상단 헤더 줄을 숨겨 화면을 넓게 쓴다 (모바일은 메뉴 버튼이 필요하므로 유지) */
-body.page-timeline .topbar{display:none}
-@media(max-width:900px){body.page-timeline .topbar{display:flex}}
+body.page-timeline .topbar,
+body.page-projects:not(.pj-detail) .topbar,
+body.page-life .topbar{display:none}
+@media(max-width:900px){
+  body.page-timeline .topbar,
+  body.page-projects .topbar,
+  body.page-life .topbar{display:flex}
+}
 .topbar .hov-btns{opacity:0;transition:opacity .15s}
 .topbar:hover .hov-btns{opacity:1}
 .tb-title{font-size:1em;font-weight:500}
@@ -681,6 +690,12 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 }
 @container (max-width: 620px){ .mtab-wrap{--mtab-fs:10px;--mtab-pad:6px 2px} }
 @container (max-width: 470px){ .mtab-wrap{--mtab-fs:8.5px;--mtab-pad:5px 1px} }
+/* 프로젝트 필터 탭: 영역 이름이 월 이름보다 길어서 더 작게 */
+.pjtab-wrap{--mtab-fs:11px;--mtab-pad:7px 3px}
+.pjtab-wrap .mtab{gap:2px}
+.pjtab-wrap .mtab-item{letter-spacing:-0.3px}
+@container (max-width: 900px){ .pjtab-wrap{--mtab-fs:9.5px;--mtab-pad:6px 2px} }
+@container (max-width: 640px){ .pjtab-wrap{--mtab-fs:8px;--mtab-pad:5px 1px} }
 @supports not (container-type: inline-size){
   @media(max-width:900px){ .mtab-wrap{--mtab-fs:10px;--mtab-pad:6px 2px} }
   @media(max-width:600px){ .mtab-wrap{--mtab-fs:8.5px;--mtab-pad:5px 1px} }
@@ -977,7 +992,13 @@ let pendingCloudSave = false;
 function scheduleSave() {
   clearTimeout(saveTimer);
   pendingCloudSave = true;
-  saveTimer = setTimeout(() => { saveToCloud(S); pendingCloudSave = false; }, 600);
+  // ⚠️ 반드시 _ledger를 함께 올려야 한다.
+  // saveToCloud는 문서를 통째로 덮어쓰기 때문에, _ledger 없이 올리면
+  // 클라우드에 저장돼 있던 가계부 데이터가 지워진다.
+  saveTimer = setTimeout(() => {
+    saveToCloud(typeof LD!=='undefined' ? {...S, _ledger: LD} : S);
+    pendingCloudSave = false;
+  }, 600);
 }
 function scheduleSaveLedger() {
   clearTimeout(saveLedgerTimer);
@@ -1239,7 +1260,7 @@ function moOut(e){if(e.target===document.getElementById('mo'))closeMo();}
 function render(){
   const el=document.getElementById('main');
   // 현재 페이지를 body class로 반영 (페이지별 레이아웃 예외 처리용)
-  document.body.className=document.body.className.replace(/\bpage-\S+/g,'').trim()+' page-'+page;
+  document.body.className=document.body.className.replace(/\bpage-\S+/g,'').trim()+' page-'+page+((page==='projects'&&activePid)?' pj-detail':'');
   const div=document.createElement('div');
   div.className='pc'+(page==='timeline'?' pc-wide':'');
   if(page==='today') div.innerHTML=renderToday();
@@ -2809,15 +2830,16 @@ function renderProjects(){
   const areas=S.lifeAreas||[];
   const filtered=pjFilter?S.projects.filter(p=>p.lifeAreaId===pjFilter):S.projects;
   let html='';
-  // 상단 필터 탭 (To Do 월 탭과 동일한 인덱스 탭 스타일)
-  html+='<div style="display:flex;align-items:flex-end;gap:10px;margin-bottom:20px">';
-  html+='<div class="mtab-wrap" style="flex:1;min-width:0"><div class="mtab" style="grid-template-columns:repeat('+(areas.length+1)+',minmax(0,1fr))">';
+  // 상단 필터 탭 (To Do 월 탭과 동일한 인덱스 탭 스타일) — 한 줄 전체를 차지
+  html+='<div class="mtab-wrap pjtab-wrap"><div class="mtab" style="grid-template-columns:repeat('+(areas.length+1)+',minmax(0,1fr))">';
   html+='<div class="mtab-item'+(pjFilter===''?' on':'')+'" onclick="setPjF(\'\')">전체</div>';
   areas.forEach(function(a){
     html+='<div class="mtab-item'+(pjFilter===a.id?' on':'')+'" data-aid="'+a.id+'" onclick="setPjF(this.dataset.aid)" title="'+esc(a.name)+'">'+esc(a.name)+'</div>';
   });
   html+='</div></div>';
-  html+='<button class="btn bp bsm" onclick="openPjModal()" style="flex-shrink:0;margin-bottom:2px">+ 새 프로젝트</button></div>';
+  // 새 프로젝트 버튼은 탭 아래 줄로
+  html+='<div style="display:flex;justify-content:flex-end;margin:10px 0 16px">'+
+    '<button class="btn bp bsm" onclick="openPjModal()">+ 새 프로젝트</button></div>';
   if(filtered.length===0){html+='<div class="empty" style="padding:60px"><div class="ei">🗂️</div>'+(pjFilter?'이 영역의 프로젝트가 없어요':'첫 프로젝트를 만들어 보세요!')+'</div>';}
   else{
   html+='<div class="pj-grid">';
@@ -7270,7 +7292,7 @@ function applyTheme(t){
   var f=S.font||'pretendard';
   if(f!=='pretendard') cls+=' font-'+f;
   cls += ' cardstyle-'+(S.projectCardStyle||'highlight');
-  if(typeof page!=='undefined' && page) cls += ' page-'+page;
+  if(typeof page!=='undefined' && page) cls += ' page-'+page+((page==='projects'&&typeof activePid!=='undefined'&&activePid)?' pj-detail':'');
   document.body.className=cls;
 
   // Noto Serif KR Google Font 동적 로드
@@ -8849,7 +8871,15 @@ auth.onAuthStateChanged(async function(user){
       delete cloudData._ledger;
       delete cloudData._cloudUpdatedAt;
       S = Object.assign({}, S, cloudData);
-      if(ledgerData) LD = Object.assign({}, LD, ledgerData);
+      // 클라우드에 가계부가 있으면 그것을, 없으면 이 기기에 저장된 가계부를 살린다.
+      // (클라우드에 없다고 해서 로컬 가계부를 기본값으로 덮어쓰면 안 된다)
+      var ledgerRestoredFromLocal = false;
+      if(ledgerData){
+        LD = Object.assign({}, LD, ledgerData);
+      } else {
+        loadLedger();
+        ledgerRestoredFromLocal = true;
+      }
 
       // 폰트 데이터 복원 (클라우드엔 없으므로 localStorage 것 유지)
       S.customFontData = localFontData;
@@ -8864,6 +8894,10 @@ auth.onAuthStateChanged(async function(user){
       // localStorage 업데이트
       localStorage.setItem(KEY, JSON.stringify(S));
       localStorage.setItem(LEDGER_KEY, JSON.stringify(LD));
+      // 클라우드에 가계부가 없어서 로컬에서 살렸다면, 클라우드에도 다시 올려둔다
+      if(ledgerRestoredFromLocal){
+        try{ await saveToCloud({...S, _ledger: LD}); }catch(e){}
+      }
     } else if(localIsNewer){
       // 로컬이 더 최신 → 로컬 데이터를 유지하고, 아직 못 올라간 변경사항을 클라우드에 재업로드
       load(); loadLedger();

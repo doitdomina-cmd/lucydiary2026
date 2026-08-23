@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Lucy's Space</title>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Noto+Serif+KR:wght@400;500;600;700&family=Nanum+Pen+Script&family=Nanum+Myeongjo:wght@400;700&family=Sunflower:wght@300;500;700&family=Hi+Melody&family=Stylish&family=Gaegu:wght@400;700&family=Montserrat:ital,wght@1,700;1,800&family=Dancing+Script:wght@600;700&family=Sacramento&family=Allura&family=Kaushan+Script&family=Geist+Mono:wght@300;400;500&family=Pretendard:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Noto+Serif+KR:wght@400;500;600;700&family=Nanum+Pen+Script&family=Nanum+Myeongjo:wght@400;700&family=Sunflower:wght@300;500;700&family=Hi+Melody&family=Stylish&family=Gaegu:wght@400;700&family=Nanum+Brush+Script&family=Gamja+Flower&family=Montserrat:ital,wght@1,700;1,800&family=Dancing+Script:wght@600;700&family=Sacramento&family=Allura&family=Kaushan+Script&family=Geist+Mono:wght@300;400;500&family=Pretendard:wght@300;400;500;600&display=swap" rel="stylesheet">
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
@@ -420,7 +420,7 @@ body.page-timeline .topbar{display:none}
 .pj-row-meta{margin-left:auto;color:var(--t3);font-size:0.85em;font-family:var(--mono);flex-shrink:0;padding-right:4px}
 .pj-row-del{opacity:0;flex-shrink:0;font-size:0.8em;transition:opacity .15s}
 .pj-row:hover .pj-row-del{opacity:1}
-.pj-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;box-shadow:var(--sh);transition:box-shadow .2s,transform .2s;display:flex;flex-direction:column}
+.pj-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;box-shadow:var(--sh);transition:box-shadow .2s,transform .2s;display:flex;flex-direction:column;position:relative}
 .pj-card:hover{box-shadow:var(--shm);transform:translateY(-2px)}
 .pj-bar{height:4px}
 .pj-body{padding:16px;flex:1;display:flex;flex-direction:column;gap:10px}
@@ -902,7 +902,7 @@ function chunkData(data) {
   const FIELDS = ['routines','checks','projects','deadlines','savings','notes','calEvents',
     'lifeGoal','theme','customThemeColor','projectCardStyle','diaryEntries','monthlyGoals','monthlyMemo',
     'weeklyGoals','weeklyMemo','diaryStickers','font','fontSize','fontWeight','customFonts','logoFont','navMarker','todayLayout','todayCardVis',
-    'lifeAreas','todoList','todoListTmr','timeline','timelineTitle','tlFontScaleBig','tlFontScaleSmall','tlLineLenBig','tlLineLenSmall','tlTextColor','bgIntensity'];
+    'lifeAreas','todoList','todoListTmr','timeline','timelineTitle','tlFontScaleBig','tlFontScaleSmall','tlLineLenBig','tlLineLenSmall','tlTextColor','bgIntensity','diaryFont'];
   const chunks = {};
   FIELDS.forEach(f => { if (data[f] !== undefined) chunks[f] = data[f]; });
   // customFontData는 Firestore 용량 초과 → 저장 제외 (localStorage에만)
@@ -1070,6 +1070,7 @@ let S = {
   tlLineLenSmall: 34,  // 로드맵 작은 시점 연결선 길이(px)
   tlTextColor: '',     // 로드맵 글자 색상 (빈 값이면 테마 기본색)
   bgIntensity: 0,   // 전체 배경색 진하기 (0=아주 연하게 ~ 100=진하게)
+  diaryFont: 'inherit',  // 일기 내용 전용 글씨체
 };
 
 function load(){try{const d=localStorage.getItem(KEY);if(d)S=Object.assign({},S,JSON.parse(d));}catch(e){}}
@@ -2031,6 +2032,7 @@ const MOOD_COLORS={'😄':'#F5C842','🙂':'#8BBF88','😐':'#B6AE9F','😢':'#6
 const MN_D=['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 function renderDiary(){
+  var dFF=diaryFontFF();
   const ts=todStr();
   var monthCards='<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:20px;padding-bottom:4px">'+
     '<div style="display:grid;grid-template-columns:repeat(12,minmax(56px,1fr));gap:4px;min-width:600px">';
@@ -2092,8 +2094,8 @@ function renderDiary(){
           (entry.mood?'<span style="font-size:0.85em;line-height:1">'+entry.mood+'</span>':'')+
           (entry.weather?'<span style="font-size:0.85em;line-height:1">'+entry.weather+'</span>':'')+
         '</div>':'')+
-      (entry&&entry.title?'<div style="font-size:0.78em;font-weight:600;color:var(--accent);margin-top:4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;'+pts+'">'+esc(entry.title)+'</div>':'')+
-      (entry&&entry.text?'<div style="font-size:0.68em;color:var(--t2);margin-top:3px;line-height:1.45;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-all;'+pts+'">'+esc(entry.text)+'</div>':'')+
+      (entry&&entry.title?'<div style="font-size:0.78em;font-weight:600;color:var(--accent);font-family:'+dFF+';margin-top:4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;'+pts+'">'+esc(entry.title)+'</div>':'')+
+      (entry&&entry.text?'<div style="font-size:0.68em;color:var(--t2);font-family:'+dFF+';margin-top:3px;line-height:1.45;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-all;'+pts+'">'+esc(entry.text)+'</div>':'')+
       (isT&&!entry?'<div style="font-size:0.72em;color:var(--t3);margin-top:4px">write today</div>':'')+
     '</div>';
   }
@@ -2115,6 +2117,7 @@ function renderDiary(){
         '<div style="font-family:var(--serif);font-size:1.2em">'+MN_D[diaryM]+' '+diaryY+'</div>'+
         '<div style="font-size:0.88em;color:var(--accent);font-weight:500">이번달 '+curMonthCnt+'번 일기를 썼어요!</div>'+
         '<div style="display:flex;gap:6px"><button class="btn bg bsm" onclick="openDiarySearch()">🔍 검색</button>'+
+        '<button class="btn bg bsm" onclick="openDiaryFontModal()" title="일기 글씨체 설정">⚙</button>'+
         '<button class="btn bp bsm" onclick="openDiaryModal(todStr())">+ 오늘 일기</button></div>'+
       '</div>'+
       calHtml+
@@ -2385,6 +2388,7 @@ document.addEventListener('touchmove',function(e){
 document.addEventListener('touchend',_dphotoEnd);
 
 function openDiaryModal(ds){
+  var dFF=diaryFontFF();
   const entry=(S.diaryEntries||{})[ds]||{text:'',mood:'',weather:''};
   const dt=new Date(ds+'T00:00:00');
   const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -2433,14 +2437,14 @@ function openDiaryModal(ds){
     '<div style="display:flex;gap:4px;flex-wrap:wrap">'+moodHtml+'</div></div>'+
     '<div style="margin-bottom:9px"><div style="font-size:0.76em;color:var(--t3);margin-bottom:4px">날씨</div>'+
     '<div style="display:flex;gap:4px;flex-wrap:wrap">'+weatherHtml+'</div></div>'+
-    '<div style="margin-bottom:12px"><input id="diary-title-inp" class="inp" placeholder="제목 (선택)" value="'+esc(rawTitle)+'" style="font-size:1em;font-weight:500;background:transparent;border-color:transparent;border-bottom:1px solid var(--border);border-radius:0;padding:6px 0"></div>'+
+    '<div style="margin-bottom:12px"><input id="diary-title-inp" class="inp" placeholder="제목 (선택)" value="'+esc(rawTitle)+'" style="font-family:'+dFF+';font-size:1em;font-weight:500;background:transparent;border-color:transparent;border-bottom:1px solid var(--border);border-radius:0;padding:6px 0"></div>'+
     '<div style="position:relative;overflow:hidden;border:1px solid var(--border);border-radius:8px;background:var(--s2);margin-bottom:14px">'+
       '<div id="diary-line-nums-clip" style="position:absolute;left:0;top:0;bottom:0;width:38px;overflow:hidden;pointer-events:none;background:var(--s2);border-right:1px solid var(--border)">'+
         '<div id="diary-line-nums" style="padding:8px 6px 8px 0;font-family:var(--mono);font-size:0.9286em;color:var(--t3);line-height:1.8;user-select:none;text-align:right">'+
           getLineNums(rawText)+
         '</div>'+
       '</div>'+
-      '<textarea id="diary-ta" style="width:100%;height:34vh;min-height:190px;border:none;border-radius:0;padding:8px 12px 8px 46px;font-size:0.9286em;font-family:var(--sans);line-height:1.8;resize:none;background:transparent;color:var(--text);outline:none;display:block;box-sizing:border-box" '+
+      '<textarea id="diary-ta" style="width:100%;height:34vh;min-height:190px;border:none;border-radius:0;padding:8px 12px 8px 46px;font-size:0.9286em;font-family:'+dFF+';line-height:1.8;resize:none;background:transparent;color:var(--text);outline:none;display:block;box-sizing:border-box" '+
       'placeholder="오늘 감사한 일을 적어보세요..." oninput="updateLineNums(this)" onscroll="syncLineNums(this)">'+esc(rawText)+'</textarea>'+
     '</div>'+
     photoHtml,
@@ -2515,6 +2519,51 @@ function delDiaryEntry(ds){
 }
 
 // ═══════════ 일기 검색 ═══════════
+// ═══════════ 일기 글씨체 설정 ═══════════
+// 설정의 글자체 + 손글씨 2종. 다이어리 내용(제목/본문)에만 적용된다.
+var DIARY_FONTS=[
+  {id:'inherit',name:'설정과 동일',desc:'전체 설정에서 고른 글씨체 사용',ff:''},
+  {id:'pretendard',name:'Pretendard',desc:'기본 — 깔끔한 서체',ff:"'Pretendard','Apple SD Gothic Neo',sans-serif"},
+  {id:'notoserif',name:'Noto Serif KR',desc:'한국어 명조체 — 단아한 느낌',ff:"'Noto Serif KR','Nanum Myeongjo',serif"},
+  {id:'nanummyeongjo',name:'나눔명조',desc:'고전적인 명조체',ff:"'Nanum Myeongjo',serif"},
+  {id:'sunflower',name:'해바라기',desc:'부드러운 고딕',ff:"'Sunflower','Pretendard',sans-serif"},
+  {id:'stylish',name:'스타일리시',desc:'가늘고 모던한 고딕',ff:"'Stylish','Pretendard',sans-serif"},
+  {id:'gaegu',name:'개구쟁이',desc:'손글씨 — 동글동글한 느낌',ff:"'Gaegu',cursive"},
+  {id:'himelody',name:'하이멜로디',desc:'손글씨 — 귀엽고 아기자기',ff:"'Hi Melody',cursive"},
+  {id:'nanumbrush',name:'나눔손글씨 붓',desc:'손글씨 — 붓펜으로 쓴 느낌',ff:"'Nanum Brush Script',cursive"},
+  {id:'gamja',name:'감자꽃',desc:'손글씨 — 삐뚤빼뚤 편안한 느낌',ff:"'Gamja Flower',cursive"}
+];
+function diaryFontFF(){
+  var id=S.diaryFont||'inherit';
+  var f=DIARY_FONTS.find(function(x){return x.id===id;});
+  return (f&&f.ff)?f.ff:'var(--sans)';
+}
+function setDiaryFont(id){
+  S.diaryFont=id;
+  save();
+  closeMo();
+  render();
+}
+function openDiaryFontModal(){
+  var cur=S.diaryFont||'inherit';
+  var html='<div style="font-size:0.8em;color:var(--t3);margin-bottom:10px">일기 제목과 본문에만 적용돼요.</div>'+
+    '<div style="display:flex;flex-direction:column;gap:6px">';
+  DIARY_FONTS.forEach(function(f){
+    var isCur=cur===f.id;
+    html+='<div onclick="setDiaryFont(\''+f.id+'\')" style="border:1.5px solid '+(isCur?'var(--accent)':'var(--border)')+';border-radius:8px;padding:10px 14px;background:'+(isCur?'var(--al)':'var(--surface)')+';cursor:pointer;transition:all .2s">'+
+      '<div style="display:flex;align-items:center">'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-size:1.05em;font-weight:500;color:var(--text)'+(f.ff?';font-family:'+f.ff:'')+'">오늘도 감사한 하루였어요</div>'+
+          '<div style="font-size:0.75em;color:var(--t3);margin-top:3px">'+f.name+' · '+f.desc+'</div>'+
+        '</div>'+
+        (isCur?'<div style="color:var(--accent);font-weight:700;flex-shrink:0">✓</div>':'')+
+      '</div>'+
+    '</div>';
+  });
+  html+='</div>';
+  openMo('일기 글씨체', html, '<button class="btn bg" onclick="closeMo()">닫기</button>');
+}
+
 function openDiarySearch(){
   openMo('🔍 일기 검색',
     '<input id="diary-search-inp" class="inp" placeholder="키워드를 입력하세요... (제목+본문 검색)" oninput="runDiarySearch(this.value)" style="margin-bottom:12px">'+
@@ -2573,16 +2622,16 @@ function renderLife(){
   areas.forEach(function(a){
     const projs=S.projects.filter(p=>p.lifeAreaId===a.id);
     html+='<div class="la-card" draggable="true" data-aid="'+a.id+'" data-color="'+a.color+'" onclick="laCardClick(event,this.dataset.aid)" style="border-color:'+a.color+'30;--card-accent:'+a.color+'">';
-    html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">';
-    html+='<div style="display:flex;align-items:center;gap:6px"><span style="color:var(--t3);font-size:0.9em;cursor:grab;user-select:none">⠿</span><div class="la-title-text" style="font-size:1.0714em;font-weight:600;color:var(--text)">'+a.name+'</div>'+
+    html+='<div style="display:flex;align-items:center;margin-bottom:12px;min-width:0;padding-right:34px">';
+    html+='<div style="display:flex;align-items:center;gap:6px;min-width:0;flex:1"><span style="color:var(--t3);font-size:0.9em;cursor:grab;user-select:none;flex-shrink:0">⠿</span><div class="la-title-text" style="font-size:1.0714em;font-weight:600;color:var(--text);min-width:0">'+a.name+'</div>'+
       (a.dday?(function(){var dl=dLeft(a.dday);var lab=dl>0?'D-'+dl:dl===0?'D-DAY':'D+'+Math.abs(dl);return '<span style="font-size:0.68em;padding:2px 7px;border-radius:99px;background:'+a.color+'18;color:'+a.color+';font-weight:600;font-family:var(--mono)">'+lab+'</span>';})():'')+
     '</div>';
-    html+='<div class="la-btns" style="display:flex;gap:4px;opacity:0;transition:opacity .15s">';
-    html+='<button class="bi" data-aid="'+a.id+'" onclick="event.stopPropagation();openAreaModal(this.dataset.aid)" style="color:var(--t3);font-size:1em" title="수정">'+
-      '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>'+
+    html+='<div class="la-btns" style="position:absolute;top:6px;right:6px;display:flex;gap:2px;opacity:0;transition:opacity .15s;z-index:2">';
+    html+='<button class="bi" data-aid="'+a.id+'" onclick="event.stopPropagation();openAreaModal(this.dataset.aid)" style="color:var(--t3);padding:2px;line-height:0" title="수정">'+
+      '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>'+
     '</button>';
-    html+='<button class="bi" data-aid="'+a.id+'" onclick="event.stopPropagation();delArea(this.dataset.aid)" style="color:var(--t3);font-size:1em" title="삭제">'+
-      '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'+
+    html+='<button class="bi" data-aid="'+a.id+'" onclick="event.stopPropagation();delArea(this.dataset.aid)" style="color:var(--t3);padding:2px;line-height:0" title="삭제">'+
+      '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'+
     '</button>';
     html+='</div></div>';
     html+='<div style="width:32px;height:3px;border-radius:99px;background:'+a.color+';margin-bottom:12px"></div>';
@@ -2721,10 +2770,10 @@ function renderProjects(){
       html+='<div class="pj-card" onclick="go(\'projects\',\''+p.id+'\')" style="--card-accent:'+col+'">'+
           '<div class="pj-bar" style="background:'+col+'"></div>'+
           '<div class="pj-body">'+
-            '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px">'+
-              '<span class="pj-title-text" style="font-weight:600;font-size:1.02em;color:var(--text)">'+(p.emoji?p.emoji+' ':'')+p.name+'</span>'+
-              '<button class="bi pj-card-del" onclick="event.stopPropagation();delPj(\''+p.id+'\')" style="color:var(--t3);flex-shrink:0;opacity:0;transition:opacity .15s">✕</button>'+
+            '<div style="display:flex;align-items:flex-start;min-width:0;padding-right:22px">'+
+              '<span class="pj-title-text" style="font-weight:600;font-size:1.02em;color:var(--text);min-width:0">'+(p.emoji?p.emoji+' ':'')+p.name+'</span>'+
             '</div>'+
+            '<button class="bi pj-card-del" onclick="event.stopPropagation();delPj(\''+p.id+'\')" style="position:absolute;top:6px;right:6px;color:var(--t3);opacity:0;transition:opacity .15s;padding:2px;line-height:0;font-size:0.85em;z-index:2">✕</button>'+
             (tk.length>0?'<div style="height:5px;border-radius:99px;background:var(--s2);overflow:hidden"><div style="height:100%;width:'+pc+'%;background:'+col+';border-radius:99px"></div></div>':'')+
             (metaBits.length?'<div style="font-size:0.8em;color:var(--t3);font-family:var(--mono)">'+metaBits.join(' · ')+'</div>':'')+
           '</div>'+
@@ -6449,7 +6498,7 @@ function renderTodoCal(){
 
   return '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'+
     '<button class="btn bg bsm" onclick="todoCalY--;render()">← '+(todoCalY-1)+'</button>'+
-    '<div style="font-family:var(--serif);font-size:1.8em !important;font-weight:700 !important;color:var(--accent)">'+todoCalY+'</div>'+
+    '<div style="font-family:\'Instrument Serif\',serif;font-size:2.1em !important;font-weight:400 !important;letter-spacing:0.5px;color:var(--accent)">'+todoCalY+'</div>'+
     '<button class="btn bg bsm" onclick="todoCalY++;render()">'+(todoCalY+1)+' →</button>'+
   '</div>'+
   monthCards+
@@ -6758,7 +6807,7 @@ function renderCalendar(){
   return ''+  
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'+
       '<button class="btn bg bsm" onclick="calY--;render()">← '+(calY-1)+'</button>'+
-      '<div style="font-family:var(--serif);font-size:1.8em !important;font-weight:700 !important;color:var(--accent)">'+calY+'</div>'+
+      '<div style="font-family:\'Instrument Serif\',serif;font-size:2.1em !important;font-weight:400 !important;letter-spacing:0.5px;color:var(--accent)">'+calY+'</div>'+
       '<button class="btn bg bsm" onclick="calY++;render()">'+(calY+1)+' →</button>'+
     '</div>'+
     monthCards+
@@ -6874,10 +6923,8 @@ function renderSettings(){
 
   var fontSlots=[
     {id:'pretendard',name:'Pretendard',desc:'기본 — 깔끔한 서체',ff:"'Pretendard',sans-serif"},
-    {id:'serif',name:'Serif',desc:'세리프 — 클래식한 느낌',ff:"'Instrument Serif',Georgia,serif"},
     {id:'notoserif',name:'Noto Serif KR',desc:'한국어 명조체 — 단아한 느낌',ff:"'Noto Serif KR',serif"},
     {id:'nanummyeongjo',name:'나눔명조',desc:'고전적인 명조체',ff:"'Nanum Myeongjo',serif"},
-    {id:'nanumpen',name:'나눔손글씨 펜',desc:'손글씨 — 자유로운 느낌',ff:"'Nanum Pen Script',cursive"},
     {id:'sunflower',name:'해바라기',desc:'부드러운 고딕',ff:"'Sunflower',sans-serif"},
     {id:'himelody',name:'하이멜로디',desc:'귀여운 손글씨',ff:"'Hi Melody',cursive"},
     {id:'stylish',name:'스타일리시',desc:'가늘고 모던한 고딕',ff:"'Stylish',sans-serif"}
@@ -7184,10 +7231,8 @@ function applyTheme(t){
 
   var fontMap={
     pretendard:"'Pretendard','Apple SD Gothic Neo',sans-serif",
-    serif:"'Instrument Serif',Georgia,serif",
     notoserif:"'Noto Serif KR','Nanum Myeongjo',serif",
     nanummyeongjo:"'Nanum Myeongjo',serif",
-    nanumpen:"'Nanum Pen Script',cursive",
     sunflower:"'Sunflower','Pretendard',sans-serif",
     himelody:"'Hi Melody',cursive",
     stylish:"'Stylish','Pretendard',sans-serif",

@@ -379,7 +379,6 @@ body.page-life .topbar{display:none}
 
 /* ── PROJECT CARD ── */
 .pj-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-.pj-list{display:flex;flex-direction:column;gap:4px}
 /* ═══ 3년 로드맵(연대기) 타임라인 ═══ */
 .tl3-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:22px;flex-wrap:wrap}
 .tl3-title{display:flex;align-items:center;gap:8px;font-size:1.25em;font-weight:700;color:var(--text)}
@@ -420,13 +419,6 @@ body.page-life .topbar{display:none}
 @media(max-width:720px){
   .tl3-col{flex-basis:126px}
 }
-.pj-row{display:flex;align-items:center;gap:8px;padding:11px 14px;border-radius:8px;background:var(--s2);cursor:pointer;transition:background .15s;font-size:0.9286em}
-.pj-row:hover{background:var(--s3)}
-.pj-row-dot{color:var(--t3);font-weight:700;flex-shrink:0}
-.pj-row-name{color:var(--text);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pj-row-meta{margin-left:auto;color:var(--t3);font-size:0.85em;font-family:var(--mono);flex-shrink:0;padding-right:4px}
-.pj-row-del{opacity:0;flex-shrink:0;font-size:0.8em;transition:opacity .15s}
-.pj-row:hover .pj-row-del{opacity:1}
 .pj-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;box-shadow:var(--sh);transition:box-shadow .2s,transform .2s;display:flex;flex-direction:column;position:relative}
 .pj-card:hover{box-shadow:var(--shm);transform:translateY(-2px)}
 .pj-bar{height:4px}
@@ -699,13 +691,6 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 @supports not (container-type: inline-size){
   @media(max-width:900px){ .mtab-wrap{--mtab-fs:10px;--mtab-pad:6px 2px} }
   @media(max-width:600px){ .mtab-wrap{--mtab-fs:8.5px;--mtab-pad:5px 1px} }
-}
-.mstrip-wrap{container-type:inline-size;--mstrip-fs:13px;--mstrip-pad:9px 4px}
-@container (max-width: 620px){ .mstrip-wrap{--mstrip-fs:10px;--mstrip-pad:6px 2px} }
-@container (max-width: 470px){ .mstrip-wrap{--mstrip-fs:8.5px;--mstrip-pad:5px 1px} }
-@supports not (container-type: inline-size){
-  @media(max-width:900px){ .mstrip-wrap{--mstrip-fs:10px;--mstrip-pad:6px 2px} }
-  @media(max-width:600px){ .mstrip-wrap{--mstrip-fs:8.5px;--mstrip-pad:5px 1px} }
 }
 .cal-cell{transition:background .1s;cursor:pointer;min-width:0;overflow:hidden;}
 /* ── Monthly 달력: 폭이 좁아지면 가로 스크롤 대신 글자가 작아지도록 ── */
@@ -1853,57 +1838,6 @@ function carryTodoToNext(ds,i,nextDs){
   save();render();
 }
 
-var _todoDragDs=null,_todoDragI=null;
-function todoDragStart(e,ds,i){
-  _todoDragDs=ds;
-  _todoDragI=parseInt(i);
-  e.dataTransfer.effectAllowed='move';
-  e.currentTarget.style.opacity='0.4';
-}
-function todoDropOnRow(e,ds,toI){
-  e.preventDefault();
-  e.stopPropagation();
-  toI=parseInt(toI);
-  if(_todoDragDs===null||!S.todoList)return;
-  var fromDs=_todoDragDs, fromI=_todoDragI;
-  _todoDragDs=null;_todoDragI=null;
-  if(!S.todoList[fromDs])return;
-  var item=S.todoList[fromDs][fromI];
-  if(!item)return;
-  if(fromDs===ds){
-    // 같은 카드: 순서 이동
-    var list=S.todoList[ds];
-    var moved=list.splice(fromI,1)[0];
-    var dest=toI>fromI?toI-1:toI;
-    list.splice(dest,0,moved);
-  } else {
-    // 다른 카드: 날짜 이동
-    if(!S.todoList[ds])S.todoList[ds]=[];
-    var already=S.todoList[ds].some(function(x){return x.text===item.text;});
-    if(!already){
-      S.todoList[ds].splice(toI,0,{id:gid(),text:item.text,done:false,_carried:item._carried||false});
-      S.todoList[fromDs].splice(fromI,1);
-    }
-  }
-  save();render();
-}
-function todoDropItem(e,ds){
-  e.preventDefault();
-  if(_todoDragDs===null||!S.todoList)return;
-  var fromDs=_todoDragDs, fromI=_todoDragI;
-  _todoDragDs=null;_todoDragI=null;
-  if(fromDs===ds)return;
-  if(!S.todoList[fromDs])return;
-  var item=S.todoList[fromDs][fromI];
-  if(!item)return;
-  if(!S.todoList[ds])S.todoList[ds]=[];
-  var already=S.todoList[ds].some(function(x){return x.text===item.text;});
-  if(!already){
-    S.todoList[ds].push({id:gid(),text:item.text,done:false,_carried:item._carried||false});
-    S.todoList[fromDs].splice(fromI,1);
-    save();render();
-  }
-}
 
 // ═══════════ ROUTINE SETTINGS PAGE ═══════════
 function renderRoutinePage(){
@@ -1997,7 +1931,6 @@ function saveR(eid){
 function delR(id){S.routines=S.routines.filter(r=>r.id!==id);save();render();}
 
 // ═══════════ MONTHLY ═══════════
-let monthlyY=new Date().getFullYear(), monthlyM=new Date().getMonth();
 
 
 function openMonthlyGoalModal(ym){
@@ -2013,7 +1946,6 @@ function openMonthlyGoalModal(ym){
 }
 function togMonthlyGoal(ym,i){i=parseInt(i);if(!S.monthlyGoals[ym]||!S.monthlyGoals[ym][i])return;S.monthlyGoals[ym][i].done=!S.monthlyGoals[ym][i].done;save();render();}
 function delMonthlyGoal(ym,i){i=parseInt(i);if(!S.monthlyGoals[ym])return;S.monthlyGoals[ym].splice(i,1);save();render();}
-function saveMonthlyMemo(v){const ym=monthlyY+'-'+String(monthlyM+1).padStart(2,'0');S.monthlyMemo[ym]=v;save();}
 
 // ═══════════ WEEKLY ═══════════
 let weekOffset=0;
@@ -2029,19 +1961,6 @@ function getWeekDates(offset){
 }
 
 
-function openWeeklyGoalModal(wk){
-  openMo('이번 주 목표 추가',
-    '<div class="fg"><label class="fl">목표</label><input class="inp" id="wg-t" placeholder="이번 주 목표"></div>',
-    '<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" id="wg-save">추가</button>');
-  document.getElementById('wg-save').onclick=function(){
-    const text=document.getElementById('wg-t').value.trim();if(!text)return;
-    if(!S.weeklyGoals[wk])S.weeklyGoals[wk]=[];
-    S.weeklyGoals[wk].push({id:gid(),text,done:false});
-    save();closeMo();render();
-  };
-}
-function togWeeklyGoal(wk,i){i=parseInt(i);if(!S.weeklyGoals[wk]||!S.weeklyGoals[wk][i])return;S.weeklyGoals[wk][i].done=!S.weeklyGoals[wk][i].done;save();render();}
-function delWeeklyGoal(wk,i){i=parseInt(i);if(!S.weeklyGoals[wk])return;S.weeklyGoals[wk].splice(i,1);save();render();}
 // saveWeeklyMemo는 renderInsights 앞에 통합 정의됨
 
 // ═══════════ DIARY ═══════════
@@ -6696,24 +6615,6 @@ function applyTodoCalDate(fromDs,i){
   setTimeout(function(){openTodoCalDay(toDs);},50);
 }
 
-function todoCalCellDrop(e,ds){
-  e.preventDefault();
-  e.stopPropagation();
-  e.currentTarget.style.background='';
-  if(_todoDragDs===null||!S.todoList)return;
-  var fromDs=_todoDragDs, fromI=_todoDragI;
-  _todoDragDs=null;_todoDragI=null;
-  if(!S.todoList[fromDs])return;
-  var item=S.todoList[fromDs][fromI];
-  if(!item||fromDs===ds)return;
-  if(!S.todoList[ds])S.todoList[ds]=[];
-  var already=S.todoList[ds].some(function(x){return x.text===item.text;});
-  if(!already){
-    S.todoList[ds].push({id:gid(),text:item.text,done:false,_carried:item._carried||false});
-    S.todoList[fromDs].splice(fromI,1);
-    save();render();
-  }
-}
 
 function renderCalendar(){
   const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -7440,7 +7341,16 @@ let LD = {
 
 function loadLedger(){try{const d=localStorage.getItem(LEDGER_KEY);if(d)LD=Object.assign({},LD,JSON.parse(d));}catch(e){}}
 function saveLedger(){
-  localStorage.setItem(LEDGER_KEY,JSON.stringify(LD));
+  try{
+    localStorage.setItem(LEDGER_KEY,JSON.stringify(LD));
+  }catch(e){
+    // 저장 공간이 가득 차도 클라우드 저장은 계속 시도한다 (가계부 유실 방지)
+    console.error('가계부 localStorage 저장 실패:',e);
+    if(!window._ledgerQuotaWarned){
+      window._ledgerQuotaWarned=true;
+      alert('저장 공간이 부족해서 이 기기에 가계부를 저장하지 못했어요.\n로그인 상태라면 클라우드에는 저장돼요.');
+    }
+  }
   scheduleSaveLedger();
 }
 
@@ -8891,9 +8801,11 @@ auth.onAuthStateChanged(async function(user){
         if(!S.diaryEntries[k].photoUrl) Object.assign(S.diaryEntries[k], localDiaryPhotos[k]);
       });
 
-      // localStorage 업데이트
-      localStorage.setItem(KEY, JSON.stringify(S));
-      localStorage.setItem(LEDGER_KEY, JSON.stringify(LD));
+      // localStorage 업데이트 (용량 초과로 실패해도 아래 클라우드 복구는 계속 진행)
+      try{
+        localStorage.setItem(KEY, JSON.stringify(S));
+        localStorage.setItem(LEDGER_KEY, JSON.stringify(LD));
+      }catch(e){ console.error('로컬 캐시 저장 실패:',e); }
       // 클라우드에 가계부가 없어서 로컬에서 살렸다면, 클라우드에도 다시 올려둔다
       if(ledgerRestoredFromLocal){
         try{ await saveToCloud({...S, _ledger: LD}); }catch(e){}

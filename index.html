@@ -1177,6 +1177,8 @@ function routinesForDate(ds){
   const dayOfMonth = dt.getDate();
   const lastDayOfMonth = new Date(dt.getFullYear(), dt.getMonth()+1, 0).getDate();
   return S.routines.filter(function(r){
+    // 특정 날짜만 건너뛰기(그 날짜에서만 삭제) 처리된 항목은 제외
+    if(r.skipDates && r.skipDates.indexOf(ds)!==-1) return false;
     // 루틴화(프로젝트 연동) 항목은 시작일~등록 마감일 범위 안에서만 표시
     if(r.isRz){
       if(r.startDate && ds<r.startDate) return false;
@@ -4500,23 +4502,25 @@ function renderHealth(){
   if(!S.health) S.health={schedules:[],records:[],memo:'',inbody:[],tab:'summary'};
   const H=S.health;
   if(!H.inbody) H.inbody=[];
-  if(!H.tab||H.tab==='sched') H.tab='summary';
-  if(!['summary','inbody','records','supps','memo'].includes(H.tab)) H.tab='summary';
+  if(!H.tab) H.tab='summary';
+  if(!['summary','inbody','sched','records','supps','memo'].includes(H.tab)) H.tab='summary';
   const tab=H.tab;
 
   // ── 탭 헤더 ──
   const tabIco={
     summary:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>',
     inbody:'<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-2px;margin-right:4px"><rect x="3.5" y="12" width="3.4" height="8" rx="0.8"/><rect x="10.3" y="6.5" width="3.4" height="13.5" rx="0.8"/><rect x="17.1" y="2.5" width="3.4" height="17.5" rx="0.8"/></svg>',
+    sched:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>',
     records:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M9 4h6a1 1 0 0 1 1 1v1h1a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h1V5a1 1 0 0 1 1-1z"/><rect x="8.5" y="2.5" width="7" height="3.5" rx="1"/><path d="M9 12h6M9 16h4"/></svg>',
     supps:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M10.5 3.5a4 4 0 0 1 0 5.66L5.16 14.5a4 4 0 1 1-5.66-5.66L4.84 3.5a4 4 0 0 1 5.66 0z" transform="translate(4 2)"/><line x1="8.5" y1="8.5" x2="15.5" y2="15.5"/></svg>',
     memo:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M3.5 20.5l1-4 12-12a1.6 1.6 0 0 1 2.3 0l0.7 0.7a1.6 1.6 0 0 1 0 2.3l-12 12z"/><path d="M14 6l4 4"/></svg>'
   };
-  const tabs=[{k:'summary',l:'건강 요약'},{k:'inbody',l:'인바디'},{k:'records',l:'검진 기록'},{k:'supps',l:'식품 정리'},{k:'memo',l:'메모'}];
+  const tabs=[{k:'summary',l:'건강 요약'},{k:'inbody',l:'인바디'},{k:'sched',l:'검진 일정'},{k:'records',l:'검진 기록'},{k:'supps',l:'식품 정리'},{k:'memo',l:'메모'}];
   // 인덱스(폴더 탭) 느낌을 위한 탭별 고유 색상
   const tabColors=[
     {bg:'#F5D976',text:'#7A5E16'},
     {bg:'#A9D9E8',text:'#255A6E'},
+    {bg:'#E8A0A0',text:'#7A3535'},
     {bg:'#E8897E',text:'#7A2E22'},
     {bg:'#8FCFA0',text:'#245C3A'},
     {bg:'#C9A06B',text:'#5C3E1A'}
@@ -4684,9 +4688,10 @@ function renderHealth(){
     }
   }
 
-  // ══ 검진 예정 탭 (건강 요약의 "검진 예정 추가" 버튼에서 진입) ══
+  // ══ 탭: 검진 일정 (모든 검진 예정을 모아서 보여줌) ══
   else if(tab==='sched'){
     html+='<div class="card" style="margin-bottom:16px">';
+    html+='<div class="ch"><div class="ct">📅 검진 일정</div><button class="btn bp bsm" onclick="openHealthSchedModal()">+ 일정 추가</button></div>';
     const upcoming=(H.schedules||[]).filter(s=>!s.done).sort((a,b)=>a.date.localeCompare(b.date));
     const doneList=(H.schedules||[]).filter(s=>s.done);
     if(upcoming.length===0){
@@ -6401,11 +6406,11 @@ function openDayRoutineModal(ds){
   } else {
     rods.forEach(function(r){
       const isDone=!!checks[r.id];
-      itemsHtml+='<div onclick="dayRoutineToggle(\''+r.id+'\',\''+ds+'\')" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:8px;margin-bottom:6px;cursor:pointer;background:'+(isDone?'var(--al)':'var(--s2)')+';transition:background .15s">'+
-        '<div style="width:20px;height:20px;border-radius:6px;border:2px solid '+(isDone?'var(--green)':'var(--border2)')+';background:'+(isDone?'var(--green)':'transparent')+';flex-shrink:0;display:flex;align-items:center;justify-content:center">'+
+      itemsHtml+='<div style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:8px;margin-bottom:6px;background:'+(isDone?'var(--al)':'var(--s2)')+';transition:background .15s">'+
+        '<div onclick="dayRoutineToggle(\''+r.id+'\',\''+ds+'\')" style="width:20px;height:20px;border-radius:6px;border:2px solid '+(isDone?'var(--green)':'var(--border2)')+';background:'+(isDone?'var(--green)':'transparent')+';flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer">'+
         (isDone?'<span style="color:#fff;font-size:0.7em">&#10003;</span>':'')+
         '</div>'+
-        '<div style="flex:1;min-width:0">'+
+        '<div onclick="dayRoutineToggle(\''+r.id+'\',\''+ds+'\')" style="flex:1;min-width:0;cursor:pointer">'+
           '<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">'+
             (r.time?'<span style="font-size:0.8em;color:var(--accent);font-family:var(--mono);font-weight:600">'+r.time+'</span>':'')+
             '<span style="font-size:0.92em;font-weight:500;'+(isDone?'text-decoration:line-through;color:var(--t3)':'')+'">'+r.task+'</span>'+
@@ -6413,6 +6418,10 @@ function openDayRoutineModal(ds){
           '</div>'+
           (r.detail?'<div style="font-size:0.78em;color:var(--t3);margin-top:2px">'+r.detail+'</div>':'')+
         '</div>'+
+        (r.isRz?'<div style="display:flex;gap:2px;flex-shrink:0">'+
+          '<button class="bi" onclick="event.stopPropagation();dayRoutineEdit(\''+r.id+'\',\''+ds+'\')" style="font-size:0.8em" title="반복 일정 전체 수정">✎</button>'+
+          '<button class="bi" onclick="event.stopPropagation();dayRoutineSkip(\''+r.id+'\',\''+ds+'\')" style="font-size:0.8em;color:var(--red)" title="이 날짜에서만 삭제">✕</button>'+
+        '</div>':'')+
       '</div>';
     });
     dls.forEach(function(d){
@@ -6503,6 +6512,35 @@ function dayHealthToggle(id,ds){
 function dayHealthDelete(id,ds){
   delHealthSched(id);
   openDayRoutineModal(ds);
+}
+// 루틴화 항목을 이 날짜에서만 삭제 (반복 일정 자체는 유지, 이후 날짜에는 계속 나옴)
+function dayRoutineSkip(rid,ds){
+  var r=S.routines.find(function(x){return x.id===rid;});
+  if(r){
+    if(!r.skipDates)r.skipDates=[];
+    if(r.skipDates.indexOf(ds)===-1)r.skipDates.push(ds);
+  }
+  if(r&&r.rzProjectId){
+    var p=S.projects.find(function(x){return x.id===r.rzProjectId;});
+    var entry=p&&p.routinized?p.routinized.find(function(x){return x.id===rid;}):null;
+    if(entry){
+      if(!entry.skipDates)entry.skipDates=[];
+      if(entry.skipDates.indexOf(ds)===-1)entry.skipDates.push(ds);
+    }
+  }
+  if(S.checks[ds])delete S.checks[ds][rid];
+  save();render();
+  openDayRoutineModal(ds);
+}
+// 루틴화 항목의 반복 설정 자체를 수정 (모든 날짜에 반영됨)
+function dayRoutineEdit(rid,ds){
+  var r=S.routines.find(function(x){return x.id===rid;});
+  if(!r||!r.rzProjectId)return;
+  var p=S.projects.find(function(x){return x.id===r.rzProjectId;});
+  if(!p||!p.routinized)return;
+  var idx=p.routinized.findIndex(function(x){return x.id===rid;});
+  if(idx<0)return;
+  closeDayOverlayAnd(function(){openRzEditModal(p.id,idx);});
 }
 // 날짜 오버레이를 닫고 다른 모달(openMo 기반)을 여는 헬퍼
 function closeDayOverlayAnd(fn){

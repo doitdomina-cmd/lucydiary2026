@@ -6383,6 +6383,38 @@ function openYearReview(Y){
 
 // ═══════════ CALENDAR ═══════════
 let calY=new Date().getFullYear(), calM=new Date().getMonth();
+let calProjectFilter=''; // 월간 달력 프로젝트 필터 (빈 문자열 = 전체보기)
+function setCalProjectFilter(pid){
+  calProjectFilter=pid;
+  var old=document.getElementById('cal-filter-overlay');
+  if(old)old.remove();
+  render();
+}
+function openCalFilterPanel(btn){
+  var old=document.getElementById('cal-filter-overlay');
+  if(old){old.remove();return;} // 이미 열려있으면 토글로 닫기
+  var rect=btn.getBoundingClientRect();
+  var projects=window._calFilterProjectsCache||[];
+  var itemsHtml='<div onclick="setCalProjectFilter(\'\')" style="padding:8px 10px;border-radius:6px;cursor:pointer;font-size:0.85em;font-weight:'+(!calProjectFilter?'700':'500')+';background:'+(!calProjectFilter?'var(--al)':'transparent')+';color:'+(!calProjectFilter?'var(--accent)':'var(--text)')+'">전체 보기</div>';
+  if(projects.length===0){
+    itemsHtml+='<div style="padding:8px 10px;font-size:0.8em;color:var(--t3)">이번 달에 표시된 프로젝트가 없어요</div>';
+  } else {
+    projects.forEach(function(p){
+      var on=calProjectFilter===p.id;
+      itemsHtml+='<div onclick="setCalProjectFilter(\''+p.id+'\')" style="display:flex;align-items:center;gap:7px;padding:8px 10px;border-radius:6px;cursor:pointer;font-size:0.85em;font-weight:'+(on?'700':'500')+';background:'+(on?'var(--al)':'transparent')+';color:'+(on?'var(--accent)':'var(--text)')+'">'+
+        '<span style="width:9px;height:9px;border-radius:50%;background:'+p.color+';flex-shrink:0"></span>'+
+        '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+p.name+'</span>'+
+      '</div>';
+    });
+  }
+  var left=Math.max(8,Math.min(rect.right-190,window.innerWidth-198));
+  var overlay=document.createElement('div');
+  overlay.id='cal-filter-overlay';
+  overlay.style.cssText='position:fixed;inset:0;z-index:1000';
+  overlay.innerHTML='<div onclick="event.stopPropagation()" style="position:absolute;top:'+(rect.bottom+6)+'px;left:'+left+'px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.14);min-width:190px;max-height:280px;overflow-y:auto;padding:6px">'+itemsHtml+'</div>';
+  overlay.addEventListener('click',function(e){if(e.target===overlay)overlay.remove();});
+  document.body.appendChild(overlay);
+}
 // ═══════════ 캘린더 날짜별 루틴 체크 모달 ═══════════
 function openDayRoutineModal(ds){
   const old=document.getElementById('day-routine-overlay');
@@ -6782,6 +6814,22 @@ function renderCalendar(){
 
   const first=new Date(calY,calM,1),last=new Date(calY,calM+1,0),sdow=first.getDay();
   const prevLast=new Date(calY,calM,0);
+
+  // ── 이번 달에 표시되는 프로젝트만 모아서 필터 목록 구성 ──
+  var filterPidSet={};
+  for(var fd=1;fd<=last.getDate();fd++){
+    var fds=calY+'-'+String(calM+1).padStart(2,'0')+'-'+String(fd).padStart(2,'0');
+    routinesForDate(fds).filter(function(r){return r.isRz&&r.rzProjectId;}).forEach(function(r){filterPidSet[r.rzProjectId]=true;});
+  }
+  (S.calEvents||[]).forEach(function(e){if(e.date&&e.date.indexOf(ym)===0&&e.projectId&&!e.rzId)filterPidSet[e.projectId]=true;});
+  (S.deadlines||[]).forEach(function(d){if(d.date&&d.date.indexOf(ym)===0&&d.projectId)filterPidSet[d.projectId]=true;});
+  var filterProjects=Object.keys(filterPidSet).map(function(pid){return S.projects.find(function(p){return p.id===pid;});}).filter(Boolean);
+  // 이번 달에 없는 프로젝트가 선택돼있으면 필터 목록에도 표시해 무엇이 선택된 상태인지 알 수 있게 함
+  if(calProjectFilter&&!filterProjects.some(function(p){return p.id===calProjectFilter;})){
+    var stillSel=S.projects.find(function(p){return p.id===calProjectFilter;});
+    if(stillSel)filterProjects.push(stillSel);
+  }
+
   var cells=[];
   for(var i=sdow-1;i>=0;i--){var pd=prevLast.getDate()-i,pm=calM===0?11:calM-1,py=calM===0?calY-1:calY;cells.push({d:pd,m:pm,y:py,cur:false});}
   for(var d=1;d<=last.getDate();d++)cells.push({d:d,m:calM,y:calY,cur:true});
@@ -6817,14 +6865,20 @@ function renderCalendar(){
     var ds=cell.y+'-'+String(cell.m+1).padStart(2,'0')+'-'+String(cell.d).padStart(2,'0');
     var isT=ds===ts;
     var rodsCell=routinesForDate(ds).filter(function(r){return r.isRz;});
+    if(calProjectFilter) rodsCell=rodsCell.filter(function(r){return r.rzProjectId===calProjectFilter;});
     var routineEvs=rodsCell.map(function(r){
       var pr=r.rzProjectId?S.projects.find(p=>p.id===r.rzProjectId):null;
-      return {isRzCell:true,rid:r.id,title:(r.time?r.time+' ':'')+r.task,color:pr?pr.color:'var(--accent)'};
+      return {isRzCell:true,rid:r.id,pid:r.rzProjectId||'',title:(r.time?r.time+' ':'')+r.task,color:pr?pr.color:'var(--accent)'};
     });
     var cellEvs=evMap[ds]||[];
     var dlEvs=cellEvs.filter(function(e){return e.isDl;});
     var healthEvs=cellEvs.filter(function(e){return e.isHealthSched;});
     var otherEvs=cellEvs.filter(function(e){return !e.isDl&&!e.isHealthSched;});
+    if(calProjectFilter){
+      dlEvs=dlEvs.filter(function(e){return e.projectId===calProjectFilter;});
+      healthEvs=[]; // 프로젝트에 연결되지 않은 검진 일정은 필터 중엔 숨김
+      otherEvs=otherEvs.filter(function(e){return e.projectId===calProjectFilter;});
+    }
     var evs=dlEvs.concat(healthEvs,routineEvs,otherEvs);
     // 호버 툴팁: 그 날의 전체 일정 (마감 → 검진 → 루틴 → 일반 일정 순)
     var tipLines=[];
@@ -6841,7 +6895,7 @@ function renderCalendar(){
       var rDone=!!ckMap[r.id];
       tipLines.push((rDone?'✓':'○')+' '+(r.time?r.time+' ':'')+r.task);
     });
-    (evMap[ds]||[]).filter(function(e){return !e.isDl&&!e.isHealthSched;}).forEach(function(e){
+    (evMap[ds]||[]).filter(function(e){return !e.isDl&&!e.isHealthSched&&(!calProjectFilter||e.projectId===calProjectFilter);}).forEach(function(e){
       tipLines.push('• '+(e.title||''));
     });
     var tipAttr=tipLines.length>0?' data-tip="'+(cell.d+'일&#10;'+tipLines.join('&#10;')).replace(/"/g,'&quot;')+'"':'';
@@ -6931,6 +6985,13 @@ function renderCalendar(){
     '</div>';
   });
 
+  var activeFilterProj=calProjectFilter?S.projects.find(function(p){return p.id===calProjectFilter;}):null;
+  var filterIconSvg='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="4 4 20 4 14 12 14 19 10 21 10 12 4 4"/></svg>';
+  window._calFilterProjectsCache=filterProjects;
+  var filterBtnHtml='<button class="btn '+(activeFilterProj?'bp':'bg')+' bsm" onclick="event.stopPropagation();openCalFilterPanel(this)" title="프로젝트별로 보기" style="display:flex;align-items:center;gap:5px">'+
+      filterIconSvg+(activeFilterProj?'<span style="max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+activeFilterProj.name+'</span>':'')+
+    '</button>';
+
   return ''+  
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'+
       '<button class="btn bg bsm" onclick="calY--;render()">← '+(calY-1)+'</button>'+
@@ -6942,7 +7003,7 @@ function renderCalendar(){
       '<div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">'+
         '<button class="btn bg bsm" onclick="calM=calM===0?11:calM-1;if(calM===11)calY--;render()">←</button>'+
         '<div style="font-family:\'Instrument Serif\',serif;font-size:1.55em;font-weight:600;letter-spacing:1.5px;color:var(--text)">'+MN_D[calM]+'</div>'+
-        '<button class="btn bg bsm" onclick="calM=calM===11?0:calM+1;if(calM===0)calY++;render()">→</button>'+
+        '<div style="display:flex;align-items:center;gap:8px">'+filterBtnHtml+'<button class="btn bg bsm" onclick="calM=calM===11?0:calM+1;if(calM===0)calY++;render()">→</button></div>'+
       '</div>'+
       calHtml+
     '</div>'+

@@ -1175,6 +1175,15 @@ function fmtDateObj(s){
   const M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   return {month:M[d.getMonth()],monthNum:(d.getMonth()+1),day:d.getDate()};
 }
+// 년/월/일 스택형 날짜 뱃지 (월은 진하게, 일은 굵게 강조)
+function dateBadgeHtml(dateStr){
+  var f=fmtDateObj(dateStr),yr=dateStr.slice(0,4);
+  return '<div style="background:var(--s2);border-radius:8px;padding:4px 8px;flex-shrink:0;text-align:center;min-width:48px">'+
+    '<div style="font-size:0.6em;color:var(--t3);font-weight:600">'+yr+'</div>'+
+    '<div style="font-size:0.86em;color:var(--text);font-weight:700;line-height:1.2">'+f.monthNum+'월</div>'+
+    '<div style="font-size:1.3em;font-weight:900;color:var(--text);line-height:1.1">'+f.day+'</div>'+
+  '</div>';
+}
 function dLeft(s){const n=new Date();n.setHours(0,0,0,0);return Math.ceil((new Date(s+'T00:00:00')-n)/86400000);}
 function money(n){if(!n)return '0원';if(n>=10000){const manwon=n/10000;const formatted=manwon%1===0?manwon.toLocaleString():manwon.toFixed(1).replace(/\B(?=(\d{3})+(?!\d))/g,',');return formatted+'만원';}return n.toLocaleString()+'원';}
 function addDays(dateS, d){const dt=new Date(dateS+'T00:00:00');dt.setDate(dt.getDate()+d);return dateStr(dt);}
@@ -4634,12 +4643,10 @@ function renderHealth(){
             '<div style="font-size:0.82em;color:var(--t2);font-weight:600;line-height:1.2">'+f.monthNum+'월</div>'+
             '<div style="font-size:1.25em;font-weight:800;color:var(--text);line-height:1.1">'+f.day+'</div>'+
           '</div>'+
-          '<div style="flex:1;min-width:0">'+
-            '<div style="font-size:0.9286em">'+s.title+'</div>'+
-            '<div style="font-size:0.78em;color:var(--t2);margin-top:3px;display:flex;flex-wrap:wrap;gap:5px">'+
-              (s.hospital?'<span style="padding:2px 8px;background:var(--s2);border-radius:6px;font-weight:500">'+s.hospital+'</span>':'')+
-              (condName?'<span style="padding:2px 8px;background:'+(condColor?condColor.bg:'var(--al)')+';border-radius:6px;color:'+(condColor?condColor.text:'var(--accent)')+';font-weight:600">'+condName+'</span>':'')+
-            '</div>'+
+          '<div style="flex:1;min-width:0;display:flex;align-items:center;gap:8px;overflow:hidden">'+
+            '<span style="font-size:1.05em;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">'+s.title+'</span>'+
+            (s.hospital?'<span style="font-size:0.82em;color:var(--t2);flex-shrink:0">'+s.hospital+'</span>':'')+
+            (condName?'<span style="font-size:0.72em;font-weight:600;padding:2px 8px;border-radius:6px;background:'+(condColor?condColor.bg:'var(--al)')+';color:'+(condColor?condColor.text:'var(--accent)')+';flex-shrink:0">'+condName+'</span>':'')+
           '</div>'+
           '<div style="font-family:var(--mono);font-size:1.3em;font-weight:800;color:'+uc+';flex-shrink:0;line-height:1">D-'+dd+'</div>'+
           '<div class="sched-hover-btns" style="display:flex;gap:4px;flex-shrink:0;opacity:0;transition:opacity .15s">'+
@@ -4665,10 +4672,10 @@ function renderHealth(){
       recs.slice(0,3).forEach(function(r){
         var rid='hrec-sum-'+r.id;
         html+='<details id="'+rid+'" open style="padding:10px 0;border-bottom:1px solid var(--border)">'+
-          '<summary style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px">'+
+          '<summary style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px">'+
+            dateBadgeHtml(r.date)+
             '<svg width="11" height="11" viewBox="0 0 10 10" fill="none" stroke="var(--t3)" stroke-width="1.5" style="flex-shrink:0"><polyline points="2,3 5,7 8,3"/></svg>'+
             '<span style="font-size:1.05em;font-weight:700;color:var(--text);flex:1">'+(r.title||'제목 없음')+'</span>'+
-            '<span style="font-size:0.9em;font-weight:600;color:var(--t2);flex-shrink:0">'+r.date+'</span>'+
           '</summary>'+
           '<div style="padding:10px 0 2px 34px">'+hrRecFieldsHtml(r)+'</div>'+
         '</details>';
@@ -5776,8 +5783,8 @@ function openCondReport(id){
       var nuc=ndd<=7?'var(--red)':ndd<=30?'var(--accent)':'var(--t2)';
       body+='<div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:0.85em">'+
         '<span style="color:var(--t3);flex-shrink:0">'+ns.date+'</span>'+
+        (ns.hospital?'<span style="color:var(--text);font-weight:700;flex-shrink:0">'+ns.hospital+'</span>':'')+
         '<span style="flex:1;font-weight:500">'+ns.title+'</span>'+
-        (ns.hospital?'<span style="color:var(--t3);font-size:0.9em">'+ns.hospital+'</span>':'')+
         '<span style="color:'+nuc+';font-weight:700;flex-shrink:0">D-'+ndd+'</span>'+
       '</div>';
     }

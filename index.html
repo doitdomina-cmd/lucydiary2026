@@ -1173,7 +1173,7 @@ function todLabel(){
 function fmtDateObj(s){
   const d=new Date(s+'T00:00:00');
   const M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return {month:M[d.getMonth()],day:d.getDate()};
+  return {month:M[d.getMonth()],monthNum:(d.getMonth()+1),day:d.getDate()};
 }
 function dLeft(s){const n=new Date();n.setHours(0,0,0,0);return Math.ceil((new Date(s+'T00:00:00')-n)/86400000);}
 function money(n){if(!n)return '0원';if(n>=10000){const manwon=n/10000;const formatted=manwon%1===0?manwon.toLocaleString():manwon.toFixed(1).replace(/\B(?=(\d{3})+(?!\d))/g,',');return formatted+'만원';}return n.toLocaleString()+'원';}
@@ -4563,7 +4563,7 @@ function renderHealth(){
     const latest=ibs[ibs.length-1];
     if(latest){
       html+='<div class="card" style="margin-bottom:14px">'+
-        '<div class="ct" style="margin-bottom:10px;gap:5px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18M5 20V12M9 20V8M13 20V4M17 20V10M21 20V14"/></svg>최근 인바디 <span style="font-size:0.75em;color:var(--t3);font-weight:400">'+latest.date+(latest.timing?' · '+latest.timing:'')+'</span></div>'+
+        '<div class="ct" style="margin-bottom:10px;gap:5px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18M5 20V12M9 20V8M13 20V4M17 20V10M21 20V14"/></svg><span class="hl-title">최근 인바디</span> <span style="font-size:0.75em;color:var(--t3);font-weight:400">'+latest.date+(latest.timing?' · '+latest.timing:'')+'</span></div>'+
         '<div style="display:grid;grid-template-columns:1fr 1fr 1fr'+(latest.bmi?' 1fr':'')+';gap:8px;text-align:center">'+
           (latest.weight?'<div style="background:var(--s2);border-radius:8px;padding:8px 6px"><div style="font-size:0.7em;color:var(--t3);margin-bottom:3px">체중</div><div style="display:flex;align-items:baseline;justify-content:center;gap:2px"><span style="font-family:var(--serif);font-size:1.4em;font-weight:700;color:var(--text)">'+latest.weight+'</span><span style="font-size:0.72em;color:var(--t3)">kg</span></div></div>':'')+
           (latest.muscle?'<div style="background:var(--s2);border-radius:8px;padding:8px 6px"><div style="font-size:0.7em;color:var(--t3);margin-bottom:3px">골격근량</div><div style="display:flex;align-items:baseline;justify-content:center;gap:2px"><span style="font-family:var(--serif);font-size:1.4em;font-weight:700;color:var(--text)">'+latest.muscle+'</span><span style="font-size:0.72em;color:var(--t3)">kg</span></div></div>':'')+
@@ -4576,7 +4576,7 @@ function renderHealth(){
     // ── 건강 상태 관리 ──
     const conds=(H.conditions||[]);
     html+='<div class="card" style="margin-bottom:14px">'+
-      '<div class="ch"><div class="ct" style="gap:5px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7.5-4.7-10-9.3C.4 8.5 1.5 5 4.7 4.2c2-.5 3.8.4 4.8 1.9l.5.8.5-.8c1-1.5 2.8-2.4 4.8-1.9C22.5 5 23.6 8.5 22 11.7 19.5 16.3 12 21 12 21z"/></svg>건강 상태 관리</div><button class="btn bp bsm" onclick="openCondModal()">+ 추가</button></div>';
+      '<div class="ch"><div class="ct" style="gap:5px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7.5-4.7-10-9.3C.4 8.5 1.5 5 4.7 4.2c2-.5 3.8.4 4.8 1.9l.5.8.5-.8c1-1.5 2.8-2.4 4.8-1.9C22.5 5 23.6 8.5 22 11.7 19.5 16.3 12 21 12 21z"/></svg><span class=\"hl-title\">건강 상태 관리</span></div><button class="btn bp bsm" onclick="openCondModal()">+ 추가</button></div>';
     if(conds.length===0){
       html+='<div style="font-size:0.85em;color:var(--t3);padding:8px 0">관리 중인 건강 상태가 없어요</div>';
     } else {
@@ -4610,7 +4610,7 @@ function renderHealth(){
     html+='</div>';
     const nextSched=(H.schedules||[]).filter(s=>!s.done&&dLeft(s.date)>=0).sort((a,b)=>a.date.localeCompare(b.date));
     html+='<div class="card" style="margin-bottom:14px">'+
-      '<div class="ch"><div class="ct" style="gap:5px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>검진 예정</div>'+
+      '<div class="ch"><div class="ct" style="gap:5px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg><span class=\"hl-title\">검진 예정</span></div>'+
         '<button class="btn bp bsm" onclick="openHealthSchedModal()">+ 추가</button>'+
       '</div>';
     if(nextSched.length===0){
@@ -4630,8 +4630,8 @@ function renderHealth(){
         html+='<div class="sched-row" style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);position:relative" onmouseenter="this.querySelector(\'.sched-hover-btns\').style.opacity=\'1\'" onmouseleave="this.querySelector(\'.sched-hover-btns\').style.opacity=\'0\'">'+
           '<div style="background:var(--s3);border-radius:8px;padding:3px 7px;flex-shrink:0;text-align:center;min-width:42px">'+
             '<div style="font-size:0.6em;color:var(--t2);font-weight:600">'+yr+'</div>'+
-            '<div style="font-size:0.65em;color:var(--t2);font-weight:600;text-transform:uppercase">'+f.month+'</div>'+
-            '<div style="font-size:1.1em;font-weight:700;color:var(--text);line-height:1.1">'+f.day+'</div>'+
+            '<div style="font-size:0.82em;color:var(--t2);font-weight:600;line-height:1.2">'+f.monthNum+'월</div>'+
+            '<div style="font-size:1.25em;font-weight:800;color:var(--text);line-height:1.1">'+f.day+'</div>'+
           '</div>'+
           '<div style="flex:1;min-width:0">'+
             '<div style="font-size:0.9286em">'+s.title+'</div>'+
@@ -4660,16 +4660,16 @@ function renderHealth(){
     const recs=(H.records||[]).slice().sort((a,b)=>b.date.localeCompare(a.date));
     if(recs.length>0){
       html+='<div class="card" style="margin-bottom:14px">'+
-        '<div class="ch"><div class="ct" style="gap:5px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6a1 1 0 0 1 1 1v1h1a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h1V5a1 1 0 0 1 1-1z"/><rect x="8.5" y="2.5" width="7" height="3.5" rx="1"/><path d="M9 12h6M9 16h4"/></svg>최근 검진 기록</div></div>';
+        '<div class="ch"><div class="ct" style="gap:5px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6a1 1 0 0 1 1 1v1h1a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h1V5a1 1 0 0 1 1-1z"/><rect x="8.5" y="2.5" width="7" height="3.5" rx="1"/><path d="M9 12h6M9 16h4"/></svg><span class=\"hl-title\">최근 검진 기록</span></div></div>';
       recs.slice(0,3).forEach(function(r){
         var rid='hrec-sum-'+r.id;
-        html+='<details id="'+rid+'" open style="padding:8px 0;border-bottom:1px solid var(--border)">'+
+        html+='<details id="'+rid+'" open style="padding:10px 0;border-bottom:1px solid var(--border)">'+
           '<summary style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px">'+
-            '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--t3)" stroke-width="1.5" style="flex-shrink:0"><polyline points="2,3 5,7 8,3"/></svg>'+
-            '<span style="font-size:0.88em;font-weight:600;flex:1">'+(r.title||'제목 없음')+'</span>'+
-            '<span style="font-size:0.75em;color:var(--t3)">'+r.date+'</span>'+
+            '<svg width="11" height="11" viewBox="0 0 10 10" fill="none" stroke="var(--t3)" stroke-width="1.5" style="flex-shrink:0"><polyline points="2,3 5,7 8,3"/></svg>'+
+            '<span style="font-size:1.05em;font-weight:700;color:var(--text);flex:1">'+(r.title||'제목 없음')+'</span>'+
+            '<span style="font-size:0.9em;font-weight:600;color:var(--t2);flex-shrink:0">'+r.date+'</span>'+
           '</summary>'+
-          '<div style="padding:8px 0 2px 18px">'+hrRecFieldsHtml(r)+'</div>'+
+          '<div style="padding:10px 0 2px 34px">'+hrRecFieldsHtml(r)+'</div>'+
         '</details>';
       });
       html+='</div>';
@@ -4709,8 +4709,8 @@ function renderHealth(){
       var tagColor=muted?'var(--t3)':'var(--t3)';
       return '<div style="background:'+(muted?'var(--s3)':'var(--s2)')+';border-radius:8px;padding:4px 8px;flex-shrink:0;text-align:center;min-width:48px">'+
           '<div style="font-size:0.6em;color:var(--t3);font-weight:600">'+yr+'</div>'+
-          '<div style="font-size:0.65em;color:var(--t3);font-weight:600;text-transform:uppercase">'+f.month+'</div>'+
-          '<div style="font-size:1.15em;font-weight:700;color:'+(muted?'var(--t3)':'var(--text)')+';line-height:1.1">'+f.day+'</div>'+
+          '<div style="font-size:0.82em;color:'+(muted?'var(--t3)':'var(--t2)')+';font-weight:600;line-height:1.2">'+f.monthNum+'월</div>'+
+          '<div style="font-size:1.25em;font-weight:800;color:'+(muted?'var(--t3)':'var(--text)')+';line-height:1.1">'+f.day+'</div>'+
         '</div>'+
         '<div style="flex:1;min-width:0">'+
           '<div style="font-size:0.9643em;font-weight:600;color:'+titleColor+'">'+s.title+'</div>'+
@@ -4968,8 +4968,8 @@ function renderHealth(){
           '<div style="display:flex;align-items:flex-start;gap:10px">'+
             '<div style="background:var(--s2);border-radius:8px;padding:4px 8px;flex-shrink:0;text-align:center;min-width:48px">'+
               '<div style="font-size:0.6em;color:var(--t3);font-weight:600">'+r.date.slice(0,4)+'</div>'+
-              '<div style="font-size:0.65em;color:var(--t3);font-weight:600;text-transform:uppercase">'+fmtDateObj(r.date).month+'</div>'+
-              '<div style="font-size:1.1em;font-weight:700;color:var(--text)">'+fmtDateObj(r.date).day+'</div>'+
+              '<div style="font-size:0.82em;color:var(--t2);font-weight:600;line-height:1.2">'+fmtDateObj(r.date).monthNum+'월</div>'+
+              '<div style="font-size:1.25em;font-weight:800;color:var(--text);line-height:1.1">'+fmtDateObj(r.date).day+'</div>'+
             '</div>'+
             '<div style="flex:1;min-width:0">'+
               '<div style="font-size:0.9643em;font-weight:600">'+(r.title||'제목 없음')+'</div>'+

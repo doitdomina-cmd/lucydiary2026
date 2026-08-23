@@ -364,6 +364,15 @@ body.page-life .topbar{display:none}
 .mt{font-family:var(--serif);font-size:1.5714em}
 .mb{padding:20px 24px}
 .mf{padding:0 24px 20px;display:flex;gap:8px;justify-content:flex-end}
+/* ── 건강 상태 보고서 모달: 고정 높이 + 오른쪽 노트 인덱스 탭 ── */
+.md.cond-report{max-width:770px;height:88vh;max-height:88vh;display:flex;flex-direction:column;overflow:hidden}
+.md.cond-report .mb{flex:1;min-height:0;padding-right:0;display:flex;gap:0}
+.cr-content{flex:1;min-width:0;overflow-y:auto;padding-right:16px;scrollbar-width:none;-ms-overflow-style:none}
+.cr-content::-webkit-scrollbar{display:none}
+.cr-tabs{width:36px;flex-shrink:0;display:flex;flex-direction:column;gap:10px;padding-top:4px}
+.cr-tab{writing-mode:vertical-rl;text-orientation:mixed;padding:16px 0;border:none;border-radius:0 8px 8px 0;font-family:inherit;font-size:0.78em;font-weight:700;letter-spacing:.08em;color:#fff;cursor:pointer;opacity:.45;transition:opacity .15s,transform .15s;white-space:nowrap;display:flex;align-items:center;justify-content:center;box-shadow:1px 1px 3px rgba(0,0,0,.08)}
+.cr-tab:hover{opacity:.8}
+.cr-tab.on{opacity:1;transform:translateX(3px)}
 
 /* ── COLORS ── */
 .cops{display:flex;gap:8px;flex-wrap:wrap}
@@ -1282,7 +1291,7 @@ function openMo(t,b,f){
   document.getElementById('mo-b').innerHTML=b;
   document.getElementById('mo-f').innerHTML=f;
   var md=document.querySelector('.md');
-  if(md) md.style.maxWidth='';
+  if(md){md.style.maxWidth='';md.classList.remove('cond-report');}
   document.getElementById('mo').classList.add('open');
 }
 // 건강 관리 모달 전용 - 저장/취소 버튼이 헤더 오른쪽에
@@ -1300,7 +1309,7 @@ function openHealthMo(t,b,f){
   mh.insertBefore(btnWrap, mh.querySelector('.bi'));
   document.getElementById('mo-f').innerHTML='';
   var md=document.querySelector('.md');
-  if(md) md.style.maxWidth='';
+  if(md){md.style.maxWidth='';md.classList.remove('cond-report');}
   document.getElementById('mo').classList.add('open');
 }
 function closeMo(){
@@ -1308,7 +1317,7 @@ function closeMo(){
   var existBtns=mh&&mh.querySelector('.mo-hbtns');
   if(existBtns) existBtns.remove();
   var md=document.querySelector('.md');
-  if(md) md.style.maxWidth='';
+  if(md){md.style.maxWidth='';md.classList.remove('cond-report');}
   document.getElementById('mo').classList.remove('open');
 }
 function moOut(e){if(e.target===document.getElementById('mo'))closeMo();}
@@ -5742,13 +5751,8 @@ function openCondReport(id){
   var timeline=linkedRecs.slice().sort(function(a,b){return b.date.localeCompare(a.date);}).map(function(r){return {type:'rec',date:r.date,data:r};});
 
   var tab=window._condReportTab;
-  // ── 상단 가로 탭 ──
-  var body='<div style="display:flex;gap:6px;margin-bottom:16px;border-bottom:1px solid var(--border2);padding-bottom:10px">'+
-    [['basic','기본정보'],['sched','검진일정'],['records','검진기록']].map(function(t){
-      var on=tab===t[0];
-      return '<button class="btn '+(on?'bp':'bg')+' bsm" onclick="setCondReportTab(\''+t[0]+'\')">'+t[1]+'</button>';
-    }).join('')+
-  '</div>';
+  var CR_TABS=[['basic','기본정보','#7FA8B8'],['sched','검진일정','#8FB89A'],['records','검진기록','#D9A87C']];
+  var body='<div class="cr-content">';
 
   if(tab==='basic'){
     body+='<div style="display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--s2);margin-bottom:18px">'+
@@ -5833,6 +5837,13 @@ function openCondReport(id){
       });
     }
   }
+  body+='</div>'; // /cr-content
+  // ── 오른쪽 노트 인덱스 탭 ──
+  body+='<div class="cr-tabs">'+
+    CR_TABS.map(function(t){
+      return '<button class="cr-tab'+(tab===t[0]?' on':'')+'" style="background:'+t[2]+'" onclick="setCondReportTab(\''+t[0]+'\')">'+t[1]+'</button>';
+    }).join('')+
+  '</div>';
 
   var footer='<button class="btn bg bsm" style="color:var(--red)" onclick="if(confirm(\''+c.name+'을(를) 삭제할까요?\')){delCond(\''+c.id+'\');closeMo();}">삭제</button>';
 
@@ -5848,9 +5859,8 @@ function openCondReport(id){
   btnWrap.style.cssText='display:flex;gap:6px;align-items:center;margin-left:auto;margin-right:8px';
   btnWrap.innerHTML='<button class="btn bg bsm" onclick="closeMo();openCondModal(\''+c.id+'\')">✎ 정보 수정</button>';
   mh.insertBefore(btnWrap, mh.querySelector('.bi'));
-  // 병원 차트 느낌으로 조금 더 넓게
   var md=document.querySelector('.md');
-  if(md) md.style.maxWidth='770px';
+  if(md){md.style.maxWidth='';md.classList.add('cond-report');}
   document.getElementById('mo').classList.add('open');
 }
 function setCondReportTab(tabKey){

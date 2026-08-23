@@ -2066,18 +2066,25 @@ function compressDiaryPhotoToDataURL(file){
     var tempUrl=URL.createObjectURL(file);
     img.onload=function(){
       try{
-        var w=img.naturalWidth,h=img.naturalHeight,maxSide=160;
+        var w=img.naturalWidth,h=img.naturalHeight;
         if(!w||!h){reject(new Error('이미지 크기를 읽지 못했어요.'));return;}
-        var scale=Math.min(1,maxSide/Math.max(w,h));
+        // 캘린더 칸은 background-size:cover라 '짧은 변'이 칸을 채운다.
+        // 칸 너비 약 160px + 고해상도(2x) 화면 대비 → 짧은 변을 330px로 맞춘다.
+        // (긴 변은 640px로 상한을 둬서 용량이 과하게 커지지 않게 한다)
+        var SHORT=330, LONG_CAP=640;
+        var scale=SHORT/Math.min(w,h);
+        if(Math.max(w,h)*scale>LONG_CAP) scale=LONG_CAP/Math.max(w,h);
+        if(scale>1) scale=1;   // 원본보다 크게 늘리지 않음
         var cw=Math.max(1,Math.round(w*scale)),ch=Math.max(1,Math.round(h*scale));
         var canvas=document.createElement('canvas');
         canvas.width=cw;canvas.height=ch;
         var ctx=canvas.getContext('2d',{alpha:false});
+        if(ctx.imageSmoothingQuality!==undefined) ctx.imageSmoothingQuality='high';
         ctx.fillStyle='#fff';ctx.fillRect(0,0,cw,ch);
         ctx.drawImage(img,0,0,cw,ch);
         URL.revokeObjectURL(tempUrl);
         var dataUrl='';
-        try{ dataUrl=canvas.toDataURL('image/webp',0.40); }catch(e){ dataUrl=''; }
+        try{ dataUrl=canvas.toDataURL('image/webp',0.25); }catch(e){ dataUrl=''; }
         // 일부 브라우저(WebP 인코딩 미지원)는 png로 그대로 돌려주므로 webp가 아니면 jpeg로 재시도
         if(!dataUrl || dataUrl.indexOf('data:image/webp')!==0){
           try{ dataUrl=canvas.toDataURL('image/jpeg',0.5); }catch(e2){ dataUrl=''; }
@@ -2115,11 +2122,10 @@ async function selectDiaryPhoto(ds,input){
     if(wrap){
       wrap.innerHTML=diaryPhotoBoxHtml(ds,dataUrl);
     }
-    var lbl=document.getElementById('diary-photo-label');
-    if(lbl){
-      lbl.style.marginTop='5px';
-      lbl.innerHTML='<div style="font-size:0.72em;color:var(--t3);text-align:center">눌러서 사진 교체</div>';
-    }
+    var hint=document.getElementById('diary-photo-hint');
+    if(hint) hint.textContent='여기를 눌러서 사진 교체';
+    var del=document.getElementById('diary-photo-del');
+    if(del) del.style.visibility='visible';
   }catch(e){
     console.error('사진 처리 실패:',e);
     alert('사진 처리 실패: '+(e.message||e));
@@ -2134,8 +2140,8 @@ function diaryPhotoBoxHtml(ds,url){
   var d=ds.split('-'), dayNum=d[2]?String(parseInt(d[2],10)):'';
   // 실제 캘린더 칸과 동일하게: 같은 흰색 덮개(72%) + 칸 비율 + 날짜 숫자까지 그대로 미리보기
   return '<div class="dphoto-drag" data-ds="'+ds+'" style="position:relative;overflow:hidden;border-radius:8px;'+
-      'border:1px solid var(--border);aspect-ratio:7/5;max-height:150px;cursor:grab;background:var(--surface)">'+
-      '<img id="diary-photo-img" src="'+url+'" onerror="this.style.display=\'none\'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:'+px+'% '+py+'%;display:block;pointer-events:none;user-select:none">'+
+      'border:1px solid var(--border);width:210px;height:150px;box-sizing:border-box;margin:0 auto;cursor:grab;background:var(--surface)" onclick="event.preventDefault();event.stopPropagation()">'+
+      '<img id="diary-photo-img" src="'+url+'" onerror="this.style.display=\'none\'" onload="var t=document.getElementById(\'dphoto-lowres\');if(t)t.style.display=(this.naturalWidth&&this.naturalWidth<300)?\'block\':\'none\'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:'+px+'% '+py+'%;display:block;pointer-events:none;user-select:none">'+
       '<div style="position:absolute;inset:0;background:rgba(255,255,255,.72);pointer-events:none"></div>'+
       '<div style="position:absolute;top:6px;left:8px;font-size:0.8em;color:var(--text);pointer-events:none">'+dayNum+'</div>'+
       '<div style="position:absolute;bottom:4px;right:6px;font-size:.65em;color:#fff;background:rgba(0,0,0,.45);padding:1px 6px;border-radius:99px;pointer-events:none">드래그로 위치 조정</div>'+
@@ -2336,19 +2342,20 @@ function openDiaryModal(ds){
   var existingPhoto=(pendingDiaryPhoto[ds]&&pendingDiaryPhoto[ds].dataUrl)||entry.photoUrl||'';
   var photoHtml=
     '<div style="margin-bottom:12px">'+
-      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;height:26px">'+
         '<div style="font-size:0.8em;color:var(--t3)">오늘의 사진 <span style="font-size:.88em">(선택)</span></div>'+
-        (entry.photoUrl?'<button type="button" class="btn bg bsm" style="padding:3px 8px;font-size:.72em;color:var(--red)" onclick="removeDiaryPhoto(\''+ds+'\')">사진 삭제</button>':'')+
+        '<button type="button" id="diary-photo-del" class="btn bg bsm" style="padding:3px 8px;font-size:.72em;color:var(--red);visibility:'+(entry.photoUrl?'visible':'hidden')+'" onclick="removeDiaryPhoto(\''+ds+'\')">사진 삭제</button>'+
       '</div>'+
       '<input type="file" id="diary-photo-input" accept="image/*" style="display:none" onchange="selectDiaryPhoto(\''+ds+'\',this)">'+
-      '<div id="diary-photo-preview">'+(existingPhoto?diaryPhotoBoxHtml(ds,existingPhoto):'')+'</div>'+
-      '<label for="diary-photo-input" id="diary-photo-label" style="display:block;cursor:pointer;margin-top:'+(existingPhoto?'5px':'0')+'">'+
-        (existingPhoto?
-          '<div style="font-size:0.72em;color:var(--t3);text-align:center">눌러서 사진 교체</div>'
-          :
-          '<div style="border:1px dashed var(--border2);border-radius:8px;padding:12px;text-align:center;color:var(--t3);font-size:.8em;background:var(--s2)">📷 사진 선택 · 캘린더 배경용으로 자동 압축</div>'
-        )+
+      // 사진이 있든 없든 항상 같은 높이를 차지해서 팝업 크기가 변하지 않게 한다
+      '<label for="diary-photo-input" id="diary-photo-label" style="display:block;cursor:pointer">'+
+        '<div id="diary-photo-preview" style="height:150px">'+
+          (existingPhoto?diaryPhotoBoxHtml(ds,existingPhoto)
+            :'<div style="height:100%;box-sizing:border-box;border:1px dashed var(--border2);border-radius:8px;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--t3);font-size:.8em;background:var(--s2)">📷 사진 선택 · 캘린더 배경용으로 자동 압축</div>')+
+        '</div>'+
+        '<div id="diary-photo-hint" style="font-size:0.72em;color:var(--t3);text-align:center;margin-top:5px;height:14px">'+(existingPhoto?'여기를 눌러서 사진 교체':'')+'</div>'+
       '</label>'+
+      '<div id="dphoto-lowres" style="display:none;font-size:0.72em;color:var(--accent);text-align:center">저화질로 저장된 사진이에요. 다시 선택하면 선명하게 바뀌어요.</div>'+
     '</div>';
 
   openMo(label,
@@ -2357,12 +2364,14 @@ function openDiaryModal(ds){
     '<div style="margin-bottom:9px"><div style="font-size:0.76em;color:var(--t3);margin-bottom:4px">날씨</div>'+
     '<div style="display:flex;gap:4px;flex-wrap:wrap">'+weatherHtml+'</div></div>'+
     '<div style="margin-bottom:12px"><input id="diary-title-inp" class="inp" placeholder="제목 (선택)" value="'+esc(rawTitle)+'" style="font-size:1em;font-weight:500;background:transparent;border-color:transparent;border-bottom:1px solid var(--border);border-radius:0;padding:6px 0"></div>'+
-    '<div style="position:relative;margin-bottom:14px">'+
-      '<div id="diary-line-nums" style="position:absolute;left:0;top:0;width:32px;padding:8px 6px 8px 0;font-family:var(--mono);font-size:0.9286em;color:var(--t3);line-height:1.8;user-select:none;pointer-events:none;text-align:right">'+
-        getLineNums(rawText)+
+    '<div style="position:relative;overflow:hidden;border:1px solid var(--border);border-radius:8px;background:var(--s2);margin-bottom:14px">'+
+      '<div id="diary-line-nums-clip" style="position:absolute;left:0;top:0;bottom:0;width:38px;overflow:hidden;pointer-events:none;background:var(--s2);border-right:1px solid var(--border)">'+
+        '<div id="diary-line-nums" style="padding:8px 6px 8px 0;font-family:var(--mono);font-size:0.9286em;color:var(--t3);line-height:1.8;user-select:none;text-align:right">'+
+          getLineNums(rawText)+
+        '</div>'+
       '</div>'+
-      '<textarea id="diary-ta" style="width:100%;height:34vh;min-height:190px;border:1px solid var(--border);border-radius:8px;padding:8px 12px 8px 44px;font-size:0.9286em;font-family:var(--sans);line-height:1.8;resize:vertical;background:var(--s2);color:var(--text);outline:none" '+
-      'placeholder="오늘 감사한 일을 적어보세요...\n1. \n2. \n3. " oninput="updateLineNums(this)">'+esc(rawText)+'</textarea>'+
+      '<textarea id="diary-ta" style="width:100%;height:34vh;min-height:190px;border:none;border-radius:0;padding:8px 12px 8px 46px;font-size:0.9286em;font-family:var(--sans);line-height:1.8;resize:none;background:transparent;color:var(--text);outline:none;display:block;box-sizing:border-box" '+
+      'placeholder="오늘 감사한 일을 적어보세요..." oninput="updateLineNums(this)" onscroll="syncLineNums(this)">'+esc(rawText)+'</textarea>'+
     '</div>'+
     photoHtml,
     '<button class="btn bg" onclick="closeMo()">닫기</button>'+
@@ -2374,7 +2383,8 @@ function openDiaryModal(ds){
 }
 
 function getLineNums(text){if(!text) return '1'; return text.split('\n').map(function(_,i){return i+1;}).join('<br>');}
-function updateLineNums(ta){var nums=document.getElementById('diary-line-nums');if(!nums) return; nums.innerHTML=ta.value.split('\n').map(function(_,i){return i+1;}).join('<br>');}
+function updateLineNums(ta){var nums=document.getElementById('diary-line-nums');if(!nums) return; nums.innerHTML=ta.value.split('\n').map(function(_,i){return i+1;}).join('<br>'); syncLineNums(ta);}
+function syncLineNums(ta){var nums=document.getElementById('diary-line-nums');if(!nums) return; nums.style.transform='translateY('+(-ta.scrollTop)+'px)';}
 function setDiaryMood(ds, mood){
   if(!S.diaryEntries) S.diaryEntries={};
   if(!S.diaryEntries[ds]) S.diaryEntries[ds]={text:'',mood:'',weather:''};

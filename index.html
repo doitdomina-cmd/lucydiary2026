@@ -4658,12 +4658,7 @@ function renderHealth(){
             '<span style="font-size:0.88em;font-weight:600;flex:1">'+(r.title||'제목 없음')+'</span>'+
             '<span style="font-size:0.75em;color:var(--t3)">'+r.date+'</span>'+
           '</summary>'+
-          '<div style="padding:8px 0 2px 18px">'+
-            (r.abnormal?'<div style="margin-bottom:6px"><span style="font-size:0.72em;font-weight:600;color:var(--red);background:#fde8e8;padding:1px 6px;border-radius:4px">⚠️ 이상 소견</span><div style="font-size:0.82em;color:var(--t2);margin-top:3px;white-space:pre-wrap">'+r.abnormal+'</div></div>':(!r.abnormal&&!r.normal&&!r.action&&r.memo?'<div style="font-size:0.82em;color:var(--t3);white-space:pre-wrap">'+r.memo+'</div>':''))+
-            (r.normal?'<div style="margin-bottom:6px"><span style="font-size:0.72em;font-weight:600;color:#2d8653;background:#e6f4ec;padding:1px 6px;border-radius:4px">✅ 정상 범위</span><div style="font-size:0.82em;color:var(--t2);margin-top:3px;white-space:pre-wrap">'+r.normal+'</div></div>':'')+
-            (r.action?'<div style="margin-bottom:6px"><span style="font-size:0.72em;font-weight:600;color:var(--accent);background:var(--al);padding:1px 6px;border-radius:4px">📌 추후 조치</span><div style="font-size:0.82em;color:var(--t2);margin-top:3px;white-space:pre-wrap">'+r.action+'</div></div>':'')+
-            (r.note?'<div style="margin-bottom:6px"><span style="font-size:0.72em;font-weight:600;color:var(--t2);background:var(--s2);padding:1px 6px;border-radius:4px">📝 메모</span><div style="font-size:0.82em;color:var(--t2);margin-top:3px;white-space:pre-wrap">'+r.note+'</div></div>':'')+
-          '</div>'+
+          '<div style="padding:8px 0 2px 18px">'+hrRecFieldsHtml(r)+'</div>'+
         '</details>';
       });
       html+='</div>';
@@ -4930,12 +4925,8 @@ function renderHealth(){
   else if(tab==='records'){
     html+='<div class="card" style="margin-bottom:16px">';
     html+='<div class="ch"><div class="ct">📋 검진 기록</div><button class="btn bp bsm" onclick="openHealthRecModal()">+ 기록 추가</button></div>';
-    const recs=(H.records||[]).slice().sort((a,b)=>b.date.localeCompare(a.date));
-    if(recs.length===0){
-      html+='<div class="empty" style="padding:14px 0">검진 기록을 추가해보세요</div>';
-    } else {
-      recs.forEach(function(r){
-        html+='<div class="row-hov" style="padding:10px 0;border-bottom:1px solid var(--border)">'+
+    function hrRecRowHtml(r){
+      return '<div class="row-hov" style="padding:10px 0;border-bottom:1px solid var(--border)">'+
           '<div style="display:flex;align-items:flex-start;gap:10px">'+
             '<div style="background:var(--s2);border-radius:8px;padding:4px 8px;flex-shrink:0;text-align:center;min-width:48px">'+
               '<div style="font-size:0.6em;color:var(--t3);font-weight:600">'+r.date.slice(0,4)+'</div>'+
@@ -4945,11 +4936,7 @@ function renderHealth(){
             '<div style="flex:1;min-width:0">'+
               '<div style="font-size:0.9643em;font-weight:600">'+(r.title||'제목 없음')+'</div>'+
               ((r.conditionIds&&r.conditionIds.length)?'<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">'+r.conditionIds.map(function(cid){var cc=(S.health.conditions||[]).find(function(x){return x.id===cid;});if(!cc)return'';var ccp=cc.color?{bg:cc.color.bg,text:cc.color.text}:{bg:'var(--s3)',text:'var(--t2)'};return '<span onclick="event.stopPropagation();openCondReport(\''+cc.id+'\')" style="cursor:pointer;font-size:0.7em;font-weight:700;padding:1px 8px;border-radius:99px;background:'+ccp.bg+';color:'+ccp.text+'">'+cc.name+'</span>';}).join('')+'</div>':'')+
-              (r.abnormal?'<div style="margin-top:5px"><span style="font-size:0.72em;font-weight:600;color:var(--red);background:#fde8e8;padding:1px 6px;border-radius:4px">⚠️ 이상 소견</span><div style="font-size:0.82em;color:var(--t2);margin-top:3px;white-space:pre-wrap">'+r.abnormal+'</div></div>':'')+
-              (r.normal?'<div style="margin-top:5px"><span style="font-size:0.72em;font-weight:600;color:#2d8653;background:#e6f4ec;padding:1px 6px;border-radius:4px">✅ 정상 범위</span><div style="font-size:0.82em;color:var(--t2);margin-top:3px;white-space:pre-wrap">'+r.normal+'</div></div>':'')+
-              (r.action?'<div style="margin-top:5px"><span style="font-size:0.72em;font-weight:600;color:var(--accent);background:var(--al);padding:1px 6px;border-radius:4px">📌 추후 조치</span><div style="font-size:0.82em;color:var(--t2);margin-top:3px;white-space:pre-wrap">'+r.action+'</div></div>':'')+
-              (r.note?'<div style="margin-top:5px"><span style="font-size:0.72em;font-weight:600;color:var(--t2);background:var(--s2);padding:1px 6px;border-radius:4px">📝 메모</span><div style="font-size:0.82em;color:var(--t2);margin-top:3px;white-space:pre-wrap">'+r.note+'</div></div>':'')+
-              (!r.abnormal&&!r.normal&&!r.action&&!r.note&&r.memo?'<div style="font-size:0.82em;color:var(--t3);margin-top:3px;white-space:pre-wrap">'+r.memo+'</div>':'')+
+              hrRecFieldsHtml(r)+
               ((r.files&&r.files.length)?'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">'+
                 r.files.map(function(f,fi){
                   if(f.type&&f.type.startsWith('image/')) return '<img src="'+f.data+'" onclick="openHealthFile(\''+r.id+'\','+fi+')" style="width:60px;height:60px;object-fit:cover;border-radius:6px;cursor:pointer;border:1px solid var(--border)">';
@@ -4962,7 +4949,33 @@ function renderHealth(){
             '</div>'+
           '</div>'+
         '</div>';
+    }
+    const recs=(H.records||[]).slice().sort((a,b)=>b.date.localeCompare(a.date));
+    html+='<div style="display:flex;gap:6px;margin-bottom:12px">'+
+      '<button class="btn '+(healthRecViewMode==='date'?'bp':'bg')+' bsm" onclick="setHealthRecViewMode(\'date\')">📅 날짜별</button>'+
+      '<button class="btn '+(healthRecViewMode==='cond'?'bp':'bg')+' bsm" onclick="setHealthRecViewMode(\'cond\')">🏷️ 병명별</button>'+
+    '</div>';
+    if(recs.length===0){
+      html+='<div class="empty" style="padding:14px 0">검진 기록을 추가해보세요</div>';
+    } else if(healthRecViewMode==='cond'){
+      var condsList=S.health.conditions||[];
+      var condPalette2=[
+        {bg:'#E8F0F2',text:'#6D898D'},{bg:'#F5E8D8',text:'#C17C3C'},
+        {bg:'#E0EDEA',text:'#4A7C6F'},{bg:'#F5DDD8',text:'#C14A3C'},
+        {bg:'#EDF3F5',text:'#5A8FA8'},{bg:'#F3EFEA',text:'#928980'},
+        {bg:'#E6DFD0',text:'#7A6B50'},{bg:'#DFE3E8',text:'#838C94'}
+      ];
+      var groups=condsList.map(function(c,ci){
+        return {name:c.name,color:c.color?{bg:c.color.bg,text:c.color.text}:condPalette2[ci%condPalette2.length],recs:recs.filter(function(r){return r.conditionIds&&r.conditionIds.indexOf(c.id)!==-1;})};
+      }).filter(function(g){return g.recs.length>0;});
+      var unassigned=recs.filter(function(r){return !r.conditionIds||r.conditionIds.length===0;});
+      if(unassigned.length)groups.push({name:'병명 없음',color:{bg:'var(--s2)',text:'var(--t3)'},recs:unassigned});
+      groups.forEach(function(g){
+        html+='<div style="margin-bottom:6px"><span style="font-size:0.8em;font-weight:700;padding:2px 10px;border-radius:99px;background:'+g.color.bg+';color:'+g.color.text+'">'+g.name+' · '+g.recs.length+'건</span></div>';
+        g.recs.forEach(function(r){html+=hrRecRowHtml(r);});
       });
+    } else {
+      recs.forEach(function(r){html+=hrRecRowHtml(r);});
     }
     html+='</div>';
   }
@@ -5707,10 +5720,7 @@ function openCondReport(id){
           '<span style="font-size:0.88em;font-weight:600;flex:1;min-width:0">'+(r.title||'제목 없음')+'</span>'+
           '<button class="bi" onclick="closeMo();openHealthRecModal(\''+r.id+'\')" style="font-size:0.75em;flex-shrink:0" title="수정">✎</button>'+
         '</div>'+
-        (r.abnormal?'<div style="margin-top:4px"><span style="font-size:0.7em;font-weight:600;color:var(--red);background:#fde8e8;padding:1px 6px;border-radius:4px">⚠️ 이상 소견</span><div style="font-size:0.8em;color:var(--t2);margin-top:3px;white-space:pre-wrap">'+r.abnormal+'</div></div>':'')+
-        (r.normal?'<div style="margin-top:4px"><span style="font-size:0.7em;font-weight:600;color:#2d8653;background:#e6f4ec;padding:1px 6px;border-radius:4px">✅ 정상 범위</span><div style="font-size:0.8em;color:var(--t2);margin-top:3px;white-space:pre-wrap">'+r.normal+'</div></div>':'')+
-        (r.action?'<div style="margin-top:4px"><span style="font-size:0.7em;font-weight:600;color:var(--accent);background:var(--al);padding:1px 6px;border-radius:4px">📌 추후 조치</span><div style="font-size:0.8em;color:var(--t2);margin-top:3px;white-space:pre-wrap">'+r.action+'</div></div>':'')+
-        (r.note?'<div style="margin-top:4px"><span style="font-size:0.7em;font-weight:600;color:var(--t2);background:var(--s2);padding:1px 6px;border-radius:4px">📝 메모</span><div style="font-size:0.8em;color:var(--t2);margin-top:3px;white-space:pre-wrap">'+r.note+'</div></div>':'')+
+        hrRecFieldsHtml(r)+
         (r.files&&r.files.length?'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">'+r.files.map(function(f,fi){return f.type&&f.type.startsWith('image/')?'<img src="'+f.data+'" onclick="openHealthFile(\''+r.id+'\','+fi+')" style="width:44px;height:44px;object-fit:cover;border-radius:6px;cursor:pointer;border:1px solid var(--border)">':'<a href="'+f.data+'" download="'+f.name+'" style="font-size:0.75em;color:var(--accent);padding:3px 7px;border:1px solid var(--border);border-radius:6px;text-decoration:none">📄 '+f.name+'</a>';}).join('')+'</div>':'')+
       '</div>';
     });
@@ -5719,11 +5729,13 @@ function openCondReport(id){
 
   body+='</div>'; // /left column
 
-  // ── 오른쪽 인덱스 내비게이션 ──
-  body+='<div style="width:88px;flex-shrink:0;position:sticky;top:0;display:flex;flex-direction:column;gap:6px">'+
+  // ── 오른쪽 인덱스 내비게이션 (세로 인덱스 형태) ──
+  body+='<div style="width:96px;flex-shrink:0;position:sticky;top:0;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--surface)">'+
     ['기본정보','검진예정','기록'].map(function(label,li){
       var target=['cr-sec-info','cr-sec-sched','cr-sec-records'][li];
-      return '<button class="btn bg bsm" onclick="var el=document.getElementById(\''+target+'\');if(el)el.scrollIntoView({behavior:\'smooth\',block:\'start\'});" style="width:100%;font-size:0.78em;padding:7px 4px;text-align:center">'+label+'</button>';
+      return '<div onclick="var el=document.getElementById(\''+target+'\');if(el)el.scrollIntoView({behavior:\'smooth\',block:\'start\'});" '+
+        'onmouseover="this.style.background=\'var(--al)\';this.style.color=\'var(--accent)\'" onmouseout="this.style.background=\'transparent\';this.style.color=\'var(--text)\'" '+
+        'style="padding:10px 8px;font-size:0.78em;font-weight:500;text-align:center;cursor:pointer;color:var(--text);transition:background .12s,color .12s;'+(li<2?'border-bottom:1px solid var(--border)':'')+'">'+label+'</div>';
     }).join('')+
   '</div>';
 
@@ -5770,6 +5782,37 @@ function delCondHist(condId, histId){
   save();render();
 }
 
+// 검진 기록 필드 라벨·색상 (유형 구분 없이 공통)
+var HR_LABELS={
+  abnormal:{l:'⚠️ 이상 소견', c:'var(--red)', bg:'#fde8e8'},
+  normal:{l:'✅ 정상 범위', c:'#2d8653', bg:'#e6f4ec'},
+  treatment:{l:'💊 처치 / 처방', c:'#3C6BC1', bg:'#e8edfa'},
+  action:{l:'📌 추후 조치', c:'var(--accent)', bg:'var(--al)'},
+  nextAppt:{l:'📅 다음 예약', c:'#C17C3C', bg:'#f5e8d8'},
+  note:{l:'📝 진료 내용', c:'var(--t2)', bg:'var(--s2)'}
+};
+// 검진 기록의 소견/처치/조치 등 필드를 라벨과 함께 렌더링 (여러 화면에서 공용)
+function hrRecFieldsHtml(r){
+  var out='';
+  ['abnormal','normal','treatment','action','nextAppt','note'].forEach(function(k){
+    var L=HR_LABELS[k];
+    var content;
+    if(k==='nextAppt'){
+      if(!r.nextApptDate)return;
+      var dd=dLeft(r.nextApptDate);
+      var ddTxt=dd<0?'지남':dd===0?'오늘':'D-'+dd;
+      content=r.nextApptDate+(r.nextApptNote?' · '+r.nextApptNote:'')+' <span style="color:var(--t3);font-weight:600">('+ddTxt+')</span>';
+    } else {
+      if(!r[k])return;
+      content=r[k];
+    }
+    out+='<div style="margin-top:5px"><span style="font-size:0.72em;font-weight:600;color:'+L.c+';background:'+L.bg+';padding:1px 6px;border-radius:4px">'+L.l+'</span><div style="font-size:0.82em;color:var(--t2);margin-top:3px;white-space:pre-wrap">'+content+'</div></div>';
+  });
+  if(!r.abnormal&&!r.normal&&!r.treatment&&!r.action&&!r.nextApptDate&&!r.note&&r.memo){
+    out='<div style="font-size:0.82em;color:var(--t3);margin-top:3px;white-space:pre-wrap">'+r.memo+'</div>'+out;
+  }
+  return out;
+}
 function openHealthRecModal(id, presetCondId){
   if(!S.health) S.health={schedules:[],records:[],memo:''};
   const r=id?S.health.records.find(x=>x.id===id):{};
@@ -5792,14 +5835,23 @@ function openHealthRecModal(id, presetCondId){
       }).join('')+
       '</div>'
     : '<div style="font-size:0.8em;color:var(--t3)">등록된 병명이 없어요. 건강 요약에서 먼저 추가해보세요.</div>';
+  window._hrEditId=id||null;
   openHealthMo((id?'검진 기록 수정':'검진 기록 추가'),
-    '<div class="fg"><label class="fl">검진 이름</label><input class="inp" id="hr-t" placeholder="" value="'+(r.title||'')+'"></div>'+
+    '<div class="fg"><label class="fl">이름</label><input class="inp" id="hr-t" placeholder="예: 종합 건강검진, 항문외과 진료" value="'+(r.title||'')+'"></div>'+
     '<div class="fg"><label class="fl">날짜</label><input type="date" class="inp" id="hr-d" value="'+(r.date||todStr())+'"></div>'+
     '<div class="fg"><label class="fl">관련 병명 (선택)</label>'+condChipsHtml+'</div>'+
-    '<div class="fg"><label class="fl" style="color:var(--red)">⚠️ 이상 소견</label><textarea class="ta" id="hr-abnormal" rows="3" placeholder="">'+(r.abnormal||r.memo||'')+'</textarea></div>'+
-    '<div class="fg"><label class="fl" style="color:#2d8653">✅ 정상 범위</label><textarea class="ta" id="hr-normal" rows="2" placeholder="">'+(r.normal||'')+'</textarea></div>'+
-    '<div class="fg"><label class="fl" style="color:var(--accent)">📌 추후 조치</label><textarea class="ta" id="hr-action" rows="2" placeholder="">'+(r.action||'')+'</textarea></div>'+
-    '<div class="fg"><label class="fl">📝 메모 (경과, 증상, 크기 변화 등)</label><textarea class="ta" id="hr-note" rows="2" placeholder="">'+(r.note||'')+'</textarea></div>'+
+    '<div class="fg"><label class="fl" style="color:'+HR_LABELS.abnormal.c+'">'+HR_LABELS.abnormal.l+'</label><textarea class="ta" id="hr-abnormal" rows="3" placeholder="">'+(r.abnormal||r.memo||'')+'</textarea></div>'+
+    '<div class="fg"><label class="fl" style="color:'+HR_LABELS.normal.c+'">'+HR_LABELS.normal.l+'</label><textarea class="ta" id="hr-normal" rows="2" placeholder="">'+(r.normal||'')+'</textarea></div>'+
+    '<div class="fg"><label class="fl" style="color:'+HR_LABELS.treatment.c+'">'+HR_LABELS.treatment.l+'</label><textarea class="ta" id="hr-treatment" rows="2" placeholder="">'+(r.treatment||'')+'</textarea></div>'+
+    '<div class="fg"><label class="fl" style="color:'+HR_LABELS.action.c+'">'+HR_LABELS.action.l+'</label><textarea class="ta" id="hr-action" rows="2" placeholder="">'+(r.action||'')+'</textarea></div>'+
+    '<div class="fg"><label class="fl" style="color:'+HR_LABELS.nextAppt.c+'">'+HR_LABELS.nextAppt.l+'</label>'+
+      '<div style="display:flex;gap:6px">'+
+        '<input type="date" class="inp" id="hr-nextappt-date" style="flex:1" value="'+(r.nextApptDate||'')+'">'+
+        '<input class="inp" id="hr-nextappt-note" style="flex:1.4" placeholder="메모 (선택)" value="'+(r.nextApptNote||'')+'">'+
+      '</div>'+
+      '<div style="font-size:0.72em;color:var(--t3);margin-top:4px">날짜를 입력하면 저장 시 검진 일정에 자동으로 추가·동기화돼요</div>'+
+    '</div>'+
+    '<div class="fg"><label class="fl">'+HR_LABELS.note.l+'</label><textarea class="ta" id="hr-note" rows="2" placeholder="">'+(r.note||'')+'</textarea></div>'+
     '<div class="fg"><label class="fl">파일 첨부 (이미지/PDF)</label>'+
       '<label class="btn bg bsm" style="cursor:pointer;display:inline-flex;align-items:center;gap:5px">📎 파일 선택<input type="file" id="hr-f" multiple accept="image/*,.pdf" style="display:none" onchange="previewHealthFiles(this)"></label>'+
       '<div id="hr-preview" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px"></div></div>',
@@ -5882,24 +5934,54 @@ function toggleRecCond(el){
     el.style.background='var(--s2)';el.style.color='var(--t3)';el.style.border='1.5px solid transparent';
   }
 }
+// 검진 기록의 "다음 예약" 날짜를 검진 일정(S.health.schedules)에 자동으로 추가·동기화
+function syncNextApptSchedule(rec){
+  if(!S.health.schedules) S.health.schedules=[];
+  if(rec.nextApptDate){
+    var schedTitle=(rec.title||'진료')+' 다음 예약'+(rec.nextApptNote?' · '+rec.nextApptNote:'');
+    var cid=(rec.conditionIds&&rec.conditionIds[0])||'';
+    var s=rec.nextApptSchedId?S.health.schedules.find(function(x){return x.id===rec.nextApptSchedId;}):null;
+    if(s){
+      s.title=schedTitle;s.date=rec.nextApptDate;s.conditionId=cid;s.done=false;
+    } else {
+      var ns={id:gid(),title:schedTitle,date:rec.nextApptDate,memo:'',hospital:'',conditionId:cid,done:false,fromRecordId:rec.id};
+      S.health.schedules.push(ns);
+      rec.nextApptSchedId=ns.id;
+    }
+  } else if(rec.nextApptSchedId){
+    S.health.schedules=S.health.schedules.filter(function(x){return x.id!==rec.nextApptSchedId;});
+    rec.nextApptSchedId=null;
+  }
+}
 function saveHealthRec(id){
   const t=document.getElementById('hr-t').value.trim();
   const d=document.getElementById('hr-d').value;
   const abnormal=document.getElementById('hr-abnormal').value.trim();
   const normal=document.getElementById('hr-normal').value.trim();
+  const treatment=document.getElementById('hr-treatment').value.trim();
   const action=document.getElementById('hr-action').value.trim();
+  const nextApptDate=document.getElementById('hr-nextappt-date').value;
+  const nextApptNote=document.getElementById('hr-nextappt-note').value.trim();
   const note=document.getElementById('hr-note').value.trim();
   if(!t||!d){alert('이름과 날짜를 입력해주세요');return;}
   if(!S.health) S.health={schedules:[],records:[],memo:''};
   const files=window._hrFiles||[];
   const conditionIds=window._hrCondIds||[];
-  const entry={id:id||gid(),title:t,date:d,abnormal,normal,action,note,files,conditionIds};
-  if(id){const r=S.health.records.find(x=>x.id===id);if(r)Object.assign(r,entry);}
-  else S.health.records.push(entry);
-  window._hrFiles=[];window._hrCondIds=[];save();closeMo();render();
+  const entry={id:id||gid(),title:t,date:d,abnormal,normal,treatment,action,nextApptDate,nextApptNote,note,files,conditionIds};
+  var recRef;
+  if(id){const r=S.health.records.find(x=>x.id===id);if(r){Object.assign(r,entry);recRef=r;}}
+  else {S.health.records.push(entry);recRef=entry;}
+  if(recRef) syncNextApptSchedule(recRef);
+  window._hrFiles=[];window._hrCondIds=[];window._hrEditId=null;save();closeMo();render();
 }
 function editHealthRec(id){openHealthRecModal(id);}
-function delHealthRec(id){if(!S.health)return;S.health.records=S.health.records.filter(x=>x.id!==id);save();render();}
+function delHealthRec(id){
+  if(!S.health)return;
+  var rec=(S.health.records||[]).find(function(x){return x.id===id;});
+  if(rec&&rec.nextApptSchedId){S.health.schedules=(S.health.schedules||[]).filter(function(x){return x.id!==rec.nextApptSchedId;});}
+  S.health.records=S.health.records.filter(x=>x.id!==id);
+  save();render();
+}
 function openHealthFile(recId,fi){
   const r=(S.health.records||[]).find(x=>x.id===recId);if(!r||!r.files[fi])return;
   const f=r.files[fi],w=window.open('','_blank');
@@ -6399,6 +6481,8 @@ function openYearReview(Y){
 // ═══════════ CALENDAR ═══════════
 let calY=new Date().getFullYear(), calM=new Date().getMonth();
 let calProjectFilter=[]; // 월간 달력 프로젝트 필터 (배열 — 빈 배열 = 전체보기, 복수 선택 가능)
+let healthRecViewMode='date'; // 검진 기록 탭 보기 모드: 'date'(날짜별) | 'cond'(병명별)
+function setHealthRecViewMode(m){healthRecViewMode=m;render();}
 function calFilterItemsHtml(){
   var projects=window._calFilterProjectsCache||[];
   var allOn=calProjectFilter.length===0;

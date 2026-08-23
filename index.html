@@ -837,6 +837,25 @@ function chunkData(data) {
   const chunks = {};
   FIELDS.forEach(f => { if (data[f] !== undefined) chunks[f] = data[f]; });
   // customFontData는 Firestore 용량 초과 → 저장 제외 (localStorage에만)
+  // 브라우저에 직접 저장된(base64) 일기 사진도 Firestore 1MB 문서 한도를 넘겨
+  // 일기 전체 동기화를 막을 수 있으므로 클라우드 전송분에서만 제외한다.
+  // (localStorage 원본은 그대로 유지되므로 이 기기에서는 계속 보인다)
+  if (chunks.diaryEntries) {
+    const slim = {};
+    Object.keys(chunks.diaryEntries).forEach(k => {
+      const e = chunks.diaryEntries[k];
+      if (e && e.photoStorage === 'local') {
+        const copy = Object.assign({}, e);
+        delete copy.photoUrl;
+        delete copy.photoStorage;
+        delete copy.photoSize;
+        slim[k] = copy;
+      } else {
+        slim[k] = e;
+      }
+    });
+    chunks.diaryEntries = slim;
+  }
   // 나머지 소형 데이터
   const rest = {};
   Object.keys(data).forEach(k => {
@@ -986,8 +1005,23 @@ let S = {
 
 function load(){try{const d=localStorage.getItem(KEY);if(d)S=Object.assign({},S,JSON.parse(d));}catch(e){}}
 function save(){
-  localStorage.setItem(KEY,JSON.stringify(S));
-  localStorage.setItem(KEY+'_savedAt', String(Date.now()));
+  try{
+    localStorage.setItem(KEY,JSON.stringify(S));
+    localStorage.setItem(KEY+'_savedAt', String(Date.now()));
+  }catch(e){
+    // 저장 공간 초과(주로 일기 사진 누적) — 데이터를 잃지 않도록 안내만 하고 진행
+    console.error('localStorage 저장 실패:',e);
+    if(!window._saveQuotaWarned){
+      window._saveQuotaWarned=true;
+      var localPhotos=0;
+      var de=S.diaryEntries||{};
+      Object.keys(de).forEach(function(k){ if(de[k]&&de[k].photoStorage==='local') localPhotos++; });
+      alert('저장 공간이 가득 찼어요.\n\n'+
+        (localPhotos>0
+          ? '이 브라우저에 직접 저장된 일기 사진이 '+localPhotos+'장 있어요. 오래된 일기의 사진을 몇 장 삭제하면 다시 저장할 수 있어요.\n\n로그인해서 쓰시면 사진이 클라우드에 저장돼서 이 문제가 생기지 않아요.'
+          : '브라우저 저장 공간이 부족해요. 오래된 데이터를 정리해 주세요.'));
+    }
+  }
   scheduleSave();
 }
 function gid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,5);}
@@ -1849,7 +1883,7 @@ function openRModal(idx){
   const dowOpts=DOWS.map((k,i)=>'<button type="button" class="daybtn" id="rd-'+k+'" onclick="togRDay(this,\''+k+'\')" style="'+(selDays.has(k)?'background:var(--rc-header);color:#fff;border-color:var(--rc-header)':'')+'">'+DOW_KO[i]+'요일</button>').join('');
   openMo(idx!==undefined?'루틴 수정':'루틴 추가',
     '<div class="fg"><label class="fl">시간 <span style="color:var(--t3);font-weight:400">(선택)</span></label><input type="time" class="inp" id="r-time" value="'+(r.time||'')+'"></div>'+
-    '<div class="fg"><label class="fl">이름</label><input class="inp" id="r-task" value="'+r.task+'" placeholder="루틴 이름"></div>'+
+    '<div class="fg"><label class="fl">이름</label><input class="inp" id="r-task" value="'+esc(r.task)+'" placeholder="루틴 이름"></div>'+
     '<div class="fg"><label class="fl">상세 설명</label><input class="inp" id="r-detail" value="'+(r.detail||'')+'" placeholder="상세 설명 (선택)"></div>'+
     '<div class="fg"><label class="fl">반복 요일 <span style="color:var(--t3)">(선택 없으면 매일)</span></label>'+
     '<div style="display:flex;gap:6px;flex-wrap:wrap">'+dowOpts+'</div></div>',
@@ -1968,9 +2002,9 @@ function renderDiary(){
     var isLR=ri===5, isLC=ci===6;
     var hasPhoto=!!(entry&&entry.photoUrl);
     var diaryPhotoBg=hasPhoto
-      ? "background-image:linear-gradient(rgba(255,255,255,.3),rgba(255,255,255,.3)),url('"+entry.photoUrl+"');background-size:cover;background-position:"+(entry.photoPosX!=null?entry.photoPosX:50)+"% "+(entry.photoPosY!=null?entry.photoPosY:50)+"%;background-repeat:no-repeat;"
+      ? "background-image:linear-gradient(rgba(255,255,255,.72),rgba(255,255,255,.72)),url('"+entry.photoUrl+"');background-size:cover;background-position:"+(entry.photoPosX!=null?entry.photoPosX:50)+"% "+(entry.photoPosY!=null?entry.photoPosY:50)+"%;background-repeat:no-repeat;"
       : 'background:'+(isT?'var(--al)':hasDiary?'var(--s2)':'transparent')+';';
-    var pts=hasPhoto?'text-shadow:0 1px 4px rgba(255,255,255,.95),0 0 8px rgba(255,255,255,.8);':'';
+    var pts='';
     calHtml+='<div class="diary-cell'+(ri<=1?' dc-top':'')+'" data-ds="'+ds+'" style="'+
       'min-height:96px;padding:6px 8px;cursor:pointer;'+
       'border-right:'+(isLC?'none':'1px solid var(--border)')+';'+
@@ -1988,8 +2022,8 @@ function renderDiary(){
           (entry.mood?'<span style="font-size:0.85em;line-height:1">'+entry.mood+'</span>':'')+
           (entry.weather?'<span style="font-size:0.85em;line-height:1">'+entry.weather+'</span>':'')+
         '</div>':'')+
-      (entry&&entry.title?'<div style="font-size:0.78em;font-weight:600;color:var(--accent);margin-top:4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;'+pts+'">'+entry.title+'</div>':'')+
-      (entry&&entry.text?'<div style="font-size:0.68em;color:var(--t2);margin-top:3px;line-height:1.45;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-all;'+pts+'">'+entry.text.replace(/[<>]/g,'')+'</div>':'')+
+      (entry&&entry.title?'<div style="font-size:0.78em;font-weight:600;color:var(--accent);margin-top:4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;'+pts+'">'+esc(entry.title)+'</div>':'')+
+      (entry&&entry.text?'<div style="font-size:0.68em;color:var(--t2);margin-top:3px;line-height:1.45;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-all;'+pts+'">'+esc(entry.text)+'</div>':'')+
       (isT&&!entry?'<div style="font-size:0.72em;color:var(--t3);margin-top:4px">write today</div>':'')+
     '</div>';
   }
@@ -2032,7 +2066,7 @@ function compressDiaryPhotoToDataURL(file){
     var tempUrl=URL.createObjectURL(file);
     img.onload=function(){
       try{
-        var w=img.naturalWidth,h=img.naturalHeight,maxSide=360;
+        var w=img.naturalWidth,h=img.naturalHeight,maxSide=160;
         if(!w||!h){reject(new Error('이미지 크기를 읽지 못했어요.'));return;}
         var scale=Math.min(1,maxSide/Math.max(w,h));
         var cw=Math.max(1,Math.round(w*scale)),ch=Math.max(1,Math.round(h*scale));
@@ -2043,10 +2077,10 @@ function compressDiaryPhotoToDataURL(file){
         ctx.drawImage(img,0,0,cw,ch);
         URL.revokeObjectURL(tempUrl);
         var dataUrl='';
-        try{ dataUrl=canvas.toDataURL('image/webp',0.55); }catch(e){ dataUrl=''; }
+        try{ dataUrl=canvas.toDataURL('image/webp',0.40); }catch(e){ dataUrl=''; }
         // 일부 브라우저(WebP 인코딩 미지원)는 png로 그대로 돌려주므로 webp가 아니면 jpeg로 재시도
         if(!dataUrl || dataUrl.indexOf('data:image/webp')!==0){
-          try{ dataUrl=canvas.toDataURL('image/jpeg',0.7); }catch(e2){ dataUrl=''; }
+          try{ dataUrl=canvas.toDataURL('image/jpeg',0.5); }catch(e2){ dataUrl=''; }
         }
         if(!dataUrl){reject(new Error('사진 압축에 실패했어요.'));return;}
         resolve(dataUrl);
@@ -2153,40 +2187,46 @@ async function finishDiaryPhotoUpload(ds){
     if(!S.diaryEntries[ds])S.diaryEntries[ds]={text:'',mood:'',title:''};
     var e=S.diaryEntries[ds];
     var oldPath=e.photoPath,oldStorage=e.photoStorage;
-    var savedRemotely=false;
 
-    if(currentUser){
-      try{
-        var blob=dataUrlToBlob(pending.dataUrl);
-        var ext=(blob.type==='image/jpeg')?'jpg':'webp';
-        var path=diaryPhotoPath(ds,ext);
-        var ref=storage.ref().child(path);
-        await ref.put(blob,{contentType:blob.type||'image/webp',cacheControl:'public,max-age=31536000'});
-        var url=await ref.getDownloadURL();
-        e.photoUrl=url;
-        e.photoPath=path;
-        e.photoStorage='firebase';
-        e.photoSize=blob.size;
-        savedRemotely=true;
-      }catch(err){
-        console.warn('Firebase Storage 업로드 실패, 로컬(base64)로 저장합니다.',err);
-      }
-    }
-    if(!savedRemotely){
-      // 로그인 안 됨 또는 업로드 실패 → 사진을 diaryEntries 안에 base64로 직접 저장 (항상 성공)
-      e.photoUrl=pending.dataUrl;
-      e.photoPath='';
-      e.photoStorage='local';
-      e.photoSize=pending.dataUrl.length;
-    }
+    // ① 먼저 base64로 즉시 반영 — 업로드를 기다리지 않으므로 사진이 바로 보인다
+    e.photoUrl=pending.dataUrl;
+    e.photoPath='';
+    e.photoStorage='local';
+    e.photoSize=pending.dataUrl.length;
     e.photoPosX=pending.posX!=null?pending.posX:50;
     e.photoPosY=pending.posY!=null?pending.posY:50;
     save();
+    if(page==='diary')render();
 
-    if(oldStorage==='firebase'&&oldPath&&oldPath!==e.photoPath){
+    // ② 이전 사진 정리
+    if(oldStorage==='firebase'&&oldPath){
       deleteDiaryPhotoFile(ds,{photoStorage:oldStorage,photoPath:oldPath});
     }
-    if(page==='diary')render();
+
+    // ③ 로그인 상태면 백그라운드로 클라우드에 올리고, 끝나면 주소만 조용히 교체
+    if(currentUser){
+      (async function(){
+        try{
+          var blob=dataUrlToBlob(pending.dataUrl);
+          var ext=(blob.type==='image/jpeg')?'jpg':'webp';
+          var path=diaryPhotoPath(ds,ext);
+          var ref=storage.ref().child(path);
+          await ref.put(blob,{contentType:blob.type||'image/webp',cacheControl:'public,max-age=31536000'});
+          var url=await ref.getDownloadURL();
+          var cur=(S.diaryEntries||{})[ds];
+          // 그 사이 사용자가 사진을 바꾸거나 지웠으면 덮어쓰지 않는다
+          if(!cur||cur.photoUrl!==pending.dataUrl)return;
+          cur.photoUrl=url;
+          cur.photoPath=path;
+          cur.photoStorage='firebase';
+          cur.photoSize=blob.size;
+          save();
+          if(page==='diary')render();
+        }catch(err){
+          console.warn('Firebase Storage 업로드 실패 — 이 기기에 저장된 사진을 계속 사용합니다.',err);
+        }
+      })();
+    }
   }catch(err){
     console.error('Diary photo save error:',err);
     alert('사진 저장에 실패했어요: '+(err.message||err));
@@ -2301,7 +2341,7 @@ function openDiaryModal(ds){
         (existingPhoto?
           '<div style="font-size:0.72em;color:var(--t3);text-align:center">눌러서 사진 교체</div>'
           :
-          '<div style="border:1px dashed var(--border2);border-radius:8px;padding:12px;text-align:center;color:var(--t3);font-size:.8em;background:var(--s2)">📷 사진 선택 · 캘린더 배경용 360px로 자동 압축</div>'
+          '<div style="border:1px dashed var(--border2);border-radius:8px;padding:12px;text-align:center;color:var(--t3);font-size:.8em;background:var(--s2)">📷 사진 선택 · 캘린더 배경용으로 자동 압축</div>'
         )+
       '</label>'+
     '</div>';
@@ -2311,13 +2351,13 @@ function openDiaryModal(ds){
     '<div style="display:flex;gap:6px;flex-wrap:wrap">'+moodHtml+'</div></div>'+
     '<div style="margin-bottom:12px"><div style="font-size:0.8em;color:var(--t3);margin-bottom:6px">날씨</div>'+
     '<div style="display:flex;gap:6px;flex-wrap:wrap">'+weatherHtml+'</div></div>'+
-    '<div style="margin-bottom:12px"><input id="diary-title-inp" class="inp" placeholder="제목 (선택)" value="'+rawTitle+'" style="font-size:1em;font-weight:500;background:transparent;border-color:transparent;border-bottom:1px solid var(--border);border-radius:0;padding:6px 0"></div>'+
+    '<div style="margin-bottom:12px"><input id="diary-title-inp" class="inp" placeholder="제목 (선택)" value="'+esc(rawTitle)+'" style="font-size:1em;font-weight:500;background:transparent;border-color:transparent;border-bottom:1px solid var(--border);border-radius:0;padding:6px 0"></div>'+
     '<div style="position:relative;margin-bottom:14px">'+
       '<div id="diary-line-nums" style="position:absolute;left:0;top:0;width:32px;padding:8px 6px 8px 0;font-family:var(--mono);font-size:0.9286em;color:var(--t3);line-height:1.8;user-select:none;pointer-events:none;text-align:right">'+
         getLineNums(rawText)+
       '</div>'+
       '<textarea id="diary-ta" style="width:100%;min-height:320px;border:1px solid var(--border);border-radius:8px;padding:8px 12px 8px 44px;font-size:0.9286em;font-family:var(--sans);line-height:1.8;resize:none;background:var(--s2);color:var(--text);outline:none" '+
-      'placeholder="오늘 감사한 일을 적어보세요...\n1. \n2. \n3. " oninput="updateLineNums(this)">'+rawText+'</textarea>'+
+      'placeholder="오늘 감사한 일을 적어보세요...\n1. \n2. \n3. " oninput="updateLineNums(this)">'+esc(rawText)+'</textarea>'+
     '</div>'+
     photoHtml,
     '<button class="btn bg" onclick="closeMo()">닫기</button>'+
@@ -2518,7 +2558,7 @@ function renderGoalSection(){
 function openGoalModal(){
   const g=S.lifeGoal||{text:'',sub:''};
   openMo('궁극적인 목표',
-    '<div class="fg"><label class="fl">목표</label><input class="inp" id="gl-t" value="'+g.text+'" placeholder="예: 웹툰 콘티 작가로 독립하기"></div>'+
+    '<div class="fg"><label class="fl">목표</label><input class="inp" id="gl-t" value="'+esc(g.text)+'" placeholder="예: 웹툰 콘티 작가로 독립하기"></div>'+
     '<div class="fg"><label class="fl">부연 설명 (선택)</label><input class="inp" id="gl-s" value="'+(g.sub||'')+'" placeholder="예: 2027년까지, 월 수익 300만원"></div>'+
     '<div class="fg"><label class="fl">🎯 목표 날짜 (선택)</label><input type="date" class="inp" id="gl-dday" value="'+(g.dday||'')+'"></div>',
     '<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="saveGoal()">저장</button>');
@@ -2999,7 +3039,7 @@ function openPjEditModal(pid){
     aHtml+='<button type="button" class="daybtn" data-aid="'+a.id+'" onclick="pickPjA(this)" style="'+aStyle+'">'+a.emoji+' '+a.name+'</button>';
   });
   openMo('프로젝트 수정',
-    '<div class="fg"><label class="fl">이름</label><input class="inp" id="pje-n" value="'+p.name+'" placeholder="프로젝트 이름"></div>'+
+    '<div class="fg"><label class="fl">이름</label><input class="inp" id="pje-n" value="'+esc(p.name)+'" placeholder="프로젝트 이름"></div>'+
     '<div class="fg"><label class="fl">이모지</label><input class="inp" id="pje-e" value="'+(p.emoji||'')+'" placeholder="📁" maxlength="2" style="width:70px"></div>'+
     '<div class="fg"><label class="fl">설명</label><input class="inp" id="pje-d" value="'+(p.desc||'')+'" placeholder="한 줄 설명"></div>'+
     '<div class="fg"><label class="fl">🎯 프로젝트 디데이 <span style="color:var(--t3)">(카드에 표시)</span></label><input class="inp" type="date" id="pje-dday" value="'+(p.dday||'')+'"></div>'+
@@ -3243,7 +3283,7 @@ function openTkEditModal(pid,i){
   const p=S.projects.find(x=>x.id===pid);if(!p)return;
   const t=p.tasks[i];if(!t)return;
   openMo('태스크 수정',
-    '<div class="fg"><label class="fl">태스크</label><input class="inp" id="te-t" value="'+t.text+'"></div>'+
+    '<div class="fg"><label class="fl">태스크</label><input class="inp" id="te-t" value="'+esc(t.text)+'"></div>'+
     '<div class="fg"><label class="fl">마감일 (선택)</label><input type="date" class="inp" id="te-d" value="'+(t.due||'')+'"></div>',
     '<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="saveTkEdit(\''+pid+'\','+i+')">저장</button>');
 }
@@ -3367,7 +3407,7 @@ function openMatEditModal(pid,i){
   const m=p.materials[i];
   openMo('학습 자료 수정',
     '<div class="fg"><label class="fl">종류</label><select class="sel" id="mat-type"><option value="pdf" '+(m.type==='pdf'?'selected':'')+'>📄 PDF</option><option value="book" '+(m.type==='book'?'selected':'')+'>📖 책</option></select></div>'+
-    '<div class="fg"><label class="fl">제목</label><input class="inp" id="mat-title" value="'+m.title+'"></div>'+
+    '<div class="fg"><label class="fl">제목</label><input class="inp" id="mat-title" value="'+esc(m.title)+'"></div>'+
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">'+
     '<div><label class="fl">전체 분량</label><input type="number" class="inp" id="mat-total" value="'+m.total+'" min="0"></div>'+
     '<div><label class="fl">단위</label><select class="sel" id="mat-unit">'+
@@ -4808,7 +4848,7 @@ function openSuppEditModal(slotKey,id){
   var it=(S.health.supplements[slotKey]||[]).find(function(x){return x.id===id;});
   if(!it)return;
   openHealthMo('영양제 수정',
-    '<div class="fg"><label class="fl">이름</label><input class="inp" id="supp-name" value="'+it.name+'"></div>'+
+    '<div class="fg"><label class="fl">이름</label><input class="inp" id="supp-name" value="'+esc(it.name)+'"></div>'+
     '<div class="fg"><label class="fl">갯수 (알)</label><input class="inp" id="supp-count" type="number" min="1" value="'+it.count+'" style="max-width:80px"></div>'+
     '<div class="fg"><label class="fl">효능</label><input class="inp" id="supp-effect" value="'+(it.effect||'')+'" placeholder="예: 면역력 강화"></div>',
     '<button class="btn bg" onclick="closeMo()">취소</button>'+
@@ -8618,11 +8658,20 @@ auth.onAuthStateChanged(async function(user){
     if(cloudData && !localIsNewer){
       // localStorage에서 폰트 데이터 미리 보존 (Firestore에 없으므로)
       let localFontData = ['','',''];
+      let localDiaryPhotos = {};
       try {
         const localRaw = localStorage.getItem(KEY);
         if(localRaw) {
           const localS = JSON.parse(localRaw);
           if(localS.customFontData) localFontData = localS.customFontData;
+          // 이 브라우저에만 저장된(base64) 일기 사진도 보존 (Firestore에 올리지 않으므로)
+          const lde = localS.diaryEntries || {};
+          Object.keys(lde).forEach(function(k){
+            const e = lde[k];
+            if(e && e.photoStorage === 'local' && e.photoUrl){
+              localDiaryPhotos[k] = {photoUrl:e.photoUrl, photoStorage:'local', photoSize:e.photoSize};
+            }
+          });
         }
       } catch(e) {}
 
@@ -8635,6 +8684,13 @@ auth.onAuthStateChanged(async function(user){
 
       // 폰트 데이터 복원 (클라우드엔 없으므로 localStorage 것 유지)
       S.customFontData = localFontData;
+
+      // 로컬 전용 일기 사진 복원
+      if(!S.diaryEntries) S.diaryEntries = {};
+      Object.keys(localDiaryPhotos).forEach(function(k){
+        if(!S.diaryEntries[k]) S.diaryEntries[k] = {text:'',mood:'',title:''};
+        if(!S.diaryEntries[k].photoUrl) Object.assign(S.diaryEntries[k], localDiaryPhotos[k]);
+      });
 
       // localStorage 업데이트
       localStorage.setItem(KEY, JSON.stringify(S));

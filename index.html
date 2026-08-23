@@ -218,7 +218,8 @@ html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--t
 .sb-lbl{font-size:0.7143em;font-weight:500;color:var(--t3);letter-spacing:.08em;text-transform:uppercase;padding:0 8px;margin-bottom:4px;display:flex;align-items:center;justify-content:space-between}
 .nav{display:flex;align-items:center;gap:10px;padding:5.5px 10px;border-radius:var(--rsm);cursor:pointer;color:var(--t2);font-size:0.9643em;border:none;background:none;width:100%;text-align:left;transition:all .15s;font-family:var(--sans)}
 .nav:hover{background:var(--s3);color:var(--text)}
-.nav.on{background:var(--al);color:var(--accent)}
+.nav.on{background:var(--al);color:var(--accent);font-weight:600;position:relative}
+.nav.on::before{content:"";position:absolute;left:0;top:4px;bottom:4px;width:3px;border-radius:0 3px 3px 0;background:var(--accent)}
 .nav-ic{font-size:1.0714em;width:18px;text-align:center;flex-shrink:0}
 .nav-bd{margin-left:auto;background:var(--accent);color:#fff;font-size:0.7143em;padding:1px 6px;border-radius:8px;font-family:var(--mono)}
 .pnav{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:var(--rsm);cursor:pointer;color:var(--t2);font-size:0.9286em;transition:all .15s}
@@ -366,9 +367,6 @@ body.page-timeline .topbar{display:none}
 .la-card.dragging{opacity:.4;transform:scale(.97)}
 .la-card[draggable="true"]{cursor:grab}
 .la-card[draggable="true"]:active{cursor:grabbing}
-.pj-drag-item{cursor:grab;user-select:none}
-.pj-drag-item.dragging{opacity:.4}
-.pj-drag-item.drag-over-top{border-top:2px solid var(--accent) !important}
 
 /* ── PROJECT CARD ── */
 .pj-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
@@ -2623,7 +2621,7 @@ function renderLife(){
     const projs=S.projects.filter(p=>p.lifeAreaId===a.id);
     html+='<div class="la-card" draggable="true" data-aid="'+a.id+'" data-color="'+a.color+'" onclick="laCardClick(event,this.dataset.aid)" style="border-color:'+a.color+'30;--card-accent:'+a.color+'">';
     html+='<div style="display:flex;align-items:center;margin-bottom:12px;min-width:0;padding-right:34px">';
-    html+='<div style="display:flex;align-items:center;gap:6px;min-width:0;flex:1"><span style="color:var(--t3);font-size:0.9em;cursor:grab;user-select:none;flex-shrink:0">⠿</span><div class="la-title-text" style="font-size:1.0714em;font-weight:600;color:var(--text);min-width:0">'+a.name+'</div>'+
+    html+='<div style="display:flex;align-items:center;gap:6px;min-width:0;flex:1"><div class="la-title-text" style="font-size:1.0714em;font-weight:600;color:var(--text);min-width:0">'+esc(a.name)+'</div>'+
       (a.dday?(function(){var dl=dLeft(a.dday);var lab=dl>0?'D-'+dl:dl===0?'D-DAY':'D+'+Math.abs(dl);return '<span style="font-size:0.68em;padding:2px 7px;border-radius:99px;background:'+a.color+'18;color:'+a.color+';font-weight:600;font-family:var(--mono)">'+lab+'</span>';})():'')+
     '</div>';
     html+='<div class="la-btns" style="position:absolute;top:6px;right:6px;display:flex;gap:2px;opacity:0;transition:opacity .15s;z-index:2">';
@@ -2641,13 +2639,12 @@ function renderLife(){
     } else {
       projs.forEach(function(p){
         const tk=p.tasks||[], dn=tk.filter(t=>t.done).length, pc=tk.length?Math.round(dn/tk.length*100):0;
-        html+='<div class="pj-drag-item" draggable="true" data-pid="'+p.id+'" data-aid="'+a.id+'" '+
+        html+='<div class="pj-item" data-pid="'+p.id+'" data-aid="'+a.id+'" '+
           'onclick="event.stopPropagation();go(\'projects\',this.dataset.pid)" '+
-          'style="display:flex;align-items:center;gap:8px;padding:4px 2px;margin-bottom:2px">'+
-          '<span style="color:var(--t3);font-size:0.8em;cursor:grab;user-select:none;flex-shrink:0">⠿</span>'+
+          'style="display:flex;align-items:center;gap:8px;padding:4px 2px;margin-bottom:2px;cursor:pointer">'+
           '<div style="width:6px;height:6px;border-radius:50%;background:'+p.color+';flex-shrink:0"></div>'+
-          '<div style="flex:1;font-size:0.8571em;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+p.name+'</div>'+
-          (tk.length>0?'<div style="font-size:0.75em;color:var(--t3);font-family:var(--mono)">'+pc+'%</div>':'')+
+          '<div style="flex:1;font-size:0.8571em;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+esc(p.name)+'</div>'+
+          (tk.length>0?'<div style="font-size:0.75em;color:var(--t3);font-family:var(--mono);flex-shrink:0">'+pc+'%</div>':'')+
         '</div>';
       });
     }
@@ -2712,12 +2709,83 @@ function openAreaModal(id){
   var areaColorHtml=COLORS.map(function(c){var isOn=(a?c===a.color:c===COLORS[0]);return '<div class="cop '+(isOn?'on':'')+'" style="background:'+c+'" onclick="pickAreaC(this,\''+c+'\')"></div>';}).join('');
   // 신규 생성 시 상위 목표 날짜를 기본값으로
   var ddayDefault=a?(a.dday||''):((S.lifeGoal&&S.lifeGoal.dday)||'');
+  // 기존 영역일 때만 세부 목록(프로젝트) 관리 표시
+  var projHtml='';
+  if(a){
+    projHtml='<div class="fg"><label class="fl">세부 목록 <span style="font-size:0.8em;color:var(--t3);font-weight:400">(위/아래로 순서 변경)</span></label>'+
+      '<div id="ar-proj-list">'+areaProjListHtml(a.id)+'</div>'+
+      '<div style="display:flex;gap:6px;margin-top:8px">'+
+        '<input class="inp" id="ar-new-proj" placeholder="새 세부 목록 이름" style="flex:1" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addAreaProj(\''+a.id+'\')}">'+
+        '<button type="button" class="btn bp bsm" onclick="addAreaProj(\''+a.id+'\')">추가</button>'+
+      '</div>'+
+    '</div>';
+  }
   openMo(a?'영역 수정':'영역 추가',
-    '<div class="fg"><label class="fl">이모지</label><input class="inp" id="ar-e" value="'+(a?a.emoji:'')+'" placeholder="🌱" maxlength="2" style="width:70px"></div>'+
-    '<div class="fg"><label class="fl">이름</label><input class="inp" id="ar-n" value="'+(a?a.name:'')+'" placeholder="예: 창작, 건강..."></div>'+
+    '<div class="fg"><label class="fl">이모지</label><input class="inp" id="ar-e" value="'+(a?esc(a.emoji):'')+'" placeholder="🌱" maxlength="2" style="width:70px"></div>'+
+    '<div class="fg"><label class="fl">이름</label><input class="inp" id="ar-n" value="'+(a?esc(a.name):'')+'" placeholder="예: 창작, 건강..."></div>'+
     '<div class="fg"><label class="fl">🎯 디데이 <span style="font-size:0.8em;color:var(--t3);font-weight:400">(상위 목표 날짜 자동 · 수정 가능)</span></label><input type="date" class="inp" id="ar-dday" value="'+ddayDefault+'"></div>'+
-    '<div class="fg"><label class="fl">색상</label><div class="cops">'+areaColorHtml+'</div></div>',
+    '<div class="fg"><label class="fl">색상</label><div class="cops">'+areaColorHtml+'</div></div>'+
+    projHtml,
     '<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="saveArea(\''+( id||'')+'\')">저장</button>');
+}
+
+// 영역 수정창 안의 세부 목록(프로젝트) 목록 HTML
+function areaProjListHtml(aid){
+  var projs=(S.projects||[]).filter(function(p){return p.lifeAreaId===aid;});
+  if(projs.length===0){
+    return '<div style="font-size:0.82em;color:var(--t3);padding:6px 2px">세부 목록이 없어요.</div>';
+  }
+  var html='';
+  projs.forEach(function(p,i){
+    html+='<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--s2);border-radius:8px;margin-bottom:4px">'+
+      '<div style="width:6px;height:6px;border-radius:50%;background:'+p.color+';flex-shrink:0"></div>'+
+      '<div style="flex:1;min-width:0;font-size:0.86em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.name)+'</div>'+
+      '<button type="button" class="bi" title="위로" onclick="moveAreaProj(\''+aid+'\',\''+p.id+'\',-1)" style="padding:2px 4px;line-height:1;'+(i===0?'opacity:.25;pointer-events:none':'')+'">▲</button>'+
+      '<button type="button" class="bi" title="아래로" onclick="moveAreaProj(\''+aid+'\',\''+p.id+'\',1)" style="padding:2px 4px;line-height:1;'+(i===projs.length-1?'opacity:.25;pointer-events:none':'')+'">▼</button>'+
+      '<button type="button" class="bi" title="영역에서 빼기" onclick="removeAreaProj(\''+aid+'\',\''+p.id+'\')" style="padding:2px 4px;line-height:1;color:var(--t3)">✕</button>'+
+    '</div>';
+  });
+  return html;
+}
+function refreshAreaProjList(aid){
+  var box=document.getElementById('ar-proj-list');
+  if(box) box.innerHTML=areaProjListHtml(aid);
+}
+// 같은 영역 안에서만 순서 변경 (S.projects 전체 배열에서 위치를 맞바꾼다)
+function moveAreaProj(aid,pid,dir){
+  var idxs=[];
+  (S.projects||[]).forEach(function(p,i){ if(p.lifeAreaId===aid) idxs.push(i); });
+  var pos=idxs.findIndex(function(i){return S.projects[i].id===pid;});
+  if(pos<0) return;
+  var target=pos+dir;
+  if(target<0||target>=idxs.length) return;
+  var i1=idxs[pos], i2=idxs[target];
+  var tmp=S.projects[i1]; S.projects[i1]=S.projects[i2]; S.projects[i2]=tmp;
+  save();
+  refreshAreaProjList(aid);
+  render();
+}
+function addAreaProj(aid){
+  var inp=document.getElementById('ar-new-proj');
+  if(!inp) return;
+  var name=inp.value.trim();
+  if(!name) return;
+  var area=(S.lifeAreas||[]).find(function(x){return x.id===aid;});
+  if(!S.projects) S.projects=[];
+  S.projects.push({id:gid(),name:name,color:(area&&area.color)||COLORS[0],lifeAreaId:aid,tasks:[]});
+  inp.value='';
+  save();
+  refreshAreaProjList(aid);
+  render();
+}
+function removeAreaProj(aid,pid){
+  var p=(S.projects||[]).find(function(x){return x.id===pid;});
+  if(!p) return;
+  if(!confirm('"'+p.name+'"을(를) 이 영역에서 뺄까요?\n(프로젝트 자체는 삭제되지 않아요)')) return;
+  p.lifeAreaId='';
+  save();
+  refreshAreaProjList(aid);
+  render();
 }
 function pickAreaC(el,c){selAreaC=c;document.querySelectorAll('.cop').forEach(e=>e.classList.remove('on'));el.classList.add('on');}
 function saveArea(eid){
@@ -2741,19 +2809,15 @@ function renderProjects(){
   const areas=S.lifeAreas||[];
   const filtered=pjFilter?S.projects.filter(p=>p.lifeAreaId===pjFilter):S.projects;
   let html='';
-  html+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;align-items:center">';
-  // 전체 버튼
-  html+='<button class="btn bsm" onclick="setPjF(\'\')" style="'+(pjFilter===''?'background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600':'background:var(--s2);color:var(--t2);border-color:var(--border);font-weight:500')+'">전체</button>';
-  // 라이프 영역 버튼
+  // 상단 필터 탭 (To Do 월 탭과 동일한 인덱스 탭 스타일)
+  html+='<div style="display:flex;align-items:flex-end;gap:10px;margin-bottom:20px">';
+  html+='<div class="mtab-wrap" style="flex:1;min-width:0"><div class="mtab" style="grid-template-columns:repeat('+(areas.length+1)+',minmax(0,1fr))">';
+  html+='<div class="mtab-item'+(pjFilter===''?' on':'')+'" onclick="setPjF(\'\')">전체</div>';
   areas.forEach(function(a){
-    var on=pjFilter===a.id;
-    html+='<button class="btn bsm" onclick="setPjF(\''+a.id+'\')" style="'+
-      (on
-        ? 'background:'+a.color+';color:#fff;border-color:'+a.color+';font-weight:600'
-        : 'background:var(--s2);color:var(--text);border-color:var(--border);font-weight:500'
-      )+'">'+(a.emoji?a.emoji+' ':'')+a.name+'</button>';
+    html+='<div class="mtab-item'+(pjFilter===a.id?' on':'')+'" data-aid="'+a.id+'" onclick="setPjF(this.dataset.aid)" title="'+esc(a.name)+'">'+esc(a.name)+'</div>';
   });
-  html+='<button class="btn bp bsm" onclick="openPjModal()" style="margin-left:auto">+ 새 프로젝트</button></div>';
+  html+='</div></div>';
+  html+='<button class="btn bp bsm" onclick="openPjModal()" style="flex-shrink:0;margin-bottom:2px">+ 새 프로젝트</button></div>';
   if(filtered.length===0){html+='<div class="empty" style="padding:60px"><div class="ei">🗂️</div>'+(pjFilter?'이 영역의 프로젝트가 없어요':'첫 프로젝트를 만들어 보세요!')+'</div>';}
   else{
   html+='<div class="pj-grid">';
@@ -3004,21 +3068,10 @@ document.addEventListener('dragstart', function(e){
   // supp 약 pill 드래그는 방해하지 않음
   if(e.target.closest('[draggable][data-id]')) return;
 
-  // pj-drag-item 안에서 시작했는지 먼저 확인 (부모 카드보다 우선)
-  var pj = e.target.closest('.pj-drag-item[draggable]');
+  // 라이프 카드(영역) 드래그만 처리 — 카드 안 세부 목록은 드래그하지 않는다
   var card = e.target.closest('.la-card[draggable]');
 
-  if(pj){
-    // 프로젝트 드래그 - 라이프 카드 드래그 차단
-    e.stopPropagation();
-    window._laDragging = true;
-    _dragPjId = pj.dataset.pid;
-    _dragAreaId = null;
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('type','pj');
-    setTimeout(function(){pj.classList.add('dragging');},0);
-  } else if(card && !e.target.closest('.pj-drop-zone')){
-    // 라이프 카드 드래그 (프로젝트 영역에서 시작한 게 아닐 때만)
+  if(card){
     window._laDragging = true;
     _dragAreaId = card.dataset.aid;
     _dragPjId = null;
@@ -3034,7 +3087,7 @@ document.addEventListener('dragstart', function(e){
 document.addEventListener('dragend', function(e){
   window._laDragging = false;
   _dragAreaId = null; _dragPjId = null;
-  document.querySelectorAll('.la-card.dragging,.pj-drag-item.dragging').forEach(function(el){el.classList.remove('dragging');});
+  document.querySelectorAll('.la-card.dragging').forEach(function(el){el.classList.remove('dragging');});
   document.querySelectorAll('.la-card.drag-over,.pj-drop-zone.drag-over').forEach(function(el){el.classList.remove('drag-over');});
 });
 

@@ -296,6 +296,19 @@ lucide.createIcons({icons});\``);if(typeof c>"u")throw new Error("`createIcons()
         .rs-chevron.collapsed { transform: rotate(-90deg); }
 
     </style>
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#f9fafb">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="기획보드">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('sw.js').catch(() => {});
+        });
+      }
+    </script>
 </head>
 <body data-theme="default" class="flex h-screen w-full bg-gray-50 font-sans text-sm text-gray-800 overflow-hidden transition-colors duration-300" style="font-family: 'Pretendard', sans-serif;">
 
@@ -452,7 +465,12 @@ lucide.createIcons({icons});\``);if(typeof c>"u")throw new Error("`createIcons()
         <!-- Page: 캐릭터 소개 -->
         <div id="page-character" class="theme-canvas flex-1 flex flex-col p-8 overflow-auto" style="display:none; min-height:0;">
             <div style="width:800px;max-width:100%;margin-left:auto;margin-right:auto;">
-                <div class="inline-flex flex-wrap items-center gap-1 bg-gray-100 rounded-full" style="padding:5px; margin:16px 0 24px 0;" id="char-page-tabs"></div>
+                <div class="flex items-center justify-between" style="margin:16px 0 24px 0;">
+                    <div class="inline-flex flex-wrap items-center gap-1 bg-gray-100 rounded-full" style="padding:5px;" id="char-page-tabs"></div>
+                    <button onclick="window.openFloatView('character')" class="shrink-0 text-gray-400 hover:text-indigo-600 bg-white border border-gray-200 rounded-full shadow-sm transition-colors" style="width:30px; height:30px; display:flex; align-items:center; justify-content:center;" title="플로팅 창으로 항상 위에 띄우기">
+                        <i data-lucide="pin" class="w-4 h-4"></i>
+                    </button>
+                </div>
 
                 <div id="char-single-view">
                     <div class="flex items-start mb-6" style="gap:100px;">
@@ -503,7 +521,12 @@ lucide.createIcons({icons});\``);if(typeof c>"u")throw new Error("`createIcons()
         <!-- Page: 메모 -->
         <div id="page-memo" class="theme-canvas flex-1 flex flex-col p-8 overflow-auto" style="display:none; min-height:0;">
             <div style="width:800px;max-width:100%;margin-left:auto;margin-right:auto;">
-                <div class="inline-flex flex-wrap items-center gap-1 bg-gray-100 rounded-full" style="padding:5px; margin:16px 0 24px 0;" id="note-page-tabs"></div>
+                <div class="flex items-center justify-between" style="margin:16px 0 24px 0;">
+                    <div class="inline-flex flex-wrap items-center gap-1 bg-gray-100 rounded-full" style="padding:5px;" id="note-page-tabs"></div>
+                    <button onclick="window.openFloatView('memo')" class="shrink-0 text-gray-400 hover:text-indigo-600 bg-white border border-gray-200 rounded-full shadow-sm transition-colors" style="width:30px; height:30px; display:flex; align-items:center; justify-content:center;" title="플로팅 창으로 항상 위에 띄우기">
+                        <i data-lucide="pin" class="w-4 h-4"></i>
+                    </button>
+                </div>
                 <div id="note-entries-list" class="flex flex-col gap-3 mb-3"></div>
                 <button onclick="window.addNoteEntry()" class="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-400 hover:text-blue-500 transition-colors">
                     <i data-lucide="plus" class="w-4 h-4"></i> 추가
@@ -2869,6 +2892,67 @@ window.manualFirebasePush = async function () {
                 <div class="border border-gray-100 rounded p-2 bg-gray-50/50">${e.text}</div>
             `).join('') : '<div class="text-gray-300">내용 없음</div>';
         }
+
+        // 캐릭터/메모 페이지 상단 핀 아이콘: 현재 탭 내용을 항상-위-플로팅 창으로 띄움 (데스크탑 전용)
+        window.openFloatView = (kind) => {
+            const board = window.getCurrentBoard();
+            if (!board) return;
+            const allTabs = board.memoTabs || DEFAULT_MEMO_TABS;
+            const payload = { kind };
+
+            if (kind === 'character') {
+                const tabId = window.activeCharTab;
+                const tabInfo = allTabs.find(t => t.id === tabId);
+                payload.title = (tabInfo && tabInfo.label) || '캐릭터';
+                if (tabId === 'subChar') {
+                    payload.subChars = (board.subChars || []).map(sc => ({
+                        name: sc.name, age: sc.age, relation: sc.relation, role: sc.role, note: sc.note, photo: sc.photo
+                    }));
+                } else {
+                    const profile = (board.charProfiles && board.charProfiles[tabId]) || {};
+                    const rows = [];
+                    if (profile.name) rows.push(['이름', profile.name]);
+                    if (profile.age) rows.push(['나이', profile.age]);
+                    if (profile.job) rows.push(['직업', profile.job]);
+                    PROFILE_LINE_FIELDS.forEach(f => { if (profile[f.key]) rows.push([f.label, profile[f.key]]); });
+                    if (profile.dailyRoutine) rows.push(['하루 일과', profile.dailyRoutine]);
+                    if (profile.fetish) rows.push(['성적 취향', profile.fetish]);
+                    if (profile.trigger) rows.push(['발작 버튼', profile.trigger]);
+                    if (profile.trauma) rows.push(['결핍/트라우마', profile.trauma]);
+                    if (profile.relationship) rows.push(['관계 역학', profile.relationship]);
+                    if (profile.charm) rows.push(['상업적 매력', profile.charm]);
+                    payload.rows = rows;
+                    const posY = (board.memoPhotoPos && board.memoPhotoPos[tabId] && board.memoPhotoPos[tabId].y != null) ? board.memoPhotoPos[tabId].y : 50;
+                    payload.photo = (board.memoPhotos && board.memoPhotos[tabId]) || '';
+                    payload.photoPosY = posY;
+                }
+            } else {
+                const tabId = window.activeNoteTab;
+                const tabInfo = allTabs.find(t => t.id === tabId);
+                payload.title = (tabInfo && tabInfo.label) || '메모';
+                const entries = (board.memoEntries && board.memoEntries[tabId]) || [];
+                payload.entries = entries.filter(e => e.text && e.text.trim() && e.text !== '<br>').map(e => e.text);
+            }
+
+            try {
+                let bounds = {};
+                try { bounds = JSON.parse(localStorage.getItem('fvp_bounds') || '{}'); } catch(e) {}
+                payload.width = bounds.width;
+                payload.height = bounds.height;
+                payload.x = bounds.x;
+                payload.y = bounds.y;
+
+                const { ipcRenderer } = require('electron');
+                ipcRenderer.send('open-float-view', payload);
+
+                ipcRenderer.removeAllListeners('save-float-bounds');
+                ipcRenderer.on('save-float-bounds', (ev, b) => {
+                    try { localStorage.setItem('fvp_bounds', JSON.stringify(b)); } catch(e) {}
+                });
+            } catch (e) {
+                alert('이 기능은 데스크탑 앱에서만 사용할 수 있습니다.');
+            }
+        };
 
         function renderCharacterPage() {
             const board = window.getCurrentBoard();

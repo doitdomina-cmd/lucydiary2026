@@ -4,15 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>에피소드 기획 보드</title>
-    <!-- 폰트 (CDN, 온라인 버전 전용) -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700;800&family=Nanum+Myeongjo:wght@400;700;800&display=swap">
-    <!-- Tailwind (CDN, 온라인 버전 전용) -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Lucide Icons (CDN) -->
-    <script src="https://cdn.jsdelivr.net/npm/lucide@0.462.0/dist/umd/lucide.min.js"></script>
-    <!-- html2canvas (CDN) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- 로컬 폰트 (Pretendard / 나눔고딕 / 나눔명조) -->
+    <link rel="stylesheet" href="fonts/fonts.css">
+    <!-- Tailwind (정적 빌드, 오프라인) -->
+    <link rel="stylesheet" href="vendor/tailwind.css">
+    <!-- Lucide Icons (로컬) -->
+    <script src="vendor/lucide.min.js"></script>
+    <!-- html2canvas (로컬) -->
+    <script src="vendor/html2canvas.min.js"></script>
     <!-- Firebase (실시간 동기화용, CDN) -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -22,7 +21,6 @@
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-        .top-toolbar::-webkit-scrollbar { height: 4px; }
         
         [contenteditable]:focus, input:focus, select:focus, textarea:focus { outline: none; box-shadow: none; }
         
@@ -43,14 +41,74 @@
         .rich-editor { min-height: 80px; font-size: 10.5pt; line-height: 1.6; }
         .rich-editor blockquote { border-left: 3px solid #ccc; padding-left: 8px; color: #666; margin: 4px 0; }
 
+        /* 캐릭터 사진 삭제 버튼: 호버 시에만 노출 */
+        .photo-remove-btn { display: flex; opacity: 0; transition: opacity 0.15s; }
+        .photo-box:hover .photo-remove-btn { opacity: 1; }
+
+        /* 조연/메모 카드 삭제(X) 버튼: 호버 시에만 노출 */
+        .card-remove-btn { opacity: 0; transition: opacity 0.15s; }
+        .hover-card:hover .card-remove-btn { opacity: 1; }
+
+        /* 하단 메인 탭 바 (캐릭터 소개 / 플롯 / 메모) */
+        .main-tab-btn {
+            display: flex; align-items: center; gap: 6px;
+            padding: 6px 18px; border-radius: 8px;
+            font-size: 13px; font-weight: 600; color: #6b7280;
+            background: transparent; border: none; cursor: pointer;
+            transition: background-color 0.15s, color 0.15s;
+        }
+        .main-tab-btn:hover { background: rgba(0,0,0,0.04); color: #374151; }
+        .main-tab-btn.main-tab-active { background: #eff6ff; color: #1d4ed8; }
+        .page-tab-btn { transition: all 0.15s; }
+
+        /* 카드 안의 시놉시스 블록 */
+        .block-list { min-height: 26px; }
+        .block-item {
+            border: 1px solid #e5e7eb;
+            background: #ffffff;
+            border-radius: 0.375rem;
+            padding: 3px 6px;
+            transition: border-color 0.12s, background-color 0.12s;
+        }
+        .block-item:hover { border-color: #cbd5e1; }
+        .block-item .rich-editor { min-height: 1.4em; }
+        .block-item.block-dragging { opacity: 0.35; }
+        .block-item.active-block { box-shadow: 0 0 0 2px #3b82f6; }
+        .block-item.block-drag-over-top { border-top-color: #3b82f6; box-shadow: inset 0 2px 0 0 #3b82f6; }
+        .block-item.block-drag-over-bottom { border-bottom-color: #3b82f6; box-shadow: inset 0 -2px 0 0 #3b82f6; }
+        .block-list.block-list-drag-over { outline: 2px dashed #93c5fd; outline-offset: -2px; border-radius: 0.25rem; }
+
         /* 빈 에디터 플레이스홀더 처리 */
         .empty-editor:before { content: attr(data-placeholder); color: #9ca3af; pointer-events: none; display: block; }
+
+        /* 스크롤은 되지만 막대는 투명하게 */
+        #page-character::-webkit-scrollbar { width: 8px; background: transparent; }
+        #page-character::-webkit-scrollbar-thumb { background: transparent; }
+        #page-character { scrollbar-width: none; }
 
         /* 테마 시스템 CSS (채도를 낮춘 Muted 톤) */
         body[data-theme="green"] .theme-panel { background-color: #f4f6f4 !important; border-color: #e3e8e4 !important; }
         body[data-theme="green"] .theme-canvas { background-color: #eef1ef !important; }
+        body[data-theme="green"] .card-wrapper { background-color: #f6f9f7 !important; border-color: #dbe5de !important; }
+        body[data-theme="green"] .block-item { background-color: #ffffff !important; border-color: #dbe5de !important; }
         body[data-theme="pink"] .theme-panel { background-color: #fdf8f9 !important; border-color: #eedce0 !important; }
         body[data-theme="pink"] .theme-canvas { background-color: #f7f0f2 !important; }
+        body[data-theme="pink"] .card-wrapper { background-color: #fdf9fa !important; border-color: #f3dbe1 !important; }
+        body[data-theme="pink"] .block-item { background-color: #ffffff !important; border-color: #f3dbe1 !important; }
+
+        /* 테마: 왼쪽 메뉴 버튼/클릭 상태 등 세부 요소 */
+        body[data-theme="green"] .sidebar-left .bg-gray-100 { background-color: #e3e8e4 !important; }
+        body[data-theme="green"] .sidebar-left .bg-gray-100:hover { background-color: #d7e3da !important; }
+        body[data-theme="green"] #board-list-active .bg-gray-200,
+        body[data-theme="green"] #board-list-completed .bg-gray-200 { background-color: #dbe5de !important; }
+        body[data-theme="green"] .main-tab-btn.main-tab-active { background-color: #dbe5de !important; color: #3f6b53 !important; }
+        body[data-theme="pink"] .sidebar-left .bg-gray-100 { background-color: #f3dbe1 !important; }
+        body[data-theme="pink"] .sidebar-left .bg-gray-100:hover { background-color: #eecbd4 !important; }
+        body[data-theme="pink"] #board-list-active .bg-gray-200,
+        body[data-theme="pink"] #board-list-completed .bg-gray-200 { background-color: #f3dbe1 !important; }
+        body[data-theme="pink"] .main-tab-btn.main-tab-active { background-color: #f3dbe1 !important; color: #a3557a !important; }
+        body[data-theme="green"] #char-page-tabs, body[data-theme="green"] #note-page-tabs { background-color: #dbe5de !important; }
+        body[data-theme="pink"] #char-page-tabs, body[data-theme="pink"] #note-page-tabs { background-color: #f3dbe1 !important; }
 
         /* 메모 탭 버튼 스타일 트위크 */
         .memo-tab-btn { transition: all 0.2s; }
@@ -178,13 +236,6 @@
 </head>
 <body data-theme="default" class="flex h-screen w-full bg-gray-50 font-sans text-sm text-gray-800 overflow-hidden transition-colors duration-300" style="font-family: 'Pretendard', sans-serif;">
 
-    <!-- 로컬 저장 상태 인디케이터 -->
-    <div id="save-indicator" class="fixed top-3 right-4 text-xs font-bold px-3 py-1.5 rounded-full shadow-sm bg-white border border-gray-200 z-50 transition-opacity duration-300 opacity-0 pointer-events-none flex items-center">
-    </div>
-
-    <!-- 온라인(구글) 로그인 배지: 브라우저에서 Firestore 실시간 동기화를 쓰려면 여기서 로그인해야 함 -->
-    <div id="fb-login-badge" class="hidden fixed top-3 right-40 text-xs font-bold px-3 py-1.5 rounded-full shadow-sm bg-white border border-gray-200 z-50 flex items-center gap-1.5">
-    </div>
 
     <!-- 카드 삭제 확인 토스트 (Undo 지원) -->
     <div id="delete-toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs font-bold px-4 py-2.5 rounded-full shadow-xl z-[9999] hidden flex items-center gap-3">
@@ -213,11 +264,11 @@
         <i data-lucide="chevron-left" id="left-toggle-icon" class="w-3.5 h-3.5"></i>
     </button>
 
-    <!-- Right Sidebar Toggle Button (펼치기용, 접혔을 때만 노출) -->
+    <!-- Right Sidebar Toggle Button (항상 노출, 패널 경계선에 부착) -->
     <button id="right-sidebar-toggle" onclick="window.toggleRightSidebar()"
-            class="fixed right-0 top-1/2 -translate-y-1/2 z-30 bg-white border border-gray-200 shadow-md rounded-l-lg w-5 h-12 flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200"
-            title="오른쪽 도구창 펼치기" style="display:none;">
-        <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+            class="fixed z-30 bg-white border border-gray-200 shadow-md rounded-l-lg w-5 h-12 flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200"
+            title="오른쪽 도구창 접기/펼치기" style="right:280px; top:16px;">
+        <i data-lucide="chevron-right" id="right-toggle-icon" class="w-3.5 h-3.5"></i>
     </button>
 
     <!-- Left Sidebar -->
@@ -299,131 +350,132 @@
 
     <!-- Main Content Area -->
     <div class="flex-1 flex flex-col min-w-0 bg-[#fcfcfc] relative">
-        <!-- Top Toolbar -->
-        <div class="theme-panel top-toolbar h-12 bg-white border-b border-gray-200 flex items-center justify-between px-4 shrink-0 z-10 shadow-sm transition-colors duration-300 overflow-x-auto overflow-y-hidden">
-            <!-- Left: Text Formatting -->
-            <div class="flex items-center gap-4 shrink-0 whitespace-nowrap">
-                <div class="flex items-center gap-2 text-gray-600 border-r border-gray-200/60 pr-4 shrink-0">
-                    <select onchange="window.formatText('formatBlock', this.value)" class="bg-transparent cursor-pointer hover:text-gray-900 text-sm outline-none">
-                        <option value="div">본문</option>
-                        <option value="H1">제목 1</option>
-                        <option value="H2">제목 2</option>
-                        <option value="H3">제목 3</option>
-                        <option value="BLOCKQUOTE">인용구</option>
-                    </select>
-                    <span class="text-gray-300">|</span>
-                    <select id="font-select" onchange="window.formatText('fontName', this.value)" class="bg-transparent cursor-pointer hover:text-gray-900 text-sm w-24 outline-none">
-                        <option value="Pretendard, sans-serif">Pretendard</option>
-                        <option value="'KoPub Batang', 'Nanum Myeongjo', serif">바탕체</option>
-                        <option value="'Nanum Gothic', sans-serif">나눔고딕</option>
-                        <option value="'Nanum Myeongjo', serif">나눔명조</option>
-                    </select>
-                    <span class="text-gray-300">|</span>
-                    <select id="font-size-select" onchange="window.formatText('fontSizeExact', this.value)" class="bg-transparent cursor-pointer hover:text-gray-900 text-sm outline-none">
-                        <option value="10pt">10 pt</option>
-                        <option value="10.5pt" selected>10.5 pt</option>
-                        <option value="11pt">11 pt</option>
-                        <option value="12pt">12 pt</option>
-                        <option value="14pt">14 pt</option>
-                    </select>
-                    <span class="text-gray-300">|</span>
-                    
-                    <!-- Custom Color Palette Dropdown -->
-                    <div class="relative flex items-center">
-                        <button id="color-picker-btn" onclick="window.toggleTextColorPalette()" class="w-6 h-6 rounded flex items-center justify-center hover:bg-black/5 transition-colors border border-transparent hover:border-gray-200 shadow-none hover:shadow-sm" title="글자 색상">
-                            <div id="current-text-color-indicator" class="w-3.5 h-3.5 rounded-full bg-black border border-gray-200"></div>
-                        </button>
-                        
-                        <div id="text-color-palette" class="absolute top-full mt-2 left-0 bg-white border border-gray-200 shadow-lg rounded-md p-2 z-50 hidden w-max">
-                            <div class="grid grid-cols-5 gap-1.5">
-                                <button onclick="window.applyTextColor('#000000')" class="w-5 h-5 rounded bg-[#000000] border border-gray-200 hover:scale-110 transition-transform" title="검정"></button>
-                                <button onclick="window.applyTextColor('#ffffff')" class="w-5 h-5 rounded bg-[#ffffff] border border-gray-200 hover:scale-110 transition-transform" title="흰색"></button>
-                                <button onclick="window.applyTextColor('#ef4444')" class="w-5 h-5 rounded bg-[#ef4444] border border-gray-200 hover:scale-110 transition-transform" title="빨강"></button>
-                                <button onclick="window.applyTextColor('#3b82f6')" class="w-5 h-5 rounded bg-[#3b82f6] border border-gray-200 hover:scale-110 transition-transform" title="파랑"></button>
-                                <button onclick="window.applyTextColor('#22c55e')" class="w-5 h-5 rounded bg-[#22c55e] border border-gray-200 hover:scale-110 transition-transform" title="초록"></button>
-                                <button onclick="window.applyTextColor('#a855f7')" class="w-5 h-5 rounded bg-[#a855f7] border border-gray-200 hover:scale-110 transition-transform" title="보라"></button>
-                                <button onclick="window.applyTextColor('#eab308')" class="w-5 h-5 rounded bg-[#eab308] border border-gray-200 hover:scale-110 transition-transform" title="노랑"></button>
-                                <button onclick="window.applyTextColor('#f97316')" class="w-5 h-5 rounded bg-[#f97316] border border-gray-200 hover:scale-110 transition-transform" title="주황"></button>
-                                <button onclick="window.applyTextColor('#84cc16')" class="w-5 h-5 rounded bg-[#84cc16] border border-gray-200 hover:scale-110 transition-transform" title="연두"></button>
-                            </div>
-                        </div>
+        <!-- Page: 플롯 (Board Canvas) -->
+        <div id="page-plot" class="flex-1 flex flex-col relative" style="min-height:0;">
+            <div class="theme-canvas flex-1 overflow-auto relative p-8 bg-[#fcfcfc] transition-colors duration-300 select-none" id="canvas-wrapper">
+                <div id="zoom-container" class="origin-top-left transition-transform duration-200 w-max min-w-full pr-8 pb-8">
+                    <input type="text" id="doc-title" value="" oninput="window.updateCurrentBoardTitle(this.value)" spellcheck="false" class="text-3xl font-bold mb-6 bg-transparent border-none w-full text-gray-800 min-w-[400px]" placeholder="시놉시스 제목을 입력하세요">
+
+                    <div id="board-container" class="flex flex-col w-max min-w-full" style="gap:150px;">
                     </div>
                 </div>
-                <div class="flex items-center gap-3 text-gray-600 border-r border-gray-200/60 pr-4 shrink-0">
-                    <button onclick="window.formatText('bold')" class="hover:text-gray-900 p-1 rounded hover:bg-black/5" title="굵게"><i data-lucide="bold" class="w-4 h-4"></i></button>
-                    <button onclick="window.formatText('italic')" class="hover:text-gray-900 p-1 rounded hover:bg-black/5" title="기울임"><i data-lucide="italic" class="w-4 h-4"></i></button>
-                    <button onclick="window.formatText('underline')" class="hover:text-gray-900 p-1 rounded hover:bg-black/5" title="밑줄"><i data-lucide="underline" class="w-4 h-4"></i></button>
-                    <button onclick="window.formatText('strikeThrough')" class="hover:text-gray-900 p-1 rounded hover:bg-black/5" title="취소선"><i data-lucide="strikethrough" class="w-4 h-4"></i></button>
+            </div>
+
+            <!-- 하단 상태바: 저장/동기화 상태 + 로그인 배지 + Zoom Controls -->
+            <div class="absolute bottom-6 right-6 flex items-center gap-2 z-30">
+                <div id="save-indicator" class="text-xs font-bold px-3 py-1.5 rounded-full shadow-sm bg-white border border-gray-200 transition-opacity duration-300 opacity-0 pointer-events-none flex items-center whitespace-nowrap shrink-0">
                 </div>
-                <div class="flex items-center gap-3 text-gray-600 border-r border-gray-200/60 pr-4 shrink-0">
-                    <button onclick="window.formatText('justifyLeft')" class="hover:text-gray-900 p-1 rounded hover:bg-black/5"><i data-lucide="align-left" class="w-4 h-4"></i></button>
-                    <button onclick="window.formatText('justifyCenter')" class="hover:text-gray-900 p-1 rounded hover:bg-black/5"><i data-lucide="align-center" class="w-4 h-4"></i></button>
-                    <button onclick="window.formatText('justifyRight')" class="hover:text-gray-900 p-1 rounded hover:bg-black/5"><i data-lucide="align-right" class="w-4 h-4"></i></button>
+                <div id="fb-login-badge" class="hidden text-xs font-bold px-3 py-1.5 rounded-full shadow-sm bg-white border border-gray-200 flex items-center gap-1.5 whitespace-nowrap shrink-0">
                 </div>
-                <!-- Undo / Redo 버튼 -->
-                <div class="flex items-center gap-2 text-gray-600 shrink-0">
-                    <button id="undo-btn" onclick="window.undoAction()" class="undo-btn hover:text-gray-900 p-1 rounded hover:bg-black/5 disabled:opacity-30" title="되돌리기 (Ctrl+Z)" disabled>
+                <div class="flex items-center bg-white border border-gray-200 shadow-lg rounded-full px-3 py-1.5 gap-3 shrink-0 whitespace-nowrap">
+                    <button onclick="window.changeZoom(-0.1)" class="text-gray-500 hover:text-gray-800"><i data-lucide="zoom-out" class="w-4 h-4"></i></button>
+                    <span id="zoom-level-text" class="text-xs font-semibold w-10 text-center">100%</span>
+                    <button onclick="window.changeZoom(0.1)" class="text-gray-500 hover:text-gray-800"><i data-lucide="zoom-in" class="w-4 h-4"></i></button>
+                    <div class="w-px h-4 bg-gray-300 mx-1"></div>
+                    <button onclick="window.resetZoom()" class="text-xs text-gray-500 hover:text-gray-800 font-medium">초기화</button>
+                    <div class="w-px h-4 bg-gray-300 mx-1"></div>
+                    <button id="undo-btn" onclick="window.undoAction()" class="undo-btn text-gray-500 hover:text-gray-800 disabled:opacity-30" title="되돌리기 (Ctrl+Z)" disabled>
                         <i data-lucide="undo-2" class="w-4 h-4"></i>
                     </button>
-                    <button id="redo-btn" onclick="window.redoAction()" class="redo-btn hover:text-gray-900 p-1 rounded hover:bg-black/5 disabled:opacity-30" title="다시실행 (Ctrl+Y)" disabled>
+                    <button id="redo-btn" onclick="window.redoAction()" class="redo-btn text-gray-500 hover:text-gray-800 disabled:opacity-30" title="다시실행 (Ctrl+Y)" disabled>
                         <i data-lucide="redo-2" class="w-4 h-4"></i>
                     </button>
                 </div>
             </div>
+        </div>
 
-            <!-- Right: Board Controls -->
-            <div class="flex items-center gap-3 pl-4 border-l border-gray-200 border-opacity-50 shrink-0 whitespace-nowrap">
-                <!-- 검색 버튼 -->
-                <button onclick="window.openSearch()" class="flex items-center gap-1.5 text-xs text-gray-500 hover:text-blue-600 px-2.5 py-1 bg-gray-100 hover:bg-blue-50 rounded-full border border-gray-200 transition-colors font-medium shrink-0 whitespace-nowrap" title="전체 검색 (Ctrl+F)">
-                    <i data-lucide="search" class="w-3.5 h-3.5"></i> 검색
-                </button>
-                <div class="flex items-center gap-1.5 mr-2 bg-gray-100/50 px-3 py-1 rounded-full border border-gray-200/50 shrink-0 whitespace-nowrap">
-                    <span class="text-[11px] text-gray-500 font-bold">총 글자수</span>
-                    <span id="board-total-words" class="text-[13px] font-bold text-blue-600">0</span>
-                    <span class="text-[11px] text-gray-500 font-bold">자</span>
+        <!-- Page: 캐릭터 소개 -->
+        <div id="page-character" class="theme-canvas flex-1 flex flex-col p-8 overflow-auto" style="display:none; min-height:0;">
+            <div style="width:800px;max-width:100%;margin-left:auto;margin-right:auto;">
+                <div class="inline-flex flex-wrap items-center gap-1 bg-gray-100 rounded-full" style="padding:5px; margin:16px 0 24px 0;" id="char-page-tabs"></div>
+
+                <div id="char-single-view">
+                    <div class="flex items-start mb-6" style="gap:100px;">
+                        <div class="shrink-0">
+                            <label class="photo-box block border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-300 cursor-pointer hover:border-blue-400 hover:text-blue-400 transition-colors overflow-hidden bg-gray-50 relative" style="width:250px;height:250px;">
+                                <input type="file" accept="image/*" class="hidden" onchange="window.uploadCharPhoto(event)">
+                                <img id="char-photo-img" class="w-full h-full object-cover hidden" alt="캐릭터 사진">
+                                <div id="char-photo-placeholder" class="flex flex-col items-center gap-1">
+                                    <i data-lucide="image-plus" class="w-8 h-8"></i>
+                                    <span class="text-xs">사진 추가</span>
+                                </div>
+                                <button id="char-photo-remove" onclick="window.removeCharPhoto(event)" class="photo-remove-btn hidden" style="position:absolute; top:6px; right:6px; width:24px; height:24px; border-radius:9999px; background:rgba(0,0,0,0.55); color:#fff; align-items:center; justify-content:center;" title="사진 삭제">
+                                    <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                                </button>
+                            </label>
+                        </div>
+                        <div class="flex flex-col gap-5 pt-2 flex-1 max-w-xs justify-center">
+                            <div class="flex items-center gap-2">
+                                <label class="text-sm font-bold text-gray-400 shrink-0">이름 :</label>
+                                <input type="text" id="char-name-input" oninput="window.updateCharField('name', this.value)" spellcheck="false"
+                                       class="flex-1 min-w-0 text-lg font-bold text-gray-800 bg-transparent outline-none py-1 placeholder-gray-300" placeholder="이름">
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <label class="text-sm font-bold text-gray-400 shrink-0">나이 :</label>
+                                <input type="text" id="char-age-input" oninput="window.updateCharField('age', this.value)" spellcheck="false"
+                                       class="flex-1 min-w-0 text-sm text-gray-700 bg-transparent outline-none py-1 placeholder-gray-300" placeholder="나이">
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <label class="text-sm font-bold text-gray-400 shrink-0">직업 :</label>
+                                <input type="text" id="char-job-input" oninput="window.updateCharField('job', this.value)" spellcheck="false"
+                                       class="flex-1 min-w-0 text-sm text-gray-700 bg-transparent outline-none py-1 placeholder-gray-300" placeholder="직업">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="char-profile-fields" class="flex flex-col gap-6"></div>
                 </div>
-                <div class="w-px h-5 bg-gray-300 mx-1 shrink-0"></div>
-                <div class="flex items-center gap-2 text-gray-600 shrink-0 whitespace-nowrap" title="카드 너비(크기) 조절">
-                    <i data-lucide="move-horizontal" class="w-4 h-4"></i>
-                    <input type="range" min="250" max="800" step="10" value="400" oninput="window.changeCardSize(this.value)" id="card-size-slider" class="w-20 accent-gray-500 cursor-pointer">
-                    <span id="card-size-text" class="text-xs font-semibold w-10 text-center">400px</span>
+
+                <div id="char-subchar-view" style="display:none;">
+                    <div id="char-subchar-list" class="flex flex-col gap-4 mb-4"></div>
+                    <button onclick="window.addSubChar()" class="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-400 hover:text-blue-500 transition-colors">
+                        <i data-lucide="plus" class="w-4 h-4"></i> 조연 추가
+                    </button>
                 </div>
-                <div class="w-px h-5 bg-gray-300 mx-1 shrink-0"></div>
-                <button onclick="window.toggleRightSidebar()" class="hover:bg-black/5 hover:text-blue-600 p-1.5 rounded text-gray-500 transition-colors shrink-0" title="우측 도구창 열기/닫기">
-                    <i data-lucide="panel-right-open" id="sidebar-icon" class="w-5 h-5"></i>
-                </button>
-                <div class="w-px h-5 bg-gray-300 mx-1 shrink-0"></div>
-                <button onclick="window.toggleWritingMode()" id="writing-mode-btn" class="flex items-center gap-1.5 text-xs px-2.5 py-1 bg-gray-100 hover:bg-indigo-50 text-gray-500 hover:text-indigo-600 rounded-full border border-gray-200 transition-colors font-medium shrink-0 whitespace-nowrap" title="집필 모드 (선택한 카드를 위젯으로 띄우기)">
-                    <i data-lucide="pen-line" class="w-3.5 h-3.5"></i> 집필 모드
+            </div>
+        </div>
+
+        <!-- Page: 메모 -->
+        <div id="page-memo" class="theme-canvas flex-1 flex flex-col p-8 overflow-auto" style="display:none; min-height:0;">
+            <div style="width:800px;max-width:100%;margin-left:auto;margin-right:auto;">
+                <div class="inline-flex flex-wrap items-center gap-1 bg-gray-100 rounded-full" style="padding:5px; margin:16px 0 24px 0;" id="note-page-tabs"></div>
+                <div id="note-entries-list" class="flex flex-col gap-3 mb-3"></div>
+                <button onclick="window.addNoteEntry()" class="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-400 hover:text-blue-500 transition-colors">
+                    <i data-lucide="plus" class="w-4 h-4"></i> 추가
                 </button>
             </div>
         </div>
 
-        <!-- Board Canvas Wrapper -->
-        <div class="theme-canvas flex-1 overflow-auto relative p-8 bg-[#fcfcfc] transition-colors duration-300 select-none" id="canvas-wrapper">
-            <div id="zoom-container" class="origin-top-left transition-transform duration-200 w-max min-w-full pr-8 pb-8">
-                <input type="text" id="doc-title" value="" oninput="window.updateCurrentBoardTitle(this.value)" spellcheck="false" class="text-3xl font-bold mb-6 bg-transparent border-none w-full text-gray-800 min-w-[400px]" placeholder="시놉시스 제목을 입력하세요">
-                
-                <div id="board-container" class="flex flex-col border-t border-l border-gray-200 bg-white shadow-sm w-max min-w-full">
-                </div>
-            </div>
-        </div>
-
-        <!-- Zoom Controls -->
-        <div class="absolute bottom-6 right-6 flex items-center bg-white border border-gray-200 shadow-lg rounded-full px-3 py-1.5 gap-3 z-30">
-            <button onclick="window.changeZoom(-0.1)" class="text-gray-500 hover:text-gray-800"><i data-lucide="zoom-out" class="w-4 h-4"></i></button>
-            <span id="zoom-level-text" class="text-xs font-semibold w-10 text-center">100%</span>
-            <button onclick="window.changeZoom(0.1)" class="text-gray-500 hover:text-gray-800"><i data-lucide="zoom-in" class="w-4 h-4"></i></button>
-            <div class="w-px h-4 bg-gray-300 mx-1"></div>
-            <button onclick="window.resetZoom()" class="text-xs text-gray-500 hover:text-gray-800 font-medium">초기화</button>
-        </div>
     </div>
 
     <!-- Right Sidebar (Tools) -->
-    <div id="right-sidebar" class="theme-panel sidebar-right w-64 bg-white border-l border-gray-200 flex flex-col shrink-0 h-full overflow-y-auto z-20 shadow-sm relative transition-all duration-300 ease-in-out">
-        
+    <div id="right-sidebar" class="theme-panel sidebar-right bg-white border-l border-gray-200 flex flex-col shrink-0 h-full overflow-y-auto z-20 shadow-sm relative transition-all duration-300 ease-in-out" style="width:280px;">
+
+        <div class="border-b border-gray-100 flex items-center sticky top-0 z-10" style="padding:8px 4px; gap:2px; flex-wrap:nowrap; background-color:inherit;" data-rs-init="1">
+            <button class="main-tab-btn" data-tab="character" onclick="window.switchMainTab('character')" title="캐릭터" style="padding:6px 2px; font-size:11px; flex-direction:column; gap:2px; flex:1; min-width:0;">
+                <i data-lucide="users" class="w-4 h-4"></i> 캐릭터
+            </button>
+            <button class="main-tab-btn main-tab-active" data-tab="plot" onclick="window.switchMainTab('plot')" title="플롯" style="padding:6px 2px; font-size:11px; flex-direction:column; gap:2px; flex:1; min-width:0;">
+                <i data-lucide="layout-grid" class="w-4 h-4"></i> 플롯
+            </button>
+            <button class="main-tab-btn" data-tab="memo" onclick="window.switchMainTab('memo')" title="메모" style="padding:6px 2px; font-size:11px; flex-direction:column; gap:2px; flex:1; min-width:0;">
+                <i data-lucide="notebook-pen" class="w-4 h-4"></i> 메모
+            </button>
+        </div>
+
+        <!-- 카드 크기 / 집필 모드 -->
+        <div class="p-3 border-b border-gray-100 flex items-center gap-2" data-rs-init="1">
+            <div class="flex items-center gap-1 text-gray-600 flex-1" style="min-width:0;" title="카드 너비(크기) 조절">
+                <input type="range" min="250" max="500" step="10" value="400" oninput="window.changeCardSize(this.value)" id="card-size-slider" class="accent-gray-500 cursor-pointer" style="min-width:0; width:72%;">
+                <span id="card-size-text" class="text-[11px] font-semibold w-9 text-center shrink-0">400px</span>
+            </div>
+            <button onclick="window.toggleWritingMode()" id="writing-mode-btn" class="shrink-0 text-base px-2.5 py-1.5 hover:text-indigo-600 transition-colors font-medium whitespace-nowrap text-gray-500" style="background:transparent; border:none;" title="집필 모드 (선택한 카드를 위젯으로 띄우기)">
+                집필모드
+            </button>
+        </div>
+
         <!-- Timeline Setting (Tracks) -->
-        <div class="p-4 border-b border-gray-100 bg-white">
+        <div class="p-4 border-b border-gray-100">
             <div class="flex items-center justify-between">
                 <span class="text-xs text-gray-600 font-bold flex items-center gap-1.5">
                     <i data-lucide="clock" class="w-3.5 h-3.5"></i> 트랙 수 조절
@@ -436,105 +488,112 @@
             </div>
         </div>
 
+        <!-- 서식 도구 -->
+        <div class="p-3 border-b border-gray-100 flex flex-col gap-1.5" data-rs-init="1">
+            <div class="flex items-center gap-0.5 text-gray-600">
+                <!-- 폰트 색상 -->
+                <div class="relative flex items-center justify-center flex-1" style="min-width:0;">
+                    <button id="color-picker-btn" onclick="window.toggleTextColorPalette()" class="flex items-center justify-center gap-1 px-1 py-1.5 rounded hover:bg-gray-50 transition-colors text-xs" style="width:60%; -webkit-appearance:none; appearance:none; border:none; background:transparent;" title="글자 색상">
+                        <div id="current-text-color-indicator" class="w-3.5 h-3.5 rounded-full bg-black border border-gray-200 shrink-0"></div>
+                        글자
+                    </button>
+
+                    <div id="text-color-palette" class="absolute top-full mt-2 left-0 bg-white border border-gray-200 shadow-lg rounded-md p-2 z-50 hidden w-max">
+                        <div class="grid grid-cols-5 gap-1.5">
+                            <button onclick="window.applyTextColor('#000000')" class="w-5 h-5 rounded border border-gray-200 hover:scale-110 transition-transform" style="background-color:#000000;" title="검정"></button>
+                            <button onclick="window.applyTextColor('#ffffff')" class="w-5 h-5 rounded border border-gray-200 hover:scale-110 transition-transform" style="background-color:#ffffff;" title="흰색"></button>
+                            <button onclick="window.applyTextColor('#ef4444')" class="w-5 h-5 rounded border border-gray-200 hover:scale-110 transition-transform" style="background-color:#ef4444;" title="빨강"></button>
+                            <button onclick="window.applyTextColor('#3b82f6')" class="w-5 h-5 rounded border border-gray-200 hover:scale-110 transition-transform" style="background-color:#3b82f6;" title="파랑"></button>
+                            <button onclick="window.applyTextColor('#22c55e')" class="w-5 h-5 rounded border border-gray-200 hover:scale-110 transition-transform" style="background-color:#22c55e;" title="초록"></button>
+                            <button onclick="window.applyTextColor('#a855f7')" class="w-5 h-5 rounded border border-gray-200 hover:scale-110 transition-transform" style="background-color:#a855f7;" title="보라"></button>
+                            <button onclick="window.applyTextColor('#eab308')" class="w-5 h-5 rounded border border-gray-200 hover:scale-110 transition-transform" style="background-color:#eab308;" title="노랑"></button>
+                            <button onclick="window.applyTextColor('#f97316')" class="w-5 h-5 rounded border border-gray-200 hover:scale-110 transition-transform" style="background-color:#f97316;" title="주황"></button>
+                            <button onclick="window.applyTextColor('#84cc16')" class="w-5 h-5 rounded border border-gray-200 hover:scale-110 transition-transform" style="background-color:#84cc16;" title="연두"></button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 폰트 배경 색상 -->
+                <div class="relative flex items-center justify-start flex-1" style="min-width:0;">
+                    <button id="bg-color-picker-btn" onclick="window.toggleBgColorPalette()" class="flex items-center justify-center gap-1 px-1 py-1.5 rounded hover:bg-gray-50 transition-colors text-xs" style="width:60%; margin-left:-10px; -webkit-appearance:none; appearance:none; border:none; background:transparent;" title="글자 배경 색상">
+                        <div id="current-bg-color-indicator" class="w-3.5 h-3.5 rounded-full bg-white border border-gray-200 shrink-0"></div>
+                        배경
+                    </button>
+
+                    <div id="bg-color-palette" class="absolute top-full mt-2 right-0 bg-white border border-gray-200 shadow-lg rounded-md p-2 z-50 hidden w-max">
+                        <div class="grid grid-cols-5 gap-1.5">
+                            <button onclick="window.applyBgColor('transparent')" class="w-5 h-5 rounded bg-white border border-gray-300 hover:scale-110 transition-transform" title="없음"></button>
+                            <button onclick="window.applyBgColor('#fef08a')" class="w-5 h-5 rounded border border-gray-200 hover:scale-110 transition-transform" style="background-color:#fef08a;" title="노랑"></button>
+                            <button onclick="window.applyBgColor('#fecaca')" class="w-5 h-5 rounded border border-gray-200 hover:scale-110 transition-transform" style="background-color:#fecaca;" title="빨강"></button>
+                            <button onclick="window.applyBgColor('#bfdbfe')" class="w-5 h-5 rounded border border-gray-200 hover:scale-110 transition-transform" style="background-color:#bfdbfe;" title="파랑"></button>
+                            <button onclick="window.applyBgColor('#bbf7d0')" class="w-5 h-5 rounded border border-gray-200 hover:scale-110 transition-transform" style="background-color:#bbf7d0;" title="초록"></button>
+                            <button onclick="window.applyBgColor('#e9d5ff')" class="w-5 h-5 rounded border border-gray-200 hover:scale-110 transition-transform" style="background-color:#e9d5ff;" title="보라"></button>
+                            <button onclick="window.applyBgColor('#fed7aa')" class="w-5 h-5 rounded border border-gray-200 hover:scale-110 transition-transform" style="background-color:#fed7aa;" title="주황"></button>
+                            <button onclick="window.applyBgColor('#d9f99d')" class="w-5 h-5 rounded border border-gray-200 hover:scale-110 transition-transform" style="background-color:#d9f99d;" title="연두"></button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 폰트 종류 -->
+                <select id="font-select" onchange="window.formatText('fontName', this.value)" class="cursor-pointer hover:bg-gray-50 outline-none rounded py-1.5" style="flex:0 0 82px; min-width:0; margin-left:-34px; padding-left:0; padding-right:0.25rem; font-size:12px; -webkit-appearance:none; appearance:none; border:none; background:transparent; text-align:center; text-align-last:center;">
+                    <option value="Pretendard, sans-serif">Pretendard</option>
+                    <option value="'KoPub Batang', 'Nanum Myeongjo', serif">바탕체</option>
+                    <option value="'Nanum Gothic', sans-serif">나눔고딕</option>
+                    <option value="'Nanum Myeongjo', serif">나눔명조</option>
+                </select>
+            </div>
+            <div class="flex items-center justify-center gap-0.5 text-gray-600 mt-1">
+                <select id="font-size-select" onchange="window.formatText('fontSizeExact', this.value)" class="cursor-pointer hover:bg-gray-50 text-xs outline-none rounded px-1 py-1" style="flex:0 0 50px; -webkit-appearance:none; appearance:none; border:none; background:transparent; text-align:center; text-align-last:center;">
+                    <option value="10pt">10 pt</option>
+                    <option value="10.5pt" selected>10.5 pt</option>
+                    <option value="11pt">11 pt</option>
+                    <option value="12pt">12 pt</option>
+                    <option value="14pt">14 pt</option>
+                </select>
+                <span class="w-px h-4 bg-gray-200" style="margin:0;"></span>
+                <button onclick="window.formatText('bold')" class="hover:text-gray-900 p-1 rounded hover:bg-black/5" title="굵게"><i data-lucide="bold" class="w-4 h-4"></i></button>
+                <button onclick="window.formatText('italic')" class="hover:text-gray-900 p-1 rounded hover:bg-black/5" title="기울임"><i data-lucide="italic" class="w-4 h-4"></i></button>
+                <button onclick="window.formatText('underline')" class="hover:text-gray-900 p-1 rounded hover:bg-black/5" title="밑줄"><i data-lucide="underline" class="w-4 h-4"></i></button>
+                <button onclick="window.formatText('strikeThrough')" class="hover:text-gray-900 p-1 rounded hover:bg-black/5" title="취소선"><i data-lucide="strikethrough" class="w-4 h-4"></i></button>
+                <span class="w-px h-4 bg-gray-200 mx-1"></span>
+                <button onclick="window.formatText('justifyLeft')" class="hover:text-gray-900 p-1 rounded hover:bg-black/5" title="왼쪽 정렬"><i data-lucide="align-left" class="w-4 h-4"></i></button>
+                <button onclick="window.formatText('justifyCenter')" class="hover:text-gray-900 p-1 rounded hover:bg-black/5" title="가운데 정렬"><i data-lucide="align-center" class="w-4 h-4"></i></button>
+                <button onclick="window.formatText('justifyRight')" class="hover:text-gray-900 p-1 rounded hover:bg-black/5" title="오른쪽 정렬"><i data-lucide="align-right" class="w-4 h-4"></i></button>
+            </div>
+        </div>
+
         <!-- Marker & Filter -->
-        <div class="p-4 border-b border-gray-100">
-            <div class="flex justify-between items-center mb-3">
+        <div class="p-1.5 border-b border-gray-100" data-rs-init="1">
+            <div class="flex justify-between items-center" style="margin-bottom:8px;">
                 <h3 class="text-xs font-bold text-gray-500 flex items-center gap-1"><i data-lucide="bookmark" class="w-3 h-3"></i> 마커 스탬프</h3>
             </div>
-            <div class="grid grid-cols-4 gap-2 mb-3">
-                <div onclick="window.toggleMarker('pin')" class="flex flex-col items-center gap-1 cursor-pointer hover:bg-black/5 p-2 rounded border border-transparent hover:border-gray-200 transition-all"><i data-lucide="pin" class="w-5 h-5 text-red-500"></i><span class="text-[10px] text-gray-600">핀</span></div>
-                <div onclick="window.toggleMarker('star')" class="flex flex-col items-center gap-1 cursor-pointer hover:bg-black/5 p-2 rounded border border-transparent hover:border-gray-200 transition-all"><i data-lucide="star" class="w-5 h-5 text-yellow-500"></i><span class="text-[10px] text-gray-600">중요</span></div>
-                <div onclick="window.toggleMarker('heart')" class="flex flex-col items-center gap-1 cursor-pointer hover:bg-black/5 p-2 rounded border border-transparent hover:border-gray-200 transition-all"><i data-lucide="heart" class="w-5 h-5 text-red-500"></i><span class="text-[10px] text-gray-600">씬</span></div>
-                <div onclick="window.toggleMarker('alert-circle')" class="flex flex-col items-center gap-1 cursor-pointer hover:bg-black/5 p-2 rounded border border-transparent hover:border-gray-200 transition-all"><i data-lucide="alert-circle" class="w-5 h-5 text-green-500"></i><span class="text-[10px] text-gray-600">수정</span></div>
-            </div>
-            
-            <!-- Filter Section -->
-            <div class="pt-3 border-t border-gray-100 border-dashed">
-                <span class="text-[10px] font-bold text-gray-400 mb-2 block tracking-wider">마커 필터링 (모아보기)</span>
-                <div class="flex gap-1.5">
-                    <button onclick="window.toggleFilter('heart')" id="filter-btn-heart" class="flex-1 py-1 text-[11px] rounded border border-gray-200 flex items-center justify-center gap-1 text-gray-500 transition-colors"><i data-lucide="heart" class="w-3 h-3 text-red-500"></i> 씬 점검</button>
-                    <button onclick="window.toggleFilter('alert-circle')" id="filter-btn-alert-circle" class="flex-1 py-1 text-[11px] rounded border border-gray-200 flex items-center justify-center gap-1 text-gray-500 transition-colors"><i data-lucide="alert-circle" class="w-3 h-3 text-green-500"></i> 수정 점검</button>
-                </div>
+            <div class="grid grid-cols-4 gap-2" style="margin-top:8px;">
+                <div onclick="window.toggleMarker('pin')" class="flex flex-col items-center gap-1 cursor-pointer hover:bg-black/5 p-1 rounded border border-transparent hover:border-gray-200 transition-all"><i data-lucide="pin" class="w-5 h-5 text-red-500"></i><span class="text-[10px] text-gray-600">핀</span></div>
+                <div onclick="window.toggleMarker('star')" class="flex flex-col items-center gap-1 cursor-pointer hover:bg-black/5 p-1 rounded border border-transparent hover:border-gray-200 transition-all"><i data-lucide="star" class="w-5 h-5 text-yellow-500"></i><span class="text-[10px] text-gray-600">중요</span></div>
+                <div onclick="window.toggleMarker('heart')" class="flex flex-col items-center gap-1 cursor-pointer hover:bg-black/5 p-1 rounded border border-transparent hover:border-gray-200 transition-all"><i data-lucide="heart" class="w-5 h-5 text-red-500"></i><span class="text-[10px] text-gray-600">씬</span></div>
+                <div onclick="window.toggleMarker('alert-circle')" class="flex flex-col items-center gap-1 cursor-pointer hover:bg-black/5 p-1 rounded border border-transparent hover:border-gray-200 transition-all"><i data-lucide="alert-circle" class="w-5 h-5 text-green-500"></i><span class="text-[10px] text-gray-600">수정</span></div>
             </div>
         </div>
 
         <!-- Color Palette -->
-        <div class="p-4 border-b border-gray-100">
+        <div class="p-1.5 border-b border-gray-100" data-rs-init="1">
             <h3 class="text-xs font-bold text-gray-500 mb-3 flex items-center gap-1">
                 <i data-lucide="palette" class="w-3 h-3"></i> 컬러 분류
             </h3>
-            <div id="palette-grid" class="flex flex-wrap gap-2.5 mb-2">
-            </div>
-            <button onclick="window.changeCardColor('bg-white')" class="w-full mt-4 py-1.5 text-[11px] font-medium border border-gray-200 text-gray-500 hover:text-gray-800 hover:bg-black/5 rounded transition-colors">
-                선택 카드 색상 빼기
-            </button>
-        </div>
-
-        <!-- 체크리스트 섹션 -->
-        <div class="p-4 border-b border-gray-100">
-            <div class="flex items-center justify-between mb-2">
-                <h3 class="text-xs font-bold text-gray-500 flex items-center gap-1">
-                    <i data-lucide="check-square" class="w-3 h-3"></i> 씬 체크리스트
-                </h3>
-                <button onclick="window.addChecklistItem()" class="text-[10px] text-blue-500 hover:text-blue-700 font-bold flex items-center gap-0.5">
-                    <i data-lucide="plus" class="w-3 h-3"></i> 추가
-                </button>
-            </div>
-            <div id="checklist-container" class="space-y-1 text-xs text-gray-500"></div>
-        </div>
-
-        <!-- 회차별 분량 설계 -->
-        <div class="p-4 border-b border-gray-100">
-            <div class="flex items-center justify-between mb-2">
-                <h3 class="text-xs font-bold text-gray-500 flex items-center gap-1">
-                    <i data-lucide="layers" class="w-3 h-3"></i> 회차별 분량
-                </h3>
-                <div class="flex items-center gap-1 text-[10px] text-gray-400">
-                    <span>목표</span>
-                    <input type="number" id="episode-target-input" min="500" step="100" value="5500"
-                           oninput="window.updateEpisodeTarget(this.value)"
-                           class="w-16 bg-gray-50 border border-gray-200 rounded px-1 py-0.5 text-[11px] text-gray-700 text-right outline-none focus:border-indigo-300">
-                    <span>자</span>
-                </div>
-            </div>
-            <div id="episode-summary" class="space-y-2 text-xs"></div>
-        </div>
-
-        <!-- 복선 / 떡밥 추적 -->
-        <div class="p-4 border-b border-gray-100">
-            <div class="flex items-center justify-between mb-2">
-                <h3 class="text-xs font-bold text-gray-500 flex items-center gap-1">
-                    <i data-lucide="anchor" class="w-3 h-3"></i> 복선 · 떡밥
-                </h3>
-                <button onclick="window.addForeshadow()" class="text-[10px] text-amber-600 hover:text-amber-700 font-bold flex items-center gap-0.5">
-                    <i data-lucide="plus" class="w-3 h-3"></i> 추가
-                </button>
-            </div>
-            <div id="foreshadow-editor" class="space-y-1 mb-3"></div>
-            <div class="pt-2 border-t border-dashed border-gray-100">
-                <span class="text-[10px] font-bold text-gray-400 mb-1.5 block tracking-wider">작품 전체 복선 현황</span>
-                <div id="foreshadow-summary" class="space-y-1 text-[11px] text-gray-500"></div>
+            <div id="palette-grid" class="flex flex-wrap justify-center gap-2.5 mb-2" style="margin-top:12px;">
             </div>
         </div>
 
-        <!-- Memo Section (Tabs & Textarea) -->
-        <div class="p-4 flex-1 flex flex-col min-h-[300px] bg-black/5">
-            <div class="flex items-center justify-between mb-2">
-                <h3 class="text-xs font-bold text-gray-500 flex items-center gap-1">
-                    <i data-lucide="file-key-2" class="w-3 h-3"></i> 설정 및 기획 메모
-                </h3>
-                <button onclick="window.editMemoTabs()" class="text-[10px] text-gray-400 hover:text-blue-600 font-bold flex items-center gap-0.5" title="탭 이름 커스터마이징">
-                    <i data-lucide="pencil" class="w-3 h-3"></i>
-                </button>
-            </div>
-            
-            <!-- Memo Tabs -->
-            <div class="flex flex-wrap gap-1 mb-2" id="memo-tabs">
-                <!-- JS에서 동적 렌더링 -->
-            </div>
-
-            <textarea id="board-memo" oninput="window.updateBoardMemo(this.value)" spellcheck="false" class="w-full flex-1 resize-none bg-white border border-gray-200/60 rounded p-2 text-xs text-gray-700 outline-none focus:border-gray-300 transition-all custom-scrollbar shadow-sm" placeholder="내용을 입력하세요."></textarea>
+        <!-- 캐릭터/메모 참고 보기 -->
+        <div class="p-2 border-b border-gray-100" data-rs-init="1">
+            <h3 class="text-xs font-bold text-gray-500 flex items-center gap-1" style="margin-bottom:8px;">
+                <i data-lucide="eye" class="w-3 h-3"></i> 참고 보기
+            </h3>
+            <select id="sidebar-ref-select" onchange="window.switchSidebarRef(this.value)"
+                    class="w-full text-xs bg-gray-50 border border-gray-200 rounded px-2 py-1.5 outline-none focus:border-indigo-300" style="margin-top:0; margin-bottom:5px;"></select>
+            <div id="sidebar-ref-content" class="text-xs text-gray-600 space-y-2" style="max-height:360px; overflow-y:auto;"></div>
         </div>
+
     </div>
 
     <!-- Node.js + IndexedDB 하이브리드 로직 -->
@@ -1159,11 +1218,14 @@ window.manualFirebasePush = async function () {
             { id: 'mainMale', label: '남자주인공' },
             { id: 'mainFemale', label: '여자주인공' },
             { id: 'subChar', label: '조연' },
-            { id: 'background', label: '배경' },
             { id: 'synopsis', label: '시놉시스' },
+            { id: 'background', label: '배경' },
+            { id: 'commercialPoint', label: '상업 포인트' },
             { id: 'keyDevice', label: '주요장치' },
+            { id: 'twist', label: '반전' },
             { id: 'general', label: '메모' },
         ];
+        const NOTE_TAB_ORDER = ['synopsis', 'background', 'commercialPoint', 'keyDevice', 'twist', 'general'];
 
         const memoTabPlaceholders = {
             mainMale: '남자주인공의 성격, 외모, 배경, 설정 등을 기록하세요.',
@@ -1171,7 +1233,9 @@ window.manualFirebasePush = async function () {
             subChar: '중요 조연 및 주변 인물들의 관계와 설정을 기록하세요.',
             background: '작품의 핵심 세계관, 공간적/시간적 배경을 기록하세요.',
             synopsis: '전체 줄거리와 기승전결 뼈대를 요약 기록하세요.',
+            commercialPoint: '이 작품의 상업적 셀링 포인트를 기록하세요.',
             keyDevice: '작품 내 중요한 복선, 키워드, 소품 등을 기록하세요.',
+            twist: '반전 요소나 트릭을 기록하세요.',
             general: '자유로운 아이디어나 추가 메모를 기록하세요.'
         };
 
@@ -1190,7 +1254,26 @@ window.manualFirebasePush = async function () {
                 // 메모 탭 커스터마이징 초기화
                 if (!w.memoTabs) {
                     w.memoTabs = JSON.parse(JSON.stringify(DEFAULT_MEMO_TABS));
+                } else {
+                    // 상업 포인트/반전 등 새 탭이 없으면 추가하고, 정해진 순서로 정렬
+                    const canonicalOrder = DEFAULT_MEMO_TABS.map(t => t.id);
+                    const existingIds = w.memoTabs.map(t => t.id);
+                    canonicalOrder.forEach(id => {
+                        if (!existingIds.includes(id)) {
+                            const def = DEFAULT_MEMO_TABS.find(t => t.id === id);
+                            if (def) w.memoTabs.push({ ...def });
+                        }
+                    });
+                    w.memoTabs.sort((a, b) => {
+                        const ai = canonicalOrder.indexOf(a.id), bi = canonicalOrder.indexOf(b.id);
+                        return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+                    });
                 }
+                if (!w.memoPhotos || typeof w.memoPhotos !== 'object') w.memoPhotos = {};
+                if (!w.memoPhotoPos || typeof w.memoPhotoPos !== 'object') w.memoPhotoPos = {};
+                if (!w.charProfiles || typeof w.charProfiles !== 'object') w.charProfiles = {};
+                if (!Array.isArray(w.subChars)) w.subChars = [];
+                if (!w.memoEntries || typeof w.memoEntries !== 'object') w.memoEntries = {};
                 // 카드별 체크리스트 초기화
                 (w.data || []).forEach(row => {
                     (row.cards || []).forEach(card => {
@@ -1199,6 +1282,27 @@ window.manualFirebasePush = async function () {
                         if (!card.cardFontSize) card.cardFontSize = '';
                         if (card.episode == null) card.episode = '';      // 회차 번호 (문자열)
                         if (!Array.isArray(card.foreshadows)) card.foreshadows = []; // [{id,label,role:'plant'|'payoff'}]
+                        // 구버전 단일 content(문자열) → blocks(배열) 마이그레이션
+                        if (!Array.isArray(card.blocks)) {
+                            card.blocks = [{ id: generateId(), html: card.content || '' }];
+                        }
+                        delete card.content;
+                        // 마커/색상은 카드가 아닌 블록 단위로 적용
+                        card.blocks.forEach(b => {
+                            if (!Array.isArray(b.markers)) b.markers = [];
+                            if (b.color == null) b.color = '';
+                        });
+                        // 구버전 카드 단위 마커/색상 → 첫 블록으로 이전
+                        if (card.blocks[0]) {
+                            if (Array.isArray(card.markers)) {
+                                card.markers.forEach(m => {
+                                    if (!card.blocks[0].markers.includes(m)) card.blocks[0].markers.push(m);
+                                });
+                            }
+                            if (card.color && !card.blocks[0].color) card.blocks[0].color = card.color;
+                        }
+                        card.markers = [];
+                        card.color = '';
                     });
                     if (!row.color) row.color = 'gray';
                 });
@@ -1334,7 +1438,7 @@ window.manualFirebasePush = async function () {
                     (row.cards || []).forEach((card, cIdx) => {
                         const titleMatch = (card.title || '').toLowerCase().includes(q);
                         const locMatch = (card.location || '').toLowerCase().includes(q);
-                        const contentText = card.content ? card.content.replace(/<[^>]+>/g, '') : '';
+                        const contentText = (card.blocks || []).map(b => (b.html || '').replace(/<[^>]+>/g, '')).join(' ');
                         const contentMatch = contentText.toLowerCase().includes(q);
                         if (titleMatch || locMatch || contentMatch) {
                             results.push({ board, row, card, rIdx, cIdx });
@@ -1391,6 +1495,7 @@ window.manualFirebasePush = async function () {
 
         function renderChecklist(card) {
             const container = document.getElementById('checklist-container');
+            if (!container) return;
             if (!card || !card.checklist || card.checklist.length === 0) {
                 container.innerHTML = '';
                 return;
@@ -1658,6 +1763,7 @@ window.manualFirebasePush = async function () {
                     copy.title = (copy.title || '') + ' (복사)';
                     copy.checklist = (copy.checklist || []).map(item => ({ ...item, id: generateId() }));
                     copy.foreshadows = (copy.foreshadows || []).map(f => ({ ...f, id: generateId() }));
+                    copy.blocks = (copy.blocks || []).map(b => ({ ...b, id: generateId() }));
                     r.cards.splice(idx + 1, 0, copy);
                     renderAll();
                     window.triggerSave();
@@ -1857,8 +1963,8 @@ window.manualFirebasePush = async function () {
                         title: '발단',
                         color: 'red',
                         cards: [
-                            { id: generateId(), title: '장면 1', location: '호텔 연회장', estWords: '3000', content: '시작되는 씬의 간략한 상황 묘사를 작성합니다.', color: 'bg-white', markers: ['heart'], checklist: [] },
-                            { id: generateId(), title: '장면 2', location: '주인공 오피스텔', estWords: '2500', content: '다음 씬으로 넘어가는 과정을 씁니다.', color: 'bg-white', markers: [], checklist: [] }
+                            { id: generateId(), title: '장면 1', location: '호텔 연회장', estWords: '3000', blocks: [{ id: generateId(), html: '시작되는 씬의 간략한 상황 묘사를 작성합니다.' }], color: 'bg-white', markers: ['heart'], checklist: [] },
+                            { id: generateId(), title: '장면 2', location: '주인공 오피스텔', estWords: '2500', blocks: [{ id: generateId(), html: '다음 씬으로 넘어가는 과정을 씁니다.' }], color: 'bg-white', markers: [], checklist: [] }
                         ]
                     },
                     {
@@ -1866,7 +1972,7 @@ window.manualFirebasePush = async function () {
                         title: '전개',
                         color: 'orange',
                         cards: [
-                            { id: generateId(), title: '', location: '', estWords: '', content: '', color: 'bg-white', markers: [], checklist: [] }
+                            { id: generateId(), title: '', location: '', estWords: '', blocks: [{ id: generateId(), html: '' }], color: 'bg-white', markers: [], checklist: [] }
                         ]
                     }
                 ]
@@ -1894,6 +2000,12 @@ window.manualFirebasePush = async function () {
             { class: 'bg-pink-50', viewClass: 'bg-pink-300' },
             { class: 'bg-purple-50', viewClass: 'bg-purple-300' },
         ];
+
+        // 블록 배경색: Tailwind 정적 빌드 순서 문제를 피하기 위해 인라인 스타일로 직접 적용
+        const BLOCK_COLOR_HEX = {
+            'bg-red-50': '#fef2f2', 'bg-blue-50': '#eff6ff', 'bg-green-50': '#f0fdf4',
+            'bg-orange-50': '#fff7ed', 'bg-pink-50': '#fdf2f8', 'bg-purple-50': '#faf5ff'
+        };
 
         const markerColors = {
             'pin': 'text-red-500',
@@ -1960,10 +2072,18 @@ window.manualFirebasePush = async function () {
         };
 
         window.resetData = () => {
-            if (confirm("모든 보드 및 카드 데이터가 삭제됩니다. 초기화하시겠습니까? (이 작업은 되돌릴 수 없습니다.)")) {
+            const board = window.getCurrentBoard();
+            if (!board) return;
+            if (confirm(`"${board.title || '이 시놉시스'}"의 모든 플롯 내용(트랙·장면·블록)이 삭제됩니다. 초기화하시겠습니까? (이 작업은 되돌릴 수 없습니다.)`)) {
                 pushHistory();
-                window.workspaces = [];
-                window.createNewBoard(); 
+                board.data = [
+                    { id: generateId(), title: '', color: 'gray', cards: [{ id: generateId(), title: '', location: '', estWords: '', blocks: [{ id: generateId(), html: '' }], color: 'bg-gray-50', markers: [], checklist: [], episode: '', foreshadows: [] }] }
+                ];
+                window.activeCardId = null;
+                window.activeBlockId = null;
+                window.activeBlockEditorId = null;
+                renderAll();
+                window.triggerSave();
             }
         };
 
@@ -1978,10 +2098,13 @@ window.manualFirebasePush = async function () {
                     if(card.location) text += `* 장소: ${card.location}\n`;
                     if(card.estWords) text += `* 예상 자수: ${card.estWords}자\n`;
                     text += `\n`;
-                    const tempDiv = document.createElement('div');
-                    tempDiv.innerHTML = card.content.replace(/<br\s*[\/]?>/gi, "\n").replace(/<\/p>/gi, "\n").replace(/<\/div>/gi, "\n");
-                    let plainText = tempDiv.innerText || tempDiv.textContent;
-                    text += `${plainText.trim()}\n\n`;
+                    const blockTexts = (card.blocks || []).map(block => {
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = (block.html || '').replace(/<br\s*[\/]?>/gi, "\n").replace(/<\/p>/gi, "\n").replace(/<\/div>/gi, "\n");
+                        const plain = tempDiv.innerText || tempDiv.textContent;
+                        return plain.trim();
+                    }).filter(t => t);
+                    text += `${blockTexts.join('\n\n')}\n\n`;
                     if (card.checklist && card.checklist.length > 0) {
                         text += `[체크리스트]\n`;
                         card.checklist.forEach(item => {
@@ -2060,7 +2183,7 @@ window.manualFirebasePush = async function () {
             const board = window.getCurrentBoard();
             if(board) { board.cardWidth = width; window.triggerSave(); }
             document.getElementById('card-size-text').textContent = width + 'px';
-            document.querySelectorAll('.card-wrapper, .add-card-btn').forEach(el => { el.style.width = width + 'px'; });
+            document.querySelectorAll('.card-wrapper').forEach(el => { el.style.width = width + 'px'; });
         };
 
         window.toggleLeftSidebar = () => {
@@ -2135,17 +2258,17 @@ window.manualFirebasePush = async function () {
 
         window.toggleRightSidebar = () => {
             const sidebar = document.getElementById('right-sidebar');
-            const icon = document.getElementById('sidebar-icon');
             const edgeBtn = document.getElementById('right-sidebar-toggle');
+            const edgeIcon = document.getElementById('right-toggle-icon');
             window.isRightSidebarVisible = !window.isRightSidebarVisible;
             if (window.isRightSidebarVisible) {
                 sidebar.classList.remove('collapsed');
-                if (icon) icon.setAttribute('data-lucide', 'panel-right-open');
-                if (edgeBtn) edgeBtn.style.display = 'none';
+                if (edgeBtn) edgeBtn.style.right = '280px';
+                if (edgeIcon) edgeIcon.setAttribute('data-lucide', 'chevron-right');
             } else {
                 sidebar.classList.add('collapsed');
-                if (icon) icon.setAttribute('data-lucide', 'panel-right-close');
-                if (edgeBtn) edgeBtn.style.display = 'flex';
+                if (edgeBtn) edgeBtn.style.right = '0px';
+                if (edgeIcon) edgeIcon.setAttribute('data-lucide', 'chevron-left');
             }
             if(window.lucide) window.lucide.createIcons();
         };
@@ -2171,6 +2294,16 @@ window.manualFirebasePush = async function () {
             window.formatText('foreColor', color);
             document.getElementById('current-text-color-indicator').style.backgroundColor = color;
             document.getElementById('text-color-palette').classList.add('hidden');
+        };
+
+        window.toggleBgColorPalette = () => {
+            document.getElementById('bg-color-palette').classList.toggle('hidden');
+        };
+
+        window.applyBgColor = (color) => {
+            window.formatText('hiliteColor', color);
+            document.getElementById('current-bg-color-indicator').style.backgroundColor = color === 'transparent' ? '#ffffff' : color;
+            document.getElementById('bg-color-palette').classList.add('hidden');
         };
 
         // 집필 모드 → 본 창 폰트 반영 전용. IPC를 다시 보내지 않아 무한 루프를 끊는다.
@@ -2202,22 +2335,24 @@ window.manualFirebasePush = async function () {
             (board.data || []).forEach(row => {
                 (row.cards || []).forEach(card => {
                     if (isSize) card.cardFontSize = value;
-                    if (!card.content) return;
-                    const tmp = document.createElement('div');
-                    tmp.innerHTML = card.content;
-                    Array.from(tmp.querySelectorAll(`font[${attr}]`)).forEach(el => {
-                        el.removeAttribute(attr);
-                        if (!el.getAttribute('style') && !el.getAttribute('color') &&
-                            !el.getAttribute('size') && !el.getAttribute('face')) {
-                            el.replaceWith(...Array.from(el.childNodes));
-                        }
+                    (card.blocks || []).forEach(block => {
+                        if (!block.html) return;
+                        const tmp = document.createElement('div');
+                        tmp.innerHTML = block.html;
+                        Array.from(tmp.querySelectorAll(`font[${attr}]`)).forEach(el => {
+                            el.removeAttribute(attr);
+                            if (!el.getAttribute('style') && !el.getAttribute('color') &&
+                                !el.getAttribute('size') && !el.getAttribute('face')) {
+                                el.replaceWith(...Array.from(el.childNodes));
+                            }
+                        });
+                        Array.from(tmp.querySelectorAll(`[style*="${cssKey}"]`)).forEach(el => {
+                            el.style[styleProp] = '';
+                            const st = el.getAttribute('style');
+                            if (!st || !st.trim()) el.removeAttribute('style');
+                        });
+                        block.html = tmp.innerHTML;
                     });
-                    Array.from(tmp.querySelectorAll(`[style*="${cssKey}"]`)).forEach(el => {
-                        el.style[styleProp] = '';
-                        const st = el.getAttribute('style');
-                        if (!st || !st.trim()) el.removeAttribute('style');
-                    });
-                    card.content = tmp.innerHTML;
                 });
             });
             window.triggerSave();
@@ -2248,9 +2383,10 @@ window.manualFirebasePush = async function () {
                 (board.data || []).forEach(row => {
                     (row.cards || []).forEach(card => {
                         card.cardFontSize = value;
-                        if (card.content) {
+                        (card.blocks || []).forEach(block => {
+                            if (!block.html) return;
                             const tmp = document.createElement('div');
-                            tmp.innerHTML = card.content;
+                            tmp.innerHTML = block.html;
                             tmp.querySelectorAll('font[size]').forEach(el => {
                                 el.removeAttribute('size');
                                 if (!el.getAttribute('style') && !el.getAttribute('color') && !el.getAttribute('face')) el.replaceWith(...el.childNodes);
@@ -2259,8 +2395,8 @@ window.manualFirebasePush = async function () {
                                 el.style.fontSize = '';
                                 if (!el.getAttribute('style').trim()) el.removeAttribute('style');
                             });
-                            card.content = tmp.innerHTML;
-                        }
+                            block.html = tmp.innerHTML;
+                        });
                     });
                 });
                 // 집필 모드 창에 폰트 크기 변경 전달
@@ -2286,9 +2422,10 @@ window.manualFirebasePush = async function () {
                 });
                 (board.data || []).forEach(row => {
                     (row.cards || []).forEach(card => {
-                        if (card.content) {
+                        (card.blocks || []).forEach(block => {
+                            if (!block.html) return;
                             const tmp = document.createElement('div');
-                            tmp.innerHTML = card.content;
+                            tmp.innerHTML = block.html;
                             tmp.querySelectorAll('font[face]').forEach(el => {
                                 el.removeAttribute('face');
                                 if (!el.getAttribute('style') && !el.getAttribute('color') && !el.getAttribute('size')) el.replaceWith(...el.childNodes);
@@ -2297,8 +2434,8 @@ window.manualFirebasePush = async function () {
                                 el.style.fontFamily = '';
                                 if (!el.getAttribute('style').trim()) el.removeAttribute('style');
                             });
-                            card.content = tmp.innerHTML;
-                        }
+                            block.html = tmp.innerHTML;
+                        });
                     });
                 });
                 // 집필 모드 창에 폰트 변경 전달
@@ -2306,18 +2443,18 @@ window.manualFirebasePush = async function () {
                 window.triggerSave();
                 return;
             }
-            // formatBlock은 반드시 활성 에디터에만 적용
+            // formatBlock은 반드시 활성 블록 에디터에만 적용
             if (command === 'formatBlock') {
-                const editor = window.activeCardId ? document.getElementById(`editor-${window.activeCardId}`) : null;
+                const editor = window.activeBlockEditorId ? document.getElementById(window.activeBlockEditorId) : null;
                 if (!editor) return;
                 editor.focus();
                 document.execCommand(command, false, value);
                 return;
             }
             document.execCommand(command, false, value);
-            if(window.activeCardId) {
-                const editor = document.getElementById(`editor-${window.activeCardId}`);
-                if(editor) editor.focus();
+            if (window.activeBlockEditorId) {
+                const editor = document.getElementById(window.activeBlockEditorId);
+                if (editor) editor.focus();
             }
         };
 
@@ -2331,7 +2468,7 @@ window.manualFirebasePush = async function () {
                 memoTabs: JSON.parse(JSON.stringify(DEFAULT_MEMO_TABS)),
                 status: 'active',
                 data: [
-                    { id: generateId(), title: '', color: 'gray', cards: [{ id: generateId(), title: '', location: '', estWords: '', content: '', color: 'bg-white', markers: [], checklist: [] }] }
+                    { id: generateId(), title: '', color: 'gray', cards: [{ id: generateId(), title: '', location: '', estWords: '', blocks: [{ id: generateId(), html: '' }], color: 'bg-white', markers: [], checklist: [] }] }
                 ]
             };
             window.workspaces.push(newBoard);
@@ -2385,8 +2522,8 @@ window.manualFirebasePush = async function () {
         window.switchMemoTab = (tabId) => {
             window.activeMemoTab = tabId;
             const board = window.getCurrentBoard();
-            if(board) {
-                const textarea = document.getElementById('board-memo');
+            const textarea = document.getElementById('board-memo');
+            if (board && textarea) {
                 textarea.value = (board.memos && board.memos[tabId]) ? board.memos[tabId] : '';
                 const placeholder = memoTabPlaceholders[tabId] || '내용을 입력하세요.';
                 textarea.placeholder = placeholder;
@@ -2409,6 +2546,514 @@ window.manualFirebasePush = async function () {
                 board.memos[window.activeMemoTab] = content;
                 window.triggerSave();
             }
+        };
+
+        // ========== 하단 메인 탭 (캐릭터 소개 / 플롯 / 메모) ==========
+        window.activeMainTab = 'plot';
+        const CHAR_PAGE_TAB_IDS = ['mainMale', 'mainFemale', 'subChar'];
+
+        window.switchMainTab = (tab) => {
+            window.activeMainTab = tab;
+            const pagePlot = document.getElementById('page-plot');
+            const pageChar = document.getElementById('page-character');
+            const pageMemo = document.getElementById('page-memo');
+            if (pagePlot) pagePlot.style.display = (tab === 'plot') ? '' : 'none';
+            if (pageChar) pageChar.style.display = (tab === 'character') ? '' : 'none';
+            if (pageMemo) pageMemo.style.display = (tab === 'memo') ? '' : 'none';
+            document.querySelectorAll('.main-tab-btn').forEach(btn => {
+                btn.classList.toggle('main-tab-active', btn.dataset.tab === tab);
+            });
+            if (tab === 'character') renderCharacterPage();
+            if (tab === 'memo') renderNotePage();
+            if (window.lucide) window.lucide.createIcons();
+        };
+
+        // 캐릭터 프로필 항목 정의
+        const PROFILE_LINE_FIELDS = [
+            { key: 'mbti', label: 'MBTI / 성격' },
+            { key: 'scent', label: '향수 / 고유 체향' },
+            { key: 'hobby', label: '취미 / 무의식적 습관' },
+            { key: 'style', label: '선호 색상 / 스타일' },
+            { key: 'speech', label: '말버릇 / 대사 톤' },
+            { key: 'appearance', label: '상세 외양 및 체격 (Body & Features)' },
+        ];
+
+        function profileLineFieldHtml(f, value, isLast) {
+            return `
+                <div class="flex items-center gap-3" style="padding:10px 4px;${isLast ? '' : 'border-bottom:1px solid #f1f3f5;'}">
+                    <span class="text-sm font-bold text-gray-700 shrink-0" style="padding-left:4px;">${f.label} :</span>
+                    <input type="text" value="${escapeHtml(value)}" oninput="window.updateCharField('${f.key}', this.value)" spellcheck="false"
+                           class="flex-1 min-w-0 text-sm text-gray-600 bg-transparent border-none outline-none hover:bg-black/5 focus:bg-gray-50 transition-colors" style="padding:4px 8px;">
+                </div>`;
+        }
+
+        function profileSubItemHtml(f, value) {
+            return `
+                <div class="mb-4 last:mb-0" style="padding:0 4px;">
+                    <div class="text-sm font-bold text-gray-700 mb-1.5">${f.label}</div>
+                    <div class="border-l-2 border-gray-200" style="padding-left:14px;">
+                        <textarea rows="2" oninput="window.updateCharField('${f.key}', this.value); window.autoGrowTextarea(this);" spellcheck="false"
+                                  placeholder="${escapeHtml(f.placeholder || '비어 있는 인용')}"
+                                  class="w-full text-sm text-gray-600 bg-transparent border-none outline-none resize-none placeholder-gray-300" style="overflow:hidden;">${escapeHtml(value)}</textarea>
+                    </div>
+                </div>`;
+        }
+
+        function renderCharProfileFields() {
+            const board = window.getCurrentBoard();
+            const el = document.getElementById('char-profile-fields');
+            if (!board || !el || !window.activeCharTab) return;
+            if (!board.charProfiles) board.charProfiles = {};
+            const profile = board.charProfiles[window.activeCharTab] || {};
+
+            const boxStyle = 'padding:20px 24px;';
+            el.innerHTML = `
+                <div class="bg-white border border-gray-200" style="${boxStyle}">
+                    ${PROFILE_LINE_FIELDS.map((f, i) => profileLineFieldHtml(f, profile[f.key] || '', i === PROFILE_LINE_FIELDS.length - 1)).join('')}
+                </div>
+
+                <div class="bg-white border border-gray-200" style="${boxStyle}">
+                    <div class="text-sm font-bold text-gray-800 mb-3">하루 일과 (Daily Routine)</div>
+                    <textarea rows="3" oninput="window.updateCharField('dailyRoutine', this.value); window.autoGrowTextarea(this);" spellcheck="false"
+                              placeholder="하루 일과를 기록하세요." class="w-full text-sm text-gray-600 bg-transparent border-none outline-none resize-none placeholder-gray-300" style="overflow:hidden;">${escapeHtml(profile.dailyRoutine || '')}</textarea>
+                </div>
+
+                <div class="bg-white border border-gray-200" style="${boxStyle}">
+                    <div class="flex items-center gap-1.5 text-sm font-bold text-gray-800 mb-3">
+                        <span class="w-3 h-3 rounded-sm bg-red-500 inline-block"></span> 19금 & 텐션 디테일 (R-19)
+                    </div>
+                    ${profileSubItemHtml({ key: 'fetish', label: '성적 취향 및 성감대 (Fetish)', placeholder: '특정 페티시, 강압적 성향, 여주의 특정 부위 집착 등' }, profile.fetish || '')}
+                    ${profileSubItemHtml({ key: 'trigger', label: '발작 버튼 (이성을 잃는 순간)', placeholder: '여주가 다른 남자와 웃을 때, 여주가 다쳤을 때 등' }, profile.trigger || '')}
+                </div>
+
+                <div class="bg-white border border-gray-200" style="${boxStyle}">
+                    <div class="flex items-center gap-1.5 text-sm font-bold text-gray-800 mb-3">
+                        <span class="w-3 h-3 rounded-sm bg-blue-500 inline-block"></span> 심층적 서사 (Core Dynamics)
+                    </div>
+                    ${profileSubItemHtml({ key: 'trauma', label: '결핍 / 트라우마 (약점)' }, profile.trauma || '')}
+                    ${profileSubItemHtml({ key: 'relationship', label: '관계 역학 (갑과 을)' }, profile.relationship || '')}
+                    ${profileSubItemHtml({ key: 'charm', label: '상업적 매력 (모에 포인트)' }, profile.charm || '')}
+                </div>
+            `;
+            el.querySelectorAll('textarea').forEach(t => window.autoGrowTextarea(t));
+            if (window.lucide) window.lucide.createIcons({ el });
+        }
+
+        window.autoGrowTextarea = (el) => {
+            el.style.height = 'auto';
+            el.style.height = el.scrollHeight + 'px';
+        };
+
+        window.updateCharField = (key, value) => {
+            const board = window.getCurrentBoard();
+            if (!board || !window.activeCharTab) return;
+            if (!board.charProfiles) board.charProfiles = {};
+            if (!board.charProfiles[window.activeCharTab]) board.charProfiles[window.activeCharTab] = {};
+            board.charProfiles[window.activeCharTab][key] = value;
+            window.triggerSave();
+        };
+
+        // ========== 우측 사이드바: 캐릭터/메모 참고 보기 ==========
+        window.activeSidebarRef = null; // 'char:<tabId>' 또는 'note:<tabId>'
+
+        function renderSidebarRefSelector() {
+            const board = window.getCurrentBoard();
+            const sel = document.getElementById('sidebar-ref-select');
+            if (!board || !sel) return;
+            const allTabs = board.memoTabs || DEFAULT_MEMO_TABS;
+            const charTabs = allTabs.filter(t => CHAR_PAGE_TAB_IDS.includes(t.id));
+            const noteTabs = allTabs.filter(t => !CHAR_PAGE_TAB_IDS.includes(t.id));
+            sel.innerHTML = `
+                <optgroup label="캐릭터">
+                    ${charTabs.map(t => `<option value="char:${t.id}">${escapeHtml(t.label)}</option>`).join('')}
+                </optgroup>
+                <optgroup label="메모">
+                    ${noteTabs.map(t => `<option value="note:${t.id}">${escapeHtml(t.label)}</option>`).join('')}
+                </optgroup>
+            `;
+            const valid = [...charTabs, ...noteTabs].some(t => window.activeSidebarRef === `char:${t.id}` || window.activeSidebarRef === `note:${t.id}`);
+            if (!window.activeSidebarRef || !valid) {
+                window.activeSidebarRef = charTabs[0] ? `char:${charTabs[0].id}` : (noteTabs[0] ? `note:${noteTabs[0].id}` : null);
+            }
+            if (window.activeSidebarRef) sel.value = window.activeSidebarRef;
+        }
+
+        window.switchSidebarRef = (value) => {
+            window.activeSidebarRef = value;
+            renderSidebarRefContent();
+        };
+
+        window.startSidebarRefPhotoDrag = (e, tabId) => {
+            e.preventDefault();
+            const img = e.currentTarget;
+            const startY = e.clientY;
+            const board0 = window.getCurrentBoard();
+            const startPos = (board0.memoPhotoPos && board0.memoPhotoPos[tabId] && board0.memoPhotoPos[tabId].y != null) ? board0.memoPhotoPos[tabId].y : 50;
+            let latestY = startPos;
+            const onMove = (ev) => {
+                const rect = img.getBoundingClientRect();
+                const deltaPercent = ((ev.clientY - startY) / rect.height) * 100;
+                latestY = Math.max(0, Math.min(100, startPos - deltaPercent));
+                img.style.objectPosition = `50% ${latestY}%`;
+            };
+            const onUp = () => {
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+                const board = window.getCurrentBoard();
+                if (!board) return;
+                board.memoPhotoPos = board.memoPhotoPos || {};
+                board.memoPhotoPos[tabId] = { y: latestY };
+                window.triggerSave();
+            };
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        };
+
+        function renderSidebarRefContent() {
+            const board = window.getCurrentBoard();
+            const el = document.getElementById('sidebar-ref-content');
+            if (!board || !el || !window.activeSidebarRef) return;
+            const sep = window.activeSidebarRef.indexOf(':');
+            const kind = window.activeSidebarRef.slice(0, sep);
+            const tabId = window.activeSidebarRef.slice(sep + 1);
+            const escLine = (s) => escapeHtml(s || '').replace(/\n/g, '<br>');
+
+            if (kind === 'char' && tabId === 'subChar') {
+                const list = board.subChars || [];
+                el.innerHTML = list.length ? list.map(sc => `
+                    <div class="border border-gray-100 rounded p-2 bg-gray-50/50">
+                        <div class="font-bold text-gray-700">${escapeHtml(sc.name) || '(이름 없음)'}</div>
+                        <div class="text-gray-400">${[sc.age, sc.relation, sc.role].filter(Boolean).map(escapeHtml).join(' · ')}</div>
+                        ${sc.note ? `<div class="mt-1">${escLine(sc.note)}</div>` : ''}
+                    </div>
+                `).join('') : '<div class="text-gray-300">내용 없음</div>';
+                return;
+            }
+
+            if (kind === 'char') {
+                const profile = (board.charProfiles && board.charProfiles[tabId]) || {};
+                const rows = [];
+                if (profile.name) rows.push(['이름', profile.name]);
+                if (profile.age) rows.push(['나이', profile.age]);
+                if (profile.job) rows.push(['직업', profile.job]);
+                PROFILE_LINE_FIELDS.forEach(f => { if (profile[f.key]) rows.push([f.label, profile[f.key]]); });
+                if (profile.dailyRoutine) rows.push(['하루 일과', profile.dailyRoutine]);
+                if (profile.fetish) rows.push(['성적 취향', profile.fetish]);
+                if (profile.trigger) rows.push(['발작 버튼', profile.trigger]);
+                if (profile.trauma) rows.push(['결핍/트라우마', profile.trauma]);
+                if (profile.relationship) rows.push(['관계 역학', profile.relationship]);
+                if (profile.charm) rows.push(['상업적 매력', profile.charm]);
+                const photo = (board.memoPhotos && board.memoPhotos[tabId]) || '';
+                const posY = (board.memoPhotoPos && board.memoPhotoPos[tabId] && board.memoPhotoPos[tabId].y != null) ? board.memoPhotoPos[tabId].y : 50;
+                el.innerHTML = (photo ? `<img id="sidebar-ref-photo" src="${photo}" class="w-full rounded" style="height:140px;object-fit:cover;object-position:50% ${posY}%;cursor:ns-resize;user-select:none;" title="드래그해서 사진 위치 조정">` : '') +
+                    (rows.length ? rows.map(([label, value]) => `
+                        <div><span class="font-bold text-gray-700">${escapeHtml(label)}:</span> ${escLine(value)}</div>
+                    `).join('') : '<div class="text-gray-300">내용 없음</div>');
+                if (photo) {
+                    const imgEl = el.querySelector('#sidebar-ref-photo');
+                    if (imgEl) imgEl.addEventListener('mousedown', (e) => window.startSidebarRefPhotoDrag(e, tabId));
+                }
+                return;
+            }
+
+            // kind === 'note'
+            const entries = (board.memoEntries && board.memoEntries[tabId]) || [];
+            const withText = entries.filter(e => e.text && e.text.trim() && e.text !== '<br>');
+            el.innerHTML = withText.length ? withText.map(e => `
+                <div class="border border-gray-100 rounded p-2 bg-gray-50/50">${e.text}</div>
+            `).join('') : '<div class="text-gray-300">내용 없음</div>';
+        }
+
+        function renderCharacterPage() {
+            const board = window.getCurrentBoard();
+            const tabsEl = document.getElementById('char-page-tabs');
+            if (!board || !tabsEl) return;
+            const allTabs = board.memoTabs || DEFAULT_MEMO_TABS;
+            const tabs = allTabs.filter(t => CHAR_PAGE_TAB_IDS.includes(t.id));
+            if (!window.activeCharTab || !tabs.find(t => t.id === window.activeCharTab)) {
+                window.activeCharTab = tabs[0] ? tabs[0].id : null;
+            }
+            tabsEl.innerHTML = tabs.map(t => `
+                <button onclick="window.switchCharTab('${t.id}')" id="char-tab-${t.id}"
+                        class="page-tab-btn rounded-full ${t.id === window.activeCharTab ? 'bg-white text-gray-800 shadow-sm font-bold' : 'text-gray-500 hover:text-gray-700 font-medium'}"
+                        style="padding:7px 18px; font-size:13px; border:none;">
+                    ${escapeHtml(t.label)}
+                </button>
+            `).join('');
+
+            const singleView = document.getElementById('char-single-view');
+            const subCharView = document.getElementById('char-subchar-view');
+
+            if (window.activeCharTab === 'subChar') {
+                if (singleView) singleView.style.display = 'none';
+                if (subCharView) subCharView.style.display = '';
+                renderSubCharList();
+                if (window.lucide) window.lucide.createIcons();
+                return;
+            }
+            if (singleView) singleView.style.display = '';
+            if (subCharView) subCharView.style.display = 'none';
+
+            const photoUrl = (window.activeCharTab && board.memoPhotos) ? board.memoPhotos[window.activeCharTab] : null;
+            const imgEl = document.getElementById('char-photo-img');
+            const placeholderEl = document.getElementById('char-photo-placeholder');
+            const removeBtn = document.getElementById('char-photo-remove');
+            if (imgEl && placeholderEl && removeBtn) {
+                if (photoUrl) {
+                    imgEl.src = photoUrl;
+                    imgEl.classList.remove('hidden');
+                    placeholderEl.classList.add('hidden');
+                    removeBtn.classList.remove('hidden');
+                } else {
+                    imgEl.classList.add('hidden');
+                    imgEl.src = '';
+                    placeholderEl.classList.remove('hidden');
+                    removeBtn.classList.add('hidden');
+                }
+            }
+
+            const profile = (board.charProfiles && window.activeCharTab) ? (board.charProfiles[window.activeCharTab] || {}) : {};
+            const nameInput = document.getElementById('char-name-input');
+            const ageInput = document.getElementById('char-age-input');
+            const jobInput = document.getElementById('char-job-input');
+            if (nameInput) nameInput.value = profile.name || '';
+            if (ageInput) ageInput.value = profile.age || '';
+            if (jobInput) jobInput.value = profile.job || '';
+
+            renderCharProfileFields();
+            if (window.lucide) window.lucide.createIcons();
+        }
+
+        // ========== 조연 카드 목록 ==========
+        function subCharFieldRow(sc, key, label) {
+            return `
+                <div class="flex items-center gap-2">
+                    <label class="text-xs font-bold text-gray-400 shrink-0" style="width:44px;">${label}</label>
+                    <input type="text" value="${escapeHtml(sc[key] || '')}" oninput="window.updateSubCharField('${sc.id}','${key}',this.value)" spellcheck="false"
+                           class="flex-1 min-w-0 text-sm text-gray-700 bg-transparent outline-none border-b border-gray-100 py-1 placeholder-gray-300" placeholder="${label}">
+                </div>`;
+        }
+
+        function subCharNoteRow(sc) {
+            return `
+                <div class="flex items-start gap-2">
+                    <label class="text-xs font-bold text-gray-400 shrink-0" style="width:44px; padding-top:6px;">특이사항</label>
+                    <textarea rows="1" oninput="window.updateSubCharField('${sc.id}','note',this.value); window.autoGrowTextarea(this);" spellcheck="false"
+                              class="flex-1 min-w-0 text-sm text-gray-700 bg-transparent outline-none border-b border-gray-100 py-1 resize-none placeholder-gray-300"
+                              style="overflow:hidden;" placeholder="특이사항">${escapeHtml(sc.note || '')}</textarea>
+                </div>`;
+        }
+
+        function subCharCardHtml(sc) {
+            return `
+                <div class="hover-card bg-white border border-gray-200 flex items-start gap-4" style="padding:16px;">
+                    <div class="shrink-0">
+                        <label class="photo-box block border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-300 cursor-pointer hover:border-blue-400 hover:text-blue-400 overflow-hidden bg-gray-50 relative" style="width:100px;height:100px;">
+                            <input type="file" accept="image/*" class="hidden" onchange="window.uploadSubCharPhoto(event, '${sc.id}')">
+                            ${sc.photo ? `<img src="${sc.photo}" class="w-full h-full object-cover" alt="">` : `<i data-lucide="image-plus" class="w-5 h-5"></i>`}
+                            ${sc.photo ? `<button onclick="window.removeSubCharPhoto('${sc.id}'); event.preventDefault(); event.stopPropagation();" class="photo-remove-btn" style="position:absolute; top:4px; right:4px; width:20px; height:20px; border-radius:9999px; background:rgba(0,0,0,0.55); color:#fff; align-items:center; justify-content:center;" title="사진 삭제"><i data-lucide="x" class="w-3 h-3"></i></button>` : ''}
+                        </label>
+                    </div>
+                    <div class="flex-1 min-w-0 flex flex-col gap-2">
+                        <div class="flex items-center gap-4">
+                            ${subCharFieldRow(sc, 'name', '이름')}
+                            ${subCharFieldRow(sc, 'age', '나이')}
+                        </div>
+                        <div class="flex items-center gap-4">
+                            ${subCharFieldRow(sc, 'relation', '관계')}
+                            ${subCharFieldRow(sc, 'role', '직책')}
+                        </div>
+                        ${subCharNoteRow(sc)}
+                    </div>
+                    <button onclick="window.deleteSubChar('${sc.id}')" class="card-remove-btn shrink-0 text-gray-300 hover:text-red-500" title="삭제">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>`;
+        }
+
+        function renderSubCharList() {
+            const board = window.getCurrentBoard();
+            const listEl = document.getElementById('char-subchar-list');
+            if (!board || !listEl) return;
+            if (!Array.isArray(board.subChars)) board.subChars = [];
+            if (board.subChars.length === 0) {
+                board.subChars.push({ id: generateId(), photo: '', name: '', age: '', personality: '', role: '', relation: '', note: '' });
+                window.triggerSave();
+            }
+            listEl.innerHTML = board.subChars.map(sc => subCharCardHtml(sc)).join('');
+            listEl.querySelectorAll('textarea').forEach(t => window.autoGrowTextarea(t));
+            if (window.lucide) window.lucide.createIcons({ el: listEl });
+        }
+
+        window.addSubChar = () => {
+            const board = window.getCurrentBoard();
+            if (!board) return;
+            if (!Array.isArray(board.subChars)) board.subChars = [];
+            board.subChars.push({ id: generateId(), photo: '', name: '', age: '', personality: '', role: '', relation: '', note: '' });
+            window.triggerSave();
+            renderSubCharList();
+        };
+
+        window.deleteSubChar = (id) => {
+            const board = window.getCurrentBoard();
+            if (!board || !Array.isArray(board.subChars)) return;
+            board.subChars = board.subChars.filter(sc => sc.id !== id);
+            window.triggerSave();
+            renderSubCharList();
+        };
+
+        window.updateSubCharField = (id, key, value) => {
+            const board = window.getCurrentBoard();
+            if (!board || !Array.isArray(board.subChars)) return;
+            const sc = board.subChars.find(s => s.id === id);
+            if (sc) { sc[key] = value; window.triggerSave(); }
+        };
+
+        window.uploadSubCharPhoto = (event, id) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            if (!file.type.startsWith('image/')) { alert('이미지 파일만 업로드할 수 있습니다.'); return; }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const board = window.getCurrentBoard();
+                if (!board || !Array.isArray(board.subChars)) return;
+                const sc = board.subChars.find(s => s.id === id);
+                if (sc) {
+                    sc.photo = e.target.result;
+                    window.triggerSave();
+                    renderSubCharList();
+                }
+            };
+            reader.readAsDataURL(file);
+            event.target.value = '';
+        };
+
+        window.removeSubCharPhoto = (id) => {
+            const board = window.getCurrentBoard();
+            if (!board || !Array.isArray(board.subChars)) return;
+            const sc = board.subChars.find(s => s.id === id);
+            if (sc) { sc.photo = ''; window.triggerSave(); renderSubCharList(); }
+        };
+
+        window.switchCharTab = (tabId) => {
+            window.activeCharTab = tabId;
+            renderCharacterPage();
+        };
+
+        window.uploadCharPhoto = (event) => {
+            const file = event.target.files[0];
+            if (!file || !window.activeCharTab) return;
+            if (!file.type.startsWith('image/')) { alert('이미지 파일만 업로드할 수 있습니다.'); return; }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const board = window.getCurrentBoard();
+                if (!board) return;
+                if (!board.memoPhotos) board.memoPhotos = {};
+                board.memoPhotos[window.activeCharTab] = e.target.result;
+                window.triggerSave();
+                renderCharacterPage();
+            };
+            reader.readAsDataURL(file);
+            event.target.value = '';
+        };
+
+        window.removeCharPhoto = (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            const board = window.getCurrentBoard();
+            if (board && board.memoPhotos && window.activeCharTab) {
+                delete board.memoPhotos[window.activeCharTab];
+                window.triggerSave();
+                renderCharacterPage();
+            }
+        };
+
+        function renderNotePage() {
+            const board = window.getCurrentBoard();
+            const tabsEl = document.getElementById('note-page-tabs');
+            if (!board || !tabsEl) return;
+            const allTabs = board.memoTabs || DEFAULT_MEMO_TABS;
+            const tabs = allTabs.filter(t => !CHAR_PAGE_TAB_IDS.includes(t.id));
+            if (!window.activeNoteTab || !tabs.find(t => t.id === window.activeNoteTab)) {
+                window.activeNoteTab = tabs[0] ? tabs[0].id : null;
+            }
+            tabsEl.innerHTML = tabs.map(t => `
+                <button onclick="window.switchNoteTab('${t.id}')" id="note-tab-${t.id}"
+                        class="page-tab-btn rounded-full ${t.id === window.activeNoteTab ? 'bg-white text-gray-800 shadow-sm font-bold' : 'text-gray-500 hover:text-gray-700 font-medium'}"
+                        style="padding:7px 18px; font-size:13px; border:none;">
+                    ${escapeHtml(t.label)}
+                </button>
+            `).join('');
+            renderNoteEntries();
+            if (window.lucide) window.lucide.createIcons();
+        }
+
+        window.switchNoteTab = (tabId) => {
+            window.activeNoteTab = tabId;
+            renderNotePage();
+        };
+
+        function noteEntryHtml(entry) {
+            const isEmpty = !entry.text || entry.text.trim() === '' || entry.text === '<br>';
+            return `
+                <div class="hover-card bg-white border border-gray-200 flex items-start gap-2" style="padding:12px;">
+                    <div id="editor-note-${entry.id}" contenteditable="true" spellcheck="false"
+                         oninput="window.updateNoteEntry('${entry.id}', this.innerHTML); window.toggleEmptyEditor(this);"
+                         onfocus="window.activeBlockEditorId='editor-note-${entry.id}';"
+                         class="rich-editor flex-1 min-w-0 outline-none leading-relaxed text-gray-700 text-sm ${isEmpty ? 'empty-editor' : ''}"
+                         style="min-height:46px;" data-placeholder="${escapeHtml(memoTabPlaceholders[window.activeNoteTab] || '내용을 입력하세요.')}">${entry.text || ''}</div>
+                    <button onclick="window.deleteNoteEntry('${entry.id}')" class="card-remove-btn shrink-0 text-gray-300 hover:text-red-500" title="삭제">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>`;
+        }
+
+        window.toggleEmptyEditor = (el) => {
+            if (el.innerHTML.trim() === '' || el.innerHTML === '<br>') el.classList.add('empty-editor');
+            else el.classList.remove('empty-editor');
+        };
+
+        function renderNoteEntries() {
+            const board = window.getCurrentBoard();
+            const listEl = document.getElementById('note-entries-list');
+            if (!board || !listEl || !window.activeNoteTab) return;
+            if (!board.memoEntries) board.memoEntries = {};
+            if (!Array.isArray(board.memoEntries[window.activeNoteTab]) || board.memoEntries[window.activeNoteTab].length === 0) {
+                board.memoEntries[window.activeNoteTab] = [{ id: generateId(), text: '' }];
+                window.triggerSave();
+            }
+            const entries = board.memoEntries[window.activeNoteTab];
+            listEl.innerHTML = entries.map(e => noteEntryHtml(e)).join('');
+            if (window.lucide) window.lucide.createIcons({ el: listEl });
+        }
+
+        window.addNoteEntry = () => {
+            const board = window.getCurrentBoard();
+            if (!board || !window.activeNoteTab) return;
+            if (!board.memoEntries) board.memoEntries = {};
+            if (!Array.isArray(board.memoEntries[window.activeNoteTab])) board.memoEntries[window.activeNoteTab] = [];
+            board.memoEntries[window.activeNoteTab].push({ id: generateId(), text: '' });
+            window.triggerSave();
+            renderNoteEntries();
+        };
+
+        window.deleteNoteEntry = (id) => {
+            const board = window.getCurrentBoard();
+            if (!board || !window.activeNoteTab || !board.memoEntries) return;
+            const arr = board.memoEntries[window.activeNoteTab];
+            if (!arr) return;
+            board.memoEntries[window.activeNoteTab] = arr.filter(e => e.id !== id);
+            window.triggerSave();
+            renderNoteEntries();
+        };
+
+        window.updateNoteEntry = (id, value) => {
+            const board = window.getCurrentBoard();
+            if (!board || !window.activeNoteTab || !board.memoEntries) return;
+            const arr = board.memoEntries[window.activeNoteTab];
+            if (!arr) return;
+            const e = arr.find(x => x.id === id);
+            if (e) { e.text = value; window.triggerSave(); }
         };
 
         // --- Drag & Drop for Boards ---
@@ -2515,9 +3160,132 @@ window.manualFirebasePush = async function () {
             window.triggerSave();
         };
 
-        window.updateCardContent = (id, htmlContent) => {
-            const result = findCardAndRow(id);
-            if(result) { result.card.content = htmlContent; window.triggerSave(); }
+        // --- 시놉시스 블록 (카드 안의 여러 텍스트 블록) ---
+        window.updateBlockContent = (cardId, blockId, htmlContent) => {
+            const result = findCardAndRow(cardId);
+            if (!result) return;
+            const block = (result.card.blocks || []).find(b => b.id === blockId);
+            if (block) { block.html = htmlContent; window.triggerSave(); }
+        };
+
+        window.addBlock = (cardId) => {
+            pushHistory();
+            const result = findCardAndRow(cardId);
+            if (!result) return;
+            if (!Array.isArray(result.card.blocks)) result.card.blocks = [];
+            const newBlockId = generateId();
+            result.card.blocks.push({ id: newBlockId, html: '', markers: [], color: '' });
+            renderAll();
+            window.triggerSave();
+            setTimeout(() => {
+                window.selectCard(cardId);
+                const editor = document.getElementById(`editor-${cardId}-${newBlockId}`);
+                if (editor) editor.focus();
+            }, 50);
+        };
+
+        window.deleteBlock = (cardId, blockId) => {
+            const result = findCardAndRow(cardId);
+            if (!result) return;
+            pushHistory();
+            result.card.blocks = (result.card.blocks || []).filter(b => b.id !== blockId);
+            renderAll();
+            window.triggerSave();
+        };
+
+        // 블록 드래그 앤 드롭: 같은 카드 안에서 순서 변경 + 다른 카드로 이동
+        window._blockDrag = null; // { cardId, blockId }
+
+        function clearBlockDragOverStyles() {
+            document.querySelectorAll('.block-drag-over-top, .block-drag-over-bottom').forEach(el => {
+                el.classList.remove('block-drag-over-top', 'block-drag-over-bottom');
+            });
+            document.querySelectorAll('.block-list-drag-over').forEach(el => el.classList.remove('block-list-drag-over'));
+        }
+
+        function moveBlockBetweenCards(fromCardId, blockId, toCardId, targetBlockId, insertBefore) {
+            const fromResult = findCardAndRow(fromCardId);
+            const toResult = findCardAndRow(toCardId);
+            if (!fromResult || !toResult) return;
+            const fromBlocks = fromResult.card.blocks || [];
+            const idx = fromBlocks.findIndex(b => b.id === blockId);
+            if (idx === -1) return;
+            if (fromCardId === toCardId && targetBlockId === blockId) return;
+
+            pushHistory();
+            const [block] = fromBlocks.splice(idx, 1);
+            if (!Array.isArray(toResult.card.blocks)) toResult.card.blocks = [];
+            const toBlocks = toResult.card.blocks;
+
+            if (targetBlockId) {
+                let targetIdx = toBlocks.findIndex(b => b.id === targetBlockId);
+                if (targetIdx === -1) targetIdx = toBlocks.length;
+                toBlocks.splice(insertBefore ? targetIdx : targetIdx + 1, 0, block);
+            } else {
+                toBlocks.push(block);
+            }
+
+            renderAll();
+            window.triggerSave();
+        }
+
+        window.handleBlockDragStart = (e, cardId, blockId) => {
+            window._blockDrag = { cardId, blockId };
+            e.dataTransfer.effectAllowed = 'move';
+            try { e.dataTransfer.setData('text/plain', blockId); } catch (err) {}
+            const itemEl = e.target.closest('.block-item');
+            if (itemEl) setTimeout(() => itemEl.classList.add('block-dragging'), 0);
+        };
+
+        window.handleBlockDragEnd = () => {
+            document.querySelectorAll('.block-dragging').forEach(el => el.classList.remove('block-dragging'));
+            clearBlockDragOverStyles();
+            window._blockDrag = null;
+        };
+
+        window.handleBlockDragOver = (e) => {
+            if (!window._blockDrag) return;
+            e.preventDefault();
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = 'move';
+            const itemEl = e.currentTarget;
+            if (itemEl.dataset.blockId === window._blockDrag.blockId) return;
+            clearBlockDragOverStyles();
+            const rect = itemEl.getBoundingClientRect();
+            const before = (e.clientY - rect.top) < rect.height / 2;
+            itemEl.classList.add(before ? 'block-drag-over-top' : 'block-drag-over-bottom');
+        };
+
+        window.handleBlockDragLeave = (e) => {
+            e.currentTarget.classList.remove('block-drag-over-top', 'block-drag-over-bottom');
+        };
+
+        window.handleBlockDrop = (e, targetCardId, targetBlockId) => {
+            if (!window._blockDrag) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const itemEl = e.currentTarget;
+            const rect = itemEl.getBoundingClientRect();
+            const before = (e.clientY - rect.top) < rect.height / 2;
+            clearBlockDragOverStyles();
+            moveBlockBetweenCards(window._blockDrag.cardId, window._blockDrag.blockId, targetCardId, targetBlockId, before);
+            window._blockDrag = null;
+        };
+
+        window.handleBlockListDragOver = (e) => {
+            if (!window._blockDrag) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            if (e.target === e.currentTarget) e.currentTarget.classList.add('block-list-drag-over');
+        };
+
+        window.handleBlockListDrop = (e, cardId) => {
+            if (!window._blockDrag) return;
+            if (e.target !== e.currentTarget) return; // 개별 블록 위 drop은 handleBlockDrop이 처리
+            e.preventDefault();
+            clearBlockDragOverStyles();
+            moveBlockBetweenCards(window._blockDrag.cardId, window._blockDrag.blockId, cardId, null, false);
+            window._blockDrag = null;
         };
 
         window.updateRowTitle = (id, value) => {
@@ -2527,35 +3295,30 @@ window.manualFirebasePush = async function () {
 
         // 카드 헤더의 마커 + 복선/체크리스트 마크를 한 번에 다시 그림
         window.refreshCardMarks = (cardId) => {
-            const result = findCardAndRow(cardId);
-            if (!result) return;
-            const card = result.card;
             const cont = document.getElementById(`markers-${cardId}`);
-            if (!cont) return;
-            let html = (card.markers || []).map(m => {
-                const colorClass = markerColors[m] || 'text-gray-500';
-                return `<i data-lucide="${m}" class="w-4 h-4 ${colorClass} drop-shadow-sm"></i>`;
-            }).join('');
-            const fsCount = (card.foreshadows || []).length;
-            const checkTotal = (card.checklist || []).length;
-            const checkDone = (card.checklist || []).filter(i => i.done).length;
-            if (fsCount > 0) html += `<i data-lucide="anchor" class="w-3.5 h-3.5 text-amber-500 shrink-0" title="복선 ${fsCount}개"></i>`;
-            if (checkTotal > 0) html += `<i data-lucide="list-checks" class="w-3.5 h-3.5 shrink-0 ${checkDone === checkTotal ? 'text-green-500' : 'text-indigo-400'}" title="씬 체크리스트 ${checkDone}/${checkTotal}"></i>`;
-            cont.innerHTML = html;
-            if (window.lucide) window.lucide.createIcons({ el: cont });
+            if (cont) cont.innerHTML = '';
+        };
+
+        window.highlightActiveBlock = () => {
+            document.querySelectorAll('.block-item.active-block').forEach(el => el.classList.remove('active-block'));
+            if (window.activeBlockId) {
+                const el = document.querySelector(`.block-item[data-block-id="${window.activeBlockId}"]`);
+                if (el) el.classList.add('active-block');
+            }
         };
 
         window.toggleMarker = (markerIcon) => {
-            if (!window.activeCardId) return alert('마커를 추가할 카드를 먼저 선택하세요.');
+            if (!window.activeBlockId) return alert('마커를 추가할 블록을 먼저 선택하세요.');
             pushHistory();
             const result = findCardAndRow(window.activeCardId);
-            if (result) {
-                const card = result.card;
-                const idx = card.markers.indexOf(markerIcon);
-                if (idx > -1) card.markers.splice(idx, 1);
-                else card.markers.push(markerIcon);
-                window.refreshCardMarks(card.id);
-                applyFilterDOM(); 
+            const block = result && (result.card.blocks || []).find(b => b.id === window.activeBlockId);
+            if (block) {
+                if (!Array.isArray(block.markers)) block.markers = [];
+                const idx = block.markers.indexOf(markerIcon);
+                if (idx > -1) block.markers.splice(idx, 1);
+                else block.markers.push(markerIcon);
+                renderAll();
+                applyFilterDOM();
                 window.triggerSave();
             }
         };
@@ -2579,7 +3342,7 @@ window.manualFirebasePush = async function () {
         window.addRow = () => {
             pushHistory();
             window.getCurrentBoard().data.push({
-                id: generateId(), title: '', color: 'gray', cards: [{ id: generateId(), title: '', location: '', estWords: '', content: '', color: 'bg-white', markers: [], checklist: [] }]
+                id: generateId(), title: '', color: 'gray', cards: [{ id: generateId(), title: '', location: '', estWords: '', blocks: [{ id: generateId(), html: '' }], color: 'bg-white', markers: [], checklist: [] }]
             });
             renderAll();
             window.triggerSave();
@@ -2604,12 +3367,13 @@ window.manualFirebasePush = async function () {
             const row = window.getCurrentBoard().data.find(r => r.id === rowId);
             if(row) {
                 const newId = generateId();
-                row.cards.push({ id: newId, title: '', location: '', estWords: '', content: '', color: 'bg-white', markers: [], checklist: [], episode: '', foreshadows: [] });
+                const firstBlockId = generateId();
+                row.cards.push({ id: newId, title: '', location: '', estWords: '', blocks: [{ id: firstBlockId, html: '' }], color: 'bg-white', markers: [], checklist: [], episode: '', foreshadows: [] });
                 renderAll();
                 window.triggerSave();
                 setTimeout(() => {
                     window.selectCard(newId);
-                    const editor = document.getElementById(`editor-${newId}`);
+                    const editor = document.getElementById(`editor-${newId}-${firstBlockId}`);
                     if(editor) editor.focus();
                 }, 50);
             }
@@ -2646,12 +3410,13 @@ window.manualFirebasePush = async function () {
         };
 
         window.changeCardColor = (colorClass) => {
-            if (!window.activeCardId) return;
+            if (!window.activeBlockId) return;
             pushHistory();
             const result = findCardAndRow(window.activeCardId);
-            if (result) {
-                result.card.color = colorClass;
-                renderAll(); 
+            const block = result && (result.card.blocks || []).find(b => b.id === window.activeBlockId);
+            if (block) {
+                block.color = colorClass;
+                renderAll();
                 window.triggerSave();
             }
         };
@@ -2683,6 +3448,13 @@ window.manualFirebasePush = async function () {
             e.preventDefault();
             e.stopPropagation();
             document.querySelectorAll('.card-wrapper').forEach(el => { el.classList.remove('opacity-30', 'drag-over'); });
+            // 블록을 카드 빈 곳에 떨어뜨린 경우 → 그 카드의 맨 아래로 블록 이동
+            if (window._blockDrag) {
+                clearBlockDragOverStyles();
+                moveBlockBetweenCards(window._blockDrag.cardId, window._blockDrag.blockId, targetCardId, null, false);
+                window._blockDrag = null;
+                return;
+            }
             if (!window.draggedCardObj || window.draggedCardObj.id === targetCardId) return;
             pushHistory();
             const data = window.getCurrentBoard().data;
@@ -2700,6 +3472,7 @@ window.manualFirebasePush = async function () {
         window.handleCardDropToEmptyRow = (e, targetRowId) => {
             e.preventDefault();
             document.querySelectorAll('.card-wrapper').forEach(el => { el.classList.remove('opacity-30', 'drag-over'); });
+            if (window._blockDrag) { clearBlockDragOverStyles(); window._blockDrag = null; return; }
             if (!window.draggedCardObj) return;
             pushHistory();
             const data = window.getCurrentBoard().data;
@@ -2767,47 +3540,18 @@ window.manualFirebasePush = async function () {
                 ffSel.value = board.globalFontFamily;
             }
             
-            // 메모 탭 렌더링
-            renderMemoTabs(board);
-            window.switchMemoTab(window.activeMemoTab);
-
             const container = document.getElementById('board-container');
             container.innerHTML = '';
 
+            let allRowsHtml = '';
+
             (board.data || []).forEach((row, index) => {
-                const rowTotalWords = (row.cards || []).reduce((sum, card) => {
-                    const val = card.estWords ? String(card.estWords).replace(/[^0-9]/g, '') : '0';
-                    return sum + (parseInt(val) || 0);
-                }, 0);
-
-                const rowColorCls = getRowColorCls(row.color || 'gray');
-                // 색상 칩 색상
-                const chipColorMap = {
-                    gray: '#e5e7eb', red: '#fca5a5', orange: '#fdba74', yellow: '#fde68a',
-                    green: '#86efac', blue: '#93c5fd', purple: '#d8b4fe', pink: '#f9a8d4'
-                };
-                const chipColor = chipColorMap[row.color || 'gray'] || '#e5e7eb';
-
                 let cardsHtml = (row.cards || []).map(card => {
                     const isActive = window.activeCardId === card.id;
                     const epColor = episodeColor(card.episode);
                     const epStyle = epColor ? `border-top:3px solid ${epColor};` : '';
-                    const markersHtml = (card.markers || []).map(m => {
-                        const colorClass = markerColors[m] || 'text-gray-500';
-                        return `<i data-lucide="${m}" class="w-4 h-4 ${colorClass} drop-shadow-sm"></i>`;
-                    }).join('');
-                    const checkDone = (card.checklist || []).filter(i => i.done).length;
-                    const checkTotal = (card.checklist || []).length;
-                    const checkBadge = checkTotal > 0 ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full ${checkDone === checkTotal ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'}">${checkDone}/${checkTotal}</span>` : '';
-                    const fsCount = (card.foreshadows || []).length;
-                    // 카드에 달린 표시 마크 (한눈에 보이도록 제목 옆에)
-                    const fsMark = fsCount > 0
-                        ? `<i data-lucide="anchor" class="w-3.5 h-3.5 text-amber-500 shrink-0" title="복선 ${fsCount}개"></i>` : '';
-                    const clMark = checkTotal > 0
-                        ? `<i data-lucide="list-checks" class="w-3.5 h-3.5 shrink-0 ${checkDone === checkTotal ? 'text-green-500' : 'text-indigo-400'}" title="씬 체크리스트 ${checkDone}/${checkTotal}"></i>` : '';
-                    
                     return `
-                        <div class="card-wrapper relative flex flex-col border-r border-b border-gray-200 aspect-[4/3] ${card.color || 'bg-white'} ${isActive ? 'active-card' : ''} transition-all duration-200 bg-opacity-90 shrink-0" 
+                        <div class="card-wrapper part-box relative flex flex-col shrink-0 border border-gray-200 rounded-lg bg-gray-50 ${isActive ? 'active-card' : ''} transition-all duration-200"
                              style="width: ${currentWidth}px;${epStyle}"
                              data-card-id="${card.id}" data-row-id="${row.id}"
                              onclick="window.selectCard('${card.id}')"
@@ -2815,10 +3559,10 @@ window.manualFirebasePush = async function () {
                              ondragenter="window.handleCardDragEnter(event)"
                              ondragleave="window.handleCardDragLeave(event)"
                              ondrop="window.handleCardDrop(event, '${card.id}', '${row.id}')">
-                            
+
                             <div class="card-tools absolute -top-3 -right-3 flex gap-1 z-20">
                                 <button class="w-6 h-6 bg-white border border-gray-200 text-gray-400 rounded-full flex items-center justify-center shadow hover:text-blue-500 cursor-grab active:cursor-grabbing"
-                                        draggable="true" 
+                                        draggable="true"
                                         ondragstart="window.handleCardDragStart(event, '${card.id}', '${row.id}')" title="드래그하여 이동">
                                     <i data-lucide="grip-horizontal" class="w-3 h-3"></i>
                                 </button>
@@ -2830,59 +3574,82 @@ window.manualFirebasePush = async function () {
                                 </button>
                             </div>
 
-                            <div class="p-2 border-b border-gray-100 bg-white/60 relative min-h-[44px] flex flex-col justify-center">
-                                <div class="flex items-center w-full gap-1.5">
-                                    <div class="flex gap-1 items-center shrink-0" id="markers-${card.id}">${markersHtml}${fsMark}${clMark}</div>
-                                    <input type="text" value="${escapeHtml(card.title)}" oninput="window.updateCardTitle('${card.id}', this.value)" spellcheck="false" style="flex: 4;" class="min-w-0 text-[14px] text-gray-900 bg-transparent border-none outline-none font-bold py-1 px-1 placeholder-gray-400 hover:bg-black/5 focus:bg-white focus:ring-1 focus:ring-gray-200 rounded transition-all" placeholder="장면 제목">
-                                    <input type="text" value="${escapeHtml(card.location)}" oninput="window.updateCardLocation('${card.id}', this.value)" spellcheck="false" style="flex: 2.5;" class="min-w-0 text-[13px] text-gray-700 bg-transparent border-none outline-none py-1 px-1 font-medium placeholder-gray-400 text-right hover:bg-black/5 focus:bg-white focus:ring-1 focus:ring-gray-200 rounded transition-all" placeholder="장소">
-                                    <input type="text" value="${escapeHtml(card.episode)}" oninput="window.updateCardEpisode('${card.id}', this.value)" spellcheck="false" style="flex: 0.9;${epColor ? 'color:' + epColor + ';' : ''}" class="min-w-0 w-9 text-[12px] font-bold bg-transparent border-none outline-none py-1 px-1 placeholder-gray-300 text-right hover:bg-black/5 focus:bg-white focus:ring-1 focus:ring-indigo-200 rounded transition-all" title="회차" placeholder="화">
-                                    <input type="text" value="${escapeHtml(card.estWords)}" oninput="window.updateCardEstWords('${card.id}', this.value)" spellcheck="false" style="flex: 1;" class="min-w-0 text-[13px] text-blue-600 bg-transparent border-none outline-none py-1 px-1 placeholder-gray-400 text-right hover:bg-blue-50 focus:bg-white focus:ring-1 focus:ring-blue-200 rounded transition-all" placeholder="글자수">
-                                    ${checkBadge}
+                            <div class="px-3 pt-3 pb-2">
+                                <div class="flex items-center gap-1.5">
+                                    <input type="text" value="${escapeHtml(card.title)}" oninput="window.updateCardTitle('${card.id}', this.value)" spellcheck="false" class="flex-1 min-w-0 text-[15px] text-gray-800 bg-transparent border-none outline-none font-bold px-1 py-0.5 placeholder-gray-400 hover:bg-black/5 focus:bg-white focus:ring-1 focus:ring-gray-200 rounded transition-all" placeholder="챕터">
+                                    <span class="text-[11px] text-gray-500 font-bold bg-gray-200/70 rounded-full w-5 h-5 flex items-center justify-center shrink-0" title="블록 수">${(card.blocks || []).length}</span>
+                                    <button onclick="window.addBlock('${card.id}'); event.stopPropagation();" class="text-gray-400 hover:text-blue-500 shrink-0" title="블록 추가">
+                                        <i data-lucide="plus" class="w-4 h-4"></i>
+                                    </button>
                                 </div>
+                                <div class="flex items-center gap-1.5 mt-1 flex-wrap">
+                                    <div class="flex gap-1 items-center shrink-0" id="markers-${card.id}"></div>
+                                    <input type="text" value="${escapeHtml(card.location)}" oninput="window.updateCardLocation('${card.id}', this.value)" spellcheck="false" class="min-w-0 flex-1 text-[12px] text-gray-400 bg-transparent border-none outline-none px-1 py-0.5 placeholder-gray-300 hover:bg-black/5 focus:bg-white focus:ring-1 focus:ring-gray-200 rounded transition-all" placeholder="메모">
+                                </div>
+                                <div class="border-t border-gray-200 mt-2"></div>
                             </div>
-                            
-                            <div class="flex-1 p-3 overflow-y-auto custom-scrollbar">
-                                <div id="editor-${card.id}" contenteditable="true" spellcheck="false"
-                                     oninput="window.updateCardContent('${card.id}', this.innerHTML)" 
-                                     onfocus="window.selectCard('${card.id}')"
-                                     class="rich-editor w-full h-full outline-none leading-relaxed text-gray-800" 
-                                     style="font-size:${board.globalFontSize || card.cardFontSize || '10.5pt'};${board.globalFontFamily ? 'font-family:' + board.globalFontFamily + ';' : ''}"
-                                     data-placeholder="">${card.content || ''}</div>
+
+                            <div class="px-3 pb-3">
+                                <div class="block-list flex flex-col gap-1 min-h-[26px]" data-card-id="${card.id}"
+                                     ondragover="window.handleBlockListDragOver(event)"
+                                     ondrop="window.handleBlockListDrop(event, '${card.id}')">
+                                    ${(card.blocks || []).map(block => {
+                                        const isActiveBlock = window.activeBlockId === block.id;
+                                        const blockBg = BLOCK_COLOR_HEX[block.color] ? `background-color:${BLOCK_COLOR_HEX[block.color]};` : '';
+                                        const blockMarkersHtml = (block.markers || []).map(m => {
+                                            const cc = markerColors[m] || 'text-gray-500';
+                                            return `<i data-lucide="${m}" class="w-3 h-3 ${cc}"></i>`;
+                                        }).join('');
+                                        return `
+                                    <div class="block-item group/block relative flex items-start gap-1 rounded ${isActiveBlock ? 'active-block' : ''}"
+                                         style="${blockBg}"
+                                         data-card-id="${card.id}" data-block-id="${block.id}"
+                                         ondragover="window.handleBlockDragOver(event)"
+                                         ondragleave="window.handleBlockDragLeave(event)"
+                                         ondrop="window.handleBlockDrop(event, '${card.id}', '${block.id}')">
+                                        <span class="block-handle shrink-0 mt-1 text-gray-400 cursor-grab active:cursor-grabbing"
+                                              draggable="true"
+                                              ondragstart="window.handleBlockDragStart(event, '${card.id}', '${block.id}')"
+                                              ondragend="window.handleBlockDragEnd(event)"
+                                              title="드래그하여 순서 변경 / 다른 카드로 이동">
+                                            <i data-lucide="grip-vertical" class="w-3 h-3"></i>
+                                        </span>
+                                        ${blockMarkersHtml ? `<div class="flex items-center gap-0.5 shrink-0 mt-1" id="markers-block-${block.id}">${blockMarkersHtml}</div>` : ''}
+                                        <div id="editor-${card.id}-${block.id}" contenteditable="true" spellcheck="false"
+                                             oninput="window.updateBlockContent('${card.id}', '${block.id}', this.innerHTML)"
+                                             onfocus="window.selectCard('${card.id}'); window.activeBlockEditorId = 'editor-${card.id}-${block.id}'; window.activeBlockId = '${block.id}'; window.highlightActiveBlock();"
+                                             class="rich-editor flex-1 min-w-0 outline-none leading-relaxed text-gray-800"
+                                             style="font-size:${board.globalFontSize || card.cardFontSize || '10.5pt'};${board.globalFontFamily ? 'font-family:' + board.globalFontFamily + ';' : ''}"
+                                             data-placeholder="">${block.html || ''}</div>
+                                        <button onclick="window.deleteBlock('${card.id}', '${block.id}'); event.stopPropagation();"
+                                                class="block-del shrink-0 mt-1 text-gray-300 opacity-0 group-hover/block:opacity-100 hover:text-red-500" title="블록 삭제">
+                                            <i data-lucide="x" class="w-3 h-3"></i>
+                                        </button>
+                                    </div>`;
+                                    }).join('')}
+                                </div>
+                                <button onclick="window.addBlock('${card.id}'); event.stopPropagation();"
+                                        class="add-block-btn mt-1 text-[11px] text-gray-300 hover:text-blue-500 flex items-center gap-1">
+                                    <i data-lucide="plus" class="w-3 h-3"></i> 새 블록
+                                </button>
                             </div>
                         </div>
                     `;
                 }).join('');
 
                 cardsHtml += `
-                    <div class="add-card-btn flex flex-col items-center justify-center border-r border-b border-gray-200 bg-gray-50/50 aspect-[4/3] hover:bg-blue-50 hover:text-blue-500 text-gray-300 cursor-pointer transition-colors group shrink-0"
-                         style="width: ${currentWidth}px;"
-                         onclick="window.addCardToRow('${row.id}')"
-                         ondragover="window.handleCardDragOver(event)"
-                         ondrop="window.handleCardDropToEmptyRow(event, '${row.id}')">
-                        <i data-lucide="plus" class="w-8 h-8 group-hover:scale-110 transition-transform"></i>
-                        <span class="text-xs mt-2 font-medium opacity-0 group-hover:opacity-100 transition-opacity">장면 추가</span>
-                    </div>
+                    <button class="add-card-btn shrink-0 self-start flex items-center gap-1.5 px-3 py-2 text-sm text-gray-400 hover:text-blue-500 transition-colors whitespace-nowrap"
+                            onclick="window.addCardToRow('${row.id}')"
+                            ondragover="window.handleCardDragOver(event)"
+                            ondrop="window.handleCardDropToEmptyRow(event, '${row.id}')">
+                        <i data-lucide="plus" class="w-4 h-4"></i> 새 파트
+                    </button>
                 `;
 
-                const rowHtml = `
-                    <div class="flex flex-row w-full bg-white border-gray-200 group/row relative min-w-max">
-                        <div class="w-24 shrink-0 border-r border-b border-gray-200 flex flex-col items-center justify-center p-2 ${rowColorCls} relative">
-                            <div class="absolute top-1.5 left-2 flex items-center gap-1">
-                                <span class="text-[10px] text-gray-400 font-bold">Track ${index + 1}</span>
-                                <button onclick="window.cycleRowColor('${row.id}')" title="트랙 색상 변경" 
-                                        style="background-color:${chipColor};"
-                                        class="track-color-chip hover:scale-125 transition-transform"></button>
-                            </div>
-                            <textarea oninput="window.updateRowTitle('${row.id}', this.value)" spellcheck="false" class="w-full text-center outline-none bg-transparent text-gray-700 font-bold text-sm resize-none h-20 mt-4 leading-tight overflow-hidden" placeholder="행 이름">${escapeHtml(row.title)}</textarea>
-                            <div id="row-total-${row.id}" class="text-[11px] text-gray-600 font-bold mt-1 bg-white/70 px-3 py-1 rounded-full text-center whitespace-nowrap shadow-none min-w-[64px] flex items-center justify-center" title="총 예상 글자 수">${rowTotalWords.toLocaleString()}자</div>
-                        </div>
-                        <div class="flex-1 flex flex-row">
-                            ${cardsHtml}
-                        </div>
-                    </div>
-                `;
-                container.insertAdjacentHTML('beforeend', rowHtml);
+                allRowsHtml += `<div class="flex flex-row flex-wrap items-start gap-4" data-row-id="${row.id}">${cardsHtml}</div>`;
             });
+
+            container.innerHTML = allRowsHtml;
 
             if(document.getElementById('track-count')) {
                 document.getElementById('track-count').textContent = board.data.length;
@@ -2932,7 +3699,8 @@ window.manualFirebasePush = async function () {
                 } else {
                     const cardId = el.dataset.cardId;
                     const result = findCardAndRow(cardId);
-                    if (result && (result.card.markers || []).includes(window.activeFilter)) {
+                    const hasMatch = result && (result.card.blocks || []).some(b => (b.markers || []).includes(window.activeFilter));
+                    if (hasMatch) {
                         el.classList.remove('opacity-20', 'grayscale');
                     } else {
                         el.classList.add('opacity-20', 'grayscale');
@@ -2951,6 +3719,14 @@ window.manualFirebasePush = async function () {
                     </div>
                 `);
             });
+            palette.insertAdjacentHTML('beforeend', `
+                <div class="flex items-center justify-center">
+                    <button onclick="window.changeCardColor('')" class="w-6 h-6 rounded border border-gray-200 shadow-sm hover:scale-110 transition-transform bg-white flex items-center justify-center text-gray-300" title="색상 빼기">
+                        <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                    </button>
+                </div>
+            `);
+            if (window.lucide) window.lucide.createIcons({ el: palette });
         }
 
         function renderAll() {
@@ -2977,8 +3753,10 @@ window.manualFirebasePush = async function () {
             } else {
                 renderForeshadowEditor(null);
             }
-            window.toggleFilter(window.activeFilter); 
+            window.toggleFilter(window.activeFilter);
             updateUndoRedoUI();
+            renderSidebarRefSelector();
+            renderSidebarRefContent();
             if(window.lucide) window.lucide.createIcons();
         }
 
@@ -3014,6 +3792,11 @@ window.manualFirebasePush = async function () {
                 const btn = document.getElementById('color-picker-btn');
                 if (palette && !palette.classList.contains('hidden') && !palette.contains(e.target) && !btn.contains(e.target)) {
                     palette.classList.add('hidden');
+                }
+                const bgPalette = document.getElementById('bg-color-palette');
+                const bgBtn = document.getElementById('bg-color-picker-btn');
+                if (bgPalette && !bgPalette.classList.contains('hidden') && !bgPalette.contains(e.target) && !bgBtn.contains(e.target)) {
+                    bgPalette.classList.add('hidden');
                 }
                 // 검색 패널 외부 클릭 시 닫기
                 const searchPanel = document.getElementById('search-panel');

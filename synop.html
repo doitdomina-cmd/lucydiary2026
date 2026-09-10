@@ -295,6 +295,58 @@ lucide.createIcons({icons});\``);if(typeof c>"u")throw new Error("`createIcons()
         .rs-chevron { transition: transform 0.2s ease; }
         .rs-chevron.collapsed { transform: rotate(-90deg); }
 
+        /* 모바일에서만 보이는 이동 버튼 (터치는 드래그앤드롭이 안 돼서 대체 수단) */
+        .mobile-only-btn { display: none; }
+
+        /* ===== 모바일 레이아웃 ===== */
+        @media (max-width: 768px) {
+            #left-sidebar-toggle, #right-sidebar-toggle {
+                display: flex !important;
+                position: fixed !important;
+                top: 10px !important;
+                left: auto; right: auto;
+                width: 40px !important; height: 40px !important;
+                border-radius: 9999px !important;
+                z-index: 60;
+            }
+            #left-sidebar-toggle { left: 10px !important; }
+            #right-sidebar-toggle { right: 10px !important; }
+
+            .sidebar-left, .sidebar-right {
+                position: fixed !important;
+                top: 0; bottom: 0;
+                width: 84vw !important;
+                max-width: 320px !important;
+                z-index: 55;
+                opacity: 1 !important;
+                padding: 0 !important;
+                pointer-events: auto !important;
+                box-shadow: 0 0 28px rgba(0,0,0,0.3);
+                transition: transform 0.25s ease !important;
+            }
+            .sidebar-left { left: 0; transform: translateX(0); }
+            .sidebar-left.collapsed { transform: translateX(-100%); }
+            .sidebar-right { right: 0; transform: translateX(0); }
+            .sidebar-right.collapsed { transform: translateX(100%); }
+
+            #sidebar-backdrop {
+                position: fixed; inset: 0; z-index: 50;
+                background: rgba(0,0,0,0.35);
+                display: none;
+            }
+            #sidebar-backdrop.show { display: block; }
+
+            /* 캔버스/카드 폭이 화면을 넘지 않도록 */
+            .card-wrapper { width: calc(100vw - 56px) !important; max-width: 420px; }
+            #page-plot .theme-canvas, #page-character, #page-memo { padding: 14px !important; }
+            #char-single-view > .flex.items-start { flex-direction: column !important; gap: 20px !important; }
+            #page-character > div, #page-memo > div { width: 100% !important; }
+
+            .mobile-only-btn { display: flex !important; }
+            .block-del { opacity: 1 !important; }
+
+            #doc-title { font-size: 22px !important; min-width: 0 !important; }
+        }
     </style>
 
     <link rel="manifest" href="manifest.json">
@@ -318,6 +370,9 @@ lucide.createIcons({icons});\``);if(typeof c>"u")throw new Error("`createIcons()
         <span id="delete-toast-msg">카드가 삭제됩니다.</span>
         <button id="delete-undo-btn" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-full text-[11px] transition-colors">되돌리기</button>
     </div>
+
+    <!-- 모바일 사이드바 뒷배경 (탭하면 닫힘) -->
+    <div id="sidebar-backdrop" onclick="window.closeMobileSidebars()"></div>
 
     <!-- 전체 검색 패널 -->
     <div id="search-panel" class="fixed top-14 left-1/2 -translate-x-1/2 bg-white border border-gray-200 shadow-2xl rounded-xl z-[100] w-[480px] hidden">
@@ -1901,6 +1956,36 @@ window.manualFirebasePush = async function () {
             }
         };
 
+        // 모바일(터치)에서는 드래그가 안 되므로 버튼으로 순서를 바꿀 수 있게
+        window.moveCardInRow = (cardId, rowId, dir) => {
+            const board = window.getCurrentBoard();
+            if (!board) return;
+            const row = (board.data || []).find(r => r.id === rowId);
+            if (!row || !Array.isArray(row.cards)) return;
+            const idx = row.cards.findIndex(c => c.id === cardId);
+            const newIdx = idx + dir;
+            if (idx === -1 || newIdx < 0 || newIdx >= row.cards.length) return;
+            pushHistory();
+            [row.cards[idx], row.cards[newIdx]] = [row.cards[newIdx], row.cards[idx]];
+            renderAll();
+            window.triggerSave();
+        };
+
+        window.moveBlockInCard = (cardId, blockId, dir) => {
+            const board = window.getCurrentBoard();
+            if (!board) return;
+            let card = null;
+            (board.data || []).forEach(row => (row.cards || []).forEach(c => { if (c.id === cardId) card = c; }));
+            if (!card || !Array.isArray(card.blocks)) return;
+            const idx = card.blocks.findIndex(b => b.id === blockId);
+            const newIdx = idx + dir;
+            if (idx === -1 || newIdx < 0 || newIdx >= card.blocks.length) return;
+            pushHistory();
+            [card.blocks[idx], card.blocks[newIdx]] = [card.blocks[newIdx], card.blocks[idx]];
+            renderAll();
+            window.triggerSave();
+        };
+
         // ========== 메모 탭 커스터마이징 ==========
         window.editMemoTabs = () => {
             const board = window.getCurrentBoard();
@@ -2315,6 +2400,25 @@ window.manualFirebasePush = async function () {
             document.querySelectorAll('.card-wrapper').forEach(el => { el.style.width = width + 'px'; });
         };
 
+        window.isMobileView = () => window.innerWidth > 0 && window.matchMedia('(max-width: 768px)').matches;
+
+        window.updateSidebarBackdrop = () => {
+            const backdrop = document.getElementById('sidebar-backdrop');
+            if (!backdrop) return;
+            if (!window.isMobileView()) { backdrop.classList.remove('show'); return; }
+            const ls = document.getElementById('left-sidebar');
+            const rs = document.getElementById('right-sidebar');
+            const open = (ls && !ls.classList.contains('collapsed')) || (rs && !rs.classList.contains('collapsed'));
+            backdrop.classList.toggle('show', open);
+        };
+
+        window.closeMobileSidebars = () => {
+            const ls = document.getElementById('left-sidebar');
+            const rs = document.getElementById('right-sidebar');
+            if (ls && !ls.classList.contains('collapsed')) window.toggleLeftSidebar();
+            if (rs && !rs.classList.contains('collapsed')) window.toggleRightSidebar();
+        };
+
         window.toggleLeftSidebar = () => {
             const sidebar = document.getElementById('left-sidebar');
             const toggleBtn = document.getElementById('left-sidebar-toggle');
@@ -2322,13 +2426,15 @@ window.manualFirebasePush = async function () {
             const isCollapsed = sidebar.classList.contains('collapsed');
             if (isCollapsed) {
                 sidebar.classList.remove('collapsed');
-                toggleBtn.style.display = 'none';
+                if (!window.isMobileView()) toggleBtn.style.display = 'none';
+                if(icon) icon.setAttribute('data-lucide', 'chevron-left');
             } else {
                 sidebar.classList.add('collapsed');
                 toggleBtn.style.display = 'flex';
                 if(icon) icon.setAttribute('data-lucide', 'chevron-right');
             }
             if(window.lucide) window.lucide.createIcons();
+            window.updateSidebarBackdrop();
         };
 
         // ========== 집필 모드 (별도 창) ==========
@@ -2400,6 +2506,7 @@ window.manualFirebasePush = async function () {
                 if (edgeIcon) edgeIcon.setAttribute('data-lucide', 'chevron-left');
             }
             if(window.lucide) window.lucide.createIcons();
+            window.updateSidebarBackdrop();
         };
 
         window.toggleCompletedFolder = () => {
@@ -3783,6 +3890,12 @@ window.manualFirebasePush = async function () {
                                         ondragstart="window.handleCardDragStart(event, '${card.id}', '${row.id}')" title="드래그하여 이동">
                                     <i data-lucide="grip-horizontal" class="w-3 h-3"></i>
                                 </button>
+                                <button onclick="window.moveCardInRow('${card.id}', '${row.id}', -1); event.stopPropagation();" class="mobile-only-btn w-6 h-6 bg-white border border-gray-200 text-gray-400 rounded-full flex items-center justify-center shadow hover:text-blue-500 transition-colors" title="왼쪽으로 이동">
+                                    <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+                                </button>
+                                <button onclick="window.moveCardInRow('${card.id}', '${row.id}', 1); event.stopPropagation();" class="mobile-only-btn w-6 h-6 bg-white border border-gray-200 text-gray-400 rounded-full flex items-center justify-center shadow hover:text-blue-500 transition-colors" title="오른쪽으로 이동">
+                                    <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+                                </button>
                                 <button onclick="window.duplicateCard('${card.id}'); event.stopPropagation();" class="w-6 h-6 bg-white border border-gray-200 text-gray-400 rounded-full flex items-center justify-center shadow hover:text-blue-500 transition-colors" title="카드 복사">
                                     <i data-lucide="copy" class="w-3 h-3"></i>
                                 </button>
@@ -3830,6 +3943,10 @@ window.manualFirebasePush = async function () {
                                               ondragend="window.handleBlockDragEnd(event)"
                                               title="드래그하여 순서 변경 / 다른 카드로 이동">
                                             <i data-lucide="grip-vertical" class="w-3 h-3"></i>
+                                        </span>
+                                        <span class="mobile-only-btn shrink-0 mt-1 flex flex-col text-gray-400">
+                                            <button onclick="window.moveBlockInCard('${card.id}', '${block.id}', -1); event.stopPropagation();" class="hover:text-blue-500" title="위로 이동"><i data-lucide="chevron-up" class="w-3.5 h-3.5"></i></button>
+                                            <button onclick="window.moveBlockInCard('${card.id}', '${block.id}', 1); event.stopPropagation();" class="hover:text-blue-500" title="아래로 이동"><i data-lucide="chevron-down" class="w-3.5 h-3.5"></i></button>
                                         </span>
                                         ${blockMarkersHtml ? `<div class="flex items-center gap-0.5 shrink-0 mt-1" id="markers-block-${block.id}">${blockMarkersHtml}</div>` : ''}
                                         <div id="editor-${card.id}-${block.id}" contenteditable="true" spellcheck="false"
@@ -4175,6 +4292,19 @@ window.manualFirebasePush = async function () {
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
+            // 모바일 화면이면 양쪽 사이드바를 기본적으로 닫아둠 (서랍처럼 버튼으로 열기)
+            if (window.isMobileView()) {
+                const ls = document.getElementById('left-sidebar');
+                const rs = document.getElementById('right-sidebar');
+                const lsBtn = document.getElementById('left-sidebar-toggle');
+                const rsBtn = document.getElementById('right-sidebar-toggle');
+                if (ls) ls.classList.add('collapsed');
+                if (rs) rs.classList.add('collapsed');
+                window.isRightSidebarVisible = false;
+                if (lsBtn) lsBtn.style.display = 'flex';
+                if (rsBtn) rsBtn.style.right = '0px';
+            }
+
             renderPalette();
             initCanvasPanning();
             initWritingModeWidget();

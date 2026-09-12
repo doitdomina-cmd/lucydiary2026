@@ -1221,13 +1221,20 @@ function fbIsUserEditing() {
     return el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName);
 }
 
-function fbApplyRemoteData(data) {
+async function fbApplyRemoteData(data) {
     if (!data || !Array.isArray(data) || data.length === 0) return;
     fbApplyingRemote = true;
     _skipHistory = true;
     const activeId = window.currentWorkspaceId;
     window.workspaces = normalizeData(data);
-    window.currentWorkspaceId = (activeId && window.workspaces.find(w => w.id === activeId)) ? activeId : window.workspaces[0].id;
+    if (activeId && window.workspaces.find(w => w.id === activeId)) {
+        window.currentWorkspaceId = activeId;
+    } else {
+        // activeId가 아직 초기 placeholder 상태일 수 있으니, 마지막으로 보던 보드 id를 저장소에서 직접 확인
+        let lastId = null;
+        try { lastId = await loadLastWorkspaceId(); } catch (e) {}
+        window.currentWorkspaceId = (lastId && window.workspaces.find(w => w.id === lastId)) ? lastId : window.workspaces[0].id;
+    }
     _skipHistory = false;
     renderAll();
     if (dbInitialized) saveToLocalDB(window.workspaces);

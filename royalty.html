@@ -12261,8 +12261,12 @@
                 .filter(s => !tlIsExcludedWork(s.workId))   // 초단편에 연결된 기간 일정도 제외
                 .sort((a, b) => a.startDate.localeCompare(b.startDate))
                 .forEach(s => {
-                    const st = calcSpanStats(s);
-                    spans.push({ span: s, stats: st });
+                    // 연도 경계를 넘어가는 기간 일정은 그 해에 걸친 부분만 계산한다 (연도별로 따로 집계)
+                    const clipStart = s.startDate < `${y}-01-01` ? `${y}-01-01` : s.startDate;
+                    const clipEnd = s.endDate > `${y}-12-31` ? `${y}-12-31` : s.endDate;
+                    const clippedSpan = (clipStart !== s.startDate || clipEnd !== s.endDate) ? { ...s, startDate: clipStart, endDate: clipEnd } : s;
+                    const st = calcSpanStats(clippedSpan);
+                    spans.push({ span: clippedSpan, stats: st });
                     const sType = s.type || 'write';
                     items.push({
                         kind: 'span',

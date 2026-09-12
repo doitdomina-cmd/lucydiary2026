@@ -1437,6 +1437,14 @@ window.manualFirebasePush = async function () {
             });
         }
 
+        function saveLastWorkspaceId() {
+            if (!db) return;
+            try {
+                const t = db.transaction([STORE_NAME], 'readwrite');
+                t.objectStore(STORE_NAME).put({ id: 'last_workspace_id', data: window.currentWorkspaceId });
+            } catch (e) {}
+        }
+
         function loadLastWorkspaceId() {
             return new Promise((resolve) => {
                 if (!db) return resolve(null);
@@ -2527,6 +2535,7 @@ window.manualFirebasePush = async function () {
             if (board && board.memoTabs) window.activeMemoTab = board.memoTabs[0].id;
             window.resetZoom();
             renderAll();
+            saveLastWorkspaceId();
             if (window.isMobileView()) window.closeMobileSidebars();
         };
 

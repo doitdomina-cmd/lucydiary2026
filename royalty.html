@@ -373,6 +373,7 @@
         .modal-content.modal-tall input,
         .modal-content.modal-tall select { padding-top: 8px; padding-bottom: 8px; }
         .modal-overlay.open .modal-content { transform: translateY(0); }
+        #year-timeline-modal.open .modal-content { transform: translateY(0) translateX(24px); }
 
         .lib-card {
             display: flex; flex-direction: column; transition: all 0.3s ease; position: relative; overflow: hidden; background: white; border-radius: 12px; border: 1px solid #f1f5f9;
@@ -1129,7 +1130,7 @@
                             <!-- 가운데 목표 합계 -->
                             <div class="absolute left-1/2 -translate-x-1/2 flex items-center gap-4 pointer-events-none">
                                 <span id="write-month-big-label" style="font-family:'Pretendard','Apple SD Gothic Neo',sans-serif; font-size:2.5rem; font-weight:800; color:var(--primary); line-height:1;"></span>
-                                <p class="text-xl font-semibold" style="font-family:'Pretendard','Apple SD Gothic Neo',sans-serif; color:#475569; margin:0;">이번달 목표 합계: <span id="write-month-goal-sum" style="color:var(--primary)">0자</span> <span id="write-month-empty-sum" class="text-xs font-normal text-slate-300"></span></p>
+                                <p class="text-xl font-semibold" style="font-family:'Pretendard','Apple SD Gothic Neo',sans-serif; color:#475569; margin:0;">이번달 목표 합계: <span id="write-month-goal-sum" style="color:var(--primary)">0자</span> <span id="write-month-pending-sum" class="text-xs font-normal text-slate-400"></span> <span id="write-month-empty-sum" class="text-xs font-normal text-slate-300"></span></p>
                             </div>
                             <div class="flex items-center bg-slate-100 rounded-lg p-1">
                                 <button onclick="changeWriteMonth(-1)" class="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-white rounded-md transition-all"><i class="fa-solid fa-chevron-left"></i></button>
@@ -3313,7 +3314,7 @@
                 </div>
             </div>
 
-            <div id="year-timeline-body" class="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar"></div>
+            <div id="year-timeline-body" class="flex-1 overflow-y-auto overflow-x-hidden scroll-invisible"></div>
 
             <div class="mt-3 pt-3 border-t border-slate-100 flex items-center gap-4 text-xs text-slate-400 shrink-0">
                 <span><i class="fa-solid fa-square text-emerald-300 mr-1"></i>집필 일정 (달력 카드 기준)</span>
@@ -11230,6 +11231,36 @@
                 const el = document.getElementById('write-month-goal-sum');
                 if (el) el.textContent = monthGoalSum.toLocaleString() + '자';
 
+                // [NEW] 아직 카드로 확정 안 된 '기간 일정'이 이 달에 걸쳐 있으면, 그만큼을 '예정'으로 따로 보여준다
+                // (달력에 카드가 하나도 없어서 확정 합계가 0으로 보여도, 사실 기간 일정으로는 이미 잡혀있는 경우가 있어서)
+                try {
+                    const confirmedSpanIds = new Set();
+                    Object.values(writeSchedules).forEach(list => (list || []).forEach(s => { if (s.spanId) confirmedSpanIds.add(s.spanId); }));
+                    const monthLastDay = new Date(cy, cm + 1, 0).getDate();
+                    const monthStartDate = `${moStr}-01`;
+                    const monthEndDate = `${moStr}-${String(monthLastDay).padStart(2, '0')}`;
+                    let pendingSum = 0;
+                    writeSpans.filter(s => (s.type || 'write') === 'write' && !confirmedSpanIds.has(s.id)).forEach(s => {
+                        const overlapStart = s.startDate < monthStartDate ? monthStartDate : s.startDate;
+                        const overlapEnd = s.endDate > monthEndDate ? monthEndDate : s.endDate;
+                        if (overlapStart > overlapEnd) return; // 이 달과 겹치지 않음
+                        const totalDays = spanDayDiff(s.startDate, s.endDate) + 1;
+                        const [sy, sm, sd] = s.startDate.split('-').map(Number);
+                        const restSet = s.restMode === 'days' ? new Set(s.restWeekdays || []) : null;
+                        const restPerWeek = Math.min(7, Math.max(0, Number(s.restPerWeek) || 0));
+                        const restEveryN = (!restSet && restPerWeek > 0) ? Math.round(7 / restPerWeek) : null;
+                        for (let i = 0; i < totalDays; i++) {
+                            const d = spanDateAdd(s.startDate, i);
+                            if (d < overlapStart || d > overlapEnd) continue;
+                            const dt = new Date(sy, sm - 1, sd + i);
+                            const isRest = restSet ? restSet.has(dt.getDay()) : (restEveryN ? ((i + 1) % restEveryN === 0) : false);
+                            if (!isRest) pendingSum += Number(s.dailyChars) || 0;
+                        }
+                    });
+                    const pendingEl = document.getElementById('write-month-pending-sum');
+                    if (pendingEl) pendingEl.textContent = pendingSum > 0 ? `(예정 ${pendingSum.toLocaleString()}자)` : '';
+                } catch (e) {}
+
                 // [NEW] 스케줄이 아예 없는 날 * 6000자 예상 가용 글자수 표시
                 const lastDate = new Date(cy, cm + 1, 0).getDate();
                 let emptyDaysCount = 0;
@@ -12222,7 +12253,7 @@
             for (let i = 0; i <= daysInYear; i++) {
                 if (i < daysInYear && !busy[i]) { if (i0 === null) i0 = i; }
                 else if (i0 !== null) {
-                    if (i - i0 >= 3) restSegs.push({ startIdx: i0, endIdx: i-1, days: i - i0 });
+                    if (i - i0 >= 2) restSegs.push({ startIdx: i0, endIdx: i-1, days: i - i0 });
                     i0 = null;
                 }
             }
@@ -12253,7 +12284,7 @@
             const body = document.getElementById('year-timeline-body');
 
             const data = buildYearTimelineData(y);
-            const { daysInYear, items, restSegs, busyDays, totalChars } = data;
+            const { daysInYear, items, spans, works, restSegs, busyDays, totalChars } = data;
 
             // 가로 스크롤이 생기지 않도록 창 너비에 딱 맞춰 그린다
             const avail = Math.max(600, (body.clientWidth || 1400) - TL_PAD * 2);
@@ -12263,8 +12294,36 @@
             const totalW = avail - sumColW;   // 1년치 달력이 차지하는 폭
             const xOf = (idx) => (idx / daysInYear) * totalW;
 
+            // 확정(실제 카드가 있는 작품) / 예정(카드 없이 기간 일정으로만 연결된 작품) 작품 수를 나눠서 보여준다.
+            // 총 휴식일 = 진짜 빈 날(1일짜리도 전부) + 집필·교정 기간 일정에 넣어둔 쉬는 요일(화·금 등) + 휴식/여행/시놉기획 종류 기간 일정
+            const confirmedWorkIds = new Set(works.map(w => w.workId));
+            const pendingWorkIds = new Set(
+                spans.filter(sp => sp.span.workId && (sp.span.type || 'write') === 'write' && !confirmedWorkIds.has(sp.span.workId))
+                     .map(sp => sp.span.workId)
+            );
+            const internalRestDays = items.filter(it => it.kind === 'span' && (it.group === 'spanWrite' || it.group === 'edit')).reduce((n, it) => n + (Number(it.restDays) || 0), 0);
+            const dedicatedRestDays = items.filter(it => it.group === 'spanRest').reduce((n, it) => n + (Number(it.days) || 0), 0);
+            const totalRestDays = (daysInYear - busyDays) + internalRestDays + dedicatedRestDays;
+
+            // 기간 일정(=예정)이 전부 확정되면 어떻게 되는지 — 예정 작품 수/글자수까지 다 합친 가상의 총합
+            const confirmedSpanIds = new Set();
+            Object.values(writeSchedules).forEach(list => (list || []).forEach(s => { if (s.spanId) confirmedSpanIds.add(s.spanId); }));
+            const pendingChars = spans
+                .filter(sp => (sp.span.type || 'write') === 'write' && !confirmedSpanIds.has(sp.span.id))
+                .reduce((n, sp) => n + sp.stats.totalChars, 0);
+            const grandTotalWorks = confirmedWorkIds.size + pendingWorkIds.size;
+            const grandTotalChars = totalChars + pendingChars;
+
+            // 집필일 = 실제로 쓴(카드 있는) 날 + 아직 카드는 없지만 집필형 기간 일정에서 쉬는 날 빼고 남는 날(예정)
+            const confirmedWriteDays = items.filter(it => it.kind === 'work').reduce((n, it) => n + (Number(it.days) || 0), 0);
+            const pendingWriteDays = spans
+                .filter(sp => (sp.span.type || 'write') === 'write' && !confirmedSpanIds.has(sp.span.id))
+                .reduce((n, sp) => n + (Number(sp.stats.workDays) || 0), 0);
+            const totalWriteDays = confirmedWriteDays + pendingWriteDays;
+
             document.getElementById('timeline-summary').innerHTML =
-                `작품 <b class="text-slate-700">${data.works.length}편</b> · 일정 있는 날 <b class="text-slate-700">${busyDays}일</b> · 비는 날 <b class="text-slate-700">${daysInYear - busyDays}일</b> · 목표 <b class="text-emerald-600">${totalChars.toLocaleString()}자</b>`;
+                `<div>확정 <b class="text-slate-700">${confirmedWorkIds.size}작품</b> · 예정 <b class="text-slate-700">${pendingWorkIds.size}작품</b> · 집필일 <b class="text-slate-700">${confirmedWriteDays}일</b> · 총 <b class="text-amber-700">${totalRestDays}일</b> 휴식 · 목표 <b class="text-emerald-600">${totalChars.toLocaleString()}자</b></div>
+                 <div class="text-xs text-slate-400 mt-0.5">(확정 ${grandTotalWorks}작품 · 집필일 ${totalWriteDays}일 · 총 ${totalRestDays}일 휴식 · 목표 ${grandTotalChars.toLocaleString()}자)</div>`;
             // ── 6) 막대가 좁으면 글씨를 막대 오른쪽 바깥에 내놓는다. 그 폭까지 감안해서 줄(lane)을 배치
             // ── 6) 네모(막대) 안에 글씨를 넣는다.
             //      폭이 모자라면 글씨를 조금씩 줄여서라도 안에 넣고(최대 60%까지),
@@ -12413,18 +12472,20 @@
             let track = `<div style="position:relative; width:${fullW}px; height:${trackH}px;">${gridLines(trackH)}`;
             if (hasToday) track += `<div style="position:absolute; left:${todayX}px; top:0; height:${trackH}px; width:2px; background:#f43f5e; opacity:.25;"></div>`;
 
-            // 줄 오른쪽 끝에 그 줄의 글자수 합계를 적는다 (집필 계획 / 내가 만든 집필 기간 일정)
-            const bandTotal = (bandIdx, color) => {
+            // 줄 오른쪽 끝에 그 줄의 합계를 적는다 (집필 계획 / 내가 만든 집필 기간 일정은 글자수, 휴식 등은 일수로)
+            const bandTotal = (bandIdx, color, unit) => {
                 if (!bandLanes[bandIdx]) return '';
-                const sum = items
-                    .filter(it => it.group === BAND_GROUPS[bandIdx])
-                    .reduce((n, it) => n + (Number(it.chars) || 0), 0);
+                const list = items.filter(it => it.group === BAND_GROUPS[bandIdx]);
+                const sum = unit === 'days'
+                    ? list.reduce((n, it) => n + (Number(it.days) || 0), 0)
+                    : list.reduce((n, it) => n + (Number(it.chars) || 0), 0);
                 if (!sum) return '';
+                const label = unit === 'days' ? `${sum.toLocaleString()}일` : `${sum.toLocaleString()}자`;
                 return `<div style="position:absolute; left:${totalW + 10}px; top:${bandTopOf(bandStart[bandIdx], bandIdx) + 4}px;
                             font-size:11px; font-weight:800; color:${color}; white-space:nowrap; z-index:3;">
-                        합계<br>${sum.toLocaleString()}자</div>`;
+                        합계<br>${label}</div>`;
             };
-            track += bandTotal(0, '#0f766e') + bandTotal(2, '#b45309');
+            track += bandTotal(0, '#0f766e') + bandTotal(2, '#b45309') + bandTotal(3, '#92400e', 'days');
 
 
 
@@ -12496,14 +12557,96 @@
             const empty = !drawItems.length
                 ? `<div class="text-center text-slate-300 py-16 text-sm">${y}년에 등록된 집필 일정이 없습니다.</div>` : '';
 
+            // ── 10) 화면에도 이미지 저장과 같은 내용의 표를 그대로 보여준다 (확정 일정 / 기간일정·집필 / 기간일정·휴식 등)
+            const tables = renderTimelineTablesHtml(data, y);
+
             body.innerHTML = `
                 <div style="width:${fullW}px; margin:0 auto;">
                     ${axis}
                     ${track}
                     ${empty}
-                    <div class="text-[11px] font-bold text-slate-400 mt-4 mb-1.5">쉬는 구간 (3일 이상 비는 날)</div>
+                    <div class="text-[11px] font-bold text-slate-400 mt-4 mb-1.5">쉬는 구간 (2일 이상 비는 날)</div>
                     ${rest}
+                    ${tables}
                 </div>`;
+        }
+
+        // 화면용 표(확정 일정 / 기간일정·집필 / 기간일정·휴식 등) — 이미지 저장(exportYearTimelineImage)과 같은 데이터를 그대로 HTML 표로 보여준다
+        function renderTimelineTablesHtml(data, y) {
+            const { works, spans, restSegs } = data;
+            const num = n => (Number(n) || 0).toLocaleString();
+            const wrap = (title, accent, inner) => `
+                <div class="mt-6">
+                    <h4 class="text-sm font-bold mb-2" style="color:${accent}">${title}</h4>
+                    <div class="overflow-x-auto rounded-xl border border-slate-100 scroll-invisible">${inner}</div>
+                </div>`;
+            const tableHtml = (cols, rows, accent) => rows.length ? `
+                <table class="w-full text-xs border-collapse" style="min-width:640px;">
+                    <thead><tr style="background:${accent}18;">
+                        ${cols.map(c => `<th class="text-left p-2 font-bold whitespace-nowrap" style="color:${accent}">${c}</th>`).join('')}
+                    </tr></thead>
+                    <tbody>${rows.map((r, i) => `<tr style="${i % 2 ? 'background:#fafafa;' : ''} border-top:1px solid #f1f5f9;">
+                        ${r.map(v => `<td class="p-2 whitespace-nowrap text-slate-600">${v}</td>`).join('')}
+                    </tr>`).join('')}</tbody>
+                </table>` : `<p class="text-xs text-slate-300 text-center py-4">없음</p>`;
+
+            // 확정 일정 (작품별, 달력 카드 기준)
+            const workRows = works.map(w => [
+                `<b class="text-slate-700">${w.title}</b>`, w.genre || '-',
+                `${w.firstDate} ~ ${w.lastDate}`, `${w.workDays}일`,
+                `${num(w.totalChars)}자`, w.workDays ? `${num(Math.round(w.totalChars / w.workDays))}자/일` : '-'
+            ]);
+            const confirmedHtml = wrap('■ 확정 일정 (달력 카드 기준)', '#0f766e',
+                tableHtml(['작품', '장르', '집필 기간', '일수', '글자수', '평균'], workRows, '#0f766e'));
+
+            // 기간 일정 · 집필
+            const writeSpanRows = spans.filter(sp => (sp.span.type || 'write') === 'write').map(({ span: s, stats: st }) => {
+                const t = SPAN_TYPES[s.type || 'write'];
+                const restTxt = s.restMode === 'days'
+                    ? (s.restWeekdays?.length ? `매주 ${s.restWeekdays.map(i => SPAN_DOW_NAMES[i]).join('·')}` : '없음')
+                    : `주 ${s.restPerWeek || 0}회`;
+                const workTitle = s.workId ? (resolveWorkItem(s.workId).displayTitle || '-') : '-';
+                return [`${t.icon} ${s.title}`, workTitle, `${s.startDate} ~ ${s.endDate}`,
+                    `${st.totalDays}일`, `${st.workDays}일`, restTxt,
+                    `${num(st.totalChars)}자 <span style="color:#94a3b8;">(공미 ${num(Math.round(st.totalChars * NOSPACE_TO_WITHSPACE_RATIO))}자)</span>`,
+                    `${num(s.dailyChars)}자/일`, s.memo || '-'];
+            });
+            const writeSpanHtml = wrap('■ 기간 일정 · 집필', '#b45309',
+                tableHtml(['일정 제목', '연결 작품', '기간', '총일수', '집필일', '쉬는 날', '예상 글자수', '하루 집필량', '메모'], writeSpanRows, '#b45309'));
+
+            // 기간 일정 · 휴식 등 (휴식/교정/여행/시놉기획)
+            const restSpanRows = spans.filter(sp => (sp.span.type || 'write') !== 'write').map(({ span: s, stats: st }) => {
+                const t = SPAN_TYPES[s.type || 'write'];
+                const workTitle = s.workId ? (resolveWorkItem(s.workId).displayTitle || '-') : '-';
+                return [`${t.icon} ${t.label}`, s.title, workTitle, `${s.startDate} ~ ${s.endDate}`, `${st.totalDays}일`, s.memo || '-'];
+            });
+            const restSpanHtml = wrap('■ 기간 일정 · 휴식 등 (휴식·교정·여행·시놉기획)', '#92400e',
+                tableHtml(['종류', '일정 제목', '연결 작품', '기간', '총일수', '메모'], restSpanRows, '#92400e'));
+
+            // 월별 목표 — 확정(카드) 글자수와 예정(아직 카드 없는 집필형 기간 일정) 글자수를 나눠서 같이 보여준다
+            const confirmedSpanIdsForMonth = new Set();
+            Object.values(writeSchedules).forEach(list => (list || []).forEach(s => { if (s.spanId) confirmedSpanIdsForMonth.add(s.spanId); }));
+            const pendingWriteSpans = spans.filter(sp => (sp.span.type || 'write') === 'write' && !confirmedSpanIdsForMonth.has(sp.span.id));
+            const monthRows = Array.from({ length: 12 }, (_, m) => {
+                const monthStr = `${y}-${String(m + 1).padStart(2, '0')}`;
+                const monthStart = `${monthStr}-01`;
+                const monthEnd = `${monthStr}-${String(new Date(y, m + 1, 0).getDate()).padStart(2, '0')}`;
+                const confirmedChars = data.monthly[m].chars;
+                const confirmedDays = data.monthly[m].days.size;
+                const pendingChars = pendingWriteSpans.reduce((n, sp) => n + spanCharsInRange(sp.span, monthStart, monthEnd), 0);
+                return [`${m + 1}월`,
+                    `${num(confirmedChars)}자`, `${num(pendingChars)}자`, `${num(confirmedChars + pendingChars)}자`,
+                    `${confirmedDays}일`, confirmedDays ? `${num(Math.round(confirmedChars / confirmedDays))}자/일` : '-'];
+            });
+            const monthHtml = wrap('■ 월별 목표', '#4f46e5',
+                tableHtml(['월', '확정 글자수', '예정 글자수', '합계', '집필 일수(확정)', '하루 평균(확정)'], monthRows, '#4f46e5'));
+
+            // 일정이 비어 있는 구간 (2일 이상)
+            const restRows = restSegs.map(sg => [`${tlIndexToDate(sg.startIdx, y)} ~ ${tlIndexToDate(sg.endIdx, y)}`, `${sg.days}일`]);
+            const gapHtml = wrap('■ 일정이 비어 있는 구간 (2일 이상)', '#64748b',
+                tableHtml(['기간', '일수'], restRows, '#64748b'));
+
+            return confirmedHtml + writeSpanHtml + restSpanHtml + monthHtml + gapHtml;
         }
 
         // 창 크기가 바뀌면 가로 스크롤이 생기지 않도록 다시 그린다
@@ -13140,7 +13283,8 @@
             const fmt = ds => `${ds}(${dow(ds)})`;
 
             // ── 표에 넣을 줄들을 먼저 만들어서 전체 높이를 계산한다
-            const spanRows = d.spans.map(({ span: s, stats: st }) => {
+            // 기간 일정은 '집필'과 '휴식 등(휴식·교정·여행·시놉기획)'으로 나눠서 각각 따로 보여준다
+            const buildSpanRow = ({ span: s, stats: st }) => {
                 const t = SPAN_TYPES[s.type || 'write'];
                 const rest = st.noChars ? '—'
                     : (s.restMode === 'days'
@@ -13150,9 +13294,11 @@
                 return [`${t.icon} ${t.label}`, s.title, workTitle,
                         `${fmt(s.startDate)} ~ ${fmt(s.endDate)}`, `${st.totalDays}일`,
                         st.noChars ? '—' : `${st.workDays}일`, rest,
-                        st.noChars ? '—' : `${num(st.totalChars)}자`,
+                        st.noChars ? '—' : `${num(st.totalChars)}자 (공미 ${num(Math.round(st.totalChars * NOSPACE_TO_WITHSPACE_RATIO))}자)`,
                         st.noChars ? '—' : `${num(s.dailyChars)}자/일`, s.memo || ''];
-            });
+            };
+            const writeSpanRows = d.spans.filter(sp => (sp.span.type || 'write') === 'write').map(buildSpanRow);
+            const restSpanRows = d.spans.filter(sp => (sp.span.type || 'write') !== 'write').map(buildSpanRow);
 
             const workRows = [];
             d.works.forEach(w => {
@@ -13225,7 +13371,7 @@
             let H = 132                                   // 헤더
                   + 62                                    // 요약
                   + 40 + laneCount * (BAR_H + BAR_GAP) + 46 + 30  // 간트(월축+막대+쉬는띠)
-                  + table(spanRows) + table(workRows)
+                  + table(workRows) + table(writeSpanRows) + table(restSpanRows)
                   + TITLE_H + HH + 12 * RH + 26           // 월별 표
                   + table(restRows)
                   + 60;                                   // 푸터
@@ -13262,7 +13408,7 @@
 
             // ── 요약 박스
             rrect(PAD, Y, chartW, 46, 10, '#f8fafc', '#e2e8f0');
-            const sumTxt = `1년 ${d.daysInYear}일  ·  일정 있는 날 ${d.busyDays}일  ·  비어 있는 날 ${d.daysInYear - d.busyDays}일  ·  일정 없는 3일 이상 구간 ${d.restSegs.length}개(총 ${d.restSegs.reduce((n,s)=>n+s.days,0)}일)  ·  글자수는 모두 공백 포함 목표치`;
+            const sumTxt = `1년 ${d.daysInYear}일  ·  일정 있는 날 ${d.busyDays}일  ·  비어 있는 날 ${d.daysInYear - d.busyDays}일  ·  일정 없는 2일 이상 구간 ${d.restSegs.length}개(총 ${d.restSegs.reduce((n,s)=>n+s.days,0)}일)  ·  글자수는 모두 공백 포함 목표치`;
             text(sumTxt, PAD + 16, Y + 23, { size: 14, weight: '600', color: '#475569' });
             Y += 62;
 
@@ -13339,16 +13485,19 @@
                 Y += 26;
             };
 
-            drawTable('■ 기간 일정', ['종류','일정 제목','연결 작품','기간','총일수','집필일','쉬는 날','예상 글자수','하루 집필량','메모'],
-                      [95, 250, 215, 285, 78, 78, 130, 140, 120, 233], spanRows, '#b45309');
-
-            drawTable('■ 작품별 집필 일정 (달력 카드 기준)', ['작품','장르','구간','집필 기간','일수','구간 글자수','평균','작품 합계','기타 작업'],
+            drawTable('■ 확정 일정 (달력 카드 기준)', ['작품','장르','구간','집필 기간','일수','구간 글자수','평균','작품 합계','기타 작업'],
                       [300, 150, 70, 300, 78, 140, 120, 210, 256], workRows, '#0f766e');
+
+            drawTable('■ 기간 일정 · 집필', ['종류','일정 제목','연결 작품','기간','총일수','집필일','쉬는 날','예상 글자수','하루 집필량','메모'],
+                      [95, 250, 215, 285, 78, 78, 130, 140, 120, 233], writeSpanRows, '#b45309');
+
+            drawTable('■ 기간 일정 · 휴식 등 (휴식·교정·여행·시놉기획)', ['종류','일정 제목','연결 작품','기간','총일수','집필일','쉬는 날','예상 글자수','하루 집필량','메모'],
+                      [95, 250, 215, 285, 78, 78, 130, 140, 120, 233], restSpanRows, '#92400e');
 
             drawTable('■ 월별 목표', ['월','목표 글자수','집필 일수','하루 평균'],
                       [140, 220, 180, 200], monthRows, '#4f46e5');
 
-            drawTable('■ 일정이 비어 있는 구간 (3일 이상)', ['기간','일수'], [420, 140], restRows, '#64748b');
+            drawTable('■ 일정이 비어 있는 구간 (2일 이상)', ['기간','일수'], [420, 140], restRows, '#64748b');
 
             // ── 푸터
             text('※ 글자수는 공백 포함 목표치입니다. 기간 일정의 예상 글자수 = (총일수 − 쉬는 날) × 하루 집필량으로 계산했습니다. 초단편(현로 초단 · BL 초단)은 이 표에서 제외되어 있습니다.',
@@ -13381,6 +13530,26 @@
         function spanDayDiff(a, b) { // b - a (일수)
             const [y1,m1,d1] = a.split('-').map(Number), [y2,m2,d2] = b.split('-').map(Number);
             return Math.round((new Date(y2,m2-1,d2) - new Date(y1,m1-1,d1)) / 86400000);
+        }
+        // 집필형 기간 일정이 [rangeStart, rangeEnd] 구간과 겹치는 부분만큼의 예상 글자수 (쉬는 날은 빼고 계산)
+        function spanCharsInRange(span, rangeStart, rangeEnd) {
+            const overlapStart = span.startDate < rangeStart ? rangeStart : span.startDate;
+            const overlapEnd = span.endDate > rangeEnd ? rangeEnd : span.endDate;
+            if (overlapStart > overlapEnd) return 0;
+            const totalDays = spanDayDiff(span.startDate, span.endDate) + 1;
+            const [sy, sm, sd] = span.startDate.split('-').map(Number);
+            const restSet = span.restMode === 'days' ? new Set(span.restWeekdays || []) : null;
+            const restPerWeek = Math.min(7, Math.max(0, Number(span.restPerWeek) || 0));
+            const restEveryN = (!restSet && restPerWeek > 0) ? Math.round(7 / restPerWeek) : null;
+            let sum = 0;
+            for (let i = 0; i < totalDays; i++) {
+                const d = spanDateAdd(span.startDate, i);
+                if (d < overlapStart || d > overlapEnd) continue;
+                const dt = new Date(sy, sm - 1, sd + i);
+                const isRest = restSet ? restSet.has(dt.getDay()) : (restEveryN ? ((i + 1) % restEveryN === 0) : false);
+                if (!isRest) sum += Number(span.dailyChars) || 0;
+            }
+            return sum;
         }
 
         // 기간·휴일·하루 집필량으로 총 일수 / 집필 가능 일수 / 총 글자수 계산

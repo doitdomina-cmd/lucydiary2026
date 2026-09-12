@@ -2,7 +2,13 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <link rel="manifest" href="royalty-manifest.json">
+    <meta name="theme-color" content="#87ada1">
+    <link rel="apple-touch-icon" href="royalty-icon-256.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="정산매니저">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <title>Royalty Manager Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -458,6 +464,16 @@
         @media (max-width: 640px) {
             .modal-content { padding: 20px; width: 92%; }
             main .p-3 { padding: 0.6rem; }
+
+            /* 달력(집필/작업/출간) — 7열 그리드가 좁은 화면에서도 눌리지 않게 셀 높이와 여백을 줄인다 */
+            #write-calendar-body [class*="min-h-[120px]"],
+            #task-calendar-body [class*="min-h-[120px]"],
+            #publish-cal-body [class*="min-h-[120px]"],
+            #w-calendarBody [class*="min-h-[120px]"] {
+                min-height: 72px !important;
+                padding: 4px !important;
+            }
+            #write-month-big-label { font-size: 1.7rem !important; }
         }
         @media print {
             aside, #sidebar-toggle, #sidebar-backdrop, #save-status, .no-print { display: none !important; }
@@ -16175,6 +16191,13 @@
             renderPublishCal();
         }
         // ─────────────────────────────────────────────────────────
+
+        // 폰/웹 설치(PWA)용 서비스워커 등록 — 데스크톱(Electron, file://)에서는 보안 컨텍스트가 아니라 자동으로 건너뜀
+        if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('royalty-sw.js').catch(() => {});
+            });
+        }
     </script>
 </body>
 </html>

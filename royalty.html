@@ -247,6 +247,12 @@
         .draggable-row { cursor: move; }
         .draggable-row.dragging { opacity: 0.5; background: #f8fafc; }
 
+        /* 작가 정산 금액 계산기 (매출 시뮬레이터) 전용 스타일 */
+        .rc-platform-btn.rc-selected, .rc-ratio-btn.rc-selected, .rc-char-ratio-btn.rc-selected {
+            background: var(--primary) !important; color: #fff !important; border-color: var(--primary) !important; font-weight: 700;
+        }
+        .rc-active-input { border-color: var(--primary) !important; background: var(--primary-light) !important; color: var(--primary) !important; font-weight: 700; }
+
         /* 집필/스케줄 박스 선택 */
         .cal-select-box {
             position: fixed;
@@ -588,17 +594,17 @@
                 <button onclick="openCharCalc()" id="sidebar-calc-btn" class="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all border border-white/10" title="공미↔공포 계산기">
                     <i class="fa-solid fa-calculator text-base"></i>
                 </button>
+                <button onclick="openRevenueCalc()" id="sidebar-revenue-calc-btn" class="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all border border-white/10" title="작가 정산 금액 계산기">
+                    <i class="fa-solid fa-coins text-base"></i>
+                </button>
                 <button onclick="exportAllWritingRecords()" id="sidebar-export-btn" class="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all border border-white/10" title="집필 기록 전체 내보내기 (전체 연도, 텍스트 파일)">
                     <i class="fa-solid fa-file-export text-base"></i>
                 </button>
+                <button onclick="exportAllSettlementRecords()" id="sidebar-export-settlement-btn" class="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all border border-white/10" title="정산 기록 전체 내보내기 (전체 연도, 텍스트 파일)">
+                    <i class="fa-solid fa-sack-dollar text-base"></i>
+                </button>
                 <button onclick="toggleBriefFromSidebar()" id="sidebar-brief-btn" class="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all border border-white/10" title="오늘의 브리핑" style="opacity:0.5; display:none;">
                     <i class="fa-solid fa-user-tie text-base"></i>
-                </button>
-                <button onclick="toggleMiniFromSidebar()" id="sidebar-mini-btn" class="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all border border-white/10" title="미니창" style="opacity:0.5">
-                    <i class="fa-solid fa-pen-nib text-base"></i>
-                </button>
-                <button onclick="toggleWidgetFromSidebar()" id="sidebar-widget-btn" class="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all border border-white/10" title="위젯 숨기기/보이기">
-                    <i class="fa-solid fa-window-maximize text-base"></i>
                 </button>
                 <button onclick="openSettingsPanel()" class="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all border border-white/10" title="설정">
                     <i class="fa-solid fa-gear text-base"></i>
@@ -2366,6 +2372,17 @@
                         </div>
                     </div>
                     <hr class="border-slate-100">
+                    <!-- 미니창 -->
+                    <div>
+                        <p class="text-xs font-bold text-slate-400 uppercase mb-3">📝 미니창</p>
+                        <div class="space-y-2.5">
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm text-slate-600 font-medium">미니창 표시</span>
+                                <button onclick="toggleMiniWindowSetting()" id="mini-window-toggle-btn" class="px-4 py-1.5 rounded-lg text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all">확인 중...</button>
+                            </div>
+                        </div>
+                    </div>
+                    <hr class="border-slate-100">
                     <!-- 브리핑 자동 실행 -->
                     <div>
                         <p class="text-xs font-bold text-slate-400 uppercase mb-3">📋 오늘의 브리핑</p>
@@ -2605,6 +2622,166 @@
             <div class="grid grid-cols-2 gap-2 mt-5">
                 <button onclick="ccSwap()" class="py-2 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all">스왑</button>
                 <button onclick="ccReset()" class="py-2 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all">초기화</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 작가 정산 금액 계산기 (매출 시뮬레이터) -->
+    <div id="revenue-calc-modal" class="modal-overlay">
+        <div class="modal-content w-full" style="max-width:1400px;">
+            <div class="flex justify-between items-center mb-5">
+                <h3 class="text-lg font-bold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-coins text-slate-500"></i> 작가 정산 금액 계산기</h3>
+                <button onclick="closeRevenueCalc()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-times text-xl"></i></button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 custom-scrollbar" style="max-height:78vh; overflow-y:auto;">
+
+                <!-- 1. 매출 정보 입력 -->
+                <div class="bg-slate-50 rounded-2xl border border-slate-200 p-5 flex flex-col">
+                    <div class="flex justify-between items-center mb-3">
+                        <h4 class="font-bold text-sm text-slate-700 flex items-center gap-2"><i class="fa-solid fa-won-sign text-slate-400"></i> 1. 매출 정보 입력</h4>
+                        <button onclick="rcResetAll()" class="text-xs text-slate-400 hover:text-rose-500 flex items-center gap-1"><i class="fa-solid fa-arrow-rotate-left"></i> 초기화</button>
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-slate-500 block mb-1">A. 총 매출액</label>
+                        <div class="flex gap-2">
+                            <div class="relative flex-1">
+                                <input type="text" id="rc-salesInput" placeholder="0" inputmode="numeric" class="w-full text-right font-bold p-3 pr-9 bg-white border border-slate-200 rounded-xl outline-none focus:border-[var(--primary)]" oninput="rcFormatCurrency(this)" onkeydown="if(event.key==='Enter') rcApplyDirect()">
+                                <span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">원</span>
+                            </div>
+                            <button onclick="rcApplyDirect()" class="px-4 rounded-xl font-bold text-white shrink-0" style="background:var(--primary)">적용</button>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 my-3">
+                        <div class="flex-1 h-px bg-slate-200"></div>
+                        <span class="text-[11px] text-slate-400 shrink-0">또는 상세 계산</span>
+                        <div class="flex-1 h-px bg-slate-200"></div>
+                    </div>
+                    <div class="bg-white rounded-xl p-4 border border-slate-200">
+                        <p class="text-xs font-bold text-slate-500 mb-3">B~D 판매 상세 설정</p>
+                        <div class="grid grid-cols-2 gap-2 mb-2">
+                            <div>
+                                <label class="text-[11px] text-slate-400 block mb-1">B. 1세트(권) 가격</label>
+                                <input type="text" id="rc-bookPrice" placeholder="0" inputmode="numeric" class="w-full text-right font-bold p-2 bg-slate-50 border border-slate-200 rounded-lg outline-none text-sm" oninput="rcFormatCurrency(this); rcCalcSimPreview();" onkeydown="if(event.key==='Enter') rcApplySim()">
+                            </div>
+                            <div>
+                                <label class="text-[11px] text-slate-400 block mb-1">판매 수량</label>
+                                <input type="text" id="rc-bookCount" placeholder="0" inputmode="numeric" class="w-full text-right font-bold p-2 bg-slate-50 border border-slate-200 rounded-lg outline-none text-sm" oninput="rcFormatCurrency(this); rcCalcSimPreview();" onkeydown="if(event.key==='Enter') rcApplySim()">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 mb-3">
+                            <div>
+                                <label class="text-[11px] text-slate-400 block mb-1">C. 할인율(%)</label>
+                                <input type="number" id="rc-discountRate" placeholder="0" min="0" max="100" class="w-full text-right font-bold p-2 bg-slate-50 border border-slate-200 rounded-lg outline-none text-sm" oninput="rcCalcSimPreview()" onkeydown="if(event.key==='Enter') rcApplySim()">
+                            </div>
+                            <div>
+                                <label class="text-[11px] text-slate-400 block mb-1">D. 추가 할인(%)</label>
+                                <input type="number" id="rc-additionalDiscount" placeholder="0" min="0" max="100" class="w-full text-right font-bold p-2 bg-slate-50 border border-slate-200 rounded-lg outline-none text-sm" oninput="rcCalcSimPreview()" onkeydown="if(event.key==='Enter') rcApplySim()">
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-center text-xs mb-2">
+                            <span class="font-bold" style="color:var(--primary)">예상 합계</span>
+                            <span id="rc-simTotalPreview" class="font-bold" style="color:var(--primary)">0원</span>
+                        </div>
+                        <button onclick="rcApplySim()" class="w-full py-2.5 rounded-lg text-sm font-bold border transition-all hover:text-white" style="border-color:var(--primary); color:var(--primary);" onmouseover="this.style.background='var(--primary)'" onmouseout="this.style.background=''">위 금액으로 적용하기</button>
+                    </div>
+                </div>
+
+                <!-- 2. 정산 설정 및 결과 -->
+                <div class="bg-slate-50 rounded-2xl border border-slate-200 p-5 flex flex-col">
+                    <h4 class="font-bold text-sm text-slate-700 flex items-center gap-2 mb-3"><i class="fa-solid fa-calculator text-slate-400"></i> 2. 정산 설정 및 결과</h4>
+                    <div class="mb-3">
+                        <label class="text-xs font-bold text-slate-500 block mb-1.5">플랫폼 수수료</label>
+                        <div class="grid grid-cols-4 gap-1.5">
+                            <button type="button" class="rc-platform-btn py-2 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-600" data-value="30" onclick="rcSelectPlatform(30)">30%</button>
+                            <button type="button" class="rc-platform-btn py-2 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-600" data-value="35" onclick="rcSelectPlatform(35)">35%</button>
+                            <button type="button" class="rc-platform-btn py-2 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-600" data-value="40" onclick="rcSelectPlatform(40)">40%</button>
+                            <input type="number" id="rc-customPlatformInput" placeholder="직접%" min="0" max="100" class="p-2 text-center bg-white border border-slate-200 rounded-lg text-xs outline-none" oninput="rcSetCustomPlatform(this)">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="text-xs font-bold text-slate-500 block mb-1.5">작가 정산 비율</label>
+                        <div class="grid grid-cols-3 gap-1.5 mb-1.5">
+                            <button type="button" class="rc-ratio-btn py-2 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-600" data-value="70" onclick="rcSelectRatio(70)">70%</button>
+                            <button type="button" class="rc-ratio-btn py-2 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-600" data-value="75" onclick="rcSelectRatio(75)">75%</button>
+                            <button type="button" class="rc-ratio-btn py-2 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-600" data-value="80" onclick="rcSelectRatio(80)">80%</button>
+                        </div>
+                        <div class="grid grid-cols-3 gap-1.5">
+                            <button type="button" class="rc-ratio-btn py-2 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-600" data-value="85" onclick="rcSelectRatio(85)">85%</button>
+                            <button type="button" class="rc-ratio-btn py-2 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-600" data-value="90" onclick="rcSelectRatio(90)">90%</button>
+                            <input type="number" id="rc-customRatioInput" placeholder="직접%" min="0" max="100" class="p-2 text-center bg-white border border-slate-200 rounded-lg text-xs outline-none" oninput="rcSetCustomRatio(this)">
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl p-3.5 space-y-2 text-xs border border-slate-200">
+                        <div class="flex justify-between"><span class="text-slate-400">플랫폼 수수료 (<span id="rc-platformFeePercent">0</span>%)</span><span class="text-slate-500 font-medium">- <span id="rc-platformFeeAmount">0</span>원</span></div>
+                        <div class="flex justify-between"><span class="text-slate-400">수수료 제외 매출</span><span class="text-slate-600 font-medium"><span id="rc-netSalesAmount">0</span>원</span></div>
+                        <div class="flex justify-between pt-2 border-t border-slate-100"><span class="text-slate-400">작가 정산금(세전)</span><span class="font-bold" style="color:var(--primary)"><span id="rc-grossIncome">0</span>원</span></div>
+                        <div class="flex justify-between"><span class="text-slate-400">사업소득세 (3.3%)</span><span class="text-slate-500 font-medium">- <span id="rc-taxAmount">0</span>원</span></div>
+                    </div>
+                    <div class="rounded-xl p-5 text-white text-center mt-3" style="background:var(--primary)">
+                        <p class="text-white/80 text-xs font-bold mb-1">최종 실수령액</p>
+                        <h2 class="text-2xl font-black" id="rc-finalAmount">0원</h2>
+                        <div class="mt-3 pt-3 border-t border-white/20 grid grid-cols-2 gap-2">
+                            <button onclick="rcCopyResult()" class="text-[11px] bg-white/20 hover:bg-white/30 py-2 rounded-lg flex justify-center items-center gap-1"><i class="fa-solid fa-copy"></i> 결과 복사</button>
+                            <button onclick="rcAddToComparison()" class="text-[11px] bg-white text-slate-700 font-bold py-2 rounded-lg flex justify-center items-center gap-1"><i class="fa-solid fa-circle-plus"></i> 비교함 담기</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. 정산 결과 비교 -->
+                <div class="bg-slate-50 rounded-2xl border border-slate-200 p-5 flex flex-col" style="max-height:660px;">
+                    <div class="flex justify-between items-center mb-3">
+                        <h4 class="font-bold text-sm text-slate-700 flex items-center gap-2"><i class="fa-solid fa-list-ol text-slate-400"></i> 3. 정산 결과 비교</h4>
+                        <button onclick="rcClearComparison()" class="text-xs text-slate-400 hover:text-rose-500">전체 비우기</button>
+                    </div>
+                    <div id="rc-comparisonEmpty" class="flex-1 flex flex-col items-center justify-center text-slate-300 text-center py-8">
+                        <i class="fa-regular fa-inbox text-3xl mb-2"></i>
+                        <p class="text-xs">계산 후 '비교함 담기'를 눌러<br>결과를 저장해보세요.</p>
+                    </div>
+                    <div id="rc-comparisonList" class="hidden flex-1 overflow-y-auto custom-scrollbar space-y-2"></div>
+                </div>
+
+                <!-- 4. 글자당 금액 계산 -->
+                <div class="bg-slate-50 rounded-2xl border border-slate-200 p-5 flex flex-col" style="max-height:660px;">
+                    <div class="flex justify-between items-center mb-3">
+                        <h4 class="font-bold text-sm text-slate-700 flex items-center gap-2"><i class="fa-solid fa-font text-slate-400"></i> 4. 글자당 금액 계산</h4>
+                        <button onclick="rcClearCharComparison()" class="text-xs text-slate-400 hover:text-rose-500">전체 비우기</button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 mb-2">
+                        <div>
+                            <label class="text-[11px] text-slate-400 block mb-1">공백 미포함 글자수</label>
+                            <input type="text" id="rc-charCountExc" placeholder="0" inputmode="numeric" class="w-full text-right font-bold p-2 bg-white border border-slate-200 rounded-lg outline-none text-sm" oninput="rcFormatCurrency(this); rcCalculatePerChar();">
+                        </div>
+                        <div>
+                            <label class="text-[11px] text-slate-400 block mb-1">1권 가격</label>
+                            <input type="text" id="rc-perCharPrice" placeholder="0" inputmode="numeric" class="w-full text-right font-bold p-2 bg-white border border-slate-200 rounded-lg outline-none text-sm" oninput="rcFormatCurrency(this); rcCalculatePerChar();">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="text-[11px] text-slate-400 block mb-1">정산 비율 <span class="text-slate-300">(플랫폼 수수료 30% 고정 반영)</span></label>
+                        <div class="grid grid-cols-5 gap-1">
+                            <button type="button" class="rc-char-ratio-btn py-1.5 rounded-lg border border-slate-200 bg-white text-[11px] font-bold text-slate-600" data-value="70" onclick="rcSelectCharRatio(70)">70%</button>
+                            <button type="button" class="rc-char-ratio-btn py-1.5 rounded-lg border border-slate-200 bg-white text-[11px] font-bold text-slate-600" data-value="75" onclick="rcSelectCharRatio(75)">75%</button>
+                            <button type="button" class="rc-char-ratio-btn py-1.5 rounded-lg border border-slate-200 bg-white text-[11px] font-bold text-slate-600" data-value="80" onclick="rcSelectCharRatio(80)">80%</button>
+                            <button type="button" class="rc-char-ratio-btn py-1.5 rounded-lg border border-slate-200 bg-white text-[11px] font-bold text-slate-600" data-value="85" onclick="rcSelectCharRatio(85)">85%</button>
+                            <button type="button" class="rc-char-ratio-btn py-1.5 rounded-lg border border-slate-200 bg-white text-[11px] font-bold text-slate-600" data-value="90" onclick="rcSelectCharRatio(90)">90%</button>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl p-3 border border-slate-200 mb-2">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-[11px] text-slate-500">1,000부 정산금 <span class="text-slate-300">(수수료 30% 제외)</span></span>
+                            <span class="font-bold text-slate-700"><span id="rc-resultRevenue1000">0</span>원</span>
+                        </div>
+                        <div class="flex justify-between items-center pt-2 border-t border-slate-100">
+                            <span class="text-[11px] text-slate-500">1글자당 가치</span>
+                            <span class="font-bold" style="color:var(--primary)"><span id="rc-resultPerOneInc">0</span>원</span>
+                        </div>
+                    </div>
+                    <button onclick="rcAddToCharComparison()" class="w-full py-2 rounded-lg text-xs font-bold border mb-3" style="border-color:var(--primary); color:var(--primary)">비교함 담기</button>
+                    <div id="rc-charComparisonList" class="flex-1 overflow-y-auto custom-scrollbar space-y-2">
+                        <p class="text-[11px] text-slate-300 text-center mt-4" id="rc-charListEmpty">비교할 결과가 없습니다.</p>
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>
@@ -5106,6 +5283,7 @@
             updateWidgetToggleBtn();
             updateBriefAutoOpenBtn();
             updateBriefSidebarIconBtn();
+            updateMiniWindowToggleBtn();
             restoreWidgetSettingsUI();
         }
         function closeSettingsPanel() { document.getElementById('settings-panel-modal').classList.remove('open'); save(true); }
@@ -5325,6 +5503,229 @@
         function ccReset() {
             ['cc-cur-nospace', 'cc-cur-space', 'cc-goal-nospace', 'cc-goal-space', 'cc-ratio', 'cc-per-episode-custom'].forEach(id => document.getElementById(id).value = '');
             ccSetPerUnit('po');
+        }
+
+        // ════ 작가 정산 금액 계산기 (매출 시뮬레이터) ════
+        let rcState = { appliedSales: 0, platformFeePercent: 30, writerRatio: 70, discountRate: 0, addDiscountRate: 0, charCalcRatio: 70 };
+        let rcComparisonList = [];
+        let rcCharComparisonList = [];
+
+        function openRevenueCalc() {
+            document.getElementById('revenue-calc-modal').classList.add('open');
+            rcSelectPlatform(rcState.platformFeePercent);
+            rcSelectRatio(rcState.writerRatio);
+            rcSelectCharRatio(rcState.charCalcRatio);
+            rcUpdateUI();
+        }
+        function closeRevenueCalc() { document.getElementById('revenue-calc-modal').classList.remove('open'); }
+
+        function rcParseNumber(val) { return parseInt(String(val).replace(/[^0-9]/g, ''), 10) || 0; }
+        function rcFormatCurrency(input) {
+            const v = input.value.replace(/[^0-9]/g, '');
+            input.value = v === '' ? '' : parseInt(v, 10).toLocaleString('ko-KR');
+        }
+
+        function rcCalcSimPreview() {
+            const price = rcParseNumber(document.getElementById('rc-bookPrice').value);
+            const count = rcParseNumber(document.getElementById('rc-bookCount').value);
+            const discountRate = parseFloat(document.getElementById('rc-discountRate').value) || 0;
+            const addDiscountRate = parseFloat(document.getElementById('rc-additionalDiscount').value) || 0;
+            const baseTotal = price * count;
+            const afterFirst = baseTotal * (1 - discountRate / 100);
+            const finalTotal = Math.max(0, Math.floor(afterFirst * (1 - addDiscountRate / 100)));
+            document.getElementById('rc-simTotalPreview').textContent = finalTotal.toLocaleString('ko-KR') + '원';
+        }
+
+        function rcApplyDirect() {
+            const val = rcParseNumber(document.getElementById('rc-salesInput').value);
+            if (!val) { meShowToast('매출액을 입력해주세요.'); return; }
+            rcState.appliedSales = val;
+            rcState.discountRate = 0;
+            rcState.addDiscountRate = 0;
+            rcUpdateUI();
+            meShowToast('적용되었습니다.');
+        }
+
+        function rcApplySim() {
+            const price = rcParseNumber(document.getElementById('rc-bookPrice').value);
+            const count = rcParseNumber(document.getElementById('rc-bookCount').value);
+            const discountRate = parseFloat(document.getElementById('rc-discountRate').value) || 0;
+            const addDiscountRate = parseFloat(document.getElementById('rc-additionalDiscount').value) || 0;
+            if (!price && !count) { meShowToast('가격과 수량을 입력해주세요.'); return; }
+            const baseTotal = price * count;
+            const afterFirst = baseTotal * (1 - discountRate / 100);
+            const finalTotal = Math.max(0, Math.floor(afterFirst * (1 - addDiscountRate / 100)));
+            rcState.appliedSales = finalTotal;
+            rcState.discountRate = discountRate;
+            rcState.addDiscountRate = addDiscountRate;
+            document.getElementById('rc-salesInput').value = finalTotal.toLocaleString('ko-KR');
+            rcUpdateUI();
+            meShowToast('계산 결과가 적용되었습니다.');
+        }
+
+        function rcResetAll() {
+            rcState = { appliedSales: 0, platformFeePercent: 30, writerRatio: 70, discountRate: 0, addDiscountRate: 0, charCalcRatio: 70 };
+            ['rc-salesInput', 'rc-bookPrice', 'rc-bookCount', 'rc-discountRate', 'rc-additionalDiscount', 'rc-customPlatformInput', 'rc-customRatioInput', 'rc-charCountExc', 'rc-perCharPrice'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+            document.getElementById('rc-simTotalPreview').textContent = '0원';
+            document.getElementById('rc-resultPerOneInc').textContent = '0';
+            document.getElementById('rc-resultRevenue1000').textContent = '0';
+            rcCharComparisonList = [];
+            rcRenderCharComparisonList();
+            rcSelectPlatform(30);
+            rcSelectRatio(70);
+            rcSelectCharRatio(70);
+            meShowToast('초기화되었습니다.');
+        }
+
+        function rcSelectPlatform(percent) {
+            rcState.platformFeePercent = percent;
+            const custom = document.getElementById('rc-customPlatformInput');
+            custom.value = ''; custom.classList.remove('rc-active-input');
+            rcUpdateButtons('.rc-platform-btn', percent);
+            rcUpdateUI();
+        }
+        function rcSetCustomPlatform(input) {
+            let val = parseFloat(input.value);
+            if (val > 100) val = 100; if (val < 0) val = 0;
+            document.querySelectorAll('.rc-platform-btn').forEach(btn => btn.classList.remove('rc-selected'));
+            input.classList.add('rc-active-input');
+            rcState.platformFeePercent = isNaN(val) ? 0 : val;
+            rcUpdateUI();
+        }
+        function rcSelectRatio(percent) {
+            rcState.writerRatio = percent;
+            const custom = document.getElementById('rc-customRatioInput');
+            custom.value = ''; custom.classList.remove('rc-active-input');
+            rcUpdateButtons('.rc-ratio-btn', percent);
+            rcUpdateUI();
+        }
+        function rcSetCustomRatio(input) {
+            let val = parseFloat(input.value);
+            if (val > 100) val = 100; if (val < 0) val = 0;
+            document.querySelectorAll('.rc-ratio-btn').forEach(btn => btn.classList.remove('rc-selected'));
+            input.classList.add('rc-active-input');
+            rcState.writerRatio = isNaN(val) ? 0 : val;
+            rcUpdateUI();
+        }
+        function rcUpdateButtons(selector, value) {
+            document.querySelectorAll(selector).forEach(btn => btn.classList.toggle('rc-selected', parseFloat(btn.dataset.value) === value));
+        }
+
+        function rcUpdateUI() {
+            const platformFee = Math.floor(rcState.appliedSales * (rcState.platformFeePercent / 100));
+            const salesAfterPlatform = rcState.appliedSales - platformFee;
+            const grossIncome = Math.floor(salesAfterPlatform * (rcState.writerRatio / 100));
+            const tax = Math.floor(grossIncome * 0.033);
+            const finalAmount = grossIncome - tax;
+            document.getElementById('rc-platformFeePercent').textContent = rcState.platformFeePercent;
+            document.getElementById('rc-platformFeeAmount').textContent = platformFee.toLocaleString('ko-KR');
+            document.getElementById('rc-netSalesAmount').textContent = salesAfterPlatform.toLocaleString('ko-KR');
+            document.getElementById('rc-grossIncome').textContent = grossIncome.toLocaleString('ko-KR');
+            document.getElementById('rc-taxAmount').textContent = tax.toLocaleString('ko-KR');
+            document.getElementById('rc-finalAmount').textContent = finalAmount.toLocaleString('ko-KR') + '원';
+        }
+
+        function rcAddToComparison() {
+            if (!rcState.appliedSales) { meShowToast('계산 결과가 없습니다.'); return; }
+            const platformFee = Math.floor(rcState.appliedSales * (rcState.platformFeePercent / 100));
+            const salesAfterPlatform = rcState.appliedSales - platformFee;
+            const grossIncome = Math.floor(salesAfterPlatform * (rcState.writerRatio / 100));
+            const tax = Math.floor(grossIncome * 0.033);
+            const finalAmount = grossIncome - tax;
+            rcComparisonList.push({ id: Date.now(), sales: rcState.appliedSales, platformPercent: rcState.platformFeePercent, ratioPercent: rcState.writerRatio, finalAmount, discountRate: rcState.discountRate, addDiscountRate: rcState.addDiscountRate });
+            rcRenderComparisonList();
+            meShowToast('비교함에 담았습니다.');
+        }
+        function rcRenderComparisonList() {
+            const listEl = document.getElementById('rc-comparisonList');
+            const emptyEl = document.getElementById('rc-comparisonEmpty');
+            if (!rcComparisonList.length) { listEl.classList.add('hidden'); emptyEl.classList.remove('hidden'); listEl.innerHTML = ''; return; }
+            listEl.classList.remove('hidden'); emptyEl.classList.add('hidden');
+            const maxVal = Math.max(...rcComparisonList.map(i => i.finalAmount));
+            listEl.innerHTML = rcComparisonList.map((item, i) => {
+                const label = String.fromCharCode(65 + i);
+                const isBest = item.finalAmount === maxVal && rcComparisonList.length > 1;
+                const discountParts = [];
+                if (item.discountRate > 0) discountParts.push(`할인율 ${item.discountRate}%`);
+                if (item.addDiscountRate > 0) discountParts.push(`추가 ${item.addDiscountRate}%`);
+                const discountHtml = discountParts.length ? `<div class="text-[10px] text-rose-500 mb-1"><i class="fa-solid fa-tag mr-1"></i>${discountParts.join(' + ')}</div>` : '';
+                return `<div class="bg-white p-3 rounded-xl border ${isBest ? 'border-amber-400 ring-1 ring-amber-300' : 'border-slate-200'} relative">
+                    ${isBest ? '<span class="absolute -top-2 -left-1 bg-amber-400 text-amber-900 text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm"><i class="fa-solid fa-crown mr-0.5"></i>BEST</span>' : ''}
+                    <button onclick="rcRemoveComparisonItem(${item.id})" class="absolute top-1.5 right-1.5 text-slate-300 hover:text-rose-400"><i class="fa-solid fa-xmark"></i></button>
+                    <div class="flex items-center gap-2 mb-1.5">
+                        <span class="w-5 h-5 flex items-center justify-center bg-slate-100 text-slate-500 font-bold rounded-full text-[10px]">${label}</span>
+                        <span class="text-[11px] font-bold text-slate-500 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded">매출 ${item.sales.toLocaleString()}원</span>
+                    </div>
+                    ${discountHtml}
+                    <div class="flex gap-2 text-[11px] text-slate-400 mb-1.5">
+                        <span>수수료 ${item.platformPercent}%</span><span class="text-slate-200">|</span><span class="font-bold" style="color:var(--primary)">정산 ${item.ratioPercent}%</span>
+                    </div>
+                    <div class="text-right font-black" style="color:var(--primary)">${item.finalAmount.toLocaleString()}원</div>
+                </div>`;
+            }).join('');
+        }
+        function rcRemoveComparisonItem(id) { rcComparisonList = rcComparisonList.filter(i => i.id !== id); rcRenderComparisonList(); }
+        function rcClearComparison() { rcComparisonList = []; rcRenderComparisonList(); meShowToast('비교함이 비워졌습니다.'); }
+
+        function rcSelectCharRatio(percent) {
+            rcState.charCalcRatio = percent;
+            rcUpdateButtons('.rc-char-ratio-btn', percent);
+            rcCalculatePerChar();
+        }
+        function rcCalculatePerChar() {
+            const excVal = rcParseNumber(document.getElementById('rc-charCountExc').value);
+            const price = rcParseNumber(document.getElementById('rc-perCharPrice').value);
+            const priceAfterFee = price * 0.7;
+            const revenuePerBook = priceAfterFee * (rcState.charCalcRatio / 100);
+            const rev1000 = revenuePerBook * 1000;
+            document.getElementById('rc-resultRevenue1000').textContent = Math.floor(rev1000).toLocaleString('ko-KR');
+            if (excVal > 0 && price > 0) {
+                document.getElementById('rc-resultPerOneInc').textContent = (revenuePerBook / excVal).toLocaleString('ko-KR', { maximumFractionDigits: 3 });
+            } else {
+                document.getElementById('rc-resultPerOneInc').textContent = '0';
+            }
+        }
+        function rcAddToCharComparison() {
+            const excVal = rcParseNumber(document.getElementById('rc-charCountExc').value);
+            const price = rcParseNumber(document.getElementById('rc-perCharPrice').value);
+            const res = parseFloat(document.getElementById('rc-resultPerOneInc').textContent.replace(/,/g, ''));
+            if (!res) { meShowToast('계산 결과가 없습니다.'); return; }
+            const priceAfterFee = price * 0.7;
+            const revenuePerBook = priceAfterFee * (rcState.charCalcRatio / 100);
+            const rev1000 = Math.floor(revenuePerBook * 1000);
+            rcCharComparisonList.push({ id: Date.now(), excVal, price, ratio: rcState.charCalcRatio, result: res, rev1000 });
+            rcRenderCharComparisonList();
+            meShowToast('비교함에 담았습니다.');
+        }
+        function rcRenderCharComparisonList() {
+            const listEl = document.getElementById('rc-charComparisonList');
+            if (!rcCharComparisonList.length) { listEl.innerHTML = '<p class="text-[11px] text-slate-300 text-center mt-4" id="rc-charListEmpty">비교할 결과가 없습니다.</p>'; return; }
+            const maxVal = Math.max(...rcCharComparisonList.map(i => i.result));
+            listEl.innerHTML = rcCharComparisonList.map(item => {
+                const isBest = item.result === maxVal && rcCharComparisonList.length > 1;
+                return `<div class="bg-white p-2.5 rounded-lg border ${isBest ? 'border-amber-400 ring-1 ring-amber-300' : 'border-slate-200'} relative">
+                    ${isBest ? '<span class="absolute top-1 left-1 bg-amber-400 text-amber-900 text-[9px] font-bold px-1 rounded"><i class="fa-solid fa-crown"></i></span>' : ''}
+                    <button onclick="rcRemoveCharComparison(${item.id})" class="absolute top-1 right-1 text-slate-300 hover:text-rose-400"><i class="fa-solid fa-xmark text-xs"></i></button>
+                    <div class="text-[10px] text-slate-400 flex gap-2 mt-1 pr-4">
+                        <span>${item.excVal.toLocaleString()}자</span><span>|</span><span>${item.price.toLocaleString()}원 (${item.ratio}%)</span>
+                    </div>
+                    <div class="flex justify-between items-end mt-1">
+                        <span class="text-[11px] font-bold text-slate-500">1,000부: ${item.rev1000.toLocaleString()}원</span>
+                        <span class="text-sm font-bold" style="color:var(--primary)">${item.result.toLocaleString('ko-KR', { maximumFractionDigits: 3 })}원<span class="text-[9px] text-slate-400">/자</span></span>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+        function rcRemoveCharComparison(id) { rcCharComparisonList = rcCharComparisonList.filter(i => i.id !== id); rcRenderCharComparisonList(); }
+        function rcClearCharComparison() { rcCharComparisonList = []; rcRenderCharComparisonList(); meShowToast('비교함이 비워졌습니다.'); }
+
+        function rcCopyResult() {
+            const amount = document.getElementById('rc-finalAmount').textContent;
+            if (amount === '0원') return;
+            const text = `[작가 정산 계산]\n매출: ${rcState.appliedSales.toLocaleString()}원\n실수령액: ${amount}`;
+            const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+            document.execCommand('copy'); document.body.removeChild(ta);
+            meShowToast('복사되었습니다!');
         }
 
         function toggleWidget() {
@@ -12592,6 +12993,139 @@
         }
 
         // ════════════════════════════════════════════════════════
+        // 🟢 [NEW] 정산 기록 전체를 연도 구분 없이 한 텍스트 파일로 내보내기
+        //   (챗GPT 등에 정산/수익 상담을 하기 좋게, 작품별·출판사별·장르별·연도별로 정리해서 내보낸다)
+        // ════════════════════════════════════════════════════════
+        function exportAllSettlementRecords() {
+            const lines = [];
+            const today = getYYYYMMDD(new Date());
+            const fmtDateTime = (dm) => {
+                const pad = n => String(n).padStart(2, '0');
+                return `${dm.getFullYear()}-${pad(dm.getMonth() + 1)}-${pad(dm.getDate())} ${pad(dm.getHours())}:${pad(dm.getMinutes())}`;
+            };
+            let lastModTxt = '-';
+            try {
+                if (isNodeEnvironment && fs.existsSync(dataFilePath)) lastModTxt = fmtDateTime(fs.statSync(dataFilePath).mtime);
+            } catch (e) {}
+            if (lastModTxt === '-') {
+                const raw = localStorage.getItem('lastModified_v6');
+                if (raw) { const dm = new Date(raw); if (!isNaN(dm.getTime())) lastModTxt = fmtDateTime(dm); }
+            }
+            lines.push('■ 정산 기록 전체 내보내기');
+            lines.push(`기준일: ${today} / 마지막 수정: ${lastModTxt}`);
+            lines.push('');
+
+            // 1) 작품 정보 — 정산 관련 필드 위주
+            lines.push(`=== 작품 정보 (${masterWorks.length}개) ===`);
+            if (!masterWorks.length) lines.push('(없음)');
+            masterWorks.forEach(w => {
+                const { totalProfit, totalSales } = getCumulativeWorkData(w.id);
+                const advTxt = w.advanceAmount ? `${Number(w.advanceAmount).toLocaleString()}만원${w.advanceDate ? ` (${w.advanceDate})` : ''}` : '없음';
+                lines.push(`\n- [${w.genre || '장르 미상'}] ${w.title}  (work_id: ${w.id})`);
+                lines.push(`  상태: ${w.status || '미지정'} · 출판사: ${w.publisher || '-'}${w.settlementPublisher ? ` (정산처: ${w.settlementPublisher})` : ''} · 플랫폼: ${w.platform || '-'} · 프로모션: ${w.promotion || '-'}`);
+                lines.push(`  정산 비율: ${w.rate || 0}% · 선인세: ${advTxt}`);
+                lines.push(`  출간: ${getPendingLabel(w)}`);
+                lines.push(`  누적 순수익: ₩${formatCurrency(totalProfit)} · 추정 총매출: ₩${formatCurrency(totalSales)}`);
+            });
+            lines.push('');
+
+            // 2) 작품별 정산 기록 — 연도 상관없이 월별로 쭉, 0원인 달은 생략
+            lines.push('=== 작품별 정산 기록 (월별) ===');
+            let anyRecord = false;
+            masterWorks.forEach(w => {
+                const records = [];
+                Object.entries(monthlyData).forEach(([mKey, d]) => {
+                    const amt = Number(d[w.id]) || 0;
+                    if (amt) records.push({ month: mKey, amount: amt });
+                });
+                if (!records.length) return;
+                anyRecord = true;
+                records.sort((a, b) => a.month.localeCompare(b.month));
+                const total = records.reduce((s, r) => s + r.amount, 0);
+                lines.push(`\n- [${w.genre || '장르 미상'}] ${w.title}`);
+                records.forEach(r => lines.push(`  ${r.month}  ₩${formatCurrency(r.amount)}`));
+                lines.push(`  → 누적: ₩${formatCurrency(total)} (${records.length}개월)`);
+            });
+            if (!anyRecord) lines.push('(정산 기록 없음)');
+            lines.push('');
+
+            // 3) 출판사별 정산 요약
+            lines.push('=== 출판사별 정산 요약 ===');
+            const byPublisher = {};
+            Object.values(monthlyData).forEach(d => {
+                Object.entries(d).forEach(([wId, amt]) => {
+                    const w = masterWorks.find(x => x.id === wId);
+                    if (!w) return;
+                    const pub = w.settlementPublisher || w.publisher || '미지정';
+                    byPublisher[pub] = (byPublisher[pub] || 0) + (Number(amt) || 0);
+                });
+            });
+            const pubEntries = Object.entries(byPublisher).sort((a, b) => b[1] - a[1]);
+            if (!pubEntries.length) lines.push('(없음)');
+            pubEntries.forEach(([pub, amt]) => {
+                const pd = publisherData[pub] || {};
+                const detailParts = [];
+                if (pd.paymentDay) detailParts.push(`정산일 ${pd.paymentDay}`);
+                if (pd.standard) detailParts.push(`기준 ${pd.standard}`);
+                if (pd.site) detailParts.push(`사이트 ${pd.site}`);
+                lines.push(`- ${pub}: 누적 ₩${formatCurrency(amt)}${detailParts.length ? ` (${detailParts.join(' · ')})` : ''}`);
+            });
+            lines.push('');
+
+            // 4) 장르별 정산 요약
+            lines.push('=== 장르별 정산 요약 ===');
+            const byGenre = {};
+            Object.values(monthlyData).forEach(d => {
+                Object.entries(d).forEach(([wId, amt]) => {
+                    const w = masterWorks.find(x => x.id === wId);
+                    if (!w) return;
+                    const g = w.genre || '기타';
+                    if (!byGenre[g]) byGenre[g] = { total: 0, workIds: new Set() };
+                    byGenre[g].total += Number(amt) || 0;
+                    byGenre[g].workIds.add(wId);
+                });
+            });
+            const genreEntries = Object.entries(byGenre).sort((a, b) => b[1].total - a[1].total);
+            if (!genreEntries.length) lines.push('(없음)');
+            genreEntries.forEach(([g, v]) => {
+                const avg = v.workIds.size ? Math.round(v.total / v.workIds.size) : 0;
+                lines.push(`- ${g}: 작품 ${v.workIds.size}개 · 누적 ₩${formatCurrency(v.total)} · 작품당 평균 ₩${formatCurrency(avg)}`);
+            });
+            lines.push('');
+
+            // 5) 연도별 정산 요약
+            lines.push('=== 연도별 정산 요약 ===');
+            const byYear = {};
+            Object.entries(monthlyData).forEach(([mKey, d]) => {
+                const yr = mKey.split('-')[0];
+                const sum = Object.values(d).reduce((s, v) => s + (Number(v) || 0), 0);
+                byYear[yr] = (byYear[yr] || 0) + sum;
+            });
+            const yearKeys = Object.keys(byYear).sort();
+            if (!yearKeys.length) lines.push('(없음)');
+            yearKeys.forEach(yr => lines.push(`- ${yr}년: ₩${formatCurrency(byYear[yr])}`));
+            lines.push('');
+
+            // 6) 전체 요약
+            const grandTotal = Object.values(byYear).reduce((s, v) => s + v, 0);
+            lines.push('=== 요약 ===');
+            lines.push(`- 누적 순수익 총합: ₩${formatCurrency(grandTotal)}`);
+            lines.push(`- 연 평균: ₩${formatCurrency(yearKeys.length ? grandTotal / yearKeys.length : 0)}`);
+            lines.push(`- 등록된 작품 수: ${masterWorks.length}개`);
+            const workCountWithRecord = masterWorks.filter(w => Object.values(monthlyData).some(d => Number(d[w.id]) > 0)).length;
+            lines.push(`- 정산 기록이 있는 작품 수: ${workCountWithRecord}개`);
+            lines.push(`- 작품당 평균 누적 순수익: ₩${formatCurrency(workCountWithRecord ? grandTotal / workCountWithRecord : 0)}`);
+
+            const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = `정산기록_전체연도_${today}.txt`;
+            document.body.appendChild(a); a.click(); a.remove();
+            URL.revokeObjectURL(url);
+            meShowToast('정산 기록 파일을 저장했어요.');
+        }
+
+        // ════════════════════════════════════════════════════════
         // 🟢 [NEW] 연간 일정을 이미지(PNG)로 저장
         //   그림만 있으면 읽는 쪽에서 알기 어려우니, 간트 차트 + 모든 일정을
         //   날짜/일수/글자수까지 글로 적은 표를 함께 그려서 한 장에 담는다.
@@ -14554,38 +15088,25 @@
             } catch(_) {}
         }
 
-        // ══ 사이드바 미니창 버튼 ══════════════════════════════
-        async function toggleMiniFromSidebar() {
+        // ══ 설정 패널: 미니창 표시 토글 (예전엔 사이드바에 따로 아이콘이 있었는데, 설정 안으로만 옮김) ══
+        async function toggleMiniWindowSetting() {
             if (!window.electronAPI) return;
             try {
                 const v = await window.electronAPI.miniWindowIsVisible();
                 if (v) window.electronAPI.hideMiniWindow();
                 else window.electronAPI.openMiniWindow();
-                setTimeout(updateSidebarMiniBtnState, 300);
+                setTimeout(updateMiniWindowToggleBtn, 300);
             } catch(_) {}
         }
-        async function updateSidebarMiniBtnState() {
-            if (!window.electronAPI) return;
+        async function updateMiniWindowToggleBtn() {
+            const btn = document.getElementById('mini-window-toggle-btn');
+            if (!btn) return;
+            if (!window.electronAPI) { btn.textContent = '(Electron 전용)'; btn.disabled = true; return; }
             try {
                 const v = await window.electronAPI.miniWindowIsVisible();
-                const btn = document.getElementById('sidebar-mini-btn');
-                if (btn) { btn.title = v ? '미니창 닫기' : '미니창 열기'; btn.style.opacity = v ? '1' : '0.5'; }
-            } catch(_) {}
-        }
-
-        // ══ 사이드바 위젯 버튼 ══════════════════════════════════
-        async function toggleWidgetFromSidebar() {
-            if (!ipcRenderer) return;
-            ipcRenderer.send('widget-toggle');
-            setTimeout(updateSidebarWidgetBtn, 400);
-        }
-        async function updateSidebarWidgetBtn() {
-            if (!ipcRenderer) return;
-            try {
-                const v = await ipcRenderer.invoke('widget-is-visible');
-                const btn = document.getElementById('sidebar-widget-btn');
-                if (btn) { btn.title = v ? '위젯 숨기기' : '위젯 보이기'; btn.style.opacity = v ? '1' : '0.5'; }
-            } catch(_) {}
+                btn.textContent = v ? '숨기기' : '보이기';
+                btn.className = `px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${v ? 'bg-rose-50 text-rose-500 hover:bg-rose-100 border border-rose-200' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200'}`;
+            } catch(_) { btn.textContent = '(Electron 전용)'; btn.disabled = true; }
         }
 
         function writerUpdateTime(val) {
@@ -15431,7 +15952,6 @@
                 if (wdgiV) wdgiV.value = writerGlobalDailyGoal;
                 const wmgi = document.getElementById('w-monthlyGoalInput');
                 if (wmgi) wmgi.value = writerGlobalDailyGoal;
-                setTimeout(updateSidebarWidgetBtn, 1000);
             } catch(e) { console.error("Initialization error:", e); }
         };
         // ── D-Day 사이드바 장르 필터 ────────────────────────────

@@ -462,6 +462,11 @@
             main { margin-left: 0; padding-left: 0; width: 100%; }
             #sidebar-toggle { display: flex; }
             body.sidebar-open #sidebar-backdrop { display: block; }
+            /* 표 헤더(스티키 첫 열 z-index:60 등)가 사이드바보다 z-index가 높아서
+               메뉴를 열면 표 헤더가 사이드바 위로 삐져나오던 문제 — 사이드바 쪽을 더 높게 올린다 */
+            aside { z-index: 200; }
+            #sidebar-backdrop { z-index: 150 !important; }
+            #sidebar-toggle { z-index: 201 !important; }
         }
         @media (max-width: 640px) {
             .modal-content { padding: 20px; width: 92%; }
@@ -491,6 +496,16 @@
             #genre-sheets-container .sheet-table td:first-child {
                 width: 100px !important; min-width: 100px !important;
             }
+            /* 첫 열(작품 정보)엔 제목+출간일만 남기고 출판사·선인세는 폰에서 숨긴다 (좁아서 복잡했음) */
+            #genre-sheets-container .sheet-table td.sticky-col .sheet-pub-name,
+            #genre-sheets-container .sheet-table td.sticky-col .sheet-adv-badge {
+                display: none !important;
+            }
+            /* 제목 div가 w-[240px]/w-full처럼 자체 너비를 갖고 있어서 좁아진 첫 열 밖으로
+               삐져나가던 것도 열 너비에 맞게 되돌린다 */
+            #genre-sheets-container .sheet-table td.sticky-col > div:first-child {
+                width: 100% !important; max-width: 100%;
+            }
 
             /* 월별 정산 탭 맨 위 — 연도 리포트 제목/연도 버튼/아이콘 버튼/검색창/장르 탭도 다 같이 축소 */
             #tab-records.tab-content { padding: 0; }
@@ -506,6 +521,48 @@
             #genre-tabs-container { gap: 4px !important; }
             #tab-records .genre-tab-btn { padding: 4px 9px !important; font-size: 0.68rem !important; }
 
+            /* 작품 관리 / 웹툰 관리 탭 — 상단 보기 필터 줄, 정렬 버튼 줄을 줄바꿈 없이 한 줄로,
+               다 안 들어가면 가로 스크롤로 보이게 축소 */
+            #workmanage-view-tabs, #webtoon-view-tabs,
+            #workmanage-sort-row, #webtoon-sort-row {
+                flex-wrap: nowrap !important;
+                overflow-x: auto !important;
+                -webkit-overflow-scrolling: touch;
+            }
+            #workmanage-view-tabs button, #webtoon-view-tabs button,
+            #workmanage-sort-row button, #webtoon-sort-row button {
+                padding: 4px 8px !important; font-size: 0.62rem !important;
+                white-space: nowrap !important; flex-shrink: 0;
+            }
+            #workmanage-view-tabs .w-8, #webtoon-view-tabs .w-8 {
+                width: 24px !important; height: 24px !important; flex-shrink: 0;
+            }
+            #tab-workmanage h3, #tab-webtoon h3 { font-size: 0.85rem !important; }
+
+            /* 집필 관리 탭 — 가운데 큰 "9월"+이번달 목표 합계 줄을 한 줄에 들어오게 축소 */
+            #write-month-big-label { font-size: 1.05rem !important; white-space: nowrap; flex-shrink: 0; }
+            #write-month-big-label + p { font-size: 0.68rem !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            #write-month-empty-sum { display: none !important; }
+            main .relative > [class*="left-1/2"][class*="pointer-events-none"]:has(#write-month-big-label) {
+                flex-wrap: nowrap !important;
+                overflow-x: auto !important;
+            }
+
+            /* 상세 기록 입력 탭 — 날짜 이동 줄(이전날/날짜/다음날/Today/달력)을 한 줄로 축소,
+               그래도 안 들어가면 가로 스크롤 */
+            #tab-daily .flex.justify-center.items-center.gap-3.relative {
+                flex-wrap: nowrap !important;
+                justify-content: flex-start !important;
+                overflow-x: auto !important;
+                -webkit-overflow-scrolling: touch;
+            }
+            #tab-daily .flex.justify-center.items-center.gap-3.relative button {
+                padding: 4px 8px !important; font-size: 0.65rem !important;
+                white-space: nowrap !important; flex-shrink: 0;
+            }
+            #tab-daily #w-currentDateDisplay { font-size: 0.75rem !important; min-width: 0 !important; flex-shrink: 0; }
+            #tab-daily .w-9 { width: 24px !important; height: 24px !important; flex-shrink: 0; }
+
             /* 출간 일정 탭: 달력(좌)과 출간 예정 리스트(우)가 나란히 있던 걸 세로로 쌓는다 */
             #publish-month-view-wrap { flex-direction: column; }
             #publish-dday-sidebar {
@@ -516,8 +573,10 @@
             #task-month-big-label { font-size: 1.7rem !important; }
 
             /* 상단 제목+버튼 줄 — 좁은 화면에서 한 줄에 다 안 들어가면 눌려서
-               한글이 한 글자씩 세로로 줄바꿈되던 문제. 줄바꿈을 허용해서 다음 줄로 내려가게 한다 */
-            main .flex.justify-between { flex-wrap: wrap; row-gap: 0.5rem; }
+               한글이 한 글자씩 세로로 줄바꿈되거나(justify-between) 오른쪽 끝이 화면 밖으로
+               삐져나가던(정산 입금일 탭처럼 justify-between이 없는 flex 줄도) 문제 —
+               main 안의 flex 줄은 전부 줄바꿈을 허용해서 다음 줄로 내려가게 한다 */
+            main .flex:not(.flex-col) { flex-wrap: wrap; row-gap: 0.5rem; }
 
             /* 달력/집필/스케줄 탭 상단에 가운데 절대배치로 겹쳐 있던 큰 글자(목표 합계 등)를
                일반 흐름으로 되돌려서, 위 줄바꿈과 함께 제목·버튼과 겹치지 않고 아래로 쌓이게 한다 */
@@ -6750,10 +6809,10 @@
                         totalCumulative += wCumulative; years.forEach(y => totalYearly[y] += wYearly[y]);
                         const dateDisplay = getDateDisplay(w);
                         const advAmt = w.advanceAmount ? Number(w.advanceAmount).toLocaleString()+'만원' : '';
-                        const advHtml = advAmt ? `<span style="color:#16a34a;font-size:12px;font-weight:400;margin-left:auto;padding-left:6px;white-space:nowrap;flex-shrink:0;">선인세 ${advAmt}</span>` : '';
+                        const advHtml = advAmt ? `<span class="sheet-adv-badge" style="color:#16a34a;font-size:12px;font-weight:400;margin-left:auto;padding-left:6px;white-space:nowrap;flex-shrink:0;">선인세 ${advAmt}</span>` : '';
                         const wSales = calculateGrossSales(wCumulative, w.rate); totalSalesAll += wSales;
                         const salesCell = showSalesCol ? `<td class="text-right pr-2 text-slate-500 text-sm" style="background:#fafafa;">${currencySymbol}${formatCurrency(wSales)}</td>` : '';
-                        html += `<tr><td class="sticky-col pl-6" style="min-width:156px;overflow:hidden;"><div class="font-bold text-slate-700 text-sm truncate w-full mb-1" title="${w.title}">${w.title}</div><div class="text-[11px] text-slate-400 flex items-center">${(currentGenreTab === '웹툰' ? (w.studio || '-') : w.publisher)} | ${dateDisplay}${advHtml}</div></td><td class="text-center font-bold text-[0.85rem] grand-total-cell" style="background:#f1f5f9; border-color:#e2e8f0;">${currencySymbol}${formatCurrency(wCumulative)}</td>${salesCell}` + years.map(y => `<td class="text-right pr-2 text-slate-600 text-sm">${currencySymbol}${formatCurrency(wYearly[y])}</td>`).join('') + `</tr>`;
+                        html += `<tr><td class="sticky-col pl-6" style="min-width:156px;overflow:hidden;"><div class="font-bold text-slate-700 text-sm truncate w-full mb-1" title="${w.title}">${w.title}</div><div class="text-[11px] text-slate-400 flex items-center"><span class="sheet-pub-name">${(currentGenreTab === '웹툰' ? (w.studio || '-') : w.publisher)} | </span>${dateDisplay}${advHtml}</div></td><td class="text-center font-bold text-[0.85rem] grand-total-cell" style="background:#f1f5f9; border-color:#e2e8f0;">${currencySymbol}${formatCurrency(wCumulative)}</td>${salesCell}` + years.map(y => `<td class="text-right pr-2 text-slate-600 text-sm">${currencySymbol}${formatCurrency(wYearly[y])}</td>`).join('') + `</tr>`;
                     });
                     const salesFootTotal = showSalesCol ? `<td class="text-right pr-2 font-bold grand-total-cell">${currencySymbol}${formatCurrency(totalSalesAll)}</td>` : '';
                     html += `</tbody></table></div></div><div class="sheet-footer-outer"><div class="sheet-footer-inner"><table class="sheet-table"><tbody><tr class="bg-slate-100/50"><td class="sticky-col text-center font-bold text-slate-600 text-sm" style="width:156px;min-width:156px;">총합</td><td class="text-center font-bold grand-total-cell">${currencySymbol}${formatCurrency(totalCumulative)}</td>${salesFootTotal}` + years.map(y => `<td class="text-right pr-2 font-bold grand-total-cell">${currencySymbol}${formatCurrency(totalYearly[y])}</td>`).join('') + `</tr></tbody></table></div></div>`;
@@ -6782,8 +6841,8 @@
                     gWorks.forEach(w => {
                         const dateDisplay = getDateDisplay(w);
                         const advAmt2 = w.advanceAmount ? Number(w.advanceAmount).toLocaleString()+'만원' : '';
-                        const advHtml2 = advAmt2 ? `<span style="color:#16a34a;font-size:12px;font-weight:400;margin-left:auto;padding-left:6px;white-space:nowrap;flex-shrink:0;">선인세 ${advAmt2}</span>` : '';
-                        html += `<tr><td class="sticky-col pl-6"><div class="font-bold text-slate-700 text-sm truncate w-[240px] mb-1">${w.title}</div><div class="text-[11px] text-slate-400 flex items-center">${(currentGenreTab === '웹툰' ? (w.studio || '-') : w.publisher)} | ${dateDisplay}${advHtml2}</div></td>`; 
+                        const advHtml2 = advAmt2 ? `<span class="sheet-adv-badge" style="color:#16a34a;font-size:12px;font-weight:400;margin-left:auto;padding-left:6px;white-space:nowrap;flex-shrink:0;">선인세 ${advAmt2}</span>` : '';
+                        html += `<tr><td class="sticky-col pl-6"><div class="font-bold text-slate-700 text-sm truncate w-[240px] mb-1">${w.title}</div><div class="text-[11px] text-slate-400 flex items-center"><span class="sheet-pub-name">${(currentGenreTab === '웹툰' ? (w.studio || '-') : w.publisher)} | </span>${dateDisplay}${advHtml2}</div></td>`;
                         months.forEach(m => {
                             const val = (monthlyData[m] || {})[w.id] || 0;
                             html += `<td><input type="text" class="cell-input" value="₩ ${formatCurrency(val)}" ${readonlyAttr} onchange="updateRoyalty('${m}', '${w.id}', this.value)" onfocus="this.value = this.value.replace(/[^0-9]/g, ''); this.select();" onblur="this.value = '₩ ' + formatCurrency(this.value.replace(/[^0-9]/g, ''))"></td>`;
@@ -7106,7 +7165,7 @@
             if (webtoonViewFilter === 'pen') return '';
             const btnCls = (active) => `px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${active ? 'text-white shadow-sm' : 'text-slate-500 bg-slate-100 hover:bg-slate-200'}`;
             const btnStyle = (active) => active ? 'background:var(--primary)' : '';
-            return `<div class="flex items-center gap-2 mb-4 px-1 flex-wrap">
+            return `<div id="webtoon-sort-row" class="flex items-center gap-2 mb-4 px-1 flex-wrap">
                 <button onclick="setWebtoonSortMode('date')" class="${btnCls(webtoonSortMode === 'date')}" style="${btnStyle(webtoonSortMode === 'date')}">출간일 정렬</button>
                 <button onclick="setWebtoonSortMode('pen')" class="${btnCls(webtoonSortMode === 'pen')}" style="${btnStyle(webtoonSortMode === 'pen')}">필명 정렬</button>
             </div>`;
@@ -7812,7 +7871,7 @@
             if (workManageViewFilter === 'genre') return '';
             const btnCls = (active) => `px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${active ? 'text-white shadow-sm' : 'text-slate-500 bg-slate-100 hover:bg-slate-200'}`;
             const btnStyle = (active) => active ? 'background:var(--primary)' : '';
-            return `<div class="flex items-center gap-2 mb-4 px-1 flex-wrap">
+            return `<div id="workmanage-sort-row" class="flex items-center gap-2 mb-4 px-1 flex-wrap">
                 <button onclick="setWorkManageSortMode('date')" class="${btnCls(workManageSortMode === 'date')}" style="${btnStyle(workManageSortMode === 'date')}">출간일 정렬</button>
                 <button onclick="setWorkManageSortMode('genre')" class="${btnCls(workManageSortMode === 'genre')}" style="${btnStyle(workManageSortMode === 'genre')}">장르 정렬</button>
             </div>`;

@@ -760,15 +760,18 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 .pjtab-wrap .mtab-item{letter-spacing:-0.3px}
 @container (max-width: 900px){ .pjtab-wrap{--mtab-fs:9.5px;--mtab-pad:6px 2px} }
 @container (max-width: 640px){ .pjtab-wrap{--mtab-fs:8px;--mtab-pad:5px 1px} }
-@supports not (container-type: inline-size){
-  @media(max-width:900px){ .mtab-wrap{--mtab-fs:10px;--mtab-pad:6px 2px} }
-  @media(max-width:600px){
-    .mtab-wrap{--mtab-fs:8.5px;--mtab-pad:5px 1px}
-    .mtab-item{font-size:calc(var(--mtab-fs) + 3px)}
-    .mtab-item .mtab-full{display:none}
-    .mtab-item .mtab-short{display:inline}
-  }
+/* 위 @container 규칙들은 컨테이너 자기 자신을 다시 스타일링하려는 것이라 스펙상 절대 적용되지 않는다
+   (컨테이너 쿼리는 "자기 자신을 제외한" 가장 가까운 조상 컨테이너를 찾으므로, 스스로를 쿼리 대상으로 못 씀).
+   그래서 실제로 폭이 줄어드는 건 아래 뷰포트 기준 @media 규칙뿐이다 — 이걸 없애면 안 됨. */
+@media(max-width:900px){ .mtab-wrap{--mtab-fs:10px;--mtab-pad:6px 2px} }
+@media(max-width:600px){
+  .mtab-wrap{--mtab-fs:8.5px;--mtab-pad:5px 1px}
+  .mtab-item{font-size:calc(var(--mtab-fs) + 3px)}
+  .mtab-item .mtab-full{display:none}
+  .mtab-item .mtab-short{display:inline}
 }
+@media(max-width:1100px){ .pjtab-wrap{--mtab-fs:9.5px;--mtab-pad:6px 2px} }
+@media(max-width:820px){ .pjtab-wrap{--mtab-fs:8px;--mtab-pad:5px 1px} }
 .cal-cell{transition:background .1s;cursor:pointer;min-width:0;overflow:hidden;}
 /* 섹션 제목용 형광펜 하이라이트 (테마색) */
 .hl-title{
@@ -813,17 +816,18 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     --mcal-badge:0.36em; --mcal-cellh:56px; --mcal-pad:2px 2px;
   }
 }
-/* container query 미지원 브라우저 대비 (화면 폭 기준 예비 규칙) */
-@supports not (container-type: inline-size){
-  @media(max-width:900px){
-    .mcal-wrap{--mcal-dow:0.62em;--mcal-day:0.68em;--mcal-daysz:18px;--mcal-ev:0.58em;--mcal-evpad:1px 3px;--mcal-badge:0.5em;--mcal-cellh:78px;--mcal-pad:4px 4px}
-  }
-  @media(max-width:600px){
-    .mcal-wrap{--mcal-dow:0.55em;--mcal-day:0.6em;--mcal-daysz:15px;--mcal-ev:0.5em;--mcal-evpad:1px 2px;--mcal-badge:0.45em;--mcal-cellh:64px;--mcal-pad:3px 3px}
-  }
-  @media(max-width:420px){
-    .mcal-wrap{--mcal-dow:0.46em;--mcal-day:0.5em;--mcal-daysz:12px;--mcal-ev:0.4em;--mcal-evpad:1px 1px;--mcal-badge:0.36em;--mcal-cellh:56px;--mcal-pad:2px 2px}
-  }
+/* 위 @container 규칙들은 .mcal-wrap이 자기 자신을 다시 스타일링하려는 것이라 스펙상
+   절대 적용되지 않는다 (컨테이너 쿼리는 "자기 자신을 제외한" 가장 가까운 조상 컨테이너를
+   찾으므로 스스로를 쿼리 대상으로 못 씀). 실제로 폭에 따라 글자가 줄어드는 건 아래
+   뷰포트 기준 @media 규칙뿐이다 — 이걸 없애면 모바일에서 캘린더 글자가 전혀 안 줄어든다. */
+@media(max-width:900px){
+  .mcal-wrap{--mcal-dow:0.62em;--mcal-day:0.68em;--mcal-daysz:18px;--mcal-ev:0.58em;--mcal-evpad:1px 3px;--mcal-badge:0.5em;--mcal-cellh:78px;--mcal-pad:4px 4px}
+}
+@media(max-width:600px){
+  .mcal-wrap{--mcal-dow:0.55em;--mcal-day:0.6em;--mcal-daysz:15px;--mcal-ev:0.5em;--mcal-evpad:1px 2px;--mcal-badge:0.45em;--mcal-cellh:64px;--mcal-pad:3px 3px}
+}
+@media(max-width:420px){
+  .mcal-wrap{--mcal-dow:0.46em;--mcal-day:0.5em;--mcal-daysz:12px;--mcal-ev:0.4em;--mcal-evpad:1px 1px;--mcal-badge:0.36em;--mcal-cellh:56px;--mcal-pad:2px 2px}
 }
 .cal-cell:hover{background:var(--s2) !important;}
 .mini-cal-cell:hover{background:var(--s2) !important;}
@@ -2138,10 +2142,10 @@ function renderDiary(){
   var rem=42-cells.length;
   for(var d=1;d<=rem;d++){var nm=diaryM===11?0:diaryM+1,ny=diaryM===11?diaryY+1:diaryY;cells.push({d,m:nm,y:ny,cur:false});}
 
-  var calHtml='<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><div style="min-width:560px">'+
+  var calHtml='<div class="mcal-wrap">'+
     '<div style="display:grid;grid-template-columns:repeat(7,1fr);border-bottom:1px solid var(--border)">';
   ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(function(d,i){
-    calHtml+='<div style="text-align:center;padding:8px 0;font-size:0.72em;font-weight:500;color:'+(i===0?'var(--red)':i===6?'var(--blue)':'var(--t3)')+'">'+d+'</div>';
+    calHtml+='<div style="text-align:center;padding:8px 0;font-size:var(--mcal-dow);font-weight:500;color:'+(i===0?'var(--red)':i===6?'var(--blue)':'var(--t3)')+'">'+d+'</div>';
   });
   calHtml+='</div><div style="display:grid;grid-template-columns:repeat(7,1fr)">';
 
@@ -2159,28 +2163,28 @@ function renderDiary(){
       : 'background:'+(isT?'var(--al)':hasDiary?'var(--s2)':'transparent')+';';
     var pts='';
     calHtml+='<div class="diary-cell'+(ri<=1?' dc-top':'')+'" data-ds="'+ds+'" style="'+
-      'min-height:96px;padding:6px 8px;cursor:pointer;'+
+      'min-height:var(--mcal-cellh);padding:var(--mcal-pad);cursor:pointer;'+
       'border-right:'+(isLC?'none':'1px solid var(--border)')+';'+
       'border-bottom:'+(isLR?'none':'1px solid var(--border)')+';'+
       (isT?'outline:2px solid var(--accent);outline-offset:-2px;z-index:1;position:relative;':'')+
       diaryPhotoBg+
       'transition:background .15s">'+
       '<div style="display:flex;align-items:flex-start;justify-content:space-between">'+
-        '<span style="font-size:0.8em;font-weight:'+(isT?'700':'400')+';'+pts+
+        '<span style="font-size:var(--mcal-day);font-weight:'+(isT?'700':'400')+';'+pts+
           'color:'+(isT?'var(--accent)':!cell.cur?'var(--t3)':ci===0?'var(--red)':ci===6?'var(--blue)':'var(--text)')+'">'+cell.d+'</span>'+
-        (isT?'<span style="font-size:0.62em;font-weight:700;color:var(--accent);letter-spacing:0.04em;'+pts+'">TODAY</span>':'')+
+        (isT?'<span style="font-size:var(--mcal-badge);font-weight:700;color:var(--accent);letter-spacing:0.04em;'+pts+'">TODAY</span>':'')+
       '</div>'+
       (entry&&(entry.mood||entry.weather)?
         '<div style="display:flex;gap:2px;margin-top:3px">'+
-          (entry.mood?'<span style="font-size:0.85em;line-height:1">'+entry.mood+'</span>':'')+
-          (entry.weather?'<span style="font-size:0.85em;line-height:1">'+entry.weather+'</span>':'')+
+          (entry.mood?'<span style="font-size:var(--mcal-ev);line-height:1">'+entry.mood+'</span>':'')+
+          (entry.weather?'<span style="font-size:var(--mcal-ev);line-height:1">'+entry.weather+'</span>':'')+
         '</div>':'')+
-      (entry&&entry.title?'<div style="font-size:0.78em;font-weight:600;color:var(--accent);font-family:'+dFF+';margin-top:4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;'+pts+'">'+esc(entry.title)+'</div>':'')+
-      (entry&&entry.text?'<div style="font-size:0.68em;color:var(--t2);font-family:'+dFF+';margin-top:3px;line-height:1.45;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-all;'+pts+'">'+esc(entry.text)+'</div>':'')+
-      (isT&&!entry?'<div style="font-size:0.72em;color:var(--t3);margin-top:4px">write today</div>':'')+
+      (entry&&entry.title?'<div style="font-size:var(--mcal-ev);font-weight:600;color:var(--accent);font-family:'+dFF+';margin-top:4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;'+pts+'">'+esc(entry.title)+'</div>':'')+
+      (entry&&entry.text?'<div style="font-size:var(--mcal-ev);color:var(--t2);font-family:'+dFF+';margin-top:3px;line-height:1.45;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-all;'+pts+'">'+esc(entry.text)+'</div>':'')+
+      (isT&&!entry?'<div style="font-size:var(--mcal-ev);color:var(--t3);margin-top:4px">write today</div>':'')+
     '</div>';
   }
-  calHtml+='</div></div></div>'; // grid + min-width + scroll wrapper
+  calHtml+='</div></div>'; // grid + mcal-wrap
 
   var curMonthCnt=Object.keys(S.diaryEntries||{}).filter(function(k){
     return k.startsWith(diaryY+'-'+String(diaryM+1).padStart(2,'0'))&&(S.diaryEntries[k].text||S.diaryEntries[k].mood);
@@ -2194,9 +2198,9 @@ function renderDiary(){
     '</div>'+
     monthCards+
     '<div class="card" style="padding:0;overflow:hidden">'+
-      '<div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">'+
+      '<div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px">'+
         '<div style="font-family:\'Instrument Serif\',serif;font-size:1.55em;font-weight:600;letter-spacing:1.5px;color:var(--text)">'+MN_D[diaryM]+'</div>'+
-        '<div style="font-size:0.88em;color:var(--accent);font-weight:500">이번달 '+curMonthCnt+'번 일기를 썼어요!</div>'+
+        '<div style="font-size:0.88em;color:var(--accent);font-weight:500;order:3;width:100%">이번달 '+curMonthCnt+'번 일기를 썼어요!</div>'+
         '<div style="display:flex;gap:6px"><button class="btn bg bsm" onclick="openDiarySearch()">🔍 검색</button>'+
         '<button class="btn bg bsm" onclick="openDiaryFontModal()" title="일기 글씨체 설정">⚙</button>'+
         '<button class="btn bp bsm" onclick="openDiaryModal(todStr())">+ 오늘 일기</button></div>'+
@@ -6904,10 +6908,10 @@ function renderTodoCal(){
   var rem=42-cells.length;
   for(var d=1;d<=rem;d++){var nm=todoCalM===11?0:todoCalM+1,ny=todoCalM===11?todoCalY+1:todoCalY;cells.push({d:d,m:nm,y:ny,cur:false});}
 
-  var calHtml='<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><div style="min-width:560px">'+
+  var calHtml='<div class="mcal-wrap">'+
     '<div style="display:grid;grid-template-columns:repeat(7,1fr);border-bottom:1px solid var(--border)">';
   ['일','월','화','수','목','금','토'].forEach(function(d,i){
-    calHtml+='<div style="text-align:center;padding:8px 0;font-size:0.75em;font-weight:500;color:'+(i===0?'var(--red)':i===6?'#4A90D9':'var(--t3)')+'">'+d+'</div>';
+    calHtml+='<div style="text-align:center;padding:8px 0;font-size:var(--mcal-dow);font-weight:500;color:'+(i===0?'var(--red)':i===6?'#4A90D9':'var(--t3)')+'">'+d+'</div>';
   });
   calHtml+='</div><div style="display:grid;grid-template-columns:repeat(7,1fr)">';
 
@@ -6934,35 +6938,35 @@ function renderTodoCal(){
     var badge='';
     if(hasTodo){
       var allDone=doneCount===totalCount;
-      badge='<span style="font-size:0.62em;font-weight:600;padding:1px 5px;border-radius:99px;background:'+(allDone?'var(--green)':'var(--al)')+';color:'+(allDone?'#fff':'var(--accent)')+'">'+doneCount+'/'+totalCount+'</span>';
+      badge='<span style="font-size:var(--mcal-badge);font-weight:600;padding:1px 5px;border-radius:99px;background:'+(allDone?'var(--green)':'var(--al)')+';color:'+(allDone?'#fff':'var(--accent)')+'">'+doneCount+'/'+totalCount+'</span>';
     }
 
     calHtml+='<div onclick="openTodoCalDay(\''+ds+'\')" '+
-      'style="cursor:pointer;min-height:100px;padding:6px 8px;'+
+      'style="cursor:pointer;min-height:var(--mcal-cellh);padding:var(--mcal-pad);'+
       'border-right:'+(ci===6?'none':'1px solid var(--border)')+';'+
       'border-bottom:'+(ri===5?'none':'1px solid var(--border)')+';'+
       'background:'+(isT?'var(--accent)15':'transparent')+'">'+
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">'+
-        '<div style="width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;'+
+        '<div style="width:var(--mcal-daysz);height:var(--mcal-daysz);border-radius:50%;display:flex;align-items:center;justify-content:center;'+
           'background:'+(isT?'var(--accent)25':'transparent')+';'+
-          'font-size:0.85em;font-weight:'+(isT?'700':'500')+';'+
+          'font-size:var(--mcal-day);font-weight:'+(isT?'700':'500')+';'+
           'color:'+(isT?'var(--accent)':!cell.cur?'var(--t3)':ci===0?'var(--red)':ci===6?'#4A90D9':'var(--text)')+'">'+cell.d+'</div>'+
         (badge?'<div>'+badge+'</div>':'')+
       '</div>';
 
     // 투두 항목 최대 5개 표시
     todos.slice(0,5).forEach(function(item){
-      calHtml+='<div style="display:flex;align-items:center;gap:3px;font-size:0.75em;padding:2px 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:'+(item.done?'var(--t3)':'var(--text)')+'">'+
+      calHtml+='<div style="display:flex;align-items:center;gap:3px;font-size:var(--mcal-ev);padding:var(--mcal-evpad);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:'+(item.done?'var(--t3)':'var(--text)')+'">'+
         '<span style="flex-shrink:0;width:8px;height:8px;border-radius:2px;display:inline-block;background:'+(item.done?'var(--green)':item._carried?'var(--accent)':'var(--border2)')+'"></span>'+
         '<span style="overflow:hidden;text-overflow:ellipsis;'+(item.done?'text-decoration:line-through':'')+'">'+item.text+'</span>'+
       '</div>';
     });
     if(todos.length>5){
-      calHtml+='<div style="font-size:0.7em;color:var(--t3);margin-top:1px">+' +(todos.length-5)+'개 더</div>';
+      calHtml+='<div style="font-size:var(--mcal-ev);color:var(--t3);margin-top:1px">+' +(todos.length-5)+'개 더</div>';
     }
     calHtml+='</div>';
   }
-  calHtml+='</div></div></div>';
+  calHtml+='</div></div>';
 
   return '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'+
     '<button class="btn bg bsm" onclick="todoCalY--;render()">← '+(todoCalY-1)+'</button>'+

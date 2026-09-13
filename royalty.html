@@ -3658,15 +3658,15 @@
             <div class="flex justify-between items-center mb-4 shrink-0">
                 <div class="flex items-center gap-3">
                     <h3 class="text-lg font-bold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-chart-column text-emerald-500"></i> 연간 글자수 통계</h3>
-                    <div class="flex items-center bg-slate-100 rounded-lg p-1">
-                        <button onclick="changeWriterYearStats(-1)" class="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-white rounded-md transition-all"><i class="fa-solid fa-chevron-left"></i></button>
-                        <span id="writer-year-stats-label" class="px-4 font-bold text-slate-700 w-20 text-center">2026년</span>
-                        <button onclick="changeWriterYearStats(1)" class="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-white rounded-md transition-all"><i class="fa-solid fa-chevron-right"></i></button>
+                    <div class="flex items-center bg-slate-100 rounded-lg p-0.5">
+                        <button onclick="changeWriterYearStats(-1)" class="w-6 h-6 flex items-center justify-center text-slate-500 hover:bg-white rounded-md transition-all text-xs"><i class="fa-solid fa-chevron-left"></i></button>
+                        <span id="writer-year-stats-label" class="px-2 font-bold text-slate-700 text-sm text-center whitespace-nowrap">2026년</span>
+                        <button onclick="changeWriterYearStats(1)" class="w-6 h-6 flex items-center justify-center text-slate-500 hover:bg-white rounded-md transition-all text-xs"><i class="fa-solid fa-chevron-right"></i></button>
                     </div>
                 </div>
                 <button onclick="closeWriterYearStats()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-times text-xl"></i></button>
             </div>
-            <div id="writer-year-stats-body" class="flex-1 overflow-y-auto custom-scrollbar space-y-4"></div>
+            <div id="writer-year-stats-body" class="flex-1 overflow-y-auto scroll-invisible space-y-4"></div>
         </div>
     </div>
 
@@ -10116,8 +10116,9 @@
                 .sort((a,b) => b.amt - a.amt)
                 .slice(0, 5);
 
-            // 월별 글자수 합계 (1~12월)
+            // 월별 글자수 합계 (1~12월) + 장르별 글자수 합계
             const monthlyChars = Array.from({length:12}, () => 0);
+            const charGenreTotals = {};
             let daysWithRecord = 0;
             let yearCharTotal = 0;
             for (const dateStr in writerDailyData) {
@@ -10127,7 +10128,14 @@
                 yearCharTotal += t;
                 const m = parseInt(dateStr.split('-')[1], 10) - 1;
                 if (m >= 0 && m < 12) monthlyChars[m] += t;
+                Object.entries(writerDailyData[dateStr]?.works || {}).forEach(([key, val]) => {
+                    const sum = Object.values(val?.hours || {}).reduce((a, b) => a + (b.diff || 0), 0);
+                    if (sum <= 0) return;
+                    const g = (key !== WRITER_BULK_UNASSIGNED_KEY && resolveWorkItem(key).genre) || '미지정';
+                    charGenreTotals[g] = (charGenreTotals[g] || 0) + sum;
+                });
             }
+            const charGenreList = Object.entries(charGenreTotals).sort((a, b) => b[1] - a[1]);
             let bestMonthIdx = -1, bestMonthVal = 0;
             monthlyChars.forEach((v, i) => { if (v > bestMonthVal) { bestMonthVal = v; bestMonthIdx = i; } });
             const dailyAvg = daysWithRecord > 0 ? Math.round(yearCharTotal / daysWithRecord) : 0;
@@ -10166,7 +10174,7 @@
 
             return {
                 year, totalNet, genreList, topWorks, monthlyChars, bestMonthIdx, bestMonthVal,
-                dailyAvg, daysWithRecord, yearCharTotal, published, publishedGenreGroups,
+                dailyAvg, daysWithRecord, yearCharTotal, charGenreList, published, publishedGenreGroups,
                 incomeGoal: incomeGoals[year] || 0,
                 charGoal: charGoals[year] || 0,
                 goalItems: getYearGoalItems(year)
@@ -10401,6 +10409,12 @@
                         <div class="rounded-xl p-3" style="background:#f8fafc;"><p class="text-[11px] mb-1" style="color:#94a3b8;">기록한 날</p><p class="font-bold" style="color:#334155;">${d.daysWithRecord}일</p></div>
                         <div class="rounded-xl p-3" style="background:#f8fafc;"><p class="text-[11px] mb-1" style="color:#94a3b8;">연간 누적 글자수</p><p class="font-bold" style="color:#334155;">${d.yearCharTotal.toLocaleString()}자</p></div>
                     </div>
+                    ${d.charGenreList && d.charGenreList.length ? `<div class="mt-3 pt-3 border-t border-slate-50">
+                        <p class="text-[11px] mb-1.5" style="color:#94a3b8;">장르별 글자수</p>
+                        <div class="flex flex-wrap gap-1.5">
+                            ${d.charGenreList.map(([g, chars]) => `<span class="text-[11px] font-medium px-2 py-1 rounded-lg" style="background:var(--primary-light); color:var(--primary);">${escapeHtml(g)} ${chars.toLocaleString()}자</span>`).join('')}
+                        </div>
+                    </div>` : ''}
                 </div>`;
         }
         function renderTopWorksCardHtml(d, extraClass){
@@ -16329,8 +16343,9 @@
         function renderWriterYearStats() {
             document.getElementById('writer-year-stats-label').textContent = `${writerYearStatsYear}년`;
             const y = writerYearStatsYear;
-            // 월별 { total, byWork: { key -> chars } }
+            // 월별 { total, byWork: { key -> chars } } + 장르별 총합
             const months = Array.from({ length: 12 }, () => ({ total: 0, byWork: {} }));
+            const genreTotals = {};
             Object.entries(writerDailyData).forEach(([ds, day]) => {
                 if (!ds.startsWith(`${y}-`)) return;
                 const mIdx = Number(ds.slice(5, 7)) - 1;
@@ -16340,17 +16355,25 @@
                     if (sum <= 0) return;
                     months[mIdx].total += sum;
                     months[mIdx].byWork[key] = (months[mIdx].byWork[key] || 0) + sum;
+                    const g = (key !== WRITER_BULK_UNASSIGNED_KEY && resolveWorkItem(key).genre) || '미지정';
+                    genreTotals[g] = (genreTotals[g] || 0) + sum;
                 });
             });
+            const genreList = Object.entries(genreTotals).sort((a, b) => b[1] - a[1]);
 
             const yearTotal = months.reduce((a, m) => a + m.total, 0);
             const body = document.getElementById('writer-year-stats-body');
-            const summaryHtml = `<div class="rounded-xl p-3 text-center" style="background:var(--primary-light);">
-                <span class="text-xs text-slate-500">연간 총합</span>
-                <div class="text-xl font-bold" style="color:var(--primary)">${yearTotal.toLocaleString()}자</div>
+            const summaryHtml = `<div class="rounded-xl p-3 flex items-center justify-between gap-4 flex-wrap" style="background:var(--primary-light);">
+                <div>
+                    <span class="text-xs text-slate-500">연간 총합</span>
+                    <div class="text-xl font-bold" style="color:var(--primary)">${yearTotal.toLocaleString()}자</div>
+                </div>
+                <div class="flex flex-wrap gap-1.5 justify-end">
+                    ${genreList.map(([g, chars]) => `<span class="text-[11px] font-medium px-2 py-1 rounded-lg bg-white" style="color:var(--primary);">${escapeHtml(g)} ${chars.toLocaleString()}자</span>`).join('')}
+                </div>
             </div>`;
 
-            // 출간 일정 "연간 전체보기"랑 같은 카드 스타일(월별 카드 4열)로 통일
+            // 출간 일정 "연간 전체보기"랑 같은 카드 스타일로, 한 줄에 6개월씩(2줄)
             const monthsHtml = months.map((m, i) => {
                 const header = `<div class="text-[10px] font-bold text-slate-400 mb-2 tracking-widest uppercase border-b border-slate-100 pb-2 flex items-center justify-between">
                     <span>${MONTH_NAMES_KO[i]}</span>
@@ -16362,13 +16385,13 @@
                         <span class="flex-1 min-w-0 truncate text-xs text-slate-600">${escapeHtml(writerResolveDailyKeyLabel(key))}</span>
                         <span class="text-xs font-bold text-slate-700 shrink-0">${chars.toLocaleString()}자</span>
                     </div>`).join('');
-                return `<div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4" style="min-height:160px;">
+                return `<div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-3" style="min-height:140px;">
                     ${header}
                     ${rows || '<p class="text-xs text-slate-300 text-center py-4">기록 없음</p>'}
                 </div>`;
             }).join('');
 
-            body.innerHTML = summaryHtml + `<div class="mt-4 grid grid-cols-4 gap-4">${monthsHtml}</div>`;
+            body.innerHTML = summaryHtml + `<div class="mt-4 grid grid-cols-6 gap-3">${monthsHtml}</div>`;
         }
         // ════════════════════════════════════════════════════════
 

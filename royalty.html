@@ -96,6 +96,11 @@
         body.theme-lilac { --primary: #BF406A; --primary-light: #fbeef2; }
         body.theme-peach { --primary: #BDE3C3; --primary-light: #f1faf2; }
 
+        /* 작품 정보 패널의 출간예정일/완고입고일 — 기본(PC·넓은 화면)은 세로로 쌓고,
+           폰 전용 좁은 모달에서만 위 미디어쿼리가 가로로 바꿔준다 (날짜 입력칸이 반으로 잘려서
+           "202"처럼 깨져 보이던 문제) */
+        #wwi-dates-row { flex-direction: column; }
+
         /* 사이드바 스타일 */
         aside { 
             background-color: var(--primary);
@@ -512,7 +517,7 @@
             #write-workinfo-panel .px-5.py-4.space-y-3 .w-8 i { font-size: 0.5rem !important; }
             #write-workinfo-panel .px-5.py-4.space-y-3 p { font-size: 0.52rem !important; margin-bottom: 1px !important; white-space: nowrap; }
             #write-workinfo-panel .px-5.py-4.space-y-3 input { font-size: 0.52rem !important; padding: 2px !important; }
-            #wwi-dates-row { gap: 6px !important; }
+            #wwi-dates-row { flex-direction: row; gap: 6px !important; }
             #wwi-dates-row .gap-3 { gap: 4px !important; }
 
             /* 집필 목표 추가/관리 모달 — 장르 탭이 스크롤 없이 한 줄에 들어오게 더 축소,
@@ -1640,7 +1645,7 @@
                         <div class="relative flex items-center justify-between mb-5">
                             <div>
                                 <h3 class="text-lg font-bold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-calendar text-emerald-500"></i> 글자수 관리
-                                    <button type="button" onclick="openWriterYearStats()" title="연간 글자수 통계" class="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"><i class="fa-solid fa-chart-column"></i></button>
+                                    <button type="button" onclick="openWriterYearStats()" title="연간 글자수 통계" class="px-3 py-1.5 bg-white border border-slate-200 rounded-full text-xs font-bold text-slate-500 shadow-sm flex items-center gap-1.5 transition-all hover:text-emerald-600"><i class="fa-solid fa-chart-column text-[10px]"></i> 연간 통계</button>
                                 </h3>
                                 <div id="w-calDaysRatio" class="text-xs text-slate-400 font-semibold mt-1 ml-0.5"></div>
                                 <div id="w-calGoalRatio" class="text-xs text-slate-400 font-semibold mt-0.5 ml-0.5"></div>
@@ -14122,6 +14127,13 @@
             if (id) {
                 const span = writeSpans.find(s => s.id === id);
                 if (!span) return;
+                // 연간 일정 한눈에 보기에서 박스를 눌러 들어온 경우, 뒤에 있는 집필 관리 달력도
+                // 이 기간 일정이 시작하는 '월'로 같이 옮겨둔다 (모달 닫으면 바로 그 달이 보이게)
+                if (span.startDate) {
+                    const [sy, sm] = span.startDate.split('-').map(Number);
+                    writeCalDate = new Date(sy, sm - 1, 1);
+                    try { renderWriteCalendar(); } catch (e) {}
+                }
                 document.getElementById('write-span-modal-title').innerText = "📏 기간 일정 관리";
                 document.getElementById('span-title-input').value = span.title || '';
                 // 이미 연결해둔 작품이 출간 완료로 목록에서 빠졌더라도 연결이 풀리지 않게 임시로 넣어준다

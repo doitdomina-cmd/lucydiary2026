@@ -12707,12 +12707,17 @@
                 const wSub = Math.max(w2, w3);
 
                 // 제목은 조금만(85%까지), 아래 줄은 넉넉히(60%까지) 줄여서 안에 넣는다.
-                // 그래도 제목이 안 들어가면 종류 이름만 쓴 짧은 제목으로 한 번 더 시도한다.
+                // 그래도 제목이 안 들어가면 종류 이름만 쓴 짧은 제목으로 한 번 더 시도하고,
+                // 그래도 안 들어가면 제목 자체를 6자(공백 포함)로 잘라서 말줄임표로 넣는다 —
+                // 막대 바깥으로 글씨가 빠지는 것보다 안에 짧게라도 들어가는 걸 우선한다.
                 const wFull = measLine(l1, 12, 800, 0.6);
                 const wShort = (l1short && l1short !== l1) ? measLine(l1short, 12, 800, 0.6) : wFull;
+                const l1trunc = it.title.length > 6 ? it.title.slice(0, 6) + '…' : it.title;
+                const wTrunc = measLine(l1trunc, 12, 800, 0.6);
                 const subOk = usable >= wSub * TL_MIN_SCALE;
                 if (subOk && usable >= wFull * TL_TITLE_MIN_SCALE)      { it.title1 = l1;      it.w1 = wFull; it.inside = true; }
                 else if (subOk && usable >= wShort * TL_TITLE_MIN_SCALE) { it.title1 = l1short; it.w1 = wShort; it.inside = true; }
+                else if (subOk && l1trunc !== l1 && usable >= wTrunc * TL_TITLE_MIN_SCALE) { it.title1 = l1trunc; it.w1 = wTrunc; it.inside = true; }
                 else                                                     { it.title1 = l1;      it.w1 = wFull; it.inside = false; }
 
                 it.textW = Math.max(it.w1, wSub);

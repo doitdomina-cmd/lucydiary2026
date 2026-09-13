@@ -1193,6 +1193,8 @@
                                                     <option value="시리즈">시리즈</option>
                                                     <option value="카카오">카카오</option>
                                                     <option value="봄툰">봄툰</option>
+                                                    <option value="미스터블루">미스터블루</option>
+                                                    <option value="레진">레진</option>
                                                     <option value="custom">직접 입력</option>
                                                 </select>
                                                 <input type="text" id="new-work-platform-custom" placeholder="직접 입력" class="w-[90px] shrink-0 p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100 hidden">
@@ -2285,9 +2287,19 @@
                     <div id="wmm-extras-list" class="space-y-1.5"></div>
                 </div>
                 <div>
-                    <label class="text-xs font-bold text-slate-500 ml-1 mb-1 block">런칭 사이트</label>
-                    <div class="flex gap-1">
-                        <input type="text" id="wmm-launch-platform" placeholder="플랫폼명" class="w-[110px] shrink-0 p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100">
+                    <label class="text-xs font-bold text-slate-500 ml-1 mb-1 block">플랫폼</label>
+                    <div class="flex gap-1 flex-wrap">
+                        <select id="wmm-launch-platform-select" onchange="handleWmmLaunchPlatformChange(this)" class="w-[100px] shrink-0 p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100">
+                            <option value="">선택 안 함</option>
+                            <option value="리디">리디</option>
+                            <option value="시리즈">시리즈</option>
+                            <option value="카카오">카카오</option>
+                            <option value="봄툰">봄툰</option>
+                            <option value="미스터블루">미스터블루</option>
+                            <option value="레진">레진</option>
+                            <option value="custom">직접 입력</option>
+                        </select>
+                        <input type="text" id="wmm-launch-platform-custom" placeholder="직접 입력" class="w-[80px] shrink-0 p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100 hidden">
                         <input type="text" id="wmm-launch-url" placeholder="https://..." class="flex-1 min-w-0 p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100">
                     </div>
                 </div>
@@ -6814,10 +6826,10 @@
             document.getElementById('new-work-webtoon-rate').value = w.webtoonRate || w.rate || '';
             document.getElementById('new-work-goal-nospace').value = w.goalNoSpace || '';
             const wmInfo = workManage[w.id] || {};
-            const platformPresets = ['리디', '시리즈', '카카오', '봄툰'];
+            const platformPresets = ['리디', '시리즈', '카카오', '봄툰', '미스터블루', '레진'];
             const platformSel = document.getElementById('new-work-platform-select');
             const platformCustom = document.getElementById('new-work-platform-custom');
-            const platformVal = wmInfo.platform || '';
+            const platformVal = wmInfo.launchPlatform || '';
             if (!platformVal) { platformSel.value = ''; platformCustom.classList.add('hidden'); platformCustom.value = ''; }
             else if (platformPresets.includes(platformVal)) { platformSel.value = platformVal; platformCustom.classList.add('hidden'); platformCustom.value = ''; }
             else { platformSel.value = 'custom'; platformCustom.classList.remove('hidden'); platformCustom.value = platformVal; }
@@ -6974,7 +6986,7 @@
             }
             // 플랫폼·프로모션은 작품관리 데이터(workManage)에 저장 → 작품관리와 서로 연동
             if (!workManage[savedWorkId]) workManage[savedWorkId] = {};
-            workManage[savedWorkId].platform = platform;
+            workManage[savedWorkId].launchPlatform = platform;
             workManage[savedWorkId].promotion = promotion;
             masterWorks.sort((a,b) => { const dA = sortKeyDate(a), dB = sortKeyDate(b); return dA < dB ? -1 : dA > dB ? 1 : 0; });
             if (editId) {
@@ -8310,7 +8322,13 @@
             document.getElementById('wmm-manuscript-date').value = w.manuscriptDate || '';
             wmmExtrasDraft = (w.extras || []).map(e => ({ ...e }));
             renderWmmExtrasList();
-            document.getElementById('wmm-launch-platform').value = info.launchPlatform || '';
+            const wmmPlatformPresets = ['리디', '시리즈', '카카오', '봄툰', '미스터블루', '레진'];
+            const wmmPlatformSel = document.getElementById('wmm-launch-platform-select');
+            const wmmPlatformCustom = document.getElementById('wmm-launch-platform-custom');
+            const wmmPlatformVal = info.launchPlatform || '';
+            if (!wmmPlatformVal) { wmmPlatformSel.value = ''; wmmPlatformCustom.classList.add('hidden'); wmmPlatformCustom.value = ''; }
+            else if (wmmPlatformPresets.includes(wmmPlatformVal)) { wmmPlatformSel.value = wmmPlatformVal; wmmPlatformCustom.classList.add('hidden'); wmmPlatformCustom.value = ''; }
+            else { wmmPlatformSel.value = 'custom'; wmmPlatformCustom.classList.remove('hidden'); wmmPlatformCustom.value = wmmPlatformVal; }
             document.getElementById('wmm-launch-url').value = info.launchUrl || '';
             document.getElementById('wmm-memo').value = info.contractMemo || '';
             document.getElementById('wmm-pdf-status').textContent = '';
@@ -8347,6 +8365,11 @@
         }
         function handleWmmPromotionChange(select) {
             const customInput = document.getElementById('wmm-promotion-custom');
+            if (select.value === 'custom') { customInput.classList.remove('hidden'); customInput.focus(); }
+            else { customInput.classList.add('hidden'); customInput.value = ''; }
+        }
+        function handleWmmLaunchPlatformChange(select) {
+            const customInput = document.getElementById('wmm-launch-platform-custom');
             if (select.value === 'custom') { customInput.classList.remove('hidden'); customInput.focus(); }
             else { customInput.classList.add('hidden'); customInput.value = ''; }
         }
@@ -8393,7 +8416,8 @@
             const workId = currentWorkManageWorkId;
             if (!workManage[workId]) workManage[workId] = {};
             workManage[workId].penName = document.getElementById('wmm-pen-name').value;
-            workManage[workId].launchPlatform = document.getElementById('wmm-launch-platform').value.trim();
+            const wmmPlatformSelVal = document.getElementById('wmm-launch-platform-select').value;
+            workManage[workId].launchPlatform = wmmPlatformSelVal === 'custom' ? document.getElementById('wmm-launch-platform-custom').value.trim() : wmmPlatformSelVal;
             workManage[workId].launchUrl = document.getElementById('wmm-launch-url').value.trim();
             workManage[workId].contractMemo = document.getElementById('wmm-memo').value;
             workManage[workId].contractFile = currentContractFile.work || '';
@@ -13245,7 +13269,7 @@
 
                 lines.push(`\n- [${w.genre || '장르 미상'}] ${w.title}  (work_id: ${w.id})`);
                 lines.push(`  장르: ${w.genre || '-'}`);
-                lines.push(`  출판사: ${w.publisher || '-'} · 플랫폼: ${(workManage[w.id] || {}).platform || '-'} · 프로모션: ${(workManage[w.id] || {}).promotion || '-'}`);
+                lines.push(`  출판사: ${w.publisher || '-'} · 플랫폼: ${(workManage[w.id] || {}).launchPlatform || '-'} · 프로모션: ${(workManage[w.id] || {}).promotion || '-'}`);
                 lines.push(`  원고 마감: ${w.manuscriptDate || '미정'} · 출간 예정: ${getPendingLabel(w)}`);
                 if (isPublished) {
                     lines.push(`  진행 상황: 이미 출간 완료 — 진행률 계산 제외 (목표 ${goalChars.toLocaleString()}자(공포) / 공미 ${(w.goalNoSpace || 0).toLocaleString()}자)`);
@@ -13632,7 +13656,7 @@
                 const { totalProfit, totalSales } = getCumulativeWorkData(w.id);
                 const advTxt = w.advanceAmount ? `${Number(w.advanceAmount).toLocaleString()}만원${w.advanceDate ? ` (${w.advanceDate})` : ''}` : '없음';
                 lines.push(`\n- [${w.genre || '장르 미상'}] ${w.title}  (work_id: ${w.id})`);
-                lines.push(`  출판사: ${w.publisher || '-'}${w.settlementPublisher ? ` (정산처: ${w.settlementPublisher})` : ''} · 플랫폼: ${(workManage[w.id] || {}).platform || '-'} · 프로모션: ${(workManage[w.id] || {}).promotion || '-'}`);
+                lines.push(`  출판사: ${w.publisher || '-'}${w.settlementPublisher ? ` (정산처: ${w.settlementPublisher})` : ''} · 플랫폼: ${(workManage[w.id] || {}).launchPlatform || '-'} · 프로모션: ${(workManage[w.id] || {}).promotion || '-'}`);
                 lines.push(`  정산 비율: ${w.rate || 0}% · 선인세: ${advTxt}`);
                 lines.push(`  출간: ${getPendingLabel(w)}`);
                 lines.push(`  누적 순수익: ₩${formatCurrency(totalProfit)} · 추정 총매출: ₩${formatCurrency(totalSales)}`);

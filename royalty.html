@@ -4752,12 +4752,19 @@
                             } catch(err) { console.error("백업 파일 쓰기 에러", err); }
                         }
                         
-                        alert("작품 등록 내역을 포함한 모든 데이터가 성공적으로 복원되었습니다."); 
-                        location.reload(); 
-                    } 
-                } catch(err) { alert("백업 파일 오류"); } 
-            }; 
-            reader.readAsText(file); 
+                        // [FIX] 여기서 클라우드로 안 올리고 그냥 새로고침하면, 잠시 후 로그인된 계정의
+                        // 클라우드 데이터(옛날 것)가 다시 내려와서 방금 불러온 백업을 덮어써 버렸음.
+                        // 새로고침 전에 반드시 클라우드에도 먼저 올리고 기다린다.
+                        const finishReload = () => { alert("작품 등록 내역을 포함한 모든 데이터가 성공적으로 복원되었습니다."); location.reload(); };
+                        if (window.cloudSaveNow) {
+                            window.cloudSaveNow(data).then(finishReload).catch(finishReload);
+                        } else {
+                            finishReload();
+                        }
+                    }
+                } catch(err) { alert("백업 파일 오류"); }
+            };
+            reader.readAsText(file);
         }
 
         function resetData() { if(confirm("초기화하시겠습니까?")) { try { if(fs) fs.unlinkSync(dataFilePath); } catch(e) {} localStorage.clear(); location.reload(); } }
@@ -16357,10 +16364,10 @@
                 return JSON.stringify(clone);
             }
             function cloudSaveNow(dataToSave){
-                if (!window.__cloudDocRef) return;
+                if (!window.__cloudDocRef) return Promise.resolve();
                 // [FIX] 업로드 전, 클라우드에 있는 기존 데이터와 비교해서 지금 올리려는 데이터가
                 // 눈에 띄게 부실하면(예: 이 기기가 아직 다 로딩 안 된 상태) 업로드를 건너뜀
-                window.__cloudDocRef.get().then(snap => {
+                return window.__cloudDocRef.get().then(snap => {
                     let cloudParsed = null;
                     try {
                         if (snap.exists && snap.data() && snap.data().payload) cloudParsed = JSON.parse(snap.data().payload);
@@ -16372,18 +16379,21 @@
                     // 메인 데이터 저장
                     const payload = cloudPayload(dataToSave);
                     if (payload.length > 1000000) { console.error('클라우드 저장 보류: 데이터가 1MB를 초과 (' + payload.length + ')'); return; }
-                    window.__cloudDocRef.set({ payload: payload, _savedAt: Date.now() }).then(markCloudActive).catch(e => console.error('클라우드 저장 실패', e));
+                    const mainSave = window.__cloudDocRef.set({ payload: payload, _savedAt: Date.now() }).then(markCloudActive).catch(e => console.error('클라우드 저장 실패', e));
                     // webtoonSubs 별도 doc에 저장
+                    let subsSave = Promise.resolve();
                     if (window.__cloudSubsRef) {
                         const subsPayload = JSON.stringify({ webtoonSubs: dataToSave.webtoonSubs || {}, webtoonSubOrder: dataToSave.webtoonSubOrder || [] });
                         if (subsPayload.length <= 1000000) {
-                            window.__cloudSubsRef.set({ payload: subsPayload, _savedAt: Date.now() }).catch(e => console.error('webtoonSubs 클라우드 저장 실패', e));
+                            subsSave = window.__cloudSubsRef.set({ payload: subsPayload, _savedAt: Date.now() }).catch(e => console.error('webtoonSubs 클라우드 저장 실패', e));
                         } else {
                             console.error('webtoonSubs 1MB 초과 (' + subsPayload.length + ')');
                         }
                     }
+                    return Promise.all([mainSave, subsSave]);
                 }).catch(e => console.error('[Cloud] 업로드 전 비교 조회 실패', e));
             }
+            window.cloudSaveNow = cloudSaveNow;
             window.cloudSave = function(dataToSave){
                 if (!cloudReady || !window.__cloudDocRef) return;
                 if (cloudTimer) clearTimeout(cloudTimer);

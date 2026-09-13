@@ -15983,6 +15983,12 @@
                 const p = genrePriority(a.genre) - genrePriority(b.genre);
                 return p !== 0 ? p : a.displayTitle.localeCompare(b.displayTitle, 'ko');
             });
+            // 글자수 관리 달력에서 특정 날짜를 클릭해 이동했는데, 그날 주로 쓴 작품이 이미 완결(출간일 지남)이라
+            // 목록에서 걸러져 있으면 선택이 안 먹혔다 — 그 경우엔 완결이어도 임시로 목록에 끼워 넣는다
+            if (writerJumpToWorkKey && !items.some(it => it.id === writerJumpToWorkKey)) {
+                const pastMatch = getActiveWorkItems(false, true).find(it => it.id === writerJumpToWorkKey);
+                if (pastMatch) items.push(pastMatch);
+            }
             sel.innerHTML = `<option value="">작품을 선택하세요</option>` + items.map(it =>
                 `<option value="${it.id}">[${it.genre}] ${it.displayTitle}</option>`).join('');
             // 미니창 등 외부에서 작품이 바뀐 경우 그 값을 우선 적용, 아니면 현재값 유지 → 없으면 마지막 사용 작품

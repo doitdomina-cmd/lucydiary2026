@@ -16387,6 +16387,19 @@
 
             auth.onAuthStateChanged(user => {
                 if (!user) return;
+                // [FIX] localStorage의 RoyaltyData_v6_Backup은 브라우저(기기) 단위로 저장되는 캐시라
+                // 구글 계정과 무관하다 — 그래서 다른 계정으로 로그인해도 이 기기에 남아있던
+                // 이전 계정의 캐시가 화면에 그대로 보이는 문제가 있었다. 로그인한 계정(uid)이
+                // 지난번과 다르면 이 캐시를 지우고 새로고침해서 완전히 깨끗한 상태로 다시 시작한다.
+                const lastUidKey = 'cloudLastUid_v6';
+                const lastUid = localStorage.getItem(lastUidKey);
+                if (lastUid !== user.uid) {
+                    try { localStorage.removeItem('RoyaltyData_v6_Backup'); } catch(e) {}
+                    localStorage.setItem(lastUidKey, user.uid);
+                    location.reload();
+                    return;
+                }
+                localStorage.setItem(lastUidKey, user.uid);
                 window.__cloudDocRef = db.collection('users').doc(user.uid).collection('appdata').doc('royalty');
                 window.__cloudSubsRef = db.collection('users').doc(user.uid).collection('appdata').doc('webtoonSubs');
                 setMsg('데이터 불러오는 중...');

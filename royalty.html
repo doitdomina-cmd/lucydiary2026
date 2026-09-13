@@ -1639,7 +1639,9 @@
                     <div class="glass-card p-6">
                         <div class="relative flex items-center justify-between mb-5">
                             <div>
-                                <h3 class="text-lg font-bold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-calendar text-emerald-500"></i> 글자수 관리</h3>
+                                <h3 class="text-lg font-bold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-calendar text-emerald-500"></i> 글자수 관리
+                                    <button type="button" onclick="openWriterYearStats()" title="연간 글자수 통계" class="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"><i class="fa-solid fa-chart-column"></i></button>
+                                </h3>
                                 <div id="w-calDaysRatio" class="text-xs text-slate-400 font-semibold mt-1 ml-0.5"></div>
                                 <div id="w-calGoalRatio" class="text-xs text-slate-400 font-semibold mt-0.5 ml-0.5"></div>
                             </div>
@@ -3642,6 +3644,24 @@
                     <i class="fa-solid fa-image"></i> 이미지로 저장
                 </button>
             </div>
+        </div>
+    </div>
+
+    <!-- 🟢 [NEW] 글자수 관리 연간 통계 모달 -->
+    <div id="writer-year-stats-modal" class="modal-overlay">
+        <div class="modal-content h-auto" style="max-width: 640px; max-height: calc(100vh - 48px);">
+            <div class="flex justify-between items-center mb-4 shrink-0">
+                <div class="flex items-center gap-3">
+                    <h3 class="text-lg font-bold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-chart-column text-emerald-500"></i> 연간 글자수 통계</h3>
+                    <div class="flex items-center bg-slate-100 rounded-lg p-1">
+                        <button onclick="changeWriterYearStats(-1)" class="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-white rounded-md transition-all"><i class="fa-solid fa-chevron-left"></i></button>
+                        <span id="writer-year-stats-label" class="px-4 font-bold text-slate-700 w-20 text-center">2026년</span>
+                        <button onclick="changeWriterYearStats(1)" class="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-white rounded-md transition-all"><i class="fa-solid fa-chevron-right"></i></button>
+                    </div>
+                </div>
+                <button onclick="closeWriterYearStats()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-times text-xl"></i></button>
+            </div>
+            <div id="writer-year-stats-body" class="flex-1 overflow-y-auto custom-scrollbar space-y-4"></div>
         </div>
     </div>
 
@@ -10357,7 +10377,7 @@
             return d.monthlyChars.map((v, i) => {
                 const h = Math.max(Math.round(v / maxMonthVal * 56), v > 0 ? 3 : 0);
                 const isBest = i === d.bestMonthIdx && v > 0;
-                return `<div class="flex flex-col items-center gap-1 flex-1">
+                return `<div class="flex flex-col items-center gap-1 flex-1" title="${MONTH_NAMES_KO[i]}: ${v.toLocaleString()}자">
                     <div class="w-full flex items-end justify-center" style="height:60px;">
                         <div class="w-5 rounded-t transition-all" style="height:${h}px; background:${isBest ? 'var(--primary)' : '#e2e8f0'}"></div>
                     </div>
@@ -16267,6 +16287,66 @@
                     if (perEl) perEl.textContent = hasGoal ? `${Math.round((c.dayTotal/c.goal)*100)}%` : '';
                 });
             }, 0);
+        }
+
+        // 🟢 [NEW] 연간 글자수 통계 — 글자수 관리 상단 아이콘에서 열림. 월별 총합 + 그 달 작품별 글자수
+        let writerYearStatsYear = new Date().getFullYear();
+        function writerResolveDailyKeyLabel(key) {
+            if (key === WRITER_BULK_UNASSIGNED_KEY) return '미지정';
+            const r = resolveWorkItem(key);
+            return r.displayTitle || key; // 옛 백업 등에서 작품 ID와 연결이 안 되는 키는 원래 문자열 그대로 보여준다
+        }
+        function openWriterYearStats() {
+            writerYearStatsYear = writerCalDate.getFullYear();
+            renderWriterYearStats();
+            document.getElementById('writer-year-stats-modal').classList.add('open');
+        }
+        function closeWriterYearStats() { document.getElementById('writer-year-stats-modal').classList.remove('open'); }
+        function changeWriterYearStats(delta) { writerYearStatsYear += delta; renderWriterYearStats(); }
+        function renderWriterYearStats() {
+            document.getElementById('writer-year-stats-label').textContent = `${writerYearStatsYear}년`;
+            const y = writerYearStatsYear;
+            // 월별 { total, byWork: { key -> chars } }
+            const months = Array.from({ length: 12 }, () => ({ total: 0, byWork: {} }));
+            Object.entries(writerDailyData).forEach(([ds, day]) => {
+                if (!ds.startsWith(`${y}-`)) return;
+                const mIdx = Number(ds.slice(5, 7)) - 1;
+                if (mIdx < 0 || mIdx > 11) return;
+                Object.entries(day?.works || {}).forEach(([key, val]) => {
+                    const sum = Object.values(val?.hours || {}).reduce((a, b) => a + (b.diff || 0), 0);
+                    if (sum <= 0) return;
+                    months[mIdx].total += sum;
+                    months[mIdx].byWork[key] = (months[mIdx].byWork[key] || 0) + sum;
+                });
+            });
+
+            const yearTotal = months.reduce((a, m) => a + m.total, 0);
+            const body = document.getElementById('writer-year-stats-body');
+            const summaryHtml = `<div class="rounded-xl p-3 text-center" style="background:var(--primary-light);">
+                <span class="text-xs text-slate-500">연간 총합</span>
+                <div class="text-xl font-bold" style="color:var(--primary)">${yearTotal.toLocaleString()}자</div>
+            </div>`;
+
+            const monthsHtml = months.map((m, i) => {
+                if (m.total <= 0) return `<div class="py-2 border-b border-slate-50 flex items-center justify-between">
+                    <span class="text-sm font-bold text-slate-400">${MONTH_NAMES_KO[i]}</span>
+                    <span class="text-xs text-slate-300">기록 없음</span>
+                </div>`;
+                const rows = Object.entries(m.byWork)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([key, chars]) => `<div class="flex items-center justify-between text-xs py-1 pl-3">
+                        <span class="text-slate-500 truncate mr-2">${escapeHtml(writerResolveDailyKeyLabel(key))}</span>
+                        <span class="text-slate-600 font-medium shrink-0">${chars.toLocaleString()}자</span>
+                    </div>`).join('');
+                return `<div class="py-2 border-b border-slate-50">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-sm font-bold text-slate-700">${MONTH_NAMES_KO[i]} 총 ${m.total.toLocaleString()}자</span>
+                    </div>
+                    ${rows}
+                </div>`;
+            }).join('');
+
+            body.innerHTML = summaryHtml + `<div class="mt-2">${monthsHtml}</div>`;
         }
         // ════════════════════════════════════════════════════════
 

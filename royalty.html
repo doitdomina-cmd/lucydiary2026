@@ -10382,7 +10382,7 @@
             return d.monthlyChars.map((v, i) => {
                 const h = Math.max(Math.round(v / maxMonthVal * 56), v > 0 ? 3 : 0);
                 const isBest = i === d.bestMonthIdx && v > 0;
-                return `<div class="flex flex-col items-center gap-1 flex-1" title="${MONTH_NAMES_KO[i]}: ${v.toLocaleString()}자">
+                return `<div class="flex flex-col items-center gap-1 flex-1" onmousemove="showInsightMonthTip(event,${i},${v})" onmouseleave="hideWriterDayTip()">
                     <div class="w-full flex items-end justify-center" style="height:60px;">
                         <div class="w-5 rounded-t transition-all" style="height:${h}px; background:${isBest ? 'var(--primary)' : '#e2e8f0'}"></div>
                     </div>
@@ -15336,6 +15336,17 @@
             tip.style.left = Math.max(8,left)+'px'; tip.style.top = Math.max(8,top)+'px';
         }
         function hideWriterDayTip() { const tip = document.getElementById('pay-tooltip'); if(tip) tip.classList.add('hidden'); }
+        // 인사이트 탭 "집필 활동" 월별 막대그래프 툴팁 (네이티브 title 속성은 모바일 터치에서 안 떠서 커스텀으로)
+        function showInsightMonthTip(e, i, v) {
+            const tip = document.getElementById('pay-tooltip'); const content = document.getElementById('pay-tooltip-content'); if (!tip || !content) return;
+            content.innerHTML = `<div class="text-xs font-bold text-slate-700">${MONTH_NAMES_KO[i]} · ${Number(v).toLocaleString()}자</div>`;
+            tip.classList.remove('hidden');
+            const tw = 224, th = tip.offsetHeight || 40;
+            let left = e.clientX + 14, top = e.clientY + 14;
+            if (left + tw > window.innerWidth - 8) left = e.clientX - tw - 14;
+            if (top + th > window.innerHeight - 8) top = e.clientY - th - 14;
+            tip.style.left = Math.max(8, left) + 'px'; tip.style.top = Math.max(8, top) + 'px';
+        }
         function writerGetYYYYMMDD(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
         function writerGetKoreanDate(d) { return `${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일`; }
 

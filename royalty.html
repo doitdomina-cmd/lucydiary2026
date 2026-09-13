@@ -1182,8 +1182,8 @@
                                             <ul id="custom-title-dropdown" class="hidden absolute top-full left-0 w-full max-h-[500px] overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-lg mt-1 z-50 custom-scrollbar"></ul>
                                         </div>
                                     </div>
-                                    <!-- 2-1줄: 플랫폼 + 프로모션 (작품관리와 연동) -->
-                                    <div class="grid grid-cols-2 gap-3">
+                                    <!-- 2-1줄: 플랫폼 + 프로모션 (작품관리와 연동, 웹툰은 웹툰관리에서 따로 관리해서 숨김) -->
+                                    <div id="platform-promo-row" class="grid grid-cols-2 gap-3">
                                         <div>
                                             <label class="text-sm font-bold text-slate-600 ml-1 mb-1 block">플랫폼</label>
                                             <div class="flex gap-1">
@@ -6454,12 +6454,14 @@
             const pubRateRow = document.getElementById('publisher-rate-row');
             const webtoonDates = document.getElementById('webtoon-dates-group');
             const volsGroup = document.getElementById('volumes-field-group');
-            if (genre.includes('웹툰')) { 
+            const platformPromoRow = document.getElementById('platform-promo-row');
+            if (genre.includes('웹툰')) {
                 studioGroup.classList.remove('hidden');
                 normalRate.classList.add('hidden');
                 if (volsGroup) volsGroup.classList.add('hidden');
                 if (goalGroup) goalGroup.classList.add('hidden');
                 if (webtoonDates) webtoonDates.classList.remove('hidden');
+                if (platformPromoRow) platformPromoRow.classList.add('hidden');
                 if (pubRateRow) pubRateRow.className = 'grid grid-cols-1 gap-3';
                 if (datesRow) datesRow.className = 'hidden';
                 const advDateLabel = document.getElementById('new-work-advance-date-label');
@@ -6482,6 +6484,7 @@
                 if (volsGroup) volsGroup.classList.remove('hidden');
                 if (goalGroup) goalGroup.classList.remove('hidden');
                 if (webtoonDates) webtoonDates.classList.add('hidden');
+                if (platformPromoRow) platformPromoRow.classList.remove('hidden');
                 if (pubRateRow) pubRateRow.className = 'grid grid-cols-2 gap-3';
                 if (datesRow) datesRow.className = 'hidden';
                 const advDateLabel = document.getElementById('new-work-advance-date-label');
@@ -6984,10 +6987,12 @@
                 // 신규 등록 시 완고 입고일이 있으면 자동 스케줄 생성
                 if (manuscriptDate) syncManuscriptTaskSchedule(newWork, '', manuscriptDate);
             }
-            // 플랫폼·프로모션은 작품관리 데이터(workManage)에 저장 → 작품관리와 서로 연동
-            if (!workManage[savedWorkId]) workManage[savedWorkId] = {};
-            workManage[savedWorkId].launchPlatform = platform;
-            workManage[savedWorkId].promotion = promotion;
+            // 플랫폼·프로모션은 작품관리 데이터(workManage)에 저장 → 작품관리와 서로 연동 (웹툰은 웹툰관리에서 따로 관리)
+            if (!isWebtoon) {
+                if (!workManage[savedWorkId]) workManage[savedWorkId] = {};
+                workManage[savedWorkId].launchPlatform = platform;
+                workManage[savedWorkId].promotion = promotion;
+            }
             masterWorks.sort((a,b) => { const dA = sortKeyDate(a), dB = sortKeyDate(b); return dA < dB ? -1 : dA > dB ? 1 : 0; });
             if (editId) {
                 const lbl = document.getElementById('work-form-submit-label');

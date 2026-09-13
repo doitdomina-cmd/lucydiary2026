@@ -13500,6 +13500,23 @@
             });
             lines.push('');
 
+            // 등록된 전체 작품 목록 — 위 "작품 정보"는 집필 카드/기간 일정이 걸린 작품만 나오므로,
+            // 집필 기록이 아직 없는 작품도 빠짐없이 나오게 masterWorks 전체를 기준으로 따로 뽑는다.
+            lines.push('=== 등록된 전체 작품 목록 (작품 등록에 입력한 글자수 기준, 웹툰 제외) ===');
+            const allRegisteredWorks = masterWorks.filter(w => !(w.genre || '').includes('웹툰'));
+            lines.push(`총 ${allRegisteredWorks.length}개`);
+            if (!allRegisteredWorks.length) lines.push('(없음)');
+            allRegisteredWorks
+                .slice()
+                .sort((a, b) => (workCharTotals[b.id] || 0) - (workCharTotals[a.id] || 0))
+                .forEach(w => {
+                    const withSpace = Number(w.goalWithSpace) || 0;
+                    const noSpace = Number(w.goalNoSpace) || 0;
+                    const extrasChars = (w.extras || []).reduce((sum, ex) => sum + (Number(ex.goalWithSpace) || Number(ex.goalNoSpace) || 0), 0);
+                    lines.push(`- [${w.genre || '장르 미상'}] ${w.title}: 공포 ${withSpace.toLocaleString()}자 · 공미 ${noSpace.toLocaleString()}자${extrasChars > 0 ? ` (외전 ${extrasChars.toLocaleString()}자 포함 총 ${(workCharTotals[w.id] || 0).toLocaleString()}자)` : ''}`);
+                });
+            lines.push('');
+
             // 연간 글자수 통계 — 위 "확정/예정"은 일정(카드)에 잡아둔 목표치 기준이고,
             // 여기는 글자수 관리(상세 기록 입력)에 실제로 기록한 글자수 기준이라 서로 다른 값이다.
             lines.push('=== 연간 글자수 통계 (글자수 관리에 실제로 기록한 글자수 기준 — 위 확정/예정은 일정에 잡아둔 목표치라 서로 다름) ===');

@@ -16189,7 +16189,18 @@
                     writerViewDate = new Date(yy, mm - 1, dd); // 문자열 그대로 new Date()에 넘기면 시간대에 따라 하루 밀릴 수 있어 직접 조립
                     writerJumpToDate = true;
                     const worksOnDate = writerDailyData[ds]?.works;
-                    writerJumpToWorkKey = worksOnDate ? (Object.keys(worksOnDate)[0] || null) : null; // 그 날짜에 기록된 작품으로 자동 선택
+                    // 그 날 기록된 작품으로 자동 선택 — 예전엔 그냥 첫 번째 키를 골라서, 하루에 여러 작품을
+                    // 썼으면 클릭한 그래프(=그 날 전체 합계)랑 무관한 작품이 선택되곤 했다.
+                    // 그 날 가장 많이 쓴(글자수가 제일 큰) 작품을 고르는 게 실제로 보던 숫자와 맞다.
+                    writerJumpToWorkKey = null;
+                    if (worksOnDate) {
+                        let best = null, bestSum = -1;
+                        Object.entries(worksOnDate).forEach(([key, val]) => {
+                            const sum = Object.values(val?.hours || {}).reduce((a, b) => a + (b.diff || 0), 0);
+                            if (sum > bestSum) { bestSum = sum; best = key; }
+                        });
+                        writerJumpToWorkKey = best;
+                    }
                     switchTab('daily');
                 };
 

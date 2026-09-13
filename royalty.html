@@ -480,11 +480,18 @@
                 max-width: 92% !important; width: 92% !important;
                 margin-right: 0 !important; margin-bottom: 12px;
             }
-            /* 작품 정보 패널 — 폰에서는 출판사/출간예정일/완고입고일/목표 글자수까지 다 보여주면
-               너무 길어지니, 제목+장르만 남기고 나머지는 숨겨서 원래 높이의 1/6 수준으로 압축 */
-            #write-workinfo-panel > div:not(#wwi-header) { display: none !important; }
-            #wwi-header { padding: 10px 14px !important; }
-            #wwi-title { font-size: 0.85rem !important; }
+            /* 작품 정보 패널 — 폰에서는 출판사/출간예정일/완고입고일은 숨기고,
+               제목+장르, 그리고 글자수 변경(목표 글자수) 칸만 남겨서 압축한다 */
+            #write-workinfo-panel > div:not(#wwi-header):not(#wwi-divider):not(#wwi-goal-section) {
+                display: none !important;
+            }
+            #wwi-header { padding: 8px 12px !important; }
+            #wwi-title { font-size: 0.82rem !important; }
+            #wwi-goal-section { padding: 8px 12px !important; }
+            #wwi-goal-section p { font-size: 0.6rem !important; margin-bottom: 4px !important; }
+            #wwi-goal-section .space-y-2 > * + * { margin-top: 4px !important; }
+            #wwi-goal-section .flex.items-center.justify-between { padding: 4px 8px !important; }
+            #wwi-goal-section span, #wwi-goal-section input { font-size: 0.68rem !important; }
 
             /* 집필 목표 추가/관리 모달 — 장르 탭이 스크롤 없이 한 줄에 들어오게 더 축소,
                그래도 안 되면 다음 줄로 줄바꿈 (가로 스크롤 대신) */
@@ -606,6 +613,11 @@
             /* 스케줄 관리 / 집필 관리 / 글자수 관리 탭 — 달력 위 네비게이션(‹ 날짜 › Today 설정)을
                한 줄로 축소. 순수 장식용 큰 월 숫자(스케줄 탭)는 아래 네비에 이미 나오니 폰에서 숨긴다 */
             #task-month-big-label { display: none !important; }
+            /* 이 라벨을 감싸던 바깥 div(원래 absolute였다가 static으로 바뀐 것)도 통째로 숨겨서
+               제목과 네비게이션 줄 사이에 빈 공간이 남지 않게 한다 */
+            main .relative > [class*="left-1/2"][class*="pointer-events-none"]:has(#task-month-big-label) {
+                display: none !important;
+            }
             #w-calTitle { font-size: 0.68rem !important; }
             #w-calDaysRatio, #w-calGoalRatio { display: inline; font-size: 0.58rem !important; margin: 0 !important; }
             #w-calGoalRatio::before { content: ' · '; }
@@ -3404,9 +3416,9 @@
                 </div>
             </div>
 
-            <div class="mx-5 border-t border-slate-100"></div>
+            <div id="wwi-divider" class="mx-5 border-t border-slate-100"></div>
 
-            <div class="px-5 py-4">
+            <div id="wwi-goal-section" class="px-5 py-4">
                 <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-2 flex items-center gap-1"><i class="fa-solid fa-bullseye"></i> 목표 글자수 <span class="font-normal normal-case text-slate-300">(수정 가능)</span></p>
                 <div class="space-y-2">
                     <div class="flex items-center justify-between gap-2 bg-slate-50 rounded-xl pl-3 pr-2 py-2">
@@ -11820,7 +11832,9 @@
             toggleWriteType('');
             updateWriteWorkInfoPanel();
 
-            document.getElementById('write-schedule-modal').classList.add('open');
+            const wsm1 = document.getElementById('write-schedule-modal');
+            wsm1.classList.add('open');
+            requestAnimationFrame(() => { wsm1.scrollTop = 0; });
         }
 
         function openWriteEditModal(id, dateStr) {
@@ -11853,7 +11867,9 @@
             document.getElementById('write-delete-bulk-btn').classList.toggle('hidden', !!item.category);
             updateWriteWorkInfoPanel();
 
-            document.getElementById('write-schedule-modal').classList.add('open');
+            const wsm2 = document.getElementById('write-schedule-modal');
+            wsm2.classList.add('open');
+            requestAnimationFrame(() => { wsm2.scrollTop = 0; });
         }
 
         function closeWriteModal() { document.getElementById('write-schedule-modal').classList.remove('open'); }

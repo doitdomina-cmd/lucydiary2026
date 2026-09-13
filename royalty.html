@@ -13511,9 +13511,10 @@
             const statYears = new Set();
             Object.keys(writerDailyData).forEach(ds => { const y = ds.slice(0, 4); if (/^\d{4}$/.test(y)) statYears.add(y); });
             Array.from(statYears).sort().forEach(y => {
-                const months = Array.from({ length: 12 }, () => ({ total: 0, byWork: {} }));
+                const months = Array.from({ length: 12 }, () => ({ total: 0, byWork: {}, days: new Set() }));
                 const genreTotals = {};
                 let yearTotal = 0;
+                const yearDays = new Set();
                 Object.entries(writerDailyData).forEach(([ds, day]) => {
                     if (!ds.startsWith(`${y}-`)) return;
                     const mIdx = Number(ds.slice(5, 7)) - 1;
@@ -13523,18 +13524,20 @@
                         if (sum <= 0) return;
                         months[mIdx].total += sum;
                         months[mIdx].byWork[key] = (months[mIdx].byWork[key] || 0) + sum;
+                        months[mIdx].days.add(ds);
                         yearTotal += sum;
+                        yearDays.add(ds);
                         const g = (key !== WRITER_BULK_UNASSIGNED_KEY && resolveWorkItem(key).genre) || '미지정';
                         genreTotals[g] = (genreTotals[g] || 0) + sum;
                     });
                 });
-                lines.push(`- ${y}년 총합: ${yearTotal.toLocaleString()}자`);
+                lines.push(`- ${y}년 총합: ${yearTotal.toLocaleString()}자 · 집필한 날 ${yearDays.size}일`);
                 Object.entries(genreTotals).sort((a, b) => b[1] - a[1]).forEach(([g, chars]) => {
                     lines.push(`  · ${g}: ${chars.toLocaleString()}자`);
                 });
                 months.forEach((m, i) => {
                     if (m.total <= 0) return;
-                    lines.push(`  [${MONTH_NAMES_KO[i]}] 총 ${m.total.toLocaleString()}자`);
+                    lines.push(`  [${MONTH_NAMES_KO[i]}] 총 ${m.total.toLocaleString()}자 · 집필한 날 ${m.days.size}일`);
                     Object.entries(m.byWork).sort((a, b) => b[1] - a[1]).forEach(([key, chars]) => {
                         lines.push(`    - ${writerResolveDailyKeyLabel(key)}: ${chars.toLocaleString()}자`);
                     });

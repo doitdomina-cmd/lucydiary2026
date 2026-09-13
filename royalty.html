@@ -3654,7 +3654,7 @@
 
     <!-- 🟢 [NEW] 글자수 관리 연간 통계 모달 -->
     <div id="writer-year-stats-modal" class="modal-overlay">
-        <div class="modal-content h-auto" style="max-width: 640px; max-height: calc(100vh - 48px);">
+        <div class="modal-content h-auto" style="max-width: 1200px; width: 96%; max-height: calc(100vh - 48px);">
             <div class="flex justify-between items-center mb-4 shrink-0">
                 <div class="flex items-center gap-3">
                     <h3 class="text-lg font-bold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-chart-column text-emerald-500"></i> 연간 글자수 통계</h3>
@@ -16350,26 +16350,25 @@
                 <div class="text-xl font-bold" style="color:var(--primary)">${yearTotal.toLocaleString()}자</div>
             </div>`;
 
+            // 출간 일정 "연간 전체보기"랑 같은 카드 스타일(월별 카드 4열)로 통일
             const monthsHtml = months.map((m, i) => {
-                if (m.total <= 0) return `<div class="py-2 border-b border-slate-50 flex items-center justify-between">
-                    <span class="text-sm font-bold text-slate-400">${MONTH_NAMES_KO[i]}</span>
-                    <span class="text-xs text-slate-300">기록 없음</span>
+                const header = `<div class="text-[10px] font-bold text-slate-400 mb-2 tracking-widest uppercase border-b border-slate-100 pb-2 flex items-center justify-between">
+                    <span>${MONTH_NAMES_KO[i]}</span>
+                    ${m.total > 0 ? `<span class="text-slate-600 normal-case tracking-normal">총 ${m.total.toLocaleString()}자</span>` : ''}
                 </div>`;
                 const rows = Object.entries(m.byWork)
                     .sort((a, b) => b[1] - a[1])
-                    .map(([key, chars]) => `<div class="flex items-center justify-between text-xs py-1 pl-3">
-                        <span class="text-slate-500 truncate mr-2">${escapeHtml(writerResolveDailyKeyLabel(key))}</span>
-                        <span class="text-slate-600 font-medium shrink-0">${chars.toLocaleString()}자</span>
+                    .map(([key, chars]) => `<div class="flex items-center gap-1.5 px-2 py-1.5 rounded-lg mb-1 bg-slate-50">
+                        <span class="flex-1 min-w-0 truncate text-xs text-slate-600">${escapeHtml(writerResolveDailyKeyLabel(key))}</span>
+                        <span class="text-xs font-bold text-slate-700 shrink-0">${chars.toLocaleString()}자</span>
                     </div>`).join('');
-                return `<div class="py-2 border-b border-slate-50">
-                    <div class="flex items-center justify-between mb-1">
-                        <span class="text-sm font-bold text-slate-700">${MONTH_NAMES_KO[i]} 총 ${m.total.toLocaleString()}자</span>
-                    </div>
-                    ${rows}
+                return `<div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4" style="min-height:160px;">
+                    ${header}
+                    ${rows || '<p class="text-xs text-slate-300 text-center py-4">기록 없음</p>'}
                 </div>`;
             }).join('');
 
-            body.innerHTML = summaryHtml + `<div class="mt-2">${monthsHtml}</div>`;
+            body.innerHTML = summaryHtml + `<div class="mt-4 grid grid-cols-4 gap-4">${monthsHtml}</div>`;
         }
         // ════════════════════════════════════════════════════════
 

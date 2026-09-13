@@ -747,6 +747,13 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 }
 @container (max-width: 620px){ .mtab-wrap{--mtab-fs:10px;--mtab-pad:6px 2px} }
 @container (max-width: 470px){ .mtab-wrap{--mtab-fs:8.5px;--mtab-pad:5px 1px} }
+/* 좁으면 "Jan"이 잘려서 "J.."로 보이는 대신, 아예 J/F/M 첫 글자 하나만 보여준다 */
+.mtab-item .mtab-short{display:none}
+@container (max-width: 470px){
+  .mtab-item{font-size:calc(var(--mtab-fs) + 3px)}
+  .mtab-item .mtab-full{display:none}
+  .mtab-item .mtab-short{display:inline}
+}
 /* 프로젝트 필터 탭: 영역 이름이 월 이름보다 길어서 더 작게 */
 .pjtab-wrap{--mtab-fs:11px;--mtab-pad:7px 3px}
 .pjtab-wrap .mtab{gap:2px}
@@ -755,7 +762,12 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 @container (max-width: 640px){ .pjtab-wrap{--mtab-fs:8px;--mtab-pad:5px 1px} }
 @supports not (container-type: inline-size){
   @media(max-width:900px){ .mtab-wrap{--mtab-fs:10px;--mtab-pad:6px 2px} }
-  @media(max-width:600px){ .mtab-wrap{--mtab-fs:8.5px;--mtab-pad:5px 1px} }
+  @media(max-width:600px){
+    .mtab-wrap{--mtab-fs:8.5px;--mtab-pad:5px 1px}
+    .mtab-item{font-size:calc(var(--mtab-fs) + 3px)}
+    .mtab-item .mtab-full{display:none}
+    .mtab-item .mtab-short{display:inline}
+  }
 }
 .cal-cell{transition:background .1s;cursor:pointer;min-width:0;overflow:hidden;}
 /* 섹션 제목용 형광펜 하이라이트 (테마색) */
@@ -793,6 +805,14 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
     --mcal-badge:0.45em; --mcal-cellh:64px; --mcal-pad:3px 3px;
   }
 }
+/* 실제 폰 폭(iPhone 등)에서는 이거보다도 더 줄여야 항목이 안 잘리고 한눈에 들어옴 */
+@container (max-width: 400px){
+  .mcal-wrap{
+    --mcal-dow:0.46em; --mcal-day:0.5em; --mcal-daysz:12px;
+    --mcal-ev:0.4em; --mcal-evpad:1px 1px;
+    --mcal-badge:0.36em; --mcal-cellh:56px; --mcal-pad:2px 2px;
+  }
+}
 /* container query 미지원 브라우저 대비 (화면 폭 기준 예비 규칙) */
 @supports not (container-type: inline-size){
   @media(max-width:900px){
@@ -800,6 +820,9 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
   }
   @media(max-width:600px){
     .mcal-wrap{--mcal-dow:0.55em;--mcal-day:0.6em;--mcal-daysz:15px;--mcal-ev:0.5em;--mcal-evpad:1px 2px;--mcal-badge:0.45em;--mcal-cellh:64px;--mcal-pad:3px 3px}
+  }
+  @media(max-width:420px){
+    .mcal-wrap{--mcal-dow:0.46em;--mcal-day:0.5em;--mcal-daysz:12px;--mcal-ev:0.4em;--mcal-evpad:1px 1px;--mcal-badge:0.36em;--mcal-cellh:56px;--mcal-pad:2px 2px}
   }
 }
 .cal-cell:hover{background:var(--s2) !important;}
@@ -823,6 +846,28 @@ hr{border:none;border-top:1px solid var(--border);margin:14px 0}
   .pt{font-size:1.8571em}
   .today-wrap{grid-template-columns:1fr}
   .tb-date{display:block !important}
+
+  /* 저축 목표: 상단 버튼이 가운데 금액과 겹치던 것 → 버튼을 금액 위에 별도 줄로 */
+  .sv-goal-btns{position:static !important;justify-content:center !important;margin-bottom:10px}
+  .sv-goal-amt{padding-top:0 !important}
+
+  /* 건강 관리: 탭 인덱스 글자가 잘려서 삐뚤어 보이던 것 → 폭에 맞춰 작게 */
+  .health-tab-btn{font-size:0.68em !important;padding:8px 3px 9px !important;gap:2px !important}
+}
+@media(max-width:400px){
+  .health-tab-btn{font-size:0.6em !important;padding:7px 2px 8px !important}
+}
+
+/* 건강 상태 관리 카드: 5칸 그리드가 화면 밖으로 넘치던 것 → 폭에 맞춰 칸 수를 줄이고 글자도 축소 */
+@media(max-width:640px){
+  .cond-grid{grid-template-columns:repeat(3,minmax(0,1fr)) !important}
+  .cond-card{padding:6px 4px !important;gap:3px !important}
+  .cond-card-title{font-size:0.95em !important}
+  .cond-card-cat{font-size:0.58em !important;padding:1px 5px !important}
+  .cond-card-rec{font-size:0.58em !important}
+}
+@media(max-width:380px){
+  .cond-grid{grid-template-columns:repeat(2,minmax(0,1fr)) !important}
 }
 </style>
 </head>
@@ -2080,7 +2125,8 @@ function renderDiary(){
   var monthCards='<div class="mtab-wrap"><div class="mtab">';
   for(var m=0;m<12;m++){
     var isCur=m===diaryM;
-    monthCards+='<div class="mtab-item'+(isCur?' on':'')+'" data-m="'+m+'" onclick="diaryM=parseInt(this.dataset.m);render()">'+MN_D[m].slice(0,3)+'</div>';
+    monthCards+='<div class="mtab-item'+(isCur?' on':'')+'" data-m="'+m+'" onclick="diaryM=parseInt(this.dataset.m);render()">'+
+      '<span class="mtab-full">'+MN_D[m].slice(0,3)+'</span><span class="mtab-short">'+MN_D[m][0]+'</span></div>';
   }
   monthCards+='</div></div>';
 
@@ -4179,7 +4225,7 @@ function renderSavings(){
   }
 
   return ''+
-    '<div class="card" style="margin-bottom:16px;position:relative"><div style="position:absolute;top:16px;right:16px;display:flex;gap:8px;z-index:1"><button class="btn bp bsm" onclick="openSvAdd()">+ 금액 추가</button><button class="btn bg bsm" onclick="openSvGoal()">목표 수정</button></div><div style="text-align:center;padding:4px 0 16px"><div style="font-family:var(--serif);font-size:2.8571em;letter-spacing:-1px">'+money(s.current)+'</div><div style="font-size:1.1em;color:var(--t2);margin-top:6px">목표: '+money(s.goal)+'</div><div style="margin:20px auto;max-width:400px"><div class="pw" style="height:18px"><div class="pb" style="width:'+pct+'%;background:var(--accent)"></div></div><div class="pl" style="font-size:0.95em;margin-top:6px"><span>'+pct+'% 달성</span><span>'+money(rem)+' 남음</span></div></div>'+goalBanner+'</div></div>'+
+    '<div class="card sv-goal-card" style="margin-bottom:16px;position:relative"><div class="sv-goal-btns" style="position:absolute;top:16px;right:16px;display:flex;gap:8px;z-index:1"><button class="btn bp bsm" onclick="openSvAdd()">+ 금액 추가</button><button class="btn bg bsm" onclick="openSvGoal()">목표 수정</button></div><div class="sv-goal-amt" style="text-align:center;padding:4px 0 16px"><div style="font-family:var(--serif);font-size:2.8571em;letter-spacing:-1px">'+money(s.current)+'</div><div style="font-size:1.1em;color:var(--t2);margin-top:6px">목표: '+money(s.goal)+'</div><div style="margin:20px auto;max-width:400px"><div class="pw" style="height:18px"><div class="pb" style="width:'+pct+'%;background:var(--accent)"></div></div><div class="pl" style="font-size:0.95em;margin-top:6px"><span>'+pct+'% 달성</span><span>'+money(rem)+' 남음</span></div></div>'+goalBanner+'</div></div>'+
     projectCards+
     '<div style="margin-bottom:8px;display:flex;align-items:center;gap:8px;font-size:0.9286em;font-weight:500;color:var(--text)">💳 저축 내역</div>'+histHtml;
 }
@@ -4560,15 +4606,15 @@ function renderHealth(){
     {bg:'#8FCFA0',text:'#245C3A'},
     {bg:'#C9A06B',text:'#5C3E1A'}
   ];
-  let html='<div style="position:relative;display:flex;align-items:flex-end;gap:4px;margin-bottom:18px;padding:0 2px;border-bottom:2px solid var(--border)">';
+  let html='<div class="health-tabs" style="position:relative;display:flex;align-items:flex-end;gap:4px;margin-bottom:18px;padding:0 2px;border-bottom:2px solid var(--border)">';
   tabs.forEach(function(t,ti){
     var on=tab===t.k;
     var pal=tabColors[ti];
-    html+='<button onclick="setHealthTab(\''+t.k+'\')" style="'+
+    html+='<button class="health-tab-btn" onclick="setHealthTab(\''+t.k+'\')" style="'+
       'flex:1;min-width:0;position:relative;box-sizing:border-box;'+
       'padding:'+(on?'10px 8px 12px':'7px 8px 9px')+';'+
       'border:none;border-radius:8px 12px 0 0;cursor:pointer;'+
-      'font-family:var(--sans);font-size:0.92em;font-weight:700;'+
+      'font-family:var(--sans);font-size:0.92em;font-weight:700;text-align:center;'+
       'display:flex;align-items:center;justify-content:center;gap:4px;'+
       'transition:all .2s ease;white-space:nowrap;overflow:hidden;'+
       'margin-bottom:'+(on?'-2px':'0')+';'+
@@ -4610,7 +4656,7 @@ function renderHealth(){
         {bg:'#EDF3F5',text:'#5A8FA8'},{bg:'#F3EFEA',text:'#928980'},
         {bg:'#E6DFD0',text:'#7A6B50'},{bg:'#DFE3E8',text:'#838C94'}
       ];
-      html+='<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px">';
+      html+='<div class="cond-grid" style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px">';
       conds.forEach(function(c,ci){
         var cp=c.color?{bg:c.color.bg,text:c.color.text}:condPalette[ci%condPalette.length];
         var allScheds=(H.schedules||[]).filter(s=>s.conditionId===c.id&&!s.done&&dLeft(s.date)>=0).sort((a,b)=>a.date.localeCompare(b.date));
@@ -4622,11 +4668,11 @@ function renderHealth(){
           ddBadge='<div style="position:absolute;top:6px;right:6px;font-size:0.62em;font-weight:800;color:'+uc+';background:rgba(255,255,255,.8);padding:1px 5px;border-radius:99px;line-height:1.5">D-'+dd+'</div>';
         }
         var recCount=(H.records||[]).filter(function(r){return r.conditionIds&&r.conditionIds.indexOf(c.id)!==-1;}).length;
-        html+='<div draggable="true" data-cid="'+c.id+'" ondragstart="condCardDragStart(event)" ondragend="condCardDragEnd(event)" ondragover="condCardDragOver(event)" ondragleave="condCardDragLeave(event)" ondrop="condCardDrop(event)" onclick="openCondReport(\''+c.id+'\')" title="클릭하면 상세 보고서를 볼 수 있어요 · 드래그해서 순서 변경" style="position:relative;cursor:grab;aspect-ratio:1;border-radius:8px;background:'+cp.bg+';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:10px 6px;text-align:center;transition:transform .15s,box-shadow .15s" onmouseenter="this.style.transform=\'translateY(-2px)\';this.style.boxShadow=\'0 6px 14px rgba(0,0,0,.1)\'" onmouseleave="this.style.transform=\'translateY(0)\';this.style.boxShadow=\'none\'">'+
+        html+='<div class="cond-card" draggable="true" data-cid="'+c.id+'" ondragstart="condCardDragStart(event)" ondragend="condCardDragEnd(event)" ondragover="condCardDragOver(event)" ondragleave="condCardDragLeave(event)" ondrop="condCardDrop(event)" onclick="openCondReport(\''+c.id+'\')" title="클릭하면 상세 보고서를 볼 수 있어요 · 드래그해서 순서 변경" style="position:relative;cursor:grab;aspect-ratio:1;border-radius:8px;background:'+cp.bg+';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:10px 6px;text-align:center;transition:transform .15s,box-shadow .15s" onmouseenter="this.style.transform=\'translateY(-2px)\';this.style.boxShadow=\'0 6px 14px rgba(0,0,0,.1)\'" onmouseleave="this.style.transform=\'translateY(0)\';this.style.boxShadow=\'none\'">'+
           ddBadge+
-          '<div style="font-size:1.35em;font-weight:700;color:'+cp.text+';line-height:1.3;word-break:keep-all">'+c.name+'</div>'+
-          (c.category?'<div style="font-size:0.65em;font-weight:600;color:'+cp.text+';opacity:.75;background:rgba(255,255,255,.55);padding:1px 7px;border-radius:99px">'+c.category+'</div>':'')+
-          (recCount?'<div style="font-size:0.62em;color:'+cp.text+';opacity:.65">📋 '+recCount+'건</div>':'')+
+          '<div class="cond-card-title" style="font-size:1.35em;font-weight:700;color:'+cp.text+';line-height:1.3;word-break:keep-all">'+c.name+'</div>'+
+          (c.category?'<div class="cond-card-cat" style="font-size:0.65em;font-weight:600;color:'+cp.text+';opacity:.75;background:rgba(255,255,255,.55);padding:1px 7px;border-radius:99px">'+c.category+'</div>':'')+
+          (recCount?'<div class="cond-card-rec" style="font-size:0.62em;color:'+cp.text+';opacity:.65">📋 '+recCount+'건</div>':'')+
         '</div>';
       });
       html+='</div>';
@@ -6845,7 +6891,8 @@ function renderTodoCal(){
   var monthCards='<div class="mtab-wrap"><div class="mtab">';
   for(var m=0;m<12;m++){
     var isCur=m===todoCalM;
-    monthCards+='<div class="mtab-item'+(isCur?' on':'')+'" data-m="'+m+'" onclick="todoCalM=parseInt(this.dataset.m);render()">'+MN[m]+'</div>';
+    monthCards+='<div class="mtab-item'+(isCur?' on':'')+'" data-m="'+m+'" onclick="todoCalM=parseInt(this.dataset.m);render()">'+
+      '<span class="mtab-full">'+MN[m]+'</span><span class="mtab-short">'+MN[m][0]+'</span></div>';
   }
   monthCards+='</div></div>';
 
@@ -7052,7 +7099,8 @@ function renderCalendar(){
   var monthCards='<div class="mtab-wrap"><div class="mtab">';
   for(var m=0;m<12;m++){
     var isCur=m===calM;
-    monthCards+='<div class="mtab-item'+(isCur?' on':'')+'" data-m="'+m+'" onclick="calM=parseInt(this.dataset.m);render()">'+MN[m]+'</div>';
+    monthCards+='<div class="mtab-item'+(isCur?' on':'')+'" data-m="'+m+'" onclick="calM=parseInt(this.dataset.m);render()">'+
+      '<span class="mtab-full">'+MN[m]+'</span><span class="mtab-short">'+MN[m][0]+'</span></div>';
   }
   monthCards+='</div></div>';
 

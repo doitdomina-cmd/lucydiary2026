@@ -11538,24 +11538,6 @@
                 return map;
             })();
 
-            // 작품별로 가장 최근(날짜순, 같은 날이면 나중에 만든 순) 집필 카드 id만 뽑아둔다 —
-            // '지금 실제 글자수'는 이 카드에만 보여준다 (미완료 카드 전부에 보이면 같은 숫자가 중복돼 보임)
-            const latestCardIdByWork = (() => {
-                const latest = {};
-                Object.entries(writeSchedules).forEach(([dateStr, list]) => {
-                    (list || []).forEach(s => {
-                        if (s.category || !s.workId) return;
-                        const cur = latest[s.workId];
-                        if (!cur || dateStr > cur.date || (dateStr === cur.date && s.id > cur.id)) {
-                            latest[s.workId] = { date: dateStr, id: s.id };
-                        }
-                    });
-                });
-                const map = {};
-                Object.entries(latest).forEach(([workId, v]) => { map[v.id] = true; });
-                return map;
-            })();
-
             const html = generateCalendarHTML(writeCalDate, writeSchedules, (s) => {
                 const resolved = resolveWorkItem(s.workId);
                 const work = resolved.work;
@@ -11611,12 +11593,13 @@
                     const segName = (goalData && goalData.segLabel) ? goalData.segLabel : '';
                     const segTag = segName
                         ? `<span class="text-[9px] font-bold text-amber-600 bg-amber-100 rounded px-1 py-px mr-1 align-middle">${segName}</span>` : '';
-                    // 그 작품의 진짜 마지막(가장 최근) 카드이면서 아직 완료 안 됐을 때만,
+                    // 지금 실제로 원고가 이 카드 구간 "안"에 걸쳐있을 때만(=한창 채워지고 있는 카드),
                     // 제목 줄 오른쪽에 지금 실제 원고 위치를 테마색으로 보여준다
-                    const latestPosText = (latestCardIdByWork[s.id] && !s.isCompleted)
+                    const latestPosText = (fillPct > 0 && fillPct < 100 && !s.isCompleted)
                         ? `<span class="text-[10px] font-bold shrink-0" style="color:var(--primary)">${gaugeWritten.toLocaleString()}자</span>` : '';
 
-                    content = `<div class="font-bold text-slate-700 ${opacity} flex items-center justify-between gap-1" style="white-space:normal; word-break:break-word;"><span class="min-w-0">${segTag}${titleForDisplay}</span>${latestPosText}</div>
+                    const titleWrapStyle = latestPosText ? 'white-space:nowrap; overflow:hidden; text-overflow:ellipsis;' : 'white-space:normal; word-break:break-word;';
+                    content = `<div class="font-bold text-slate-700 ${opacity} flex items-center justify-between gap-1" style="${latestPosText ? '' : 'white-space:normal; word-break:break-word;'}"><span class="min-w-0" style="${titleWrapStyle}">${segTag}${titleForDisplay}</span>${latestPosText}</div>
                                <div class="flex items-baseline justify-between gap-2 mt-0.5 ${opacity}">
                                    <span class="text-[11px] font-medium" style="color:${color}">${ownGoalText}</span>
                                    <span class="text-[10px] font-medium text-slate-400">${cumulativeText}</span>

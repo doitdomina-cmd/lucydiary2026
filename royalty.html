@@ -1171,7 +1171,7 @@
                     </div>
                     <div class="flex items-center justify-between gap-2 flex-wrap">
                         <div id="genre-tabs-container" class="flex flex-wrap gap-2"></div>
-                        <button type="button" onclick="openWithholdingCalcModal()" class="w-9 h-9 rounded-xl flex items-center justify-center transition-all shrink-0 hover:opacity-80" style="background:var(--primary-light); color:var(--primary);" title="3.3% 공제 계산기">
+                        <button type="button" onclick="openWithholdingCalc()" class="w-9 h-9 rounded-xl flex items-center justify-center transition-all shrink-0 hover:opacity-80" style="background:var(--primary-light); color:var(--primary);" title="3.3% 공제 계산기">
                             <i class="fa-solid fa-calculator"></i>
                         </button>
                     </div>
@@ -4158,6 +4158,9 @@
                 openMiniWindow: () => ipcRenderer.send('mini-window-open'),
                 hideMiniWindow: () => ipcRenderer.send('mini-window-hide'),
                 miniWindowIsVisible: () => ipcRenderer.invoke('mini-window-is-visible'),
+                openCalcWidget: () => ipcRenderer.send('calc-widget-open'),
+                hideCalcWidget: () => ipcRenderer.send('calc-widget-hide'),
+                calcWidgetIsVisible: () => ipcRenderer.invoke('calc-widget-is-visible'),
                 openBriefWindow: () => ipcRenderer.send('brief-window-open'),
                 hideBriefWindow: () => ipcRenderer.send('brief-window-hide'),
                 briefWindowIsVisible: () => ipcRenderer.invoke('brief-window-is-visible'),
@@ -12699,6 +12702,16 @@
         // 🟢 [NEW] 3.3% 공제 계산기 — 월별 정산 탭 우측 상단 계산기 아이콘에서 열림
         // ════════════════════════════════════════════════════════
         const wc$ = (id) => document.getElementById(id);
+
+        // 데스크탑 앱에서는 다른 미니 위젯처럼 항상 위에 뜨는 별도 창으로 열고,
+        // 웹(브라우저)에서는 별도 창을 띄울 수 없으니 원래대로 모달로 연다.
+        function openWithholdingCalc() {
+            if (isNodeEnvironment && window.electronAPI && window.electronAPI.openCalcWidget) {
+                window.electronAPI.openCalcWidget();
+            } else {
+                openWithholdingCalcModal();
+            }
+        }
 
         function openWithholdingCalcModal() {
             document.getElementById('withholding-calc-modal').classList.add('open');

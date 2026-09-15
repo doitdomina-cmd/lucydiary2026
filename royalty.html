@@ -76,6 +76,7 @@
         .scroll-invisible::-webkit-scrollbar { display: none; width: 0; height: 0; }
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         #publish-dday-list::-webkit-scrollbar { display: none; }
+        #task-dday-list::-webkit-scrollbar { display: none; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
 
@@ -1537,35 +1538,45 @@
                 </div>
 
                 <!-- 스케줄 관리 탭 (NEW) -->
-                <div id="tab-task" class="tab-content space-y-8 pb-20">
-                    <div class="glass-card p-8">
-                        <div class="relative flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-                            <div>
-                                <h3 class="text-lg font-bold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-list-check text-indigo-500"></i> 스케줄 & 태스크 관리</h3>
+                <div id="tab-task" class="tab-content pb-20">
+                    <div class="flex gap-5 items-start">
+                        <div class="glass-card p-8 flex-1 min-w-0">
+                            <div class="relative flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                                <div>
+                                    <h3 class="text-lg font-bold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-list-check text-indigo-500"></i> 스케줄 & 태스크 관리</h3>
+                                </div>
+                                <div class="absolute left-1/2 -translate-x-1/2 text-center pointer-events-none">
+                                    <p id="task-month-big-label" style="font-family:'Pretendard','Apple SD Gothic Neo',sans-serif; font-size:2.5rem; font-weight:800; color:var(--primary); line-height:1;"></p>
+                                </div>
+                                <div class="flex items-center bg-slate-100 rounded-lg p-1">
+                                    <button onclick="changeTaskMonth(-1)" class="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-white rounded-md transition-all"><i class="fa-solid fa-chevron-left"></i></button>
+                                    <span id="task-cal-title" class="px-4 font-bold text-slate-700 w-32 text-center">2026년 5월</span>
+                                    <button onclick="changeTaskMonth(1)" class="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-white rounded-md transition-all"><i class="fa-solid fa-chevron-right"></i></button>
+                                    <button onclick="changeTaskMonth(0, true)" class="ml-2 px-3 py-1 bg-white text-xs font-bold text-slate-600 rounded-md shadow-sm">Today</button>
+                                    <button onclick="openTaskSettings()" class="ml-2 w-8 h-8 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-all" title="스케줄 설정"><i class="fa-solid fa-sliders"></i></button>
+                                </div>
                             </div>
-                            <div class="absolute left-1/2 -translate-x-1/2 text-center pointer-events-none">
-                                <p id="task-month-big-label" style="font-family:'Pretendard','Apple SD Gothic Neo',sans-serif; font-size:2.5rem; font-weight:800; color:var(--primary); line-height:1;"></p>
+                            <div id="task-genre-tabs" class="hidden"></div>
+
+                            <div class="grid grid-cols-7 gap-1">
+                                <div class="text-center font-bold text-rose-500 text-xs py-2 bg-slate-50 rounded-t">일</div>
+                                <div class="text-center font-bold text-slate-500 text-xs py-2 bg-slate-50 rounded-t">월</div>
+                                <div class="text-center font-bold text-slate-500 text-xs py-2 bg-slate-50 rounded-t">화</div>
+                                <div class="text-center font-bold text-slate-500 text-xs py-2 bg-slate-50 rounded-t">수</div>
+                                <div class="text-center font-bold text-slate-500 text-xs py-2 bg-slate-50 rounded-t">목</div>
+                                <div class="text-center font-bold text-slate-500 text-xs py-2 bg-slate-50 rounded-t">금</div>
+                                <div class="text-center font-bold text-blue-500 text-xs py-2 bg-slate-50 rounded-t">토</div>
                             </div>
-                            <div class="flex items-center bg-slate-100 rounded-lg p-1">
-                                <button onclick="changeTaskMonth(-1)" class="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-white rounded-md transition-all"><i class="fa-solid fa-chevron-left"></i></button>
-                                <span id="task-cal-title" class="px-4 font-bold text-slate-700 w-32 text-center">2026년 5월</span>
-                                <button onclick="changeTaskMonth(1)" class="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-white rounded-md transition-all"><i class="fa-solid fa-chevron-right"></i></button>
-                                <button onclick="changeTaskMonth(0, true)" class="ml-2 px-3 py-1 bg-white text-xs font-bold text-slate-600 rounded-md shadow-sm">Today</button>
-                                <button onclick="openTaskSettings()" class="ml-2 w-8 h-8 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-all" title="스케줄 설정"><i class="fa-solid fa-sliders"></i></button>
+                            <div id="task-calendar-body" class="grid grid-cols-7 gap-1"></div>
+                        </div>
+                        <!-- 우측: 미완료 스케줄 사이드바 -->
+                        <div class="w-72 shrink-0 flex flex-col sticky top-4" style="height:calc(100vh - 120px)">
+                            <div class="glass-card p-4 flex flex-col" style="height:100%">
+                                <h3 class="text-sm font-bold text-slate-700 flex items-center gap-2 mb-1"><i class="fa-solid fa-star text-indigo-400 text-xs"></i> 스케줄</h3>
+                                <div class="border-b border-slate-100 mb-3"></div>
+                                <div id="task-dday-list" class="space-y-2 flex-1" style="overflow-y:auto; scrollbar-width:none; -ms-overflow-style:none;"></div>
                             </div>
                         </div>
-                        <div id="task-genre-tabs" class="hidden"></div>
-                        
-                        <div class="grid grid-cols-7 gap-1">
-                            <div class="text-center font-bold text-rose-500 text-xs py-2 bg-slate-50 rounded-t">일</div>
-                            <div class="text-center font-bold text-slate-500 text-xs py-2 bg-slate-50 rounded-t">월</div>
-                            <div class="text-center font-bold text-slate-500 text-xs py-2 bg-slate-50 rounded-t">화</div>
-                            <div class="text-center font-bold text-slate-500 text-xs py-2 bg-slate-50 rounded-t">수</div>
-                            <div class="text-center font-bold text-slate-500 text-xs py-2 bg-slate-50 rounded-t">목</div>
-                            <div class="text-center font-bold text-slate-500 text-xs py-2 bg-slate-50 rounded-t">금</div>
-                            <div class="text-center font-bold text-blue-500 text-xs py-2 bg-slate-50 rounded-t">토</div>
-                        </div>
-                        <div id="task-calendar-body" class="grid grid-cols-7 gap-1"></div>
                     </div>
                 </div>
 
@@ -11926,6 +11937,54 @@
 
             document.getElementById('task-calendar-body').innerHTML = html;
             if (typeof window.clearCalSelection === 'function') window.clearCalSelection();
+            renderTaskDdayList();
+        }
+
+        // 🟢 [NEW] 우측 사이드바 — 출간 일정의 'D-Day 사이드바'와 같은 방식으로,
+        // 아직 완료 처리 안 된 스케줄(할 일)을 날짜 가까운 순으로 모아 보여준다
+        function renderTaskDdayList() {
+            const list = document.getElementById('task-dday-list');
+            if (!list) return;
+            const today = getYYYYMMDD(new Date());
+            const items = [];
+            Object.entries(taskSchedules).forEach(([dateStr, arr]) => {
+                (arr || []).forEach(t => {
+                    if (t.isCompleted) return;
+                    if (dateStr < today) return;
+                    const resolved = resolveWorkItem(t.workId);
+                    if (t.workId && !resolved.work) return; // 작품이 삭제된 경우만 숨김
+                    if (resolved.work && taskGenreFilter !== '전체' && resolved.work.genre !== taskGenreFilter) return;
+                    items.push({ ...t, date: dateStr, resolved });
+                });
+            });
+            items.sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+
+            if (items.length === 0) {
+                list.innerHTML = `<div class="text-xs text-slate-400 text-center py-6">예정된 스케줄이 없습니다.</div>`;
+                return;
+            }
+
+            list.innerHTML = items.map(t => {
+                const diff = Math.round((new Date(t.date) - new Date(today)) / 86400000);
+                const dLabel = diff === 0 ? 'D-Day' : `D-${diff}`;
+                const dColor = diff === 0 ? '#ef4444' : diff <= 7 ? '#f97316' : diff <= 30 ? 'var(--primary)' : '#94a3b8';
+                const catColor = TASK_COLORS[t.category] || '#64748b';
+                const titlePart = t.resolved.work ? ` ${t.resolved.displayTitle}` : '';
+                return `<div class="flex items-start gap-2 p-2.5 bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-all group cursor-pointer" onclick="openTaskEditModal('${t.id}', '${t.date}')">
+                    <div class="shrink-0 w-1 self-stretch rounded-full" style="background:${catColor}"></div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between gap-1 mb-0.5">
+                            <span class="text-sm font-black" style="color:${dColor}">${dLabel}</span>
+                            <div class="flex items-center gap-1">
+                                <span class="text-[10px] text-slate-500 font-semibold shrink-0">${t.date.slice(5)}</span>
+                                <button onclick="event.stopPropagation(); quickDeleteTask('${t.id}', '${t.date}')" class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 text-[10px] transition-all ml-1" title="삭제"><i class="fa-solid fa-trash-can"></i></button>
+                            </div>
+                        </div>
+                        <div class="font-bold text-slate-700 text-sm" style="white-space:normal; word-break:break-word;"><span style="color:${catColor}">[${t.category}]</span>${titlePart}</div>
+                        ${t.memo ? `<div class="text-[10px] text-slate-400 mt-0.5" style="white-space:normal; word-break:break-word;">${t.memo}</div>` : ''}
+                    </div>
+                </div>`;
+            }).join('');
         }
 
 

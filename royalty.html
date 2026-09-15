@@ -1183,7 +1183,7 @@
                 <div id="tab-library" class="tab-content space-y-8 pb-20">
                     <div class="glass-card p-6 min-h-[500px] w-[90%] mx-auto">
                         <div class="flex flex-col md:flex-row justify-between items-center mb-6">
-                            <h3 class="text-xl font-bold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-layer-group text-emerald-500"></i> 작품 라이브러리</h3>
+                            <h3 class="text-xl font-bold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-layer-group text-emerald-500"></i> 작품 라이브러리 <span id="library-total-count" class="text-xs font-bold text-white rounded-full px-2 py-0.5" style="background:var(--primary)">0</span></h3>
                             <div class="flex items-center gap-3">
                                 <button onclick="resetLibraryFiles()" class="px-3 py-1.5 text-xs font-bold text-red-500 bg-red-50 hover:bg-red-100 rounded-lg transition-all flex items-center gap-1">
                                     <i class="fa-solid fa-trash-can"></i> 라이브러리 초기화
@@ -1611,7 +1611,7 @@
                         <div class="w-72 shrink-0 flex flex-col sticky top-4" id="publish-dday-sidebar" style="height:calc(100vh - 120px)">
                             <div class="glass-card p-4 flex flex-col" style="height:100%">
                                 <div class="flex items-center justify-between mb-1">
-                                    <h3 class="text-sm font-bold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-star text-yellow-400 text-xs"></i> 출간 예정</h3>
+                                    <h3 class="text-sm font-bold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-star text-yellow-400 text-xs"></i> 출간 예정 <span id="publish-dday-count" class="text-xs font-bold text-white rounded-full px-2 py-0.5" style="background:var(--primary)">0</span></h3>
                                     <div class="relative" id="dday-filter-wrap">
                                         <button id="dday-filter-btn" onclick="toggleDdayFilter()" class="w-6 h-6 flex items-center justify-center rounded-full hover:bg-slate-100 transition-all text-slate-400 hover:text-slate-600" title="장르 필터">
                                             <i class="fa-solid fa-sliders text-xs"></i>
@@ -4700,6 +4700,8 @@
             const filteredUpcoming = (_activeFilter && _activeFilter.size < genreList.length)
                 ? allUpcoming.filter(w => _activeFilter.has(w.genre))
                 : allUpcoming;
+            const ddayCountEl = document.getElementById('publish-dday-count');
+            if (ddayCountEl) ddayCountEl.textContent = String(filteredUpcoming.length);
             if (filteredUpcoming.length > 0) {
                 ddayList.innerHTML = filteredUpcoming.map(w => {
                     const gc = getGenreColor(w.genre);
@@ -4710,17 +4712,14 @@
                         ? (w.studio && w.studio !== '-' && w.studio !== 'undefined' ? `[${w.studio}]` : '')
                         : (w.publisher && w.publisher !== '-' ? `[${w.publisher}]` : '');
                     const extraSuffix = w._isExtra ? ` [${w._extraName}]` : '';
-                    const delAction = w._isExtra ? `deleteExtraFromCal('${w._parentWorkId}','${w._extraId}')` : `deletePublishWork('${w.id}')`;
+                    const editAction = w._isExtra ? `switchTab('library'); viewWork('${w._parentWorkId}');` : `switchTab('library'); viewWork('${w.id}');`;
                     const dateLabel = w._pendingMonthOnly ? `${parseInt(w.publishDate.slice(5,7),10)}월 출간예정` : w.publishDate.slice(5);
-                    return `<div class="flex items-start gap-2 p-2.5 bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-all group">
+                    return `<div class="flex items-start gap-2 p-2.5 bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-all cursor-pointer" onclick="${editAction}">
                         <div class="shrink-0 w-1 self-stretch rounded-full" style="background:${gc}"></div>
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center justify-between gap-1 mb-0.5">
                                 <span class="text-sm font-black" style="color:${dColor}">${dLabel}</span>
-                                <div class="flex items-center gap-1">
-                                    <span class="text-[12px] text-slate-500 font-semibold shrink-0">${dateLabel}</span>
-                                    <button onclick="${delAction}" class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 text-[10px] transition-all ml-1" title="삭제"><i class="fa-solid fa-trash-can"></i></button>
-                                </div>
+                                <span class="text-[12px] font-semibold shrink-0" style="color:color-mix(in srgb, var(--primary) 80%, black);">${dateLabel}</span>
                             </div>
                             <div class="font-bold text-slate-700 text-sm" style="white-space:normal; word-break:break-word;">${w.title}${extraSuffix}</div>
                             <div class="text-[10px] text-slate-400 mt-0.5">${pubShort ? pubShort + ' ' : ''}${w.genre}</div>
@@ -5080,6 +5079,8 @@
 
         function renderVisualLibrary() {
             const container = document.getElementById('visual-lib-container'); const tabsContainer = document.getElementById('visual-lib-tabs');
+            const totalBadge = document.getElementById('library-total-count');
+            if (totalBadge) totalBadge.textContent = masterWorks.length;
             const tabs = ['전체', ...genreList.map(g => g.name)];
             tabsContainer.innerHTML = tabs.map(t => `<button onclick="switchVisualLibTab('${t}')" class="px-3 py-1.5 text-xs font-bold rounded-lg transition-all mb-1 ${currentVisualLibTab === t ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-400 hover:bg-slate-50'}">${t}</button>`).join('');
             let works = currentVisualLibTab === '전체' ? [...masterWorks] : masterWorks.filter(w => w.genre === currentVisualLibTab);
@@ -11981,10 +11982,7 @@
                     <div class="flex-1 min-w-0">
                         <div class="flex items-center justify-between gap-1 mb-0.5">
                             <span class="text-sm font-black" style="color:${dColor}">${dLabel}</span>
-                            <div class="flex items-center gap-1">
-                                <span class="text-[12px] text-slate-500 font-semibold shrink-0">${t.date.slice(5)}</span>
-                                <button onclick="event.stopPropagation(); quickDeleteTask('${t.id}', '${t.date}')" class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 text-[10px] transition-all ml-1" title="삭제"><i class="fa-solid fa-trash-can"></i></button>
-                            </div>
+                            <span class="text-[12px] font-semibold shrink-0" style="color:color-mix(in srgb, var(--primary) 80%, black);">${t.date.slice(5)}</span>
                         </div>
                         <div class="text-slate-700 text-[12px]" style="font-weight:600; white-space:normal; word-break:break-word;"><span style="color:${catColor}">[${t.category}]</span>${titlePart}</div>
                         ${t.memo ? `<div class="text-[10px] text-slate-400 mt-0.5" style="white-space:normal; word-break:break-word;">${t.memo}</div>` : ''}

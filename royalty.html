@@ -14,6 +14,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- 3.3% 공제 계산기의 이미지(정산서) OCR용 -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <!-- Firebase (웹 동기화용; 데스크톱에서는 미사용) -->
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -843,6 +845,52 @@
             }
             body.printing-year-all .no-print { display: none !important; }
         }
+
+        /* 🟢 [NEW] 3.3% 공제 계산기 — 앱 전역 스타일과 안 섞이게 전부 #withholding-calc-modal 안에서만 적용 */
+        #withholding-calc-modal .wc-card + .wc-card { border-top: 1px solid #e2e8f0; padding-top: 16px; margin-top: 16px; }
+        #withholding-calc-modal label { display: block; font-size: 12px; font-weight: 600; color: #64748b; margin-bottom: 6px; }
+        #withholding-calc-modal textarea,
+        #withholding-calc-modal input[type="text"],
+        #withholding-calc-modal input[type="number"],
+        #withholding-calc-modal select {
+            width: 100%; background: #f8fafc; color: #1e293b; border: 1px solid #e2e8f0; border-radius: 12px;
+            padding: 10px 12px; outline: none; font-size: 13px; transition: all .2s; box-sizing: border-box;
+        }
+        #withholding-calc-modal textarea:focus,
+        #withholding-calc-modal input:focus,
+        #withholding-calc-modal select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+        #withholding-calc-modal textarea { min-height: 100px; resize: vertical; line-height: 1.5; font-family: inherit; }
+        #withholding-calc-modal textarea.wc-dragover { background: var(--primary-light); border: 2px dashed var(--primary); }
+        #withholding-calc-modal .wc-loading-overlay {
+            position: absolute; inset: 0; background: rgba(255,255,255,.92); border-radius: 12px;
+            display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 10;
+            color: var(--primary); font-weight: 600; font-size: 12px; text-align: center; padding: 8px;
+        }
+        #withholding-calc-modal .wc-spinner {
+            border: 3px solid var(--primary-light); border-top: 3px solid var(--primary); border-radius: 50%;
+            width: 22px; height: 22px; animation: wc-spin 1s linear infinite; margin-bottom: 8px;
+        }
+        @keyframes wc-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        #withholding-calc-modal .wc-kpi { display: grid; gap: 10px; grid-template-columns: repeat(3, 1fr); }
+        #withholding-calc-modal .wc-kpi.wc-advanced { grid-template-columns: repeat(2, 1fr); }
+        #withholding-calc-modal .wc-kpi .wc-box {
+            background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 10px 6px; text-align: center; transition: all .2s;
+        }
+        #withholding-calc-modal .wc-kpi .wc-box.wc-clickable { cursor: pointer; }
+        #withholding-calc-modal .wc-kpi .wc-box.wc-clickable:hover { background: #eef2f7; transform: translateY(-2px); }
+        #withholding-calc-modal .wc-kpi .wc-t { font-size: 10px; color: #94a3b8; margin-bottom: 4px; font-weight: 600; }
+        #withholding-calc-modal .wc-kpi .wc-v { font-size: 14px; font-weight: 700; color: #1e293b; }
+        #withholding-calc-modal .wc-net-box { background: var(--primary-light) !important; border-color: var(--primary) !important; }
+        #withholding-calc-modal .wc-net-box .wc-t, #withholding-calc-modal .wc-net-box .wc-v { color: var(--primary) !important; }
+        #withholding-calc-modal table { width: 100%; border-collapse: separate; border-spacing: 0; }
+        #withholding-calc-modal thead th { text-align: left; padding: 8px 10px; font-size: 11px; font-weight: 600; color: #94a3b8; border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
+        #withholding-calc-modal tbody td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; font-size: 12px; color: #334155; background: #fff; }
+        #withholding-calc-modal tbody tr:last-child td { border-bottom: none; }
+        #withholding-calc-modal .wc-mono { font-variant-numeric: tabular-nums; }
+        #withholding-calc-modal .wc-copy-cell { cursor: pointer; color: var(--primary); font-weight: 600; position: relative; }
+        #withholding-calc-modal .wc-copy-cell:hover { background: var(--primary-light); }
+        #withholding-calc-modal .wc-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid #e2e8f0; border-radius: 999px; font-size: 11px; color: #64748b; background: #fff; }
+        #withholding-calc-modal .wc-hint { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; padding: 10px; border-radius: 10px; font-size: 12px; margin-top: 10px; line-height: 1.5; }
     </style>
 </head>
 <body class="theme-mint">
@@ -1121,7 +1169,12 @@
                             </div>
                         </div>
                     </div>
-                    <div id="genre-tabs-container" class="flex flex-wrap gap-2"></div>
+                    <div class="flex items-center justify-between gap-2 flex-wrap">
+                        <div id="genre-tabs-container" class="flex flex-wrap gap-2"></div>
+                        <button type="button" onclick="openWithholdingCalcModal()" class="w-9 h-9 rounded-xl flex items-center justify-center transition-all shrink-0 hover:opacity-80" style="background:var(--primary-light); color:var(--primary);" title="3.3% 공제 계산기">
+                            <i class="fa-solid fa-calculator"></i>
+                        </button>
+                    </div>
                     <div id="genre-sheets-container"></div>
                 </div>
 
@@ -3645,6 +3698,107 @@
                 <div class="flex gap-2">
                     <button onclick="closeWriteVolumeModal()" class="px-5 py-2.5 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200">취소</button>
                     <button onclick="saveWriteVolumes()" class="px-6 py-2.5 bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-600">저장</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 🟢 [NEW] 3.3% 공제 계산기 -->
+    <div id="withholding-calc-modal" class="modal-overlay">
+        <div class="modal-content modal-tall" style="max-width: 560px;">
+            <div class="flex justify-between items-center mb-3 shrink-0">
+                <h3 class="text-lg font-bold text-slate-700"><i class="fa-solid fa-calculator mr-1.5" style="color:var(--primary)"></i>3.3% 공제 계산기</h3>
+                <button onclick="closeWithholdingCalcModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-times text-xl"></i></button>
+            </div>
+
+            <div class="modal-scroll-body custom-scrollbar pr-1.5">
+                <div class="wc-card">
+                    <label>금액 입력 (텍스트 또는 정산서 이미지 붙여넣기)</label>
+                    <div style="position:relative;">
+                        <textarea id="wc-amounts" oninput="wcCalculate()" ondragover="wcHandleDragOver(event)" ondragleave="wcHandleDragLeave(event)" ondrop="wcHandleDrop(event)" placeholder="예시)
+36,294.72
+344,595.46
+또는 정산서 이미지를 이곳에 Ctrl+V 하세요."></textarea>
+                        <div id="wc-loading-overlay" class="wc-loading-overlay">
+                            <div class="wc-spinner"></div>
+                            <div id="wc-loading-text">이미지 분석 준비 중...</div>
+                        </div>
+                    </div>
+
+                    <label class="flex items-center gap-2 mt-3 mb-0 cursor-pointer" style="font-size:12px; color:#475569; font-weight:600;">
+                        <input type="checkbox" id="wc-advanced-mode" style="width:auto;" onchange="wcToggleAdvanced()">
+                        매출 모드 (플랫폼 수수료 + 정산 비율 적용)
+                    </label>
+
+                    <div id="wc-advanced-controls" class="hidden grid grid-cols-2 gap-2 mt-2">
+                        <div>
+                            <label>플랫폼 수수료</label>
+                            <select id="wc-fee-rate" onchange="wcHandleFeeRateChange()">
+                                <option value="0">없음(0%)</option>
+                                <option value="30" selected>30%</option>
+                                <option value="40">40%</option>
+                                <option value="custom">직접입력</option>
+                            </select>
+                            <input type="number" id="wc-fee-rate-custom" oninput="wcCalculate()" placeholder="수수료 % 입력" class="hidden mt-1.5" min="0" max="100" step="0.1">
+                        </div>
+                        <div>
+                            <label>정산 비율</label>
+                            <select id="wc-payout-ratio" onchange="wcHandlePayoutRatioChange()">
+                                <option value="70" selected>70%</option>
+                                <option value="75">75%</option>
+                                <option value="80">80%</option>
+                                <option value="85">85%</option>
+                                <option value="90">90%</option>
+                                <option value="custom">직접입력</option>
+                            </select>
+                            <input type="number" id="wc-payout-ratio-custom" oninput="wcCalculate()" placeholder="정산비율 % 입력" class="hidden mt-1.5" min="0" max="100" step="0.1">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="wc-card">
+                    <div class="wc-kpi" id="wc-kpi-grid">
+                        <div class="wc-box wc-clickable" id="wc-gross-box" onclick="wcCopyToClipboard('wc-gross','wc-gross-title','총합(세전) 📋')">
+                            <div class="wc-t" id="wc-gross-title">총합(세전) 📋</div>
+                            <div class="wc-v wc-mono" id="wc-gross">-</div>
+                        </div>
+                        <div class="wc-box hidden" id="wc-pretax-box">
+                            <div class="wc-t">정산 순수금액(세전)</div>
+                            <div class="wc-v wc-mono" id="wc-pretax">-</div>
+                        </div>
+                        <div class="wc-box">
+                            <div class="wc-t">공제액(세금)</div>
+                            <div class="wc-v wc-mono" id="wc-withheld">-</div>
+                        </div>
+                        <div class="wc-box wc-clickable wc-net-box" id="wc-net-box" onclick="wcCopyToClipboard('wc-net','wc-net-title','총 실수령액 📋')">
+                            <div class="wc-t" id="wc-net-title">총 실수령액 📋</div>
+                            <div class="wc-v wc-mono" id="wc-net">-</div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
+                        <div class="wc-badge">항목 수: <span class="wc-mono" id="wc-count" style="margin-left:4px; font-weight:600; color:#334155;">0</span></div>
+                        <div class="wc-badge">종합 배수: <span class="wc-mono" id="wc-mult" style="margin-left:4px; font-weight:600; color:#334155;">0.967</span></div>
+                    </div>
+
+                    <div class="mt-3">
+                        <label>추출된 항목 리스트 (클릭 시 복사)</label>
+                        <div style="max-height:260px; overflow-y:auto; border-radius:12px; border:1px solid #e2e8f0;" class="custom-scrollbar">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th style="width:36px; text-align:center;">#</th>
+                                        <th style="text-align:right; width:40%;">세전 금액</th>
+                                        <th style="text-align:right;">실수령액 (클릭 복사)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="wc-rows">
+                                    <tr><td colspan="3" class="wc-mono" style="text-align:center; color:#94a3b8; padding:20px;">계산 결과가 여기에 표시돼요</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="wc-hint hidden" id="wc-err"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -12540,6 +12694,226 @@
             renderWriteCalendar();
             try { writerUpdateDailyStats(true); } catch(e) {}
         }
+
+        // ════════════════════════════════════════════════════════
+        // 🟢 [NEW] 3.3% 공제 계산기 — 월별 정산 탭 우측 상단 계산기 아이콘에서 열림
+        // ════════════════════════════════════════════════════════
+        const wc$ = (id) => document.getElementById(id);
+
+        function openWithholdingCalcModal() {
+            document.getElementById('withholding-calc-modal').classList.add('open');
+            wcCalculate();
+        }
+        function closeWithholdingCalcModal() {
+            document.getElementById('withholding-calc-modal').classList.remove('open');
+        }
+
+        function wcFormatKRW(n) {
+            const sign = n < 0 ? '-' : '';
+            const abs = Math.abs(n);
+            const hasDecimal = !Number.isInteger(abs);
+            const parts = abs.toFixed(hasDecimal ? 2 : 0).split('.');
+            parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            return sign + parts[0] + (hasDecimal ? ('.' + parts[1]) : '');
+        }
+
+        function wcParseNumbers(text) {
+            // OCR 오인식 보정 (알파벳 O/o를 숫자 0으로, 쉼표 뒤 공백 제거해 숫자 파편화 방지)
+            let cleanText = text.replace(/[Oo]/g, '0').replace(/,\s+/g, ',');
+            const matches = cleanText.match(/-?\d{1,3}(?:,\d{3})+(?:\.\d+)?|-?\d+(?:\.\d+)?/g);
+            if (!matches) return [];
+            return matches.map(s => Number(s.replace(/,/g, ''))).filter(n => Number.isFinite(n));
+        }
+
+        function wcToggleAdvanced() {
+            const on = wc$('wc-advanced-mode').checked;
+            wc$('wc-advanced-controls').classList.toggle('hidden', !on);
+            wc$('wc-kpi-grid').classList.toggle('wc-advanced', on);
+            wc$('wc-pretax-box').classList.toggle('hidden', !on);
+            wcCalculate();
+        }
+        function wcHandleFeeRateChange() {
+            wc$('wc-fee-rate-custom').classList.toggle('hidden', wc$('wc-fee-rate').value !== 'custom');
+            wcCalculate();
+        }
+        function wcHandlePayoutRatioChange() {
+            wc$('wc-payout-ratio-custom').classList.toggle('hidden', wc$('wc-payout-ratio').value !== 'custom');
+            wcCalculate();
+        }
+
+        function wcRenderRows(itemsData) {
+            const tbody = wc$('wc-rows');
+            if (itemsData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" class="wc-mono" style="text-align:center; color:#94a3b8; padding:20px;">추출된 금액이 없어요 🥲</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = itemsData.map((item, i) => `
+                <tr>
+                    <td class="wc-mono" style="text-align:center; color:#94a3b8">${i + 1}</td>
+                    <td class="wc-mono" style="text-align:right">${wcFormatKRW(item.gross)}</td>
+                    <td class="wc-mono wc-copy-cell" style="text-align:right" onclick="wcCopyIndividualItem(this, ${item.net})">${wcFormatKRW(item.net)}</td>
+                </tr>`).join('');
+        }
+
+        async function wcCopyText(text) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(text);
+            } else {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            }
+        }
+
+        async function wcCopyIndividualItem(element, value) {
+            try {
+                await wcCopyText(String(value));
+                const original = element.textContent;
+                element.textContent = '복사 완료! ✅';
+                element.style.color = '#16a34a';
+                setTimeout(() => { element.textContent = original; element.style.color = ''; }, 1200);
+            } catch (e) {
+                const errBox = wc$('wc-err');
+                errBox.textContent = '복사에 실패했어요 😭';
+                errBox.classList.remove('hidden');
+            }
+        }
+
+        async function wcCopyToClipboard(elementId, titleId, originalTitleText) {
+            const text = wc$(elementId).textContent;
+            const num = text.replace(/[^\d-]/g, '');
+            if (!num) return;
+            try {
+                await wcCopyText(num);
+                const titleElem = wc$(titleId);
+                titleElem.textContent = '복사 완료! ✅';
+                setTimeout(() => { titleElem.textContent = originalTitleText; }, 1500);
+            } catch (e) {
+                const errBox = wc$('wc-err');
+                errBox.textContent = '복사에 실패했어요 😭';
+                errBox.classList.remove('hidden');
+            }
+        }
+
+        function wcCalculate() {
+            const errBox = wc$('wc-err');
+            errBox.classList.add('hidden');
+            errBox.textContent = '';
+
+            const rate = 3.3; // 원천징수 3.3% 고정
+            const advanced = wc$('wc-advanced-mode').checked;
+            let feeRate = 0, payoutRatio = 100;
+
+            if (advanced) {
+                feeRate = wc$('wc-fee-rate').value === 'custom' ? Number(wc$('wc-fee-rate-custom').value) : Number(wc$('wc-fee-rate').value);
+                payoutRatio = wc$('wc-payout-ratio').value === 'custom' ? Number(wc$('wc-payout-ratio-custom').value) : Number(wc$('wc-payout-ratio').value);
+                if (!Number.isFinite(feeRate) || feeRate < 0 || feeRate > 100) {
+                    errBox.textContent = '플랫폼 수수료(%)는 0~100 사이 숫자로 입력해주세요.';
+                    errBox.classList.remove('hidden');
+                    return;
+                }
+                if (!Number.isFinite(payoutRatio) || payoutRatio < 0 || payoutRatio > 100) {
+                    errBox.textContent = '정산 비율(%)은 0~100 사이 숫자로 입력해주세요.';
+                    errBox.classList.remove('hidden');
+                    return;
+                }
+            }
+
+            const feeMult = (100 - feeRate) / 100;
+            const ratioMult = payoutRatio / 100;
+            const preTaxMult = feeMult * ratioMult;
+            const taxMult = (100 - rate) / 100;
+            const mult = preTaxMult * taxMult;
+
+            const nums = wcParseNumbers(wc$('wc-amounts').value);
+            const itemsData = nums.map(n => {
+                const itemNet = Math.round(n * mult);
+                return { gross: n, net: itemNet };
+            });
+
+            const gross = itemsData.reduce((a, b) => a + b.gross, 0);
+            const preTaxRaw = gross * preTaxMult;
+            const netRaw = gross * mult;
+            const withheldRaw = preTaxRaw - netRaw;
+
+            wc$('wc-gross').textContent = wcFormatKRW(Math.round(gross)) + '원';
+            wc$('wc-pretax').textContent = wcFormatKRW(Math.round(preTaxRaw)) + '원';
+            wc$('wc-withheld').textContent = wcFormatKRW(Math.round(withheldRaw)) + '원';
+            wc$('wc-net').textContent = wcFormatKRW(Math.round(netRaw)) + '원';
+            wc$('wc-count').textContent = String(nums.length);
+            wc$('wc-mult').textContent = mult.toFixed(4);
+
+            wcRenderRows(itemsData);
+        }
+
+        // ── 정산서 이미지 OCR (Tesseract.js) ──
+        async function wcProcessImage(file) {
+            const overlay = wc$('wc-loading-overlay');
+            const loadingText = wc$('wc-loading-text');
+            overlay.style.display = 'flex';
+            loadingText.textContent = '엔진 초기 로딩 중... (네트워크에 따라 최대 10초 소요)';
+            try {
+                const result = await Tesseract.recognize(file, 'kor+eng', {
+                    logger: m => {
+                        if (m.status === 'recognizing text') {
+                            loadingText.textContent = `문자 추출 중... ${Math.round(m.progress * 100)}% 완료`;
+                        } else if (m.status.includes('loading')) {
+                            loadingText.textContent = '언어팩 로딩 중... 잠시만 대기해주세요.';
+                        }
+                    }
+                });
+                const extractedText = result.data.text;
+                const amountsEl = wc$('wc-amounts');
+                amountsEl.value = amountsEl.value ? amountsEl.value + '\n\n' + extractedText : extractedText;
+                wcCalculate();
+            } catch (e) {
+                const errBox = wc$('wc-err');
+                errBox.textContent = '이미지에서 텍스트를 추출하는 데 실패했어요. (' + e.message + ')';
+                errBox.classList.remove('hidden');
+            } finally {
+                overlay.style.display = 'none';
+                loadingText.textContent = '이미지 분석 준비 중...';
+            }
+        }
+
+        function wcHandleDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('wc-dragover'); }
+        function wcHandleDragLeave(e) { e.currentTarget.classList.remove('wc-dragover'); }
+        function wcHandleDrop(e) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('wc-dragover');
+            const files = e.dataTransfer.files;
+            for (const file of files) {
+                if (file.type.indexOf('image') === 0) { wcProcessImage(file); return; }
+            }
+        }
+
+        // 계산기 모달이 열려있고 금액 입력칸에 포커스가 있을 때만 이미지 붙여넣기를 가로챈다
+        // (다른 곳의 기존 붙여넣기 기능과 절대 안 겹치게)
+        document.addEventListener('paste', (e) => {
+            const modal = document.getElementById('withholding-calc-modal');
+            if (!modal || !modal.classList.contains('open')) return;
+            if (document.activeElement !== wc$('wc-amounts')) return;
+            const cd = e.clipboardData || window.clipboardData;
+            if (!cd) return;
+            if (cd.files && cd.files.length > 0) {
+                for (let i = 0; i < cd.files.length; i++) {
+                    if (cd.files[i].type.startsWith('image/')) { e.preventDefault(); wcProcessImage(cd.files[i]); return; }
+                }
+            }
+            const items = cd.items;
+            if (items) {
+                for (let i = 0; i < items.length; i++) {
+                    if (items[i].type.indexOf('image') !== -1) {
+                        e.preventDefault();
+                        const file = items[i].getAsFile();
+                        if (file) { wcProcessImage(file); return; }
+                    }
+                }
+            }
+        });
 
         function saveWriteSchedule() {
             const dateStr = currentEditWriteDate;

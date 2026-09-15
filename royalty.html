@@ -15334,6 +15334,19 @@
             if (changed) { try { save(); } catch (e) {} }
         }
 
+        // 권을 나눴다가 다시 합친(무권으로 만든) 작품은 원고 위치가 권마다 0자부터 다시 세어져 있어서,
+        // 마지막 위치 하나만 보면 이전 권에서 쓴 분량을 놓친다. 그래서 권이 없을 땐 위치 대신
+        // 실제로 그날그날 입력한 글자수(diff)를 전부 더해서 쓴다 — 이러면 권 경계와 상관없이 항상 맞다.
+        function writerSumDiffsForWork(storageKey, sinceDate) {
+            let sum = 0;
+            Object.keys(writerDailyData).forEach(d => {
+                if (sinceDate && d < sinceDate) return;
+                const wd = writerGetDayWorkData(d, storageKey);
+                if (!wd?.hours) return;
+                Object.values(wd.hours).forEach(cell => { sum += Number(cell?.diff) || 0; });
+            });
+            return Math.max(0, sum);
+        }
         // 집필관리 카운터/진행률에 쓰이는 값. "지금부터 카운터" 초기화 기준점을 뺀 값을 반환한다.
         // (writerDailyData 자체의 글자수 기록은 그대로 유지되고, 여기서 보여지는 진행률만 초기화됨)
         function writerGetWorkTotal(storageKey) {
@@ -15349,9 +15362,7 @@
                 });
                 return sum;
             }
-            const pos = writerGetWorkPosition(storageKey);
-            const base = writeCounterBase[storageKey] || 0;
-            return Math.max(0, pos - base);
+            return writerSumDiffsForWork(storageKey, writeCounterResetDate[storageKey]);
         }
         // [NEW] "지금부터 카운터" 리셋 모달 — 기준 날짜를 고를 수 있게 함
         let writeCounterResetTargetKey = null;

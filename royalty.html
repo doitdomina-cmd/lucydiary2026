@@ -4652,6 +4652,12 @@
                     const item = {...w, _displayTitle: w.title, _refId: w.id, _isExtra: false};
                     publishMap[w.publishDate] = (publishMap[w.publishDate] || []).concat(item);
                     allItems.push(item);
+                } else if (w.isPending && /^\d{4}-\d{2}$/.test(w.pendingMonth || '')) {
+                    // 연/월까지만 정해진 출간예정 — 그 달 1일에 임의로 배치
+                    const fakeDate = `${w.pendingMonth}-01`;
+                    const item = {...w, publishDate: fakeDate, _displayTitle: w.title, _refId: w.id, _isExtra: false, _pendingMonthOnly: true};
+                    publishMap[fakeDate] = (publishMap[fakeDate] || []).concat(item);
+                    allItems.push(item);
                 }
                 (w.extras || []).forEach(ex => {
                     if (ex.publishDate) {
@@ -4708,13 +4714,14 @@
                         : (w.publisher && w.publisher !== '-' ? `[${w.publisher}]` : '');
                     const extraSuffix = w._isExtra ? ` [${w._extraName}]` : '';
                     const delAction = w._isExtra ? `deleteExtraFromCal('${w._parentWorkId}','${w._extraId}')` : `deletePublishWork('${w.id}')`;
+                    const dateLabel = w._pendingMonthOnly ? `${parseInt(w.publishDate.slice(5,7),10)}월 출간예정` : w.publishDate.slice(5);
                     return `<div class="flex items-start gap-2 p-2.5 bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-all group">
                         <div class="shrink-0 w-1 self-stretch rounded-full" style="background:${gc}"></div>
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center justify-between gap-1 mb-0.5">
                                 <span class="text-sm font-black" style="color:${dColor}">${dLabel}</span>
                                 <div class="flex items-center gap-1">
-                                    <span class="text-[10px] text-slate-500 font-semibold shrink-0">${w.publishDate.slice(5)}</span>
+                                    <span class="text-[12px] text-slate-500 font-semibold shrink-0">${dateLabel}</span>
                                     <button onclick="${delAction}" class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 text-[10px] transition-all ml-1" title="삭제"><i class="fa-solid fa-trash-can"></i></button>
                                 </div>
                             </div>
@@ -4761,6 +4768,8 @@
                     } else {
                         const w = masterWorks.find(x => x.id === dragId); if (!w) return;
                         w.publishDate = ds;
+                        // 월만 정해진 출간예정 카드를 실제 날짜로 끌어다 놓으면, 그 날짜로 확정한다
+                        if (w.isPending) { w.isPending = false; w.pendingMonth = ''; }
                         save(); updateUI(); renderPublishCal();
                     }
                 });
@@ -11976,11 +11985,11 @@
                         <div class="flex items-center justify-between gap-1 mb-0.5">
                             <span class="text-sm font-black" style="color:${dColor}">${dLabel}</span>
                             <div class="flex items-center gap-1">
-                                <span class="text-[10px] text-slate-500 font-semibold shrink-0">${t.date.slice(5)}</span>
+                                <span class="text-[12px] text-slate-500 font-semibold shrink-0">${t.date.slice(5)}</span>
                                 <button onclick="event.stopPropagation(); quickDeleteTask('${t.id}', '${t.date}')" class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 text-[10px] transition-all ml-1" title="삭제"><i class="fa-solid fa-trash-can"></i></button>
                             </div>
                         </div>
-                        <div class="font-bold text-slate-700 text-sm" style="white-space:normal; word-break:break-word;"><span style="color:${catColor}">[${t.category}]</span>${titlePart}</div>
+                        <div class="text-slate-700 text-[12px]" style="font-weight:600; white-space:normal; word-break:break-word;"><span style="color:${catColor}">[${t.category}]</span>${titlePart}</div>
                         ${t.memo ? `<div class="text-[10px] text-slate-400 mt-0.5" style="white-space:normal; word-break:break-word;">${t.memo}</div>` : ''}
                     </div>
                 </div>`;

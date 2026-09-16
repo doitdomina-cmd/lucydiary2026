@@ -1,5 +1,5 @@
-const CACHE_NAME = 'mobile-pwa-v1';
-const SHELL_FILES = ['./mobile.html', './mobile-manifest.json', './royalty-icon-256.png'];
+const CACHE_NAME = 'mobile-pwa-v2';
+const SHELL_FILES = ['./index.html', './manifest.json', './icon-256.png'];
 
 self.addEventListener('install', (e) => {
     e.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_FILES)));

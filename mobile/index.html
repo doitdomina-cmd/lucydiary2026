@@ -284,7 +284,12 @@ auth.onAuthStateChanged(user => {
     try {
       appData = JSON.parse(d.payload);
       lastAppliedSavedAt = sa;
-      renderAll();
+      if (!firstLoadDone) {
+        firstLoadDone = true;
+        switchMobileTab(currentTab);
+      } else {
+        renderAll();
+      }
     } catch(e) { console.error(e); }
   }, err => { console.error(err); showToast('불러오기 오류: ' + err.message); });
 });
@@ -319,6 +324,15 @@ function doSave() {
 let currentTab = 'publish'; // publish | task | write
 let calDate = new Date();
 let selectedDate = todayYMD();
+let firstLoadDone = false;
+
+// 홈 화면 위젯에서 특정 탭으로 바로 열도록 ?tab=publish|task|write 를 지원
+(function () {
+  try {
+    const t = new URLSearchParams(location.search).get('tab');
+    if (t === 'publish' || t === 'task' || t === 'write') currentTab = t;
+  } catch (e) {}
+})();
 
 function switchMobileTab(tab) {
   currentTab = tab;

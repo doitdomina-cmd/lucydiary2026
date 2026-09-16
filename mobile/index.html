@@ -52,18 +52,23 @@
   .cal-nav .navbtn { min-width: 32px; height: 32px; border-radius: 10px; border: none; background: #f1f5f9; color: #475569; font-size: 14px; white-space: nowrap; padding: 0 10px; }
   .cal-nav .ym { font-size: 16px; font-weight: 800; }
 
-  .cal-grid { padding: 0 10px; }
+  .cal-grid { padding: 0 8px; }
   .cal-dow { display: grid; grid-template-columns: repeat(7,1fr); text-align: center; font-size: 11px; font-weight: 700; color: #94a3b8; margin-bottom: 4px; }
-  .cal-days { display: grid; grid-template-columns: repeat(7,1fr); gap: 3px; }
+  .cal-days { display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; }
   .cal-cell {
-    aspect-ratio: 1; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
-    padding-top: 6px; font-size: 12px; color: #334155; background: #fff; position: relative; border: 1px solid transparent;
+    min-height: 74px; border-radius: 8px; display: flex; flex-direction: column; align-items: stretch;
+    padding: 3px 2px; font-size: 11px; color: #334155; background: #fff; position: relative; border: 1px solid transparent; overflow: hidden;
   }
+  .cal-cell .daynum { text-align: center; margin-bottom: 2px; }
   .cal-cell.faded { color: #cbd5e1; }
-  .cal-cell.today { border-color: var(--primary); font-weight: 800; color: var(--primary); }
-  .cal-cell.selected { background: var(--primary); color: #fff !important; }
-  .cal-cell .dots { display: flex; gap: 2px; margin-top: 3px; flex-wrap: wrap; justify-content: center; }
-  .cal-cell .dot { width: 5px; height: 5px; border-radius: 50%; }
+  .cal-cell.today .daynum { color: var(--primary); font-weight: 800; }
+  .cal-cell.selected { background: var(--primary-light); border-color: var(--primary); }
+  .cal-cell .chips { display: flex; flex-direction: column; gap: 1.5px; }
+  .cal-cell .chip {
+    font-size: 8.5px; line-height: 1.5; padding: 0 3px; border-radius: 4px; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; color: #fff; font-weight: 700;
+  }
+  .cal-cell .chip-more { font-size: 8px; color: #94a3b8; text-align: center; font-weight: 700; }
 
   .agenda-wrap { padding: 14px 16px 24px; }
   .agenda-date { font-size: 13px; font-weight: 700; color: #64748b; margin-bottom: 8px; }
@@ -371,14 +376,18 @@ function renderCalendar() {
   const prevLast = new Date(y, m, 0).getDate();
   const today = todayYMD();
   const cells = [];
+  const MAX_CHIPS = 3;
   const pushCell = (ds, dayNum, faded) => {
     const items = itemMap[ds] || [];
-    const dots = items.slice(0,4).map(it => `<span class="dot" style="background:${it.color}"></span>`).join('');
+    const visible = items.slice(0, MAX_CHIPS);
+    const extra = items.length - visible.length;
+    const chips = visible.map(it => `<div class="chip" style="background:${it.color}">${escapeHtml(it.title)}</div>`).join('')
+      + (extra > 0 ? `<div class="chip-more">+${extra}</div>` : '');
     const cls = ['cal-cell'];
     if (faded) cls.push('faded');
     if (ds === today) cls.push('today');
     if (ds === selectedDate) cls.push('selected');
-    cells.push(`<div class="${cls.join(' ')}" onclick="selectDate('${ds}')">${dayNum}<div class="dots">${dots}</div></div>`);
+    cells.push(`<div class="${cls.join(' ')}" onclick="selectDate('${ds}')"><div class="daynum">${dayNum}</div><div class="chips">${chips}</div></div>`);
   };
   for (let i=0;i<firstDow;i++) { const d = prevLast-firstDow+1+i; const pm = m-1<0?11:m-1, py = m-1<0?y-1:y; pushCell(`${py}-${String(pm+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`, d, true); }
   for (let d=1; d<=lastDate; d++) pushCell(`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`, d, false);

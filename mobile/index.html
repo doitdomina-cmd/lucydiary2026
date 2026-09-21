@@ -210,7 +210,7 @@ const TASK_COLORS = {
   "작교본 전달": "#3b82f6", "가필 전달": "#10b981", "심사고 전달": "#f59e0b",
   "표지 제안서 전달": "#ec4899", "분절본 전달": "#06b6d4", "웹툰 캐릭터 가이드 전달": "#14b8a6", "기타": "#64748b"
 };
-const WRITE_CATEGORY_COLORS = { "작교": "#e08a87", "시놉시스": "#6a9ba3", "기타": "#b89e78" };
+const WRITE_CATEGORY_COLORS = { "작교": "#e08a87", "시놉시스": "#6a9ba3", "기타": "#b89e78", "메모": "#d9a441" };
 
 function getGenreColor(name) {
   const g = (appData.genreList || []).find(x => x.name === name);
@@ -373,7 +373,7 @@ function itemsForTab(tab) {
       (list||[]).forEach(s => {
         const r = resolveWork(s.workId);
         const catPrefix = s.category ? `[${s.category}] ` : '';
-        push(d, { kind:'write', id: s.id, date: d, title: `${catPrefix}${r.title || '(작품 미지정)'}`, sub: s.category ? '' : `${(s.goal||0).toLocaleString()}자`, color: s.category ? (WRITE_CATEGORY_COLORS[s.category]||'#94a3b8') : (getGenreColor(r.genre)||'#94a3b8'), done: !!s.isCompleted, raw: s });
+        push(d, { kind:'write', id: s.id, date: d, title: `${catPrefix}${r.title || '(작품 미지정)'}`, sub: s.category === '메모' ? ((s.checklist||[]).length ? `${(s.checklist||[]).filter(c=>c.done).length}/${(s.checklist||[]).length} 완료 · ${(s.checklist||[]).map(c=>c.text).join(', ')}` : '') : s.category ? '' : `${(s.goal||0).toLocaleString()}자`, color: s.category ? (WRITE_CATEGORY_COLORS[s.category]||'#94a3b8') : (getGenreColor(r.genre)||'#94a3b8'), done: !!s.isCompleted, raw: s });
       });
     });
   }
@@ -449,7 +449,10 @@ function toggleDone(kind, id, date) {
     if (item) item.isCompleted = !item.isCompleted;
   } else if (kind === 'write') {
     const item = (appData.writeSchedules[date]||[]).find(x => x.id === id);
-    if (item) item.isCompleted = !item.isCompleted;
+    if (item) {
+      item.isCompleted = !item.isCompleted;
+      if (item.category === '메모' && item.checklist) item.checklist.forEach(c => { c.done = item.isCompleted; });
+    }
   }
   renderAgenda();
   scheduleSave();
@@ -539,7 +542,7 @@ function openEditSheet(kind, id, date) {
         </div>
         <div>
           <label>분류 (선택)</label>
-          <select id="f-wcategory"><option value="">일반</option>${Object.keys(WRITE_CATEGORY_COLORS).map(c=>`<option value="${c}" ${c===raw.category?'selected':''}>${c}</option>`).join('')}</select>
+          <select id="f-wcategory"><option value="">일반</option>${Object.keys(WRITE_CATEGORY_COLORS).filter(c=>c!=='메모'||raw.category==='메모').map(c=>`<option value="${c}" ${c===raw.category?'selected':''}>${c}</option>`).join('')}</select>
         </div>
       </div>
       <div class="checkrow"><input type="checkbox" id="f-done" ${raw.isCompleted?'checked':''}><span onclick="document.getElementById('f-done').click()">완료 처리</span></div>
@@ -578,12 +581,13 @@ function saveTaskItem(id, oldDate) {
 function saveWriteItem(id, oldDate) {
   const newDate = document.getElementById('f-date').value;
   const workId = document.getElementById('f-work').value;
-  const goal = parseInt(document.getElementById('f-goal').value) || 0;
   const category = document.getElementById('f-wcategory').value;
+  const goal = category ? 0 : (parseInt(document.getElementById('f-goal').value) || 0);
   const isCompleted = document.getElementById('f-done').checked;
   if (!newDate) { alert('날짜를 입력해주세요.'); return; }
   if (!appData.writeSchedules) appData.writeSchedules = {};
 
+  const prev = id ? (appData.writeSchedules[oldDate]||[]).find(x=>x.id===id) : null;
   if (id) {
     appData.writeSchedules[oldDate] = (appData.writeSchedules[oldDate]||[]).filter(x=>x.id!==id);
     if (appData.writeSchedules[oldDate].length===0) delete appData.writeSchedules[oldDate];
@@ -591,7 +595,8 @@ function saveWriteItem(id, oldDate) {
     id = 'ws_' + Date.now() + Math.floor(Math.random()*1000);
   }
   if (!appData.writeSchedules[newDate]) appData.writeSchedules[newDate] = [];
-  appData.writeSchedules[newDate].push({ id, date: newDate, workId, goal, category, memo:'', isCompleted, volumeId:'' });
+  // 기존 카드의 메모/권/체크리스트 등 이 화면에서 안 다루는 필드는 그대로 보존한다
+  appData.writeSchedules[newDate].push(Object.assign({ memo:'', volumeId:'' }, prev || {}, { id, date: newDate, workId, goal, category, isCompleted }));
 
   selectedDate = newDate;
   closeSheet(); renderAll(); scheduleSave(); showToast('저장했어요');

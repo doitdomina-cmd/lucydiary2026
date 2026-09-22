@@ -7106,9 +7106,9 @@
             const items = [];
             masterWorks.forEach(w => {
                 if (!includeWebtoon && w.genre.includes('웹툰')) return;
-                if (w.workDone && !includePast) return;   // 수동으로 '작업 완료' 표시한 작품 — 출간일 전이어도 숨김
                 const mainPast = !w.isPending && w.publishDate && w.publishDate < today;
-                if (!mainPast || includePast) {
+                const mainDone = !!w.workDone;   // 수동으로 '작업 완료' 표시 — 출간일 전이어도 숨김
+                if (includePast || (!mainDone && !mainPast)) {
                     items.push({
                         id: w.id, displayTitle: w.title + (mainPast ? ' (출간됨)' : ''), genre: w.genre,
                         manuscriptDate: w.manuscriptDate, publishDate: w.publishDate,
@@ -7118,7 +7118,8 @@
                 }
                 (w.extras || []).forEach(ex => {
                     const exPast = ex.publishDate && ex.publishDate < today;
-                    if (!exPast || includePast) {
+                    const exDone = !!ex.workDone;
+                    if (includePast || (!exDone && !exPast)) {
                         items.push({
                             id: w.id + '::' + ex.id,
                             displayTitle: `${w.title} [${ex.name}]` + (exPast ? ' (출간됨)' : ''),
@@ -15574,12 +15575,6 @@
         function renderWorkDoneList() {
             const list = document.getElementById('work-done-list');
             const today = getYYYYMMDD(new Date());
-            // 웹툰 제외, 이미 출간일 지난 작품 제외 (그런 작품은 이미 목록에서 자동으로 빠지므로 여기서 굳이 켜고 끌 필요가 없음)
-            const filtered = masterWorks.filter(w => {
-                if (w.genre.includes('웹툰')) return false;
-                const mainPast = !w.isPending && w.publishDate && w.publishDate < today;
-                return !mainPast;
-            });
             const genrePriority = (g) => {
                 if (g === 'BL 장편') return 0;
                 if (g === '현로 장편') return 1;
@@ -15589,23 +15584,41 @@
                 if (g.includes('초단')) return 2.5;
                 return 99;
             };
-            const sorted = filtered.sort((a, b) => {
+            // 웹툰 제외, 이미 출간일 지난 작품(본편/외전 각각) 제외 — 그런 항목은 이미 목록에서 자동으로 빠지니 여기서 켜고 끌 필요가 없음
+            // 외전도 본편과 별개로 집필/스케줄 작품 목록에 뜨므로, 여기서도 각각 따로 줄을 만든다
+            const rows = [];
+            masterWorks.forEach(w => {
+                if (w.genre.includes('웹툰')) return;
+                const mainPast = !w.isPending && w.publishDate && w.publishDate < today;
+                if (!mainPast) rows.push({ workId: w.id, extraId: null, title: w.title, genre: w.genre, done: !!w.workDone });
+                (w.extras || []).forEach(ex => {
+                    const exPast = ex.publishDate && ex.publishDate < today;
+                    if (!exPast) rows.push({ workId: w.id, extraId: ex.id, title: `${w.title} [${ex.name}]`, genre: w.genre, done: !!ex.workDone });
+                });
+            });
+            rows.sort((a, b) => {
                 const p = genrePriority(a.genre) - genrePriority(b.genre);
                 if (p !== 0) return p;
                 return a.title.localeCompare(b.title, 'ko');
             });
-            list.innerHTML = sorted.map(w => `
+            list.innerHTML = rows.map(r => `
                 <tr>
-                    <td class="px-4 py-2 text-slate-600">[${w.genre}] ${w.title}</td>
+                    <td class="px-4 py-2 text-slate-600">[${r.genre}] ${escapeHtml(r.title)}</td>
                     <td class="px-4 py-2 text-center">
-                        <input type="checkbox" ${w.workDone ? 'checked' : ''} onchange="toggleWorkDone('${w.id}', this.checked)" class="w-5 h-5 accent-emerald-500 cursor-pointer">
+                        <input type="checkbox" ${r.done ? 'checked' : ''} onchange="toggleWorkDone('${r.workId}', ${r.extraId ? `'${r.extraId}'` : 'null'}, this.checked)" class="w-5 h-5 accent-emerald-500 cursor-pointer">
                     </td>
                 </tr>`).join('');
         }
-        function toggleWorkDone(workId, done) {
+        function toggleWorkDone(workId, extraId, done) {
             const w = masterWorks.find(x => x.id === workId);
             if (!w) return;
-            w.workDone = done;
+            if (extraId) {
+                const ex = (w.extras || []).find(x => x.id === extraId);
+                if (!ex) return;
+                ex.workDone = done;
+            } else {
+                w.workDone = done;
+            }
             save();
             // 지금 열려있는 집필/스케줄 모달의 작품 목록도 바로 갱신
             if (typeof renderWriteModalWorkSelect === 'function') { try { renderWriteModalWorkSelect(); } catch(e) {} }

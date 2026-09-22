@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>일정 매니저</title>
+<meta name="theme-color" content="#87ada1">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-256.png">
+<link rel="icon" href="icon-256.png">
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<style>
+  :root { --primary: #87ada1; --primary-light: #eef6f3; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: #f7f8fa; color: #1e293b;
+    font-family: 'Pretendard','Apple SD Gothic Neo',sans-serif;
+    padding-bottom: calc(64px + env(safe-area-inset-bottom));
+    padding-top: env(safe-area-inset-top);
+  }
+  .hidden { display: none !important; }
+
+  /* 로그인 오버레이 */
+  #loginOverlay {
+    position: fixed; inset: 0; z-index: 999; background: #fff;
+    display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; padding: 24px; text-align: center;
+  }
+  #loginOverlay .logo { font-size: 40px; }
+  #loginOverlay h1 { font-size: 20px; font-weight: 800; margin: 0; }
+  #loginOverlay p { color: #94a3b8; font-size: 13px; margin: 0; }
+  #loginBtn {
+    border: 1px solid #e2e8f0; background: #fff; border-radius: 12px; padding: 14px 20px;
+    font-size: 15px; font-weight: 700; width: 100%; max-width: 320px; cursor: pointer;
+  }
+
+  /* 상단 바 */
+  .topbar {
+    position: sticky; top: 0; z-index: 20; background: #fff; border-bottom: 1px solid #eef0f3;
+    padding: 12px 16px calc(10px + env(safe-area-inset-top)); padding-top: calc(12px + env(safe-area-inset-top));
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .topbar h2 { margin: 0; font-size: 17px; font-weight: 800; }
+  .topbar .userchip { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #94a3b8; }
+  .topbar .userchip img { width: 22px; height: 22px; border-radius: 50%; }
+
+  .cal-nav { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; }
+  .cal-nav .navbtn { min-width: 32px; height: 32px; border-radius: 10px; border: none; background: #f1f5f9; color: #475569; font-size: 14px; white-space: nowrap; padding: 0 10px; }
+  .cal-nav .ym { font-size: 16px; font-weight: 800; }
+
+  .cal-grid { padding: 0 8px; }
+  .cal-dow { display: grid; grid-template-columns: repeat(7,1fr); text-align: center; font-size: 11px; font-weight: 700; color: #94a3b8; margin-bottom: 4px; }
+  .cal-days { display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; }
+  .cal-cell {
+    min-height: 74px; border-radius: 8px; display: flex; flex-direction: column; align-items: stretch;
+    padding: 3px 2px; font-size: 11px; color: #334155; background: #fff; position: relative; border: 1px solid transparent; overflow: hidden;
+  }
+  .cal-cell .daynum { text-align: center; margin-bottom: 2px; }
+  .cal-cell.faded { color: #cbd5e1; }
+  .cal-cell.today { border-color: #ec4899; border-width: 2px; }
+  .cal-cell.today .daynum { color: #ec4899; font-weight: 800; }
+  .cal-cell.selected { background: var(--primary-light); border-color: var(--primary); }
+  .cal-cell.today.selected { border-color: #ec4899; }
+  .cal-cell .chips { display: flex; flex-direction: column; gap: 1.5px; }
+  .cal-cell .chip {
+    font-size: 8.5px; line-height: 1.5; padding: 0 3px; border-radius: 4px; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; color: #fff; font-weight: 700;
+  }
+  .cal-cell .chip-more { font-size: 8px; color: #94a3b8; text-align: center; font-weight: 700; }
+
+  .agenda-wrap { padding: 14px 16px 24px; }
+  .agenda-date { font-size: 13px; font-weight: 700; color: #64748b; margin-bottom: 8px; }
+  .agenda-item {
+    display: flex; align-items: flex-start; gap: 10px; background: #fff; border: 1px solid #eef0f3; border-radius: 14px;
+    padding: 12px; margin-bottom: 8px;
+  }
+  .agenda-item .bar { width: 4px; align-self: stretch; border-radius: 4px; flex-shrink: 0; }
+  .agenda-item .body { flex: 1; min-width: 0; }
+  .agenda-item .title { font-size: 14px; font-weight: 700; word-break: break-word; }
+  .agenda-item .sub { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+  .agenda-item .chk { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #cbd5e1; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: transparent; }
+  .agenda-item.done { opacity: .5; }
+  .agenda-item.done .chk { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .agenda-item .del { color: #cbd5e1; font-size: 13px; padding: 4px; flex-shrink: 0; }
+  .agenda-empty { text-align: center; color: #cbd5e1; font-size: 12px; padding: 20px 0; }
+
+  .fab {
+    position: fixed; right: 20px; bottom: calc(80px + env(safe-area-inset-bottom)); z-index: 30;
+    width: 52px; height: 52px; border-radius: 50%; background: var(--primary); color: #fff; border: none;
+    font-size: 20px; box-shadow: 0 6px 16px rgba(0,0,0,.18);
+  }
+
+  /* 하단 탭 */
+  .bottomnav {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: #fff; border-top: 1px solid #eef0f3;
+    display: flex; padding-bottom: env(safe-area-inset-bottom);
+  }
+  .bottomnav button {
+    flex: 1; border: none; background: transparent; padding: 9px 0 8px; display: flex; flex-direction: column; align-items: center; gap: 3px;
+    color: #94a3b8; font-size: 10px; font-weight: 700;
+  }
+  .bottomnav button i { font-size: 17px; }
+  .bottomnav button.active { color: var(--primary); }
+
+  /* 바텀시트 모달 */
+  .sheet-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 90; display: none; }
+  .sheet-overlay.open { display: block; }
+  .sheet {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 91; background: #fff; border-radius: 20px 20px 0 0;
+    padding: 18px 18px calc(18px + env(safe-area-inset-bottom)); max-height: 85vh; overflow-y: auto;
+    transform: translateY(100%); transition: transform .25s ease;
+  }
+  .sheet-overlay.open .sheet { transform: translateY(0); }
+  .sheet h3 { margin: 0 0 14px; font-size: 16px; font-weight: 800; }
+  .sheet label { display: block; font-size: 12px; font-weight: 700; color: #64748b; margin: 12px 0 5px; }
+  .sheet label:first-of-type { margin-top: 0; }
+  .sheet input[type=text], .sheet input[type=number], .sheet input[type=date], .sheet input[type=month], .sheet select, .sheet textarea {
+    width: 100%; padding: 11px 12px; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 14px; background: #f8fafc; font-family: inherit;
+  }
+  .sheet textarea { min-height: 60px; resize: vertical; }
+  .sheet .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .sheet .actions { display: flex; gap: 8px; margin-top: 18px; }
+  .sheet .actions button { flex: 1; padding: 13px; border-radius: 12px; border: none; font-weight: 800; font-size: 14px; }
+  .sheet .btn-cancel { background: #f1f5f9; color: #64748b; }
+  .sheet .btn-save { background: var(--primary); color: #fff; }
+  .sheet .btn-delete { background: #fef2f2; color: #ef4444; flex: none; width: 46px; }
+  .sheet .checkrow { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+  .sheet .checkrow input { width: 18px; height: 18px; }
+  .sheet .checkrow span { font-size: 13px; font-weight: 700; color: #475569; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: calc(90px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+    background: #1e293b; color: #fff; padding: 9px 16px; border-radius: 100px; font-size: 12px; z-index: 200; opacity: 0; transition: opacity .2s; pointer-events: none;
+  }
+  .toast.show { opacity: .95; }
+</style>
+</head>
+<body>
+
+<div id="loginOverlay">
+  <div class="logo">📚</div>
+  <h1>일정 매니저</h1>
+  <p>정산 매니저와 같은 구글 계정으로 로그인하면<br>출간·스케줄·집필 일정을 바로 보고 수정할 수 있어요.</p>
+  <button id="loginBtn"><i class="fa-brands fa-google" style="margin-right:6px;color:#ea4335;"></i>구글로 로그인</button>
+</div>
+
+<div class="topbar">
+  <h2 id="tabTitle">출간 일정</h2>
+  <div class="userchip" id="userChip"></div>
+</div>
+
+<div class="cal-nav">
+  <button class="navbtn" onclick="changeMonth(-1)"><i class="fa-solid fa-chevron-left"></i></button>
+  <div class="ym" id="calYm"></div>
+  <div style="display:flex; gap:6px;">
+    <button class="navbtn" onclick="changeMonth(0)">오늘</button>
+    <button class="navbtn" onclick="changeMonth(1)"><i class="fa-solid fa-chevron-right"></i></button>
+  </div>
+</div>
+
+<div class="cal-grid">
+  <div class="cal-dow">
+    <span style="color:#f43f5e">일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span style="color:#3b82f6">토</span>
+  </div>
+  <div class="cal-days" id="calDays"></div>
+</div>
+
+<div class="agenda-wrap">
+  <div class="agenda-date" id="agendaDate"></div>
+  <div id="agendaList"></div>
+</div>
+
+<button class="fab" onclick="openEditSheet(null)"><i class="fa-solid fa-plus"></i></button>
+
+<div class="bottomnav">
+  <button id="navBtn-publish" onclick="switchMobileTab('publish')"><i class="fa-solid fa-book"></i>출간 일정</button>
+  <button id="navBtn-task" onclick="switchMobileTab('task')"><i class="fa-solid fa-list-check"></i>스케줄</button>
+  <button id="navBtn-write" onclick="switchMobileTab('write')"><i class="fa-solid fa-keyboard"></i>집필</button>
+</div>
+
+<div class="sheet-overlay" id="sheetOverlay" onclick="if(event.target===this) closeSheet()">
+  <div class="sheet" id="sheetBody"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════════════
+// Firebase (index.html의 웹 버전과 완전히 동일한 프로젝트/문서를 사용)
+// ════════════════════════════════════════════════════════
+const firebaseConfig = {
+  apiKey: "AIzaSyCYWsMUSAaxnnTNoNjxw8YfZThv9-5mHak",
+  authDomain: "writer-routine.firebaseapp.com",
+  projectId: "writer-routine"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+let cloudDocRef = null;
+let appData = null;       // 파이어스토어 payload를 그대로 파싱한 전체 데이터
+let currentUser = null;
+
+const DEFAULT_COLORS = { 'BL 장편': '#94B4C1', '현로 장편': '#F5D2D2', '현로 초단': '#F6F0D7', 'BL 초단': '#DCE4C9', '웹툰': '#DDAED3', '로판 장편': '#fbbf24' };
+const TASK_COLORS = {
+  "완고 입고": "#ef4444", "서지 정보 전달": "#f97316", "시놉시스 짜기": "#8b5cf6",
+  "작교본 전달": "#3b82f6", "가필 전달": "#10b981", "심사고 전달": "#f59e0b",
+  "표지 제안서 전달": "#ec4899", "분절본 전달": "#06b6d4", "웹툰 캐릭터 가이드 전달": "#14b8a6", "기타": "#64748b"
+};
+const WRITE_CATEGORY_COLORS = { "작교": "#e08a87", "시놉시스": "#6a9ba3", "기타": "#b89e78", "메모": "#d9a441" };
+
+function getGenreColor(name) {
+  const g = (appData.genreList || []).find(x => x.name === name);
+  return (g && g.color) || DEFAULT_COLORS[name] || '#94a3b8';
+}
+function toYMD(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function todayYMD() { return toYMD(new Date()); }
+function resolveWork(workId) {
+  if (!workId) return { work: null, extra: null, title: '', genre: '' };
+  if (workId.includes('::')) {
+    const [wId, exId] = workId.split('::');
+    const w = (appData.masterWorks||[]).find(x => x.id === wId);
+    const ex = w?.extras?.find(e => e.id === exId);
+    return { work: w, extra: ex, title: w && ex ? `${w.title} [${ex.name}]` : '', genre: w?.genre || '' };
+  }
+  const w = (appData.masterWorks||[]).find(x => x.id === workId);
+  return { work: w, extra: null, title: w?.title || '', genre: w?.genre || '' };
+}
+function activeWorkOptions(includeWebtoon) {
+  const today = todayYMD();
+  const items = [];
+  (appData.masterWorks||[]).forEach(w => {
+    if (!includeWebtoon && w.genre && w.genre.includes('웹툰')) return;
+    const mainPast = !w.isPending && w.publishDate && w.publishDate < today;
+    if (!mainPast) items.push({ id: w.id, label: `[${w.genre}] ${w.title}` });
+    (w.extras||[]).forEach(ex => {
+      const exPast = ex.publishDate && ex.publishDate < today;
+      if (!exPast) items.push({ id: `${w.id}::${ex.id}`, label: `[${w.genre}] ${w.title} [${ex.name}]` });
+    });
+  });
+  return items;
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 1600);
+}
+
+// ── 로그인 ──
+document.getElementById('loginBtn').onclick = () => {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
+  auth.signInWithPopup(provider).catch(e => {
+    if (e && (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment' || e.code === 'auth/cancelled-popup-request')) {
+      auth.signInWithRedirect(provider);
+    } else {
+      alert('로그인 오류: ' + e.message);
+    }
+  });
+};
+auth.getRedirectResult().catch(()=>{});
+
+let unsubscribeSnapshot = null;
+let lastAppliedSavedAt = 0;
+
+auth.onAuthStateChanged(user => {
+  if (!user) return;
+  currentUser = user;
+  document.getElementById('loginOverlay').classList.add('hidden');
+  document.getElementById('userChip').innerHTML = `<img src="${user.photoURL||''}" onerror="this.style.display='none'">${(user.displayName||user.email||'').split(' ')[0]}`;
+  cloudDocRef = db.collection('users').doc(user.uid).collection('appdata').doc('royalty');
+
+  if (unsubscribeSnapshot) unsubscribeSnapshot();
+  unsubscribeSnapshot = cloudDocRef.onSnapshot(snap => {
+    if (!snap.exists) { showToast('클라우드에 데이터가 없어요. 데스크탑 앱을 먼저 한 번 실행해주세요.'); return; }
+    const d = snap.data();
+    if (!d || !d.payload) return;
+    const sa = Number(d._savedAt) || 0;
+    if (sa <= lastAppliedSavedAt && appData) return; // 우리가 방금 쓴 변경이거나 이미 반영됨
+    try {
+      appData = JSON.parse(d.payload);
+      lastAppliedSavedAt = sa;
+      if (!firstLoadDone) {
+        firstLoadDone = true;
+        switchMobileTab(currentTab);
+      } else {
+        renderAll();
+      }
+    } catch(e) { console.error(e); }
+  }, err => { console.error(err); showToast('불러오기 오류: ' + err.message); });
+});
+
+// ── 저장 (전체 payload를 다시 씀 — 데스크탑 cloudPayload()와 동일한 필드 제외 규칙) ──
+let saveTimer = null;
+function scheduleSave() {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(doSave, 400);
+}
+function doSave() {
+  if (!cloudDocRef || !appData) return;
+  const clone = Object.assign({}, appData);
+  if (Array.isArray(clone.masterWorks)) {
+    clone.masterWorks = clone.masterWorks.map(w => {
+      const c = Object.assign({}, w);
+      delete c.coverImage; delete c.contractFile; delete c.memo;
+      return c;
+    });
+  }
+  delete clone.webtoonSubs; delete clone.webtoonSubOrder;
+  const payload = JSON.stringify(clone);
+  const savedAt = Date.now();
+  cloudDocRef.set({ payload, _savedAt: savedAt }, { merge: true })
+    .then(() => { lastAppliedSavedAt = savedAt; })
+    .catch(e => { console.error(e); showToast('저장 실패: ' + e.message); });
+}
+
+// ════════════════════════════════════════════════════════
+// 탭 / 달력 상태
+// ════════════════════════════════════════════════════════
+let currentTab = 'publish'; // publish | task | write
+let calDate = new Date();
+let selectedDate = todayYMD();
+let firstLoadDone = false;
+
+// 홈 화면 위젯에서 특정 탭으로 바로 열도록 ?tab=publish|task|write 를 지원
+(function () {
+  try {
+    const t = new URLSearchParams(location.search).get('tab');
+    if (t === 'publish' || t === 'task' || t === 'write') currentTab = t;
+  } catch (e) {}
+})();
+
+function switchMobileTab(tab) {
+  currentTab = tab;
+  ['publish','task','write'].forEach(t => document.getElementById('navBtn-'+t).classList.toggle('active', t===tab));
+  document.getElementById('tabTitle').textContent = tab === 'publish' ? '출간 일정' : tab === 'task' ? '스케줄' : '집필 일정';
+  renderAll();
+}
+function changeMonth(delta) {
+  if (delta === 0) { calDate = new Date(); selectedDate = todayYMD(); }
+  else calDate.setMonth(calDate.getMonth() + delta);
+  renderAll();
+}
+
+// 탭별로 "그 날짜에 표시할 항목들"을 돌려준다 (달력 점 표시 + 아젠다 목록 공용)
+function itemsForTab(tab) {
+  if (!appData) return {};
+  const map = {}; // dateStr -> [{...}]
+  const push = (d, item) => { if (!map[d]) map[d] = []; map[d].push(item); };
+
+  if (tab === 'publish') {
+    (appData.masterWorks||[]).forEach(w => {
+      if (!w.isPending && w.publishDate) {
+        push(w.publishDate, { kind:'publish', id: w.id, title: w.title, genre: w.genre, color: getGenreColor(w.genre), done: false, isExtra:false });
+      }
+      (w.extras||[]).forEach(ex => {
+        if (ex.publishDate) push(ex.publishDate, { kind:'publish', id: w.id+'::'+ex.id, parentId: w.id, extraId: ex.id, title: `${w.title} [${ex.name}]`, genre: w.genre, color: getGenreColor(w.genre), done:false, isExtra:true });
+      });
+    });
+  } else if (tab === 'task') {
+    Object.entries(appData.taskSchedules||{}).forEach(([d, list]) => {
+      (list||[]).forEach(t => {
+        const r = resolveWork(t.workId);
+        push(d, { kind:'task', id: t.id, date: d, title: `[${t.category}]${r.title ? ' '+r.title : ''}`, sub: t.memo||'', color: TASK_COLORS[t.category]||'#64748b', done: !!t.isCompleted, raw: t });
+      });
+    });
+  } else if (tab === 'write') {
+    Object.entries(appData.writeSchedules||{}).forEach(([d, list]) => {
+      (list||[]).forEach(s => {
+        const r = resolveWork(s.workId);
+        const catPrefix = s.category ? `[${s.category}] ` : '';
+        push(d, { kind:'write', id: s.id, date: d, title: `${catPrefix}${r.title || '(작품 미지정)'}`, sub: s.category === '메모' ? ((s.checklist||[]).length ? `${(s.checklist||[]).filter(c=>c.done).length}/${(s.checklist||[]).length} 완료 · ${(s.checklist||[]).map(c=>c.text).join(', ')}` : '') : s.category ? '' : `${(s.goal||0).toLocaleString()}자`, color: s.category ? (WRITE_CATEGORY_COLORS[s.category]||'#94a3b8') : (getGenreColor(r.genre)||'#94a3b8'), done: !!s.isCompleted, raw: s });
+      });
+    });
+  }
+  return map;
+}
+
+function renderAll() {
+  if (!appData) return;
+  renderCalendar();
+  renderAgenda();
+}
+
+function renderCalendar() {
+  const y = calDate.getFullYear(), m = calDate.getMonth();
+  document.getElementById('calYm').textContent = `${y}년 ${m+1}월`;
+  const itemMap = itemsForTab(currentTab);
+  const firstDow = new Date(y, m, 1).getDay();
+  const lastDate = new Date(y, m+1, 0).getDate();
+  const prevLast = new Date(y, m, 0).getDate();
+  const today = todayYMD();
+  const cells = [];
+  const MAX_CHIPS = 3;
+  const pushCell = (ds, dayNum, faded) => {
+    const items = itemMap[ds] || [];
+    const visible = items.slice(0, MAX_CHIPS);
+    const extra = items.length - visible.length;
+    const chips = visible.map(it => `<div class="chip" style="background:${it.color}">${escapeHtml(it.title)}</div>`).join('')
+      + (extra > 0 ? `<div class="chip-more">+${extra}</div>` : '');
+    const cls = ['cal-cell'];
+    if (faded) cls.push('faded');
+    if (ds === today) cls.push('today');
+    if (ds === selectedDate) cls.push('selected');
+    cells.push(`<div class="${cls.join(' ')}" onclick="selectDate('${ds}')"><div class="daynum">${dayNum}</div><div class="chips">${chips}</div></div>`);
+  };
+  for (let i=0;i<firstDow;i++) { const d = prevLast-firstDow+1+i; const pm = m-1<0?11:m-1, py = m-1<0?y-1:y; pushCell(`${py}-${String(pm+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`, d, true); }
+  for (let d=1; d<=lastDate; d++) pushCell(`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`, d, false);
+  const nextDays = (7 - (firstDow+lastDate)%7)%7;
+  for (let d=1; d<=nextDays; d++) { const nm = m+1>11?0:m+1, ny = m+1>11?y+1:y; pushCell(`${ny}-${String(nm+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`, d, true); }
+  document.getElementById('calDays').innerHTML = cells.join('');
+}
+
+function selectDate(ds) {
+  selectedDate = ds;
+  const [y,m] = ds.split('-').map(Number);
+  if (y !== calDate.getFullYear() || m-1 !== calDate.getMonth()) calDate = new Date(y, m-1, 1);
+  renderAll();
+}
+
+function renderAgenda() {
+  const itemMap = itemsForTab(currentTab);
+  const items = itemMap[selectedDate] || [];
+  const d = new Date(selectedDate + 'T00:00:00');
+  document.getElementById('agendaDate').textContent = `${d.getMonth()+1}월 ${d.getDate()}일 (${'일월화수목금토'[d.getDay()]}) · ${items.length}건`;
+  const list = document.getElementById('agendaList');
+  if (items.length === 0) { list.innerHTML = `<div class="agenda-empty">이 날은 일정이 없어요</div>`; return; }
+  list.innerHTML = items.map(it => {
+    const clickable = it.kind !== 'publish';
+    return `<div class="agenda-item ${it.done?'done':''}" ${clickable?`onclick="openEditSheet('${it.kind}','${it.id}','${selectedDate}')"`:`onclick="openPublishEditSheet('${it.id}')"`}>
+      <div class="bar" style="background:${it.color}"></div>
+      <div class="chk" ${it.kind!=='publish'?`onclick="event.stopPropagation(); toggleDone('${it.kind}','${it.id}','${selectedDate}')"`:''}>${it.done?'<i class="fa-solid fa-check" style="font-size:11px;"></i>':''}</div>
+      <div class="body">
+        <div class="title">${escapeHtml(it.title)}</div>
+        ${it.sub ? `<div class="sub">${escapeHtml(it.sub)}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+function escapeHtml(s) { return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function toggleDone(kind, id, date) {
+  if (kind === 'task') {
+    const item = (appData.taskSchedules[date]||[]).find(x => x.id === id);
+    if (item) item.isCompleted = !item.isCompleted;
+  } else if (kind === 'write') {
+    const item = (appData.writeSchedules[date]||[]).find(x => x.id === id);
+    if (item) {
+      item.isCompleted = !item.isCompleted;
+      if (item.category === '메모' && item.checklist) item.checklist.forEach(c => { c.done = item.isCompleted; });
+    }
+  }
+  renderAgenda();
+  scheduleSave();
+}
+
+// ════════════════════════════════════════════════════════
+// 편집 바텀시트
+// ════════════════════════════════════════════════════════
+function openSheet(html) {
+  document.getElementById('sheetBody').innerHTML = html;
+  document.getElementById('sheetOverlay').classList.add('open');
+}
+function closeSheet() { document.getElementById('sheetOverlay').classList.remove('open'); }
+
+// 출간 일정: 날짜만 바꾸거나 출간예정↔확정 전환 (신규 작품 등록은 데스크탑에서)
+function openPublishEditSheet(refId) {
+  let w, ex = null;
+  if (refId.includes('::')) { const [wId, exId] = refId.split('::'); w = (appData.masterWorks||[]).find(x=>x.id===wId); ex = w?.extras?.find(e=>e.id===exId); }
+  else w = (appData.masterWorks||[]).find(x=>x.id===refId);
+  if (!w) return;
+  const target = ex || w;
+  const title = ex ? `${w.title} [${ex.name}]` : w.title;
+  openSheet(`
+    <h3>${escapeHtml(title)}</h3>
+    <label>출간일</label>
+    <input type="date" id="f-pub-date" value="${target.publishDate||''}">
+    <p style="font-size:11px;color:#94a3b8;margin:10px 0 0;">신규 작품 등록이나 그 외 정보 수정은 데스크탑 앱에서 해주세요.</p>
+    <div class="actions">
+      <button class="btn-cancel" onclick="closeSheet()">취소</button>
+      <button class="btn-save" onclick="savePublishDate('${w.id}', ${ex ? `'${ex.id}'` : 'null'})">저장</button>
+    </div>
+  `);
+}
+function savePublishDate(workId, extraId) {
+  const val = document.getElementById('f-pub-date').value;
+  if (!val) { alert('날짜를 선택해주세요.'); return; }
+  const w = (appData.masterWorks||[]).find(x=>x.id===workId);
+  if (!w) return;
+  if (extraId) { const ex = w.extras.find(e=>e.id===extraId); if (ex) ex.publishDate = val; }
+  else { w.publishDate = val; w.isPending = false; }
+  closeSheet(); renderAll(); scheduleSave(); showToast('저장했어요');
+}
+
+// 스케줄/집필 추가·수정
+function openEditSheet(kind, id, date) {
+  if (!kind) kind = currentTab === 'publish' ? null : currentTab; // + 버튼: 현재 탭 기준
+  if (!kind || kind === 'publish') { showToast('출간 일정은 캘린더에서 작품을 눌러 날짜만 바꿀 수 있어요'); return; }
+  const isNew = !id;
+  const d = date || selectedDate;
+  const workOptions = activeWorkOptions(false);
+
+  if (kind === 'task') {
+    const raw = isNew ? { category: Object.keys(TASK_COLORS)[0], workId: '', memo: '', isCompleted: false } :
+      (appData.taskSchedules[d]||[]).find(x=>x.id===id);
+    if (!raw) return;
+    openSheet(`
+      <h3>${isNew?'스케줄 추가':'스케줄 수정'}</h3>
+      <label>날짜</label>
+      <input type="date" id="f-date" value="${d}">
+      <label>분류</label>
+      <select id="f-category">${Object.keys(TASK_COLORS).map(c=>`<option value="${c}" ${c===raw.category?'selected':''}>${c}</option>`).join('')}</select>
+      <label>작품 (선택)</label>
+      <select id="f-work"><option value="">작품 미지정</option>${workOptions.map(o=>`<option value="${o.id}" ${o.id===raw.workId?'selected':''}>${escapeHtml(o.label)}</option>`).join('')}</select>
+      <label>메모</label>
+      <textarea id="f-memo">${escapeHtml(raw.memo||'')}</textarea>
+      <div class="checkrow"><input type="checkbox" id="f-done" ${raw.isCompleted?'checked':''}><span onclick="document.getElementById('f-done').click()">완료 처리</span></div>
+      <div class="actions">
+        ${isNew?'':'<button class="btn-delete" onclick="deleteItem(\'task\',\''+id+'\',\''+d+'\')"><i class="fa-solid fa-trash-can"></i></button>'}
+        <button class="btn-cancel" onclick="closeSheet()">취소</button>
+        <button class="btn-save" onclick="saveTaskItem(${isNew?'null':`'${id}'`}, '${d}')">저장</button>
+      </div>
+    `);
+  } else if (kind === 'write') {
+    const raw = isNew ? { workId: '', goal: 5000, category: '', isCompleted: false } :
+      (appData.writeSchedules[d]||[]).find(x=>x.id===id);
+    if (!raw) return;
+    openSheet(`
+      <h3>${isNew?'집필 카드 추가':'집필 카드 수정'}</h3>
+      <label>날짜</label>
+      <input type="date" id="f-date" value="${d}">
+      <label>작품</label>
+      <select id="f-work"><option value="">작품 미지정</option>${workOptions.map(o=>`<option value="${o.id}" ${o.id===raw.workId?'selected':''}>${escapeHtml(o.label)}</option>`).join('')}</select>
+      <div class="row2">
+        <div>
+          <label>글자수</label>
+          <input type="number" id="f-goal" value="${raw.goal||''}" placeholder="5000">
+        </div>
+        <div>
+          <label>분류 (선택)</label>
+          <select id="f-wcategory"><option value="">일반</option>${Object.keys(WRITE_CATEGORY_COLORS).filter(c=>c!=='메모'||raw.category==='메모').map(c=>`<option value="${c}" ${c===raw.category?'selected':''}>${c}</option>`).join('')}</select>
+        </div>
+      </div>
+      <div class="checkrow"><input type="checkbox" id="f-done" ${raw.isCompleted?'checked':''}><span onclick="document.getElementById('f-done').click()">완료 처리</span></div>
+      <div class="actions">
+        ${isNew?'':'<button class="btn-delete" onclick="deleteItem(\'write\',\''+id+'\',\''+d+'\')"><i class="fa-solid fa-trash-can"></i></button>'}
+        <button class="btn-cancel" onclick="closeSheet()">취소</button>
+        <button class="btn-save" onclick="saveWriteItem(${isNew?'null':`'${id}'`}, '${d}')">저장</button>
+      </div>
+    `);
+  }
+}
+
+function saveTaskItem(id, oldDate) {
+  const newDate = document.getElementById('f-date').value;
+  const category = document.getElementById('f-category').value;
+  const workId = document.getElementById('f-work').value;
+  const memo = document.getElementById('f-memo').value;
+  const isCompleted = document.getElementById('f-done').checked;
+  if (!newDate) { alert('날짜를 입력해주세요.'); return; }
+  if (!appData.taskSchedules) appData.taskSchedules = {};
+
+  if (id) {
+    // 기존 항목 제거 후 (날짜가 바뀌었을 수 있으니) 다시 삽입
+    appData.taskSchedules[oldDate] = (appData.taskSchedules[oldDate]||[]).filter(x=>x.id!==id);
+    if (appData.taskSchedules[oldDate].length===0) delete appData.taskSchedules[oldDate];
+  } else {
+    id = 'ts_' + Date.now() + Math.floor(Math.random()*1000);
+  }
+  if (!appData.taskSchedules[newDate]) appData.taskSchedules[newDate] = [];
+  appData.taskSchedules[newDate].push({ id, date: newDate, category, workId, memo, isCompleted });
+
+  selectedDate = newDate;
+  closeSheet(); renderAll(); scheduleSave(); showToast('저장했어요');
+}
+
+function saveWriteItem(id, oldDate) {
+  const newDate = document.getElementById('f-date').value;
+  const workId = document.getElementById('f-work').value;
+  const category = document.getElementById('f-wcategory').value;
+  const goal = category ? 0 : (parseInt(document.getElementById('f-goal').value) || 0);
+  const isCompleted = document.getElementById('f-done').checked;
+  if (!newDate) { alert('날짜를 입력해주세요.'); return; }
+  if (!appData.writeSchedules) appData.writeSchedules = {};
+
+  const prev = id ? (appData.writeSchedules[oldDate]||[]).find(x=>x.id===id) : null;
+  if (id) {
+    appData.writeSchedules[oldDate] = (appData.writeSchedules[oldDate]||[]).filter(x=>x.id!==id);
+    if (appData.writeSchedules[oldDate].length===0) delete appData.writeSchedules[oldDate];
+  } else {
+    id = 'ws_' + Date.now() + Math.floor(Math.random()*1000);
+  }
+  if (!appData.writeSchedules[newDate]) appData.writeSchedules[newDate] = [];
+  // 기존 카드의 메모/권/체크리스트 등 이 화면에서 안 다루는 필드는 그대로 보존한다
+  appData.writeSchedules[newDate].push(Object.assign({ memo:'', volumeId:'' }, prev || {}, { id, date: newDate, workId, goal, category, isCompleted }));
+
+  selectedDate = newDate;
+  closeSheet(); renderAll(); scheduleSave(); showToast('저장했어요');
+}
+
+function deleteItem(kind, id, date) {
+  if (!confirm('삭제할까요?')) return;
+  const store = kind === 'task' ? appData.taskSchedules : appData.writeSchedules;
+  store[date] = (store[date]||[]).filter(x=>x.id!==id);
+  if (store[date].length===0) delete store[date];
+  closeSheet(); renderAll(); scheduleSave(); showToast('삭제했어요');
+}
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js').catch(()=>{}); });
+}
+</script>
+</body>
+</html>

@@ -15580,7 +15580,20 @@
                 const mainPast = !w.isPending && w.publishDate && w.publishDate < today;
                 return !mainPast;
             });
-            const sorted = filtered.sort((a, b) => a.title.localeCompare(b.title, 'ko'));
+            const genrePriority = (g) => {
+                if (g === 'BL 장편') return 0;
+                if (g === '현로 장편') return 1;
+                if (g === '현로 초단') return 2;
+                if (g === 'BL 초단') return 3;
+                if (g.includes('장편')) return 0.5;
+                if (g.includes('초단')) return 2.5;
+                return 99;
+            };
+            const sorted = filtered.sort((a, b) => {
+                const p = genrePriority(a.genre) - genrePriority(b.genre);
+                if (p !== 0) return p;
+                return a.title.localeCompare(b.title, 'ko');
+            });
             list.innerHTML = sorted.map(w => `
                 <tr>
                     <td class="px-4 py-2 text-slate-600">[${w.genre}] ${w.title}</td>

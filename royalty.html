@@ -4230,23 +4230,13 @@
 
     <!-- 🟢 [NEW] 작품별 '작업 완료' 수동 표시 — 출간일 전이라도 집필/스케줄 작품 목록에서 숨기기 -->
     <div id="work-done-modal" class="modal-overlay">
-        <div class="modal-content h-auto max-h-[85vh] flex flex-col">
+        <div class="modal-content h-auto max-h-[85vh] flex flex-col" style="max-width:760px;">
             <div class="flex justify-between items-center mb-4">
                 <h3 class="text-lg font-bold text-slate-700">작품 완료 상태 수정</h3>
                 <button onclick="closeWorkDoneModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-times text-xl"></i></button>
             </div>
             <p class="text-xs text-slate-400 mb-3">체크하면 출간일이 안 지났어도 집필/스케줄 작품 목록에서 숨겨져요. "출간완료" 버튼을 켜면 숨긴 작품도 다시 보여요.</p>
-            <div class="overflow-y-auto flex-1 custom-scrollbar border border-slate-100 rounded-xl">
-                <table class="w-full text-sm text-left">
-                    <thead class="bg-slate-50 text-slate-500 font-bold text-xs sticky top-0">
-                        <tr>
-                            <th class="px-4 py-2">작품</th>
-                            <th class="px-4 py-2 w-20 text-center">작업 완료</th>
-                        </tr>
-                    </thead>
-                    <tbody id="work-done-list" class="divide-y divide-slate-50"></tbody>
-                </table>
-            </div>
+            <div id="work-done-list" class="overflow-y-auto flex-1 custom-scrollbar grid grid-cols-2 gap-3 content-start"></div>
         </div>
     </div>
 
@@ -15601,13 +15591,24 @@
                 if (p !== 0) return p;
                 return a.title.localeCompare(b.title, 'ko');
             });
-            list.innerHTML = rows.map(r => `
-                <tr>
-                    <td class="px-4 py-2 text-slate-600">[${r.genre}] ${escapeHtml(r.title)}</td>
-                    <td class="px-4 py-2 text-center">
-                        <input type="checkbox" ${r.done ? 'checked' : ''} onchange="toggleWorkDone('${r.workId}', ${r.extraId ? `'${r.extraId}'` : 'null'}, this.checked)" class="w-5 h-5 accent-emerald-500 cursor-pointer">
-                    </td>
-                </tr>`).join('');
+            // 장르별로 네모 박스 하나씩 묶어서 표시
+            const groups = [];
+            rows.forEach(r => {
+                let g = groups.find(x => x.genre === r.genre);
+                if (!g) { g = { genre: r.genre, rows: [] }; groups.push(g); }
+                g.rows.push(r);
+            });
+            list.innerHTML = groups.map(g => `
+                <div class="border border-slate-200 rounded-xl p-3">
+                    <p class="text-xs font-bold text-slate-500 mb-2">${escapeHtml(g.genre)}</p>
+                    <div class="space-y-1.5">
+                        ${g.rows.map(r => `
+                            <label class="flex items-center justify-between gap-2 cursor-pointer">
+                                <span class="text-sm text-slate-600 min-w-0 truncate">${escapeHtml(r.title)}</span>
+                                <input type="checkbox" ${r.done ? 'checked' : ''} onchange="toggleWorkDone('${r.workId}', ${r.extraId ? `'${r.extraId}'` : 'null'}, this.checked)" class="w-5 h-5 accent-emerald-500 cursor-pointer shrink-0">
+                            </label>`).join('')}
+                    </div>
+                </div>`).join('');
         }
         function toggleWorkDone(workId, extraId, done) {
             const w = masterWorks.find(x => x.id === workId);

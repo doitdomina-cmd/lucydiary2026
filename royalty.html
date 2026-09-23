@@ -3941,7 +3941,7 @@
 
     <!-- 🟢 [NEW] 연간 타임라인 모달 -->
     <div id="year-timeline-modal" class="modal-overlay">
-        <div id="year-timeline-content" class="modal-content modal-lg" style="max-width: 1900px; width: 96%; height: auto; max-height: calc(100vh - 48px);">
+        <div id="year-timeline-content" class="modal-content modal-lg" style="max-width: 2000px; width: 96%; height: auto; max-height: calc(100vh - 48px);">
             <div class="flex justify-between items-center mb-4 shrink-0">
                 <div class="flex items-center gap-3">
                     <h3 class="text-lg font-bold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-timeline text-amber-500"></i> 연간 집필 일정</h3>
@@ -13570,7 +13570,7 @@
                         kind: 'span',
                         group: sType === 'edit' ? 'edit' : (sType === 'write' ? 'spanWrite' : 'spanRest'),
                         spanId: s.id, color: s.color || '#f0e0a8',
-                        title: (!s.title || s.title === '(제목 없음)') ? SPAN_TYPES[sType].label : s.title,
+                        title: (s.title && s.title !== '(제목 없음)') ? s.title : '',
                         workName: s.workId ? (resolveWorkItem(s.workId).displayTitle || '') : '',
                         spanType: sType, noChars: st.noChars,
                         startIdx: Math.max(0, tlDayIndex(s.startDate, y)),
@@ -13625,11 +13625,6 @@
 
             // 가로 스크롤이 생기지 않도록 창 너비에 딱 맞춰 그린다
             const avail = Math.max(600, (body.clientWidth || 1400) - TL_PAD * 2);
-            // 12월 뒤에 '합계'를 적을 빈 칸을 한 달 폭만큼 남겨둔다
-            const sumColW = Math.round(avail / 13);
-            const fullW = avail;              // 전체(달력 + 합계 칸)
-            const totalW = avail - sumColW;   // 1년치 달력이 차지하는 폭
-            const xOf = (idx) => (idx / daysInYear) * totalW;
 
             // 확정(실제 카드가 있는 작품) / 예정(카드 없이 기간 일정으로만 연결된 작품) 작품 수를 나눠서 보여준다.
             // 총 휴식일 = 진짜 빈 날(1일짜리도 전부) + 집필·교정 기간 일정에 넣어둔 쉬는 요일(화·금 등) + 휴식/여행/시놉기획 종류 기간 일정
@@ -13671,6 +13666,25 @@
             const TL_MIN_SCALE = 0.6;         // 일수·글자수 줄은 60%까지 줄인다
             const TL_TITLE_MIN_SCALE = 0.85;  // 제목은 아주 조금만 줄인다
             const TL_PAD_IN = 6;       // 막대 안쪽 좌우 여백 합계 (실제 padding 2+2 보다 넉넉히)
+            const TL_SUM_FONT = 15;    // 오른쪽 '합계' 글자 크기
+
+            // '합계' 칸 폭 — 실제로 찍힐 숫자 길이에 맞춰서 정한다 (전엔 무조건 한 달치 폭이라 오른쪽에 빈 공간이 많이 남았음).
+            // 칸 시작 앞(10px)·글자 뒤(10px) 여백만 남기고, 그 사이엔 가장 긴 숫자가 딱 맞게 들어간다.
+            const writeCharsSum = items.filter(it => it.group === 'write').reduce((n, it) => n + (Number(it.chars) || 0), 0);
+            const spanWriteCharsSum = items.filter(it => it.group === 'spanWrite').reduce((n, it) => n + (Number(it.chars) || 0), 0);
+            const spanRestDaysSum = items.filter(it => it.group === 'spanRest').reduce((n, it) => n + (Number(it.days) || 0), 0);
+            const restDaysSum = restSegs.reduce((n, g) => n + g.days, 0);
+            measCtx.font = `800 ${TL_SUM_FONT}px ${TL_FONT}`;
+            const sumCandidates = [
+                `${writeCharsSum.toLocaleString()}자`, `${spanWriteCharsSum.toLocaleString()}자`,
+                `${spanRestDaysSum.toLocaleString()}일`, `총 ${restDaysSum.toLocaleString()}일`, '합계'
+            ];
+            const maxSumTextW = Math.max(0, ...sumCandidates.map(t => measCtx.measureText(t).width));
+            const sumColW = Math.max(60, Math.ceil(maxSumTextW) + 20);
+            renderYearTimeline._lastSumColW = sumColW;   // 드래그 처리(startTimelineSpanMove/Resize)가 같은 값을 쓰도록 캐시
+            const fullW = avail;              // 전체(달력 + 합계 칸)
+            const totalW = avail - sumColW;   // 1년치 달력이 차지하는 폭
+            const xOf = (idx) => (idx / daysInYear) * totalW;
 
             const labelLines = (it) => {
                 const isSpan = it.kind === 'span';
@@ -13834,7 +13848,7 @@
                 if (!sum) return '';
                 const label = unit === 'days' ? `${sum.toLocaleString()}일` : `${sum.toLocaleString()}자`;
                 return `<div style="position:absolute; left:${totalW + 10}px; top:${bandTopOf(bandStart[bandIdx], gapIdxByBand[bandIdx]) + 4}px;
-                            font-size:11px; font-weight:800; color:${color}; white-space:nowrap; z-index:3;">
+                            font-size:${TL_SUM_FONT}px; font-weight:800; color:${color}; white-space:nowrap; z-index:3;">
                         합계<br>${label}</div>`;
             };
             track += bandTotal(0, '#0f766e') + bandTotal(2, '#b45309') + bandTotal(3, '#92400e', 'days');
@@ -13850,10 +13864,10 @@
                 const l2 = it.line2 || l2full;
                 const titleTxt = it.title1 || l1;
                 const tip = `${l1} · ${sd} ~ ${ed} · ${l2full}${l3 ? ` · ${l3}` : ''}`;
-                // 기간 일정: 드래그해서 날짜 이동 / 확정 일정: 그냥 정보 표시만, 클릭해도 아무 동작 없음
+                // 기간 일정: 드래그해서 날짜 이동 / 확정 일정: 클릭하면 그 일정이 시작하는 날로 집필 달력 이동
                 const click = isSpan
                     ? `onmousedown="startTimelineSpanMove(event, '${it.spanId}')"`
-                    : '';
+                    : `onclick="closeYearTimeline(); jumpWriteCalendarToDate('${sd}')"`;
 
                 // 윗줄에 제목, 아랫줄에 "총 _일 중 집필 _일 / 글자수" — 네모 안에서 가운데 정렬
                 // 제목(12) / 일수(11) / 글자수(11) — 제목은 아주 조금만, 아랫줄은 필요한 만큼 줄인다
@@ -13877,7 +13891,7 @@
                     style="position:absolute; left:${it.x + 1}px; top:${top}px; width:${Math.max(3, it.w - 2)}px; height:${TL_BAR_H}px;
                            background:${isSpan ? it.color : hexToRgba(it.color, 0.35)};
                            border-left:4px solid ${isSpan ? spanColorSolid(it.color) : it.color}; border-radius:8px; box-sizing:border-box;
-                           box-shadow:0 1px 3px rgba(0,0,0,.06); cursor:${isSpan ? 'grab' : 'default'};
+                           box-shadow:0 1px 3px rgba(0,0,0,.06); cursor:${isSpan ? 'grab' : 'pointer'};
                            display:flex; align-items:center; justify-content:center; padding:0 ${it.inside ? 2 : 0}px;">
                     ${it.inside ? textHtml : ''}
                     ${resizeHandles}
@@ -13926,7 +13940,7 @@
                     <span style="white-space:nowrap;">${txt}</span></div>`;
             });
             rest += `<div style="position:absolute; left:${totalW + 10}px; top:6px;
-                          font-size:11px; font-weight:800; color:#7c8899; white-space:nowrap;">
+                          font-size:${TL_SUM_FONT}px; font-weight:800; color:#7c8899; white-space:nowrap;">
                       총 ${restSegs.reduce((n,g)=>n+g.days,0)}일</div>`;
             rest += `</div>`;
 
@@ -15477,7 +15491,7 @@
             if (endDate < startDate) { alert('종료일이 시작일보다 빠릅니다.'); return; }
 
             const data = {
-                title: title || SPAN_TYPES[currentSpanType].label,   // 비워두면 종류 이름(집필·교정·휴식·기타)으로
+                title,   // 비워두면 그냥 빈 채로 저장 (종류 이름으로 자동 채우지 않음)
                 workId: document.getElementById('span-work-select').value,
                 startDate, endDate,
                 type: currentSpanType,
@@ -15631,8 +15645,7 @@
                 const sType = SPAN_TYPES[s.type || 'write'];
                 // 연결한 작품이 있으면 카드에 작품 이름도 같이 보여준다
                 const spanWork = s.workId ? (resolveWorkItem(s.workId).displayTitle || '') : '';
-                // 제목을 안 적었으면 종류 이름(집필·교정·휴식·기타)으로 보여준다
-                const spanTitle = (!s.title || s.title === '(제목 없음)') ? sType.label : s.title;
+                const spanTitle = (s.title && s.title !== '(제목 없음)') ? s.title : '';
                 const headText = `${sType.icon} ${spanTitle}${spanWork ? ` · ${spanWork}` : ''}`;
                 const daysTxt = (sType.rest && st.workDays !== st.totalDays)
                     ? `${st.totalDays}일 / ${sType.chars ? '집필' : '작업'} ${st.workDays}일`
@@ -15714,6 +15727,13 @@
         }
 
         // 연간 일정에서 '확정 일정' 막대를 클릭하면, 그 일정이 시작하는 날짜로 집필 관리 달력을 옮겨둔다
+        function jumpWriteCalendarToDate(dateStr) {
+            const [y, m] = dateStr.split('-').map(Number);
+            writeCalDate = new Date(y, m - 1, 1);
+            try { renderWriteCalendar(); } catch (e) {}
+        }
+
+        // 기간 일정 막대는 드래그로 날짜를 옮긴다
         function startTimelineSpanMove(e, spanId) {
             if (e.button !== 0) return;
             const span = writeSpans.find(s => s.id === spanId);

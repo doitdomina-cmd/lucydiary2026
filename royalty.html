@@ -13626,37 +13626,43 @@
             // 가로 스크롤이 생기지 않도록 창 너비에 딱 맞춰 그린다
             const avail = Math.max(600, (body.clientWidth || 1400) - TL_PAD * 2);
 
-            // 확정(실제 카드가 있는 작품) / 예정(카드 없이 기간 일정으로만 연결된 작품) 작품 수를 나눠서 보여준다.
+            // 확정(실제 카드가 있는 작품) / 계약작(제목이 작품과 연결된 기간 일정) / 자유작(작품 연결 없는 기간 일정)으로 나눠서 보여준다.
             // 총 휴식일 = 진짜 빈 날(1일짜리도 전부) + 집필·교정 기간 일정에 넣어둔 쉬는 요일(화·금 등) + 휴식/여행/시놉기획 종류 기간 일정
             const confirmedWorkIds = new Set(works.map(w => w.workId));
-            // 작품 연결을 안 해둔 기간 일정도 예정 작품으로 센다 — 연결이 없으면 그 일정 자체(span.id)를 하나의 예정으로 취급
-            const pendingWorkIds = new Set(
-                spans.filter(sp => (sp.span.type || 'write') === 'write' && !(sp.span.workId && confirmedWorkIds.has(sp.span.workId)))
-                     .map(sp => sp.span.workId || sp.span.id)
-            );
             const internalRestDays = items.filter(it => it.kind === 'span' && (it.group === 'spanWrite' || it.group === 'edit')).reduce((n, it) => n + (Number(it.restDays) || 0), 0);
             const dedicatedRestDays = items.filter(it => it.group === 'spanRest').reduce((n, it) => n + (Number(it.days) || 0), 0);
             const totalRestDays = (daysInYear - busyDays) + internalRestDays + dedicatedRestDays;
 
-            // 기간 일정(=예정)이 전부 확정되면 어떻게 되는지 — 예정 작품 수/글자수까지 다 합친 가상의 총합
+            // 아직 카드로 안 만들어진(확정 안 된) 집필형 기간 일정 — 작품 연결 여부로 계약작/자유작을 가른다
             const confirmedSpanIds = new Set();
             Object.values(writeSchedules).forEach(list => (list || []).forEach(s => { if (s.spanId) confirmedSpanIds.add(s.spanId); }));
-            const pendingChars = spans
-                .filter(sp => (sp.span.type || 'write') === 'write' && !confirmedSpanIds.has(sp.span.id))
-                .reduce((n, sp) => n + sp.stats.totalChars, 0);
-            const grandTotalWorks = confirmedWorkIds.size + pendingWorkIds.size;
-            const grandTotalChars = totalChars + pendingChars;
+            const pendingWriteSpans = spans.filter(sp => (sp.span.type || 'write') === 'write' && !confirmedSpanIds.has(sp.span.id));
+            const contractSpans = pendingWriteSpans.filter(sp => sp.span.workId && !confirmedWorkIds.has(sp.span.workId));
+            const freeSpans = pendingWriteSpans.filter(sp => !sp.span.workId);
+            const contractWorkCount = new Set(contractSpans.map(sp => sp.span.workId)).size;
+            const freeWorkCount = freeSpans.length;   // 자유작은 연결된 작품이 없어 하나로 묶을 수 없으니, 기간 일정 하나당 1개로 센다
 
-            // 집필일 = 실제로 쓴(카드 있는) 날 + 아직 카드는 없지만 집필형 기간 일정에서 쉬는 날 빼고 남는 날(예정)
+            const contractChars = contractSpans.reduce((n, sp) => n + sp.stats.totalChars, 0);
+            const contractWriteDays = contractSpans.reduce((n, sp) => n + (Number(sp.stats.workDays) || 0), 0);
+            const freeChars = freeSpans.reduce((n, sp) => n + sp.stats.totalChars, 0);
+            const freeWriteDays = freeSpans.reduce((n, sp) => n + (Number(sp.stats.workDays) || 0), 0);
+
+            // 집필일 = 실제로 쓴(카드 있는) 날 + 아직 카드는 없지만 집필형 기간 일정에서 쉬는 날 빼고 남는 날
             const confirmedWriteDays = items.filter(it => it.kind === 'work').reduce((n, it) => n + (Number(it.days) || 0), 0);
-            const pendingWriteDays = spans
-                .filter(sp => (sp.span.type || 'write') === 'write' && !confirmedSpanIds.has(sp.span.id))
-                .reduce((n, sp) => n + (Number(sp.stats.workDays) || 0), 0);
-            const totalWriteDays = confirmedWriteDays + pendingWriteDays;
+
+            // 2번째 줄: 확정 + 계약작까지 확정된다고 가정
+            const withContractWorks = confirmedWorkIds.size + contractWorkCount;
+            const withContractWriteDays = confirmedWriteDays + contractWriteDays;
+            const withContractChars = totalChars + contractChars;
+            // 3번째 줄: 거기에 자유작까지 전부 확정된다고 가정 (전체 총합)
+            const withFreeWorks = withContractWorks + freeWorkCount;
+            const withFreeWriteDays = withContractWriteDays + freeWriteDays;
+            const withFreeChars = withContractChars + freeChars;
 
             document.getElementById('timeline-summary').innerHTML =
-                `<div>확정 <b class="text-slate-700">${confirmedWorkIds.size}작품</b> · 예정 <b class="text-slate-700">${pendingWorkIds.size}작품</b> · 집필일 <b class="text-slate-700">${confirmedWriteDays}일</b> · 총 <b class="text-amber-700">${totalRestDays}일</b> 휴식 · 확정 목표 <b class="text-emerald-600">${totalChars.toLocaleString()}자</b></div>
-                 <div class="text-slate-400 mt-0.5">(둘 다 확정 시 ${grandTotalWorks}작품 · 집필일 ${totalWriteDays}일 · 총 ${totalRestDays}일 휴식 · 목표 ${grandTotalChars.toLocaleString()}자)</div>`;
+                `<div>확정 <b class="text-slate-700">${confirmedWorkIds.size}작품</b> · 계약작 <b class="text-slate-700">${contractWorkCount}작품</b> · 자유작 <b class="text-slate-700">${freeWorkCount}작품</b> · 집필일 <b class="text-slate-700">${confirmedWriteDays}일</b> · 총 <b class="text-amber-700">${totalRestDays}일</b> 휴식 · 확정 목표 <b class="text-emerald-600">${totalChars.toLocaleString()}자</b></div>
+                 <div class="text-slate-400 mt-0.5">(계약작까지 확정 시 ${withContractWorks}작품 · 집필일 ${withContractWriteDays}일 · 총 ${totalRestDays}일 휴식 · 목표 ${withContractChars.toLocaleString()}자)</div>
+                 <div class="text-slate-400 mt-0.5">(자유작까지 확정 시 ${withFreeWorks}작품 · 집필일 ${withFreeWriteDays}일 · 총 ${totalRestDays}일 휴식 · 목표 ${withFreeChars.toLocaleString()}자)</div>`;
             // ── 6) 막대가 좁으면 글씨를 막대 오른쪽 바깥에 내놓는다. 그 폭까지 감안해서 줄(lane)을 배치
             // ── 6) 네모(막대) 안에 글씨를 넣는다.
             //      폭이 모자라면 글씨를 조금씩 줄여서라도 안에 넣고(최대 60%까지),

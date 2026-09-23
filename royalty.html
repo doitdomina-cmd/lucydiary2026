@@ -14017,7 +14017,8 @@
             const monthRows = Array.from({ length: 12 }, (_, m) => {
                 const monthStr = `${y}-${String(m + 1).padStart(2, '0')}`;
                 const monthStart = `${monthStr}-01`;
-                const monthEnd = `${monthStr}-${String(new Date(y, m + 1, 0).getDate()).padStart(2, '0')}`;
+                const daysInMonth = new Date(y, m + 1, 0).getDate();
+                const monthEnd = `${monthStr}-${String(daysInMonth).padStart(2, '0')}`;
                 const confirmedChars = data.monthly[m].chars;
                 const confirmedDays = data.monthly[m].days.size;
                 // 예정(계약작+자유작 모두 포함) — 아직 카드 없는 집필형 기간 일정을 이 달 범위로 잘라서 합산
@@ -14025,11 +14026,12 @@
                 const pendingDays = pendingWriteSpans.reduce((n, sp) => n + spanWorkDaysInRange(sp.span, monthStart, monthEnd), 0);
                 const combinedChars = confirmedChars + pendingChars;
                 const combinedDays = confirmedDays + pendingDays;
+                // 하루 평균은 '집필한 날 기준'이 아니라 그 달 전체 날짜수(28~31일)로 나눈다
                 return [`${m + 1}월`,
                     `${num(confirmedChars)}자`, `${num(pendingChars)}자`, `${num(combinedChars)}자`,
                     `${confirmedDays}일`, `${combinedDays}일`,
-                    confirmedDays ? `${num(Math.round(confirmedChars / confirmedDays))}자/일` : '-',
-                    combinedDays ? `${num(Math.round(combinedChars / combinedDays))}자/일` : '-'];
+                    `${num(Math.round(confirmedChars / daysInMonth))}자/일`,
+                    `${num(Math.round(combinedChars / daysInMonth))}자/일`];
             });
             const monthHtml = wrap('■ 월별 목표', '#4f46e5',
                 tableHtml(['월', '확정 글자수', '예정 글자수', '합계', '집필 일수(확정)', '집필 일수(합계)', '하루 평균(확정)', '하루 평균(합계)'], monthRows, '#4f46e5'));

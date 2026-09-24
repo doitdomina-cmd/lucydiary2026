@@ -4506,11 +4506,6 @@
             if (!isNodeEnvironment) return;
             try {
                 if (!fs.existsSync(dataFilePath)) return;
-                // 현재 디스크 파일이 온전한지 검사 (빈/깨진 파일은 백업하지 않음 → 백업 오염 방지)
-                let cur;
-                try { cur = JSON.parse(fs.readFileSync(dataFilePath, 'utf-8')); }
-                catch (e) { return; }
-                if (!cur || !Array.isArray(cur.masterWorks) || cur.masterWorks.length === 0) return;
 
                 const now = Date.now();
                 const d = new Date();
@@ -4534,6 +4529,12 @@
                         return;
                     }
                 }
+                // 백업을 실제로 만들 차례일 때만: 현재 디스크 파일이 온전한지 검사 (빈/깨진 파일은 백업하지 않음 → 백업 오염 방지)
+                // (예전엔 저장할 때마다 큰 파일을 읽어서 검사해서 입력이 밀렸음)
+                let cur;
+                try { cur = JSON.parse(fs.readFileSync(dataFilePath, 'utf-8')); }
+                catch (e) { return; }
+                if (!cur || !Array.isArray(cur.masterWorks) || cur.masterWorks.length === 0) return;
                 const localBackupPath = path.join(localDir, BACKUP_PREFIX + stamp + '.json');
                 if (!fs.existsSync(localBackupPath)) fs.copyFileSync(dataFilePath, localBackupPath);
                 localExisting = listLocalBackups();
@@ -4560,6 +4561,18 @@
             } catch (e) { console.error('회전 백업 실패', e); }
         }
 
+        // 구글드라이브 사본 쓰기 — 화면 스레드를 막지 않게 비동기로. 쓰는 중에 또 저장되면 마지막 내용만 이어서 쓴다
+        let _gdriveWriting = false, _gdrivePending = null;
+        function writeGdriveCopyAsync(text) {
+            if (_gdriveWriting) { _gdrivePending = text; return; }
+            _gdriveWriting = true;
+            fs.writeFile(targetFilePath, text, 'utf-8', (err) => {
+                if (err) console.error('구글드라이브 사본 저장 실패', err);
+                _gdriveWriting = false;
+                if (_gdrivePending !== null) { const t = _gdrivePending; _gdrivePending = null; writeGdriveCopyAsync(t); }
+            });
+        }
+
         let saveTimeout = null;
         function save(silent = false) { 
             if (saveTimeout) clearTimeout(saveTimeout);
@@ -4572,14 +4585,14 @@
                         writeSchedules, writeSpans, writeVolumes, writeMergedVolumeWorks, taskSchedules, contacts, penNames, widgetSettingsData, writeCardSettings, taskCardSettings, taskColors: TASK_COLORS, taskCategoryList, writeColors: WRITE_COLORS, writeCategoryList,
                         writerWorks, writerDailyData, writerGlobalDailyGoal, writeCounterBase, writeCounterResetDate, submissions, webtoonSubs, webtoonSubOrder, incomeGoals, taxSettings, taxGoalMemos, charGoals, writerLastWorkKey, taxGoalItems, contactSortMode, webtoonManage, webtoonCardSettings, penNameColorOverrides, webtoonViewFilter, webtoonSortMode, workManage, workManageCardSettings, workManageViewFilter, workManageSortMode
                     };
-                    const jsonStr = JSON.stringify(dataToSave, null, 2);
+                    const jsonStr = JSON.stringify(dataToSave);
 
                     if (isNodeEnvironment) {
                         rotateBackup();
                         fs.writeFileSync(dataFilePath, jsonStr, 'utf-8');
                         if (!fs.existsSync(TARGET_DIR)) { try { fs.mkdirSync(TARGET_DIR, { recursive: true }); } catch(e) {} }
                         if (fs.existsSync(TARGET_DIR)) {
-                            fs.writeFileSync(targetFilePath, jsonStr, 'utf-8');
+                            writeGdriveCopyAsync(jsonStr);
                             if (!silent) showSaveIndicator('gdrive');
                         } else {
                             if (!silent) showSaveIndicator('local');
@@ -4588,7 +4601,7 @@
 
                     localStorage.setItem('theme_v6', activeTheme);
                     if (typeof window.cloudSave === 'function') window.cloudSave(dataToSave);
-                    try { localStorage.setItem('RoyaltyData_v6_Backup', jsonStr); } catch(e) { /* 용량 초과 시 무시 — 파일/클라우드가 주 저장소 */ }
+                    try { if (jsonStr.length < 4000000) localStorage.setItem('RoyaltyData_v6_Backup', jsonStr); } catch(e) { /* 용량 초과 시 무시 — 파일/클라우드가 주 저장소 */ }
                     const bgMain = document.documentElement.style.getPropertyValue('--bg-main');
                     if(bgMain) localStorage.setItem('bg_main_v6', bgMain);
 

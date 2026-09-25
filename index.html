@@ -8943,8 +8943,10 @@ async function loadRoyaltyFromFirebase(){
     const user=auth.currentUser;
     if(!user)throw new Error('로그인 필요');
     const snap=await db.collection('users').doc(user.uid).collection('appdata').doc('royalty').get();
-    const payload=snap.exists&&snap.data()&&snap.data().payload;
+    const docData=snap.exists&&snap.data();
+    const payload=docData&&docData.payload;
     if(!payload)throw new Error('인세 관리 앱에 저장된 데이터가 없어요');
+    const savedAt=docData._savedAt||null;
     const state=JSON.parse(payload);
     const monthlyData=state.monthlyData||{};
     const masterWorks=state.masterWorks||[];
@@ -8973,19 +8975,31 @@ async function loadRoyaltyFromFirebase(){
     });
     if(Object.keys(royalty).length===0)throw new Error('정산 내역이 없어요');
 
-    showRoyaltyImportModal(royalty);
+    showRoyaltyImportModal(royalty,savedAt);
     if(statusEl)statusEl.textContent='';
   }catch(e){
     if(statusEl)statusEl.textContent='❌ 불러오기 실패: '+e.message;
   }
 }
 
-function showRoyaltyImportModal(royalty){
+function showRoyaltyImportModal(royalty,savedAt){
   const months=Object.keys(royalty).sort().reverse().slice(0,12);
   const MN=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
 
+  let html='';
+  if(savedAt){
+    const d=new Date(savedAt);
+    const ageMs=Date.now()-savedAt;
+    const ageDays=ageMs/86400000;
+    const stale=ageDays>2;
+    const dateStr=d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+    html+='<div style="font-size:0.8em;margin-bottom:10px;padding:8px 10px;border-radius:8px;background:'+(stale?'var(--al)':'var(--s2)')+';color:'+(stale?'var(--red,#C14A3C)':'var(--t3)')+'">'+
+      (stale?'⚠ ':'☁ ')+'인세 앱에서 '+dateStr+'에 마지막으로 동기화된 데이터예요'+
+      (stale?' — 2일 넘게 지났어요. 인세 앱을 열어서 클라우드 저장이 제대로 되고 있는지 확인해보세요.':'')+
+    '</div>';
+  }
   let monthOpts=months.map(m=>'<option value="'+m+'">'+m+'</option>').join('');
-  let html='<div class="fg"><label class="fl">가져올 월 선택</label><select class="sel" id="roy-month" onchange="previewRoyalty(this.value)">'+monthOpts+'</select></div>';
+  html+='<div class="fg"><label class="fl">가져올 월 선택</label><select class="sel" id="roy-month" onchange="previewRoyalty(this.value)">'+monthOpts+'</select></div>';
   html+='<div id="roy-preview" style="margin-top:10px"></div>';
 
   openMo('📥 인세 정산 가져오기', html,

@@ -8964,9 +8964,11 @@ async function loadRoyaltyFromFirebase(){
         if(!pub)return;
         pubTotals[pub]=(pubTotals[pub]||0)+amount;
       });
-      const items=Object.keys(pubTotals).map(function(pub){
-        return {publisher:pub,amount:pubTotals[pub],paymentDay:(publisherData[pub]||{}).paymentDay||''};
-      });
+      const items=Object.keys(pubTotals)
+        .filter(function(pub){return pubTotals[pub]!==0;})
+        .map(function(pub){
+          return {publisher:pub,amount:pubTotals[pub],paymentDay:(publisherData[pub]||{}).paymentDay||''};
+        });
       if(items.length)royalty[ym]=items;
     });
     if(Object.keys(royalty).length===0)throw new Error('정산 내역이 없어요');

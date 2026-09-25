@@ -8932,21 +8932,45 @@ function renderLedgerSettings(){
 function setLedgerBudget(cat,val){if(!LD.budgets)LD.budgets={};LD.budgets[cat]=parseInt(val)||0;saveLedger();}
 
 // ═══════════ 인세 정산 불러오기 ═══════════
+// 인세 관리 앱(royalty.html)은 정산액을 미리 계산해서 저장해두지 않고, 앱 전체 상태
+// (users/{uid}/appdata/royalty 문서의 payload)에 담긴 monthlyData(작품×월 매출) +
+// masterWorks(작품→출판사) + publisherData(출판사→정산일)를 조합해 그때그때 화면에서
+// 계산한다. 여기서도 같은 방식으로 월별·출판사별 정산액을 직접 집계한다.
 async function loadRoyaltyFromFirebase(){
   const statusEl=document.getElementById('royalty-status');
   if(statusEl)statusEl.textContent='불러오는 중...';
   try{
-    // 로그인된 사용자 토큰으로 요청
     const user=auth.currentUser;
     if(!user)throw new Error('로그인 필요');
-    const token=await user.getIdToken();
-    const url='https://firestore.googleapis.com/v1/projects/writer-routine/databases/(default)/documents/royalty/latest';
-    const res=await fetch(url,{headers:{Authorization:'Bearer '+token}});
-    if(!res.ok)throw new Error('HTTP '+res.status);
-    const json=await res.json();
-    const raw=json.fields&&json.fields.data&&json.fields.data.stringValue;
-    if(!raw)throw new Error('데이터 없음');
-    const royalty=JSON.parse(raw);
+    const snap=await db.collection('users').doc(user.uid).collection('appdata').doc('royalty').get();
+    const payload=snap.exists&&snap.data()&&snap.data().payload;
+    if(!payload)throw new Error('인세 관리 앱에 저장된 데이터가 없어요');
+    const state=JSON.parse(payload);
+    const monthlyData=state.monthlyData||{};
+    const masterWorks=state.masterWorks||[];
+    const publisherData=state.publisherData||{};
+    const workById={};
+    masterWorks.forEach(function(w){workById[w.id]=w;});
+
+    const royalty={};
+    Object.keys(monthlyData).forEach(function(ym){
+      const pubTotals={};
+      Object.entries(monthlyData[ym]||{}).forEach(function(entry){
+        const workId=entry[0],amount=entry[1];
+        if(!amount)return;
+        const w=workById[workId];
+        if(!w)return;
+        const pub=w.settlementPublisher||w.publisher;
+        if(!pub)return;
+        pubTotals[pub]=(pubTotals[pub]||0)+amount;
+      });
+      const items=Object.keys(pubTotals).map(function(pub){
+        return {publisher:pub,amount:pubTotals[pub],paymentDay:(publisherData[pub]||{}).paymentDay||''};
+      });
+      if(items.length)royalty[ym]=items;
+    });
+    if(Object.keys(royalty).length===0)throw new Error('정산 내역이 없어요');
+
     showRoyaltyImportModal(royalty);
     if(statusEl)statusEl.textContent='';
   }catch(e){

@@ -8533,19 +8533,17 @@ function renderLedgerCalendar(){
   html+='<button class="btn bp bsm" onclick="openLedgerTxForm(\'\')">+ 내역 추가</button></div>';
 
   html+='<div class="card" style="padding:12px;margin-bottom:16px">';
-  html+='<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><div style="min-width:420px">';
-  html+='<div style="display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:4px">';
+  html+='<div class="mcal-wrap"><div>';
+  html+='<div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-bottom:1px solid var(--border)">';
   ['일','월','화','수','목','금','토'].forEach(function(d,i){
-    html+='<div style="text-align:center;font-size:0.72em;color:'+(i===0?'var(--red)':i===6?'var(--blue)':'var(--t3)')+';padding:4px 0;font-weight:500">'+d+'</div>';
+    html+='<div style="text-align:center;padding:8px 0;font-size:var(--mcal-dow);font-weight:500;color:'+(i===0?'var(--red)':i===6?'var(--blue)':'var(--t3)')+'">'+d+'</div>';
   });
-  html+='</div>';
-  html+='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px">';
+  html+='</div><div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr))">';
   cells.forEach(function(cell,idx){
     const ds=cell.y+'-'+String(cell.m+1).padStart(2,'0')+'-'+String(cell.d).padStart(2,'0');
     const isT=ds===ts;
     const di=dayMap[ds]||{inc:0,exp:0,fixed:[]};
-    const dow=idx%7;
-    const textColor=isT?'var(--accent)':!cell.cur?'var(--t3)':dow===0?'var(--red)':dow===6?'var(--blue)':'var(--text)';
+    const ri=Math.floor(idx/7),ci=idx%7;
     const hasPending=(di.fixed||[]).some(f=>!f.amount||f.amount==='req_input');
     // 툴팁용 내역 텍스트 생성
     var tipLines=[];
@@ -8559,10 +8557,20 @@ function renderLedgerCalendar(){
       tipLines.push(amt+'  '+(fi.memo||'')+' (고정)');
     });
     var tipAttr=tipLines.length>0?' data-tip="'+tipLines.join('&#10;').replace(/"/g,'&quot;')+'"':'';
-    html+='<div class="ledger-cal-cell" onclick="openLedgerDayModal(\''+ds+'\')"'+tipAttr+' style="position:relative;min-height:90px;border-radius:6px;padding:4px 5px;background:'+(isT?'var(--al)':'transparent')+';border:1px solid '+(isT?'var(--accent)':'var(--border)')+';cursor:pointer;transition:background .1s" onmouseover="this.style.background=\'var(--s2)\';showLedgerTip(this,event)" onmousemove="moveLedgerTip(event)" onmouseout="this.style.background=\''+(isT?'var(--al)':'transparent')+'\';hideLedgerTip()">';
-    html+='<div style="font-size:0.75em;font-weight:'+(isT?'700':'500')+';color:'+textColor+';text-align:right;margin-bottom:2px">'+cell.d+(hasPending?'<span style="color:var(--accent);margin-left:2px">·</span>':'')+'</div>';
-    if(di.inc>0)html+='<div style="text-align:right;margin-bottom:2px"><span style="display:inline-block;font-size:0.78em;color:#fff;background:var(--green);padding:1px 6px;border-radius:99px;font-weight:600">+'+new Intl.NumberFormat('ko-KR').format(di.inc)+'</span></div>';
-    if(di.exp>0)html+='<div style="text-align:right"><span style="display:inline-block;font-size:0.78em;color:#fff;background:var(--red);padding:1px 6px;border-radius:99px;font-weight:600">-'+new Intl.NumberFormat('ko-KR').format(di.exp)+'</span></div>';
+    html+='<div class="cal-cell'+(isT?' cal-today':'')+'" data-ds="'+ds+'" onclick="openLedgerDayModal(\''+ds+'\')"'+tipAttr+' onmouseover="showLedgerTip(this,event)" onmousemove="moveLedgerTip(event)" onmouseout="hideLedgerTip()" style="cursor:pointer;'+
+      'min-height:var(--mcal-cellh);padding:var(--mcal-pad);'+
+      'border-right:'+(ci===6?'none':'1px solid var(--border)')+';'+
+      'border-bottom:'+(ri===5?'none':'1px solid var(--border)')+';'+
+      'background:'+(isT?'var(--accent)15':'transparent')+'">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">'+
+        '<div style="width:var(--mcal-daysz);height:var(--mcal-daysz);border-radius:50%;display:flex;align-items:center;justify-content:center;'+
+          'background:'+(isT?'var(--accent)25':'transparent')+';'+
+          'font-size:var(--mcal-day);font-weight:'+(isT?'700':'500')+';'+
+          'color:'+(isT?'var(--accent)':!cell.cur?'var(--t3)':ci===0?'var(--red)':ci===6?'var(--blue)':'var(--text)')+'">'+cell.d+'</div>'+
+        (hasPending?'<span style="color:var(--accent);font-size:var(--mcal-ev)">·</span>':'')+
+      '</div>';
+    if(di.inc>0)html+='<div style="font-size:var(--mcal-ev);color:var(--green);font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">+'+new Intl.NumberFormat('ko-KR').format(di.inc)+'</div>';
+    if(di.exp>0)html+='<div style="font-size:var(--mcal-ev);color:var(--red);font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">-'+new Intl.NumberFormat('ko-KR').format(di.exp)+'</div>';
     html+='</div>';
   });
   html+='</div></div></div></div>';

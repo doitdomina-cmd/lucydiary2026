@@ -266,6 +266,7 @@ body.theme-sailornavy{
   --r:16px;--rsm:10px;
   --sh:0 2px 8px rgba(27,42,107,.08);
   --shm:0 10px 28px rgba(27,42,107,.16),0 3px 10px rgba(27,42,107,.08);
+  --green:#C9A227;
 }
 /* ── THEME: SAILOR PINK (세일러문·핑크 — 문스틱 핑크+골드) ── */
 body.theme-sailorpink{
@@ -280,6 +281,7 @@ body.theme-sailorpink{
   --r:16px;--rsm:10px;
   --sh:0 2px 8px rgba(230,73,128,.08);
   --shm:0 10px 28px rgba(230,73,128,.16),0 3px 10px rgba(230,73,128,.08);
+  --green:#C9A227;
 }
 /* 진회색/블랙 전용 보정: 버튼/헤더바는 흰색을 섞어 밝히는 대신 투명도만 낮춰서
    "반투명한 블랙" 느낌을 냄 (흰색을 섞으면 그냥 회색으로 보여서 흰색 믹스는 지양) +
@@ -832,6 +834,32 @@ body.theme-black .cal-cell.cal-today{
   outline-offset:-2px;
   z-index:1;
   position:relative;
+}
+
+/* ── 세일러문 테마 전용: 반짝이는 별 배경 + 로고/루틴 점을 금별 모양으로 ── */
+body.theme-sailornavy,
+body.theme-sailorpink{
+  background-image:
+    radial-gradient(circle at 8% 15%, rgba(201,162,39,.4) 0 1.6px, transparent 1.6px),
+    radial-gradient(circle at 68% 8%, rgba(201,162,39,.3) 0 1.2px, transparent 1.2px),
+    radial-gradient(circle at 88% 32%, rgba(201,162,39,.35) 0 1.4px, transparent 1.4px),
+    radial-gradient(circle at 30% 45%, rgba(201,162,39,.25) 0 1px, transparent 1px),
+    radial-gradient(circle at 55% 70%, rgba(201,162,39,.3) 0 1.3px, transparent 1.3px),
+    radial-gradient(circle at 15% 82%, rgba(201,162,39,.25) 0 1px, transparent 1px),
+    radial-gradient(circle at 92% 88%, rgba(201,162,39,.3) 0 1.2px, transparent 1.2px);
+  background-size: 420px 420px;
+  background-repeat: repeat;
+  background-attachment: fixed;
+}
+body.theme-sailornavy .logo-dot,
+body.theme-sailorpink .logo-dot{
+  width:12px;height:12px;background:#C9A227;border-radius:0;
+  clip-path:polygon(50% 0%,63% 38%,100% 50%,63% 62%,50% 100%,37% 62%,0% 50%,37% 38%);
+}
+body.theme-sailornavy .rc-dot,
+body.theme-sailorpink .rc-dot{
+  width:12px;height:12px;border-radius:0;margin-top:3px;
+  clip-path:polygon(50% 0%,63% 38%,100% 50%,63% 62%,50% 100%,37% 62%,0% 50%,37% 38%);
 }
 
 /* ── BACK ── */
@@ -7890,13 +7918,21 @@ function applyNavMarkers(){
     // custom 테마 등은 computed에서 읽기
     accent=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#888';
   }
+  // 세일러문 테마는 하트 대신 금별로, 테마 색도 참고 이미지의 골드로 고정
+  var isSailor=(th==='sailornavy'||th==='sailorpink');
+  var starPath='<path d="M12 1.5l2.1 6.8 7.15.05-5.78 4.28 2.2 6.77L12 15.05 6.33 19.4l2.2-6.77-5.78-4.28 7.15-.05z"/>';
+  var heartPath='<path d="M12 21s-7.5-4.7-10-9.3C.4 8.5 1.5 5 4.7 4.2c2-.5 3.8.4 4.8 1.9l.5.8.5-.8c1-1.5 2.8-2.4 4.8-1.9C22.5 5 23.6 8.5 22 11.7 19.5 16.3 12 21 12 21z"/>';
   document.querySelectorAll('.nav-ic[data-color]').forEach(function(ic){
     var color=ic.dataset.color;
     if(mode==='dot'){
-      ic.innerHTML='<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:'+color+'"></span>';
+      if(isSailor){
+        ic.innerHTML='<svg width="10" height="10" viewBox="0 0 24 24" fill="'+color+'" style="display:block">'+starPath+'</svg>';
+      } else {
+        ic.innerHTML='<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:'+color+'"></span>';
+      }
     } else {
-      var hc=(mode==='heartTheme')?accent:color;
-      ic.innerHTML='<svg width="12" height="12" viewBox="0 0 24 24" fill="'+hc+'" style="display:block"><path d="M12 21s-7.5-4.7-10-9.3C.4 8.5 1.5 5 4.7 4.2c2-.5 3.8.4 4.8 1.9l.5.8.5-.8c1-1.5 2.8-2.4 4.8-1.9C22.5 5 23.6 8.5 22 11.7 19.5 16.3 12 21 12 21z"/></svg>';
+      var hc=(mode==='heartTheme')?(isSailor?'#C9A227':accent):color;
+      ic.innerHTML='<svg width="12" height="12" viewBox="0 0 24 24" fill="'+hc+'" style="display:block">'+(isSailor?starPath:heartPath)+'</svg>';
     }
   });
 }

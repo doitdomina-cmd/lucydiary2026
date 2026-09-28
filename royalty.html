@@ -110,6 +110,23 @@
             transition: transform 0.3s ease, background-color 0.3s ease;
         }
         main { margin-left: auto; margin-right: auto; padding-left: 15.3rem; width: 100%; max-width: calc(1700px + 15.3rem); min-height: 100vh; transition: margin 0.3s ease; }
+        /* 데스크톱에서 왼쪽 메뉴를 접었다 폈다 할 수 있는 버튼 — 접으면 사이드바가 화면 밖으로
+           슬라이드되고, 화면 가장자리에 작은 손잡이 탭만 남는다 (index.html의 사이드바 접기와 동일한 패턴) */
+        #sidebar-collapse-btn {
+            position: fixed; bottom: 20px; left: 15.3rem;
+            width: 16px; height: 64px; padding: 0; margin: 0;
+            display: flex; align-items: center; justify-content: center;
+            background: var(--primary); border: none; border-radius: 0 10px 10px 0;
+            color: rgba(255,255,255,.85); cursor: pointer; z-index: 55;
+            transition: left 0.3s ease, background-color 0.3s ease;
+            box-shadow: 2px 2px 8px rgba(0,0,0,.15);
+        }
+        #sidebar-collapse-btn:hover { color: #fff; }
+        body.sidebar-collapsed aside { transform: translateX(-100%); }
+        body.sidebar-collapsed main { padding-left: 0 !important; }
+        body.sidebar-collapsed #sidebar-collapse-btn { left: 0; }
+        body.sidebar-collapsed #sidebar-collapse-icon { transform: rotate(180deg); }
+        @media (max-width: 1024px) { #sidebar-collapse-btn { display: none; } }
         /* 웹(브라우저)으로 볼 때만 — 메뉴 항목이 많아서 화면 높이보다 길어져 스크롤이 생기던 것을
            항목 간 여백을 줄여서 스크롤 없이 한 화면에 다 들어오게 한다. 데스크톱 앱은 그대로 둠 */
         body.sidebar-web .nav-btn { padding-top: 7px !important; padding-bottom: 7px !important; margin-top: 1px !important; margin-bottom: 1px !important; }
@@ -984,6 +1001,9 @@
                 </button>
             </div>
         </aside>
+        <button id="sidebar-collapse-btn" onclick="toggleSidebarCollapse()" title="메뉴 접기/펼치기" aria-label="메뉴 접기/펼치기">
+            <i class="fa-solid fa-angle-left" id="sidebar-collapse-icon"></i>
+        </button>
 
         <main class="flex-1">
             <div class="p-3 lg:p-5 mx-auto max-w-[1700px] space-y-8 pt-5">
@@ -2054,10 +2074,14 @@
                                 <input type="checkbox" id="contact-edit-review" class="w-4 h-4 accent-emerald-500">
                                 <span class="text-sm text-slate-700">리뷰</span>
                             </label>
-                            <input type="text" id="contact-edit-etc" placeholder="기타 직접 입력" class="flex-1 min-w-[100px] p-1.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-100">
                         </div>
                     </div>
-                    <!-- 5줄: 메일 전문 (col-span-4) -->
+                    <!-- 5줄: 기타 (col-span-4) -->
+                    <div class="col-span-2 md:col-span-4">
+                        <label class="text-xs font-bold text-slate-500 ml-1 mb-1 block">기타</label>
+                        <input type="text" id="contact-etc" placeholder="자유롭게 입력하세요" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100">
+                    </div>
+                    <!-- 6줄: 메일 전문 (col-span-4) -->
                     <div class="col-span-2 md:col-span-4">
                         <label class="text-xs font-bold text-slate-500 ml-1 mb-1 block">메일 전문</label>
                         <textarea id="contact-email" rows="8" placeholder="받은 메일 내용 전체를 붙여넣으세요..." class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100 resize-y leading-relaxed"></textarea>
@@ -5306,6 +5330,11 @@
             closeSidebarMobile();
         }
         function toggleSidebar() { document.body.classList.toggle('sidebar-open'); }
+        function toggleSidebarCollapse() {
+            document.body.classList.toggle('sidebar-collapsed');
+            try { localStorage.setItem('sidebarCollapsed_v1', document.body.classList.contains('sidebar-collapsed') ? '1' : '0'); } catch(e) {}
+        }
+        try { if (localStorage.getItem('sidebarCollapsed_v1') === '1') document.body.classList.add('sidebar-collapsed'); } catch(e) {}
         function closeSidebarMobile() { if (window.matchMedia('(max-width: 1024px)').matches) document.body.classList.remove('sidebar-open'); }
 
         function updateUI() {
@@ -9385,7 +9414,6 @@
                 if (c.edit1) editParts.push('1교');
                 if (c.edit2) editParts.push('2교');
                 if (c.editReview) editParts.push('리뷰');
-                if (c.editEtc) editParts.push(c.editEtc);
                 const editText = editParts.join(' · ');
                 
                 const settlementParts = [];
@@ -9418,6 +9446,7 @@
                         ${c.site ? `<div class="flex gap-2"><span class="text-slate-400 w-14 shrink-0">사이트</span><span>${c.site}</span></div>` : ''}
                         ${condText ? `<div class="flex gap-2"><span class="text-slate-400 w-14 shrink-0">조건</span><span style="word-break:break-word;">${condText}</span></div>` : ''}
                         ${editText ? `<div class="flex gap-2"><span class="text-slate-400 w-14 shrink-0">교정</span><span>${editText}</span></div>` : ''}
+                        ${c.etc ? `<div class="flex gap-2"><span class="text-slate-400 w-14 shrink-0">기타</span><span style="word-break:break-word;">${c.etc}</span></div>` : ''}
                     </div>
                     ${c.email ? `<div onclick="event.stopPropagation(); openEmailPreview('${c.id}')" class="mt-2 pt-2 border-t border-slate-100 text-[10px] text-slate-400 truncate hover:text-emerald-600 transition-colors cursor-pointer">✉️ 메일 전문 보기</div>` : ''}
                 </div>`;
@@ -9595,7 +9624,7 @@
             document.getElementById('contact-edit-1').checked = !!c?.edit1;
             document.getElementById('contact-edit-2').checked = !!c?.edit2;
             document.getElementById('contact-edit-review').checked = !!c?.editReview;
-            document.getElementById('contact-edit-etc').value = c?.editEtc || '';
+            document.getElementById('contact-etc').value = c?.etc || '';
 
             // 별점
             currentContactStars = c?.stars || 0;
@@ -9628,7 +9657,7 @@
                 edit1: document.getElementById('contact-edit-1').checked,
                 edit2: document.getElementById('contact-edit-2').checked,
                 editReview: document.getElementById('contact-edit-review').checked,
-                editEtc: document.getElementById('contact-edit-etc').value.trim(),
+                etc: document.getElementById('contact-etc').value.trim(),
                 stars: currentContactStars,
                 status: document.getElementById('contact-status').value,
                 email: document.getElementById('contact-email').value
@@ -12156,12 +12185,16 @@
                     
                 // 카드 폭에서 자리를 차지하지 않게 절대 위치로 띄워서, 안 보일 때도 좌우 여백이 어긋나지 않게 한다
                 let deleteBtn = `<button type="button" onclick="event.stopPropagation(); quickDeleteWrite('${s.id}', '${s.date}')" class="absolute top-1 right-1 opacity-0 group-hover/block:opacity-100 text-slate-300 hover:text-rose-500 transition-opacity shrink-0 px-1" title="일정 삭제"><i class="fa-solid fa-trash-can"></i></button>`;
+                // 우클릭(오른쪽 마우스)으로 복제하는 기능은 터치 기기(아이패드 등)에선 아예 쓸 수 없어서,
+                // 같은 동작을 하는 복사 버튼을 눈에 보이게 추가 — 탭 한 번이면 되니 터치/마우스 둘 다 동일하게 동작
+                let copyBtn = `<button type="button" onclick="event.stopPropagation(); duplicateWriteSchedule(event, '${s.id}', '${s.date}')" class="absolute top-1 right-6 opacity-0 group-hover/block:opacity-100 text-slate-300 hover:text-indigo-500 transition-opacity shrink-0 px-1" title="이 일정 복사"><i class="fa-regular fa-copy"></i></button>`;
 
                 return `<div class="cal-selectable border border-slate-200 border-l-4 p-1 rounded-lg relative group/block shadow-sm hover:shadow-md transition-all cursor-move" data-cal="write" data-block-id="${s.id}" data-block-date="${s.date}" style="border-left-color: ${color}; ${cardBg} ${cardFontStyle}" draggable="true" ondragstart="handleWriteDragStart(event, '${s.id}', '${s.date}')" ondragover="handleCardDragOver(event, this)" ondragleave="handleCardDragLeave(event, this)" ondrop="handleWriteCardDrop(event, this, '${s.id}', '${s.date}')" onclick="event.stopPropagation(); openWriteEditModal('${s.id}', '${s.date}')" oncontextmenu="duplicateWriteSchedule(event, '${s.id}', '${s.date}')">
                     <div class="flex items-start">
                         <div class="flex-1 min-w-0">
                             ${content}
                         </div>
+                        ${copyBtn}
                         ${deleteBtn}
                     </div>
                 </div>`;
@@ -12272,6 +12305,8 @@
                     : `<button type="button" onclick="event.stopPropagation(); toggleTaskComplete('${t.id}', '${t.date}')" class="opacity-0 group-hover/block:opacity-100 text-slate-300 hover:text-indigo-500 transition-opacity mt-0.5 shrink-0" title="완료 처리"><i class="fa-regular fa-circle-check"></i></button>`;
                     
                 let deleteBtn = `<button type="button" onclick="event.stopPropagation(); quickDeleteTask('${t.id}', '${t.date}')" class="opacity-0 group-hover/block:opacity-100 text-slate-300 hover:text-rose-500 transition-opacity mt-0.5 ml-1 shrink-0 px-1" title="일정 삭제"><i class="fa-solid fa-trash-can"></i></button>`;
+                // 우클릭 복제는 터치 기기에선 쓸 수 없어서, 탭으로 되는 복사 버튼을 같이 노출
+                let copyBtn = `<button type="button" onclick="event.stopPropagation(); duplicateTaskSchedule(event, '${t.id}', '${t.date}')" class="opacity-0 group-hover/block:opacity-100 text-slate-300 hover:text-indigo-500 transition-opacity mt-0.5 ml-1 shrink-0 px-1" title="이 일정 복사"><i class="fa-regular fa-copy"></i></button>`;
 
                 const taskCardStyle = `font-family:'Pretendard','Apple SD Gothic Neo',sans-serif; font-size:${taskCardSettings.fontSize}px; background:${t.isCompleted ? '#f1f5f9' : taskCardSettings.colorDefault};`;
 
@@ -12281,6 +12316,7 @@
                         <div class="flex-1 min-w-0 ml-0.5">
                             ${content}
                         </div>
+                        ${copyBtn}
                         ${deleteBtn}
                     </div>
                 </div>`;
@@ -13889,7 +13925,7 @@
                 const tip = `${l1} · ${sd} ~ ${ed} · ${l2full}${l3 ? ` · ${l3}` : ''}`;
                 // 기간 일정: 드래그해서 날짜 이동 / 확정 일정: 클릭하면 그 일정이 시작하는 날로 집필 달력 이동
                 const click = isSpan
-                    ? `onmousedown="startTimelineSpanMove(event, '${it.spanId}')"`
+                    ? `onmousedown="startTimelineSpanMove(event, '${it.spanId}')" ontouchstart="startTimelineSpanMove(event, '${it.spanId}')"`
                     : `onclick="closeYearTimeline(); jumpWriteCalendarToDate('${sd}')"`;
 
                 // 윗줄에 제목, 아랫줄에 "총 _일 중 집필 _일 / 글자수" — 네모 안에서 가운데 정렬
@@ -13906,8 +13942,8 @@
 
                 // 기간 일정 막대 양쪽 끝의 얇은 손잡이 — 잡고 늘리거나 줄이면 그쪽 날짜만 바뀐다
                 const resizeHandles = isSpan ? `
-                    <div onmousedown="startTimelineSpanResize(event, '${it.spanId}', 'start')" title="시작일 조절" style="position:absolute; left:0; top:0; width:7px; height:100%; cursor:ew-resize;"></div>
-                    <div onmousedown="startTimelineSpanResize(event, '${it.spanId}', 'end')" title="종료일 조절" style="position:absolute; right:0; top:0; width:7px; height:100%; cursor:ew-resize;"></div>
+                    <div onmousedown="startTimelineSpanResize(event, '${it.spanId}', 'start')" ontouchstart="startTimelineSpanResize(event, '${it.spanId}', 'start')" title="시작일 조절" style="position:absolute; left:0; top:0; width:14px; height:100%; cursor:ew-resize;"></div>
+                    <div onmousedown="startTimelineSpanResize(event, '${it.spanId}', 'end')" ontouchstart="startTimelineSpanResize(event, '${it.spanId}', 'end')" title="종료일 조절" style="position:absolute; right:0; top:0; width:14px; height:100%; cursor:ew-resize;"></div>
                 ` : '';
 
                 track += `<div title="${tip}" ${click}
@@ -15743,6 +15779,7 @@
                     bar.innerHTML = `<span style="padding:0 10px 0 16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${segText}</span>`;
                     // 막대 몸통을 잡고 끌면 일정 전체가 통째로 옮겨진다 (그냥 클릭하면 편집 창)
                     bar.onmousedown = (e) => startSpanMove(e, s.id);
+                    bar.ontouchstart = (e) => startSpanMove(e, s.id);
                     bar.onclick = (e) => e.stopPropagation();
 
                     // 양쪽 끝을 잡고 늘리거나 줄이는 핸들 (실제 시작/종료일이 화면에 보일 때만)
@@ -15756,11 +15793,19 @@
 
         function makeSpanHandle(spanId, edge) {
             const h = document.createElement('div');
-            h.style.cssText = `position:absolute; top:0; bottom:0; ${edge === 'start' ? 'left:0' : 'right:0'}; width:9px;
+            h.style.cssText = `position:absolute; top:0; bottom:0; ${edge === 'start' ? 'left:0' : 'right:0'}; width:14px;
                 cursor:ew-resize; background:rgba(0,0,0,0.06);`;
             h.onclick = (e) => e.stopPropagation();
             h.onmousedown = (e) => { e.stopPropagation(); startSpanResize(e, spanId, edge); };
+            h.ontouchstart = (e) => { e.stopPropagation(); startSpanResize(e, spanId, edge); };
             return h;
+        }
+
+        // 마우스든 터치든 같은 방식으로 좌표를 꺼낸다 (아이패드 등 터치 기기 지원용)
+        function pointerXY(e) {
+            if (e.touches && e.touches.length) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            if (e.changedTouches && e.changedTouches.length) return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+            return { x: e.clientX, y: e.clientY };
         }
 
         // 막대 끝을 드래그해서 기간을 늘리고 줄이는 처리
@@ -15787,7 +15832,7 @@
 
         // 기간 일정 막대는 드래그로 날짜를 옮긴다
         function startTimelineSpanMove(e, spanId) {
-            if (e.button !== 0) return;
+            if (e.type === 'mousedown' && e.button !== 0) return;
             const span = writeSpans.find(s => s.id === spanId);
             if (!span) return;
             e.preventDefault(); e.stopPropagation();
@@ -15799,21 +15844,25 @@
             const daysInYear = tlDaysInYear(timelineYear);
 
             timelineSpanMoveState = {
-                spanId, x0: e.clientX,
+                spanId, x0: pointerXY(e).x,
                 startDate: span.startDate, endDate: span.endDate,
                 totalW, daysInYear, moved: false
             };
             document.body.style.userSelect = 'none';
             document.addEventListener('mousemove', onTimelineSpanMove);
             document.addEventListener('mouseup', endTimelineSpanMove);
+            document.addEventListener('touchmove', onTimelineSpanMove, { passive: false });
+            document.addEventListener('touchend', endTimelineSpanMove);
         }
 
         function onTimelineSpanMove(e) {
             const st = timelineSpanMoveState;
             if (!st) return;
-            if (!st.moved && Math.abs(e.clientX - st.x0) < 4) return;
+            const p = pointerXY(e);
+            if (!st.moved && Math.abs(p.x - st.x0) < 4) return;
+            e.preventDefault();
 
-            const deltaPx = e.clientX - st.x0;
+            const deltaPx = p.x - st.x0;
             const deltaDays = Math.round(deltaPx / st.totalW * st.daysInYear);
             const span = writeSpans.find(s => s.id === st.spanId);
             if (!span) return;
@@ -15834,8 +15883,8 @@
                 document.body.appendChild(badge);
             }
             badge.textContent = `${tlDateLabel(ns)} ~ ${tlDateLabel(ne)}`;
-            badge.style.left = e.clientX + 'px';
-            badge.style.top = e.clientY + 'px';
+            badge.style.left = p.x + 'px';
+            badge.style.top = p.y + 'px';
 
             if (changed) renderYearTimeline();
         }
@@ -15843,6 +15892,8 @@
         function endTimelineSpanMove(e) {
             document.removeEventListener('mousemove', onTimelineSpanMove);
             document.removeEventListener('mouseup', endTimelineSpanMove);
+            document.removeEventListener('touchmove', onTimelineSpanMove);
+            document.removeEventListener('touchend', endTimelineSpanMove);
             document.body.style.userSelect = '';
             document.body.style.cursor = '';
             const badge = document.getElementById('tl-drag-date-badge');
@@ -15860,7 +15911,7 @@
         let timelineSpanResizeState = null;
 
         function startTimelineSpanResize(e, spanId, edge) {
-            if (e.button !== 0) return;
+            if (e.type === 'mousedown' && e.button !== 0) return;
             const span = writeSpans.find(s => s.id === spanId);
             if (!span) return;
             e.preventDefault(); e.stopPropagation();
@@ -15872,7 +15923,7 @@
             const daysInYear = tlDaysInYear(timelineYear);
 
             timelineSpanResizeState = {
-                spanId, edge, x0: e.clientX,
+                spanId, edge, x0: pointerXY(e).x,
                 startDate: span.startDate, endDate: span.endDate,
                 totalW, daysInYear, moved: false
             };
@@ -15880,15 +15931,19 @@
             document.body.style.cursor = 'ew-resize';
             document.addEventListener('mousemove', onTimelineSpanResize);
             document.addEventListener('mouseup', endTimelineSpanResize);
+            document.addEventListener('touchmove', onTimelineSpanResize, { passive: false });
+            document.addEventListener('touchend', endTimelineSpanResize);
         }
 
         function onTimelineSpanResize(e) {
             const st = timelineSpanResizeState;
             if (!st) return;
+            const p = pointerXY(e);
 
-            const deltaPx = e.clientX - st.x0;
+            const deltaPx = p.x - st.x0;
             const deltaDays = Math.round(deltaPx / st.totalW * st.daysInYear);
             if (!st.moved && deltaDays === 0) return;
+            e.preventDefault();
             const span = writeSpans.find(s => s.id === st.spanId);
             if (!span) return;
 
@@ -15914,8 +15969,8 @@
                 document.body.appendChild(badge);
             }
             badge.textContent = label;
-            badge.style.left = e.clientX + 'px';
-            badge.style.top = e.clientY + 'px';
+            badge.style.left = p.x + 'px';
+            badge.style.top = p.y + 'px';
 
             renderYearTimeline();
         }
@@ -15923,6 +15978,8 @@
         function endTimelineSpanResize() {
             document.removeEventListener('mousemove', onTimelineSpanResize);
             document.removeEventListener('mouseup', endTimelineSpanResize);
+            document.removeEventListener('touchmove', onTimelineSpanResize);
+            document.removeEventListener('touchend', endTimelineSpanResize);
             document.body.style.userSelect = '';
             document.body.style.cursor = '';
             const badge = document.getElementById('tl-drag-date-badge');
@@ -15936,7 +15993,8 @@
         // 커서 아래에 있는 날짜 칸의 날짜를 찾는다.
         // 칸과 칸 사이 틈에 커서가 놓여도 끊기지 않도록, 못 찾으면 가장 가까운 칸을 고른다.
         function dateUnderPointer(e) {
-            const el = document.elementFromPoint(e.clientX, e.clientY);
+            const p = pointerXY(e);
+            const el = document.elementFromPoint(p.x, p.y);
             const hit = el && el.closest ? el.closest('#write-calendar-body [data-date]') : null;
             if (hit) return hit.dataset.date;
 
@@ -15944,8 +16002,8 @@
             let best = null, bestDist = Infinity;
             cells.forEach(c => {
                 const r = c.getBoundingClientRect();
-                const dx = Math.max(r.left - e.clientX, 0, e.clientX - r.right);
-                const dy = Math.max(r.top - e.clientY, 0, e.clientY - r.bottom);
+                const dx = Math.max(r.left - p.x, 0, p.x - r.right);
+                const dy = Math.max(r.top - p.y, 0, p.y - r.bottom);
                 const d = dx * dx + dy * dy;
                 if (d < bestDist) { bestDist = d; best = c; }
             });
@@ -15954,33 +16012,38 @@
         }
 
         function startSpanMove(e, spanId) {
-            if (e.button !== 0) return;
+            if (e.type === 'mousedown' && e.button !== 0) return;
             const span = writeSpans.find(s => s.id === spanId);
             if (!span) return;
             e.preventDefault();
 
-            // 막대가 마우스 히트 테스트를 가리지 않도록 잠시 통과시킨다
+            // 막대가 마우스/터치 히트 테스트를 가리지 않도록 잠시 통과시킨다
             document.querySelectorAll('.write-span-bar').forEach(b => b.style.pointerEvents = 'none');
             const anchor = dateUnderPointer(e);
             document.querySelectorAll('.write-span-bar').forEach(b => b.style.pointerEvents = 'auto');
             if (!anchor) return;
 
+            const p0 = pointerXY(e);
             spanMoveState = {
                 spanId, anchor,
                 startDate: span.startDate, endDate: span.endDate,
-                x0: e.clientX, y0: e.clientY, moved: false
+                x0: p0.x, y0: p0.y, moved: false
             };
             document.querySelectorAll('.write-span-bar').forEach(b => b.style.pointerEvents = 'none');
             document.body.style.userSelect = 'none';
             document.addEventListener('mousemove', onSpanMoveMove);
             document.addEventListener('mouseup', endSpanMove);
+            document.addEventListener('touchmove', onSpanMoveMove, { passive: false });
+            document.addEventListener('touchend', endSpanMove);
         }
 
         function onSpanMoveMove(e) {
             if (!spanMoveState) return;
+            const p = pointerXY(e);
             // 살짝 흔들린 정도는 클릭으로 본다
             if (!spanMoveState.moved &&
-                Math.abs(e.clientX - spanMoveState.x0) < 4 && Math.abs(e.clientY - spanMoveState.y0) < 4) return;
+                Math.abs(p.x - spanMoveState.x0) < 4 && Math.abs(p.y - spanMoveState.y0) < 4) return;
+            e.preventDefault();
 
             const date = dateUnderPointer(e);
             if (!date) return;
@@ -16001,6 +16064,8 @@
         function endSpanMove(e) {
             document.removeEventListener('mousemove', onSpanMoveMove);
             document.removeEventListener('mouseup', endSpanMove);
+            document.removeEventListener('touchmove', onSpanMoveMove);
+            document.removeEventListener('touchend', endSpanMove);
             document.body.style.userSelect = '';
             document.body.style.cursor = '';
             const st = spanMoveState;
@@ -16016,17 +16081,20 @@
             const span = writeSpans.find(s => s.id === spanId);
             if (!span) return;
             spanResizeState = { spanId, edge, startDate: span.startDate, endDate: span.endDate, moved: false };
-            // 드래그 중에는 막대가 마우스 히트 테스트를 가로채지 못하게 막아야
+            // 드래그 중에는 막대가 마우스/터치 히트 테스트를 가로채지 못하게 막아야
             // 커서 아래의 '날짜 칸'을 제대로 찾을 수 있다
             document.querySelectorAll('.write-span-bar').forEach(b => b.style.pointerEvents = 'none');
             document.body.style.cursor = 'ew-resize';
             document.body.style.userSelect = 'none';
             document.addEventListener('mousemove', onSpanResizeMove);
             document.addEventListener('mouseup', endSpanResize);
+            document.addEventListener('touchmove', onSpanResizeMove, { passive: false });
+            document.addEventListener('touchend', endSpanResize);
         }
 
         function onSpanResizeMove(e) {
             if (!spanResizeState) return;
+            e.preventDefault();
             // 커서 아래에 있는 날짜 칸을 찾아서 그 날짜로 끝을 옮긴다
             const date = dateUnderPointer(e);
             if (!date) return;
@@ -16049,6 +16117,8 @@
         function endSpanResize() {
             document.removeEventListener('mousemove', onSpanResizeMove);
             document.removeEventListener('mouseup', endSpanResize);
+            document.removeEventListener('touchmove', onSpanResizeMove);
+            document.removeEventListener('touchend', endSpanResize);
             document.body.style.cursor = '';
             document.body.style.userSelect = '';
             if (spanResizeState && spanResizeState.moved) { save(); renderWriteCalendar(); }

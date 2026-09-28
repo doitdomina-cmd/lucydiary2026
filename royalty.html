@@ -2054,6 +2054,7 @@
                                 <input type="checkbox" id="contact-edit-review" class="w-4 h-4 accent-emerald-500">
                                 <span class="text-sm text-slate-700">리뷰</span>
                             </label>
+                            <input type="text" id="contact-edit-etc" placeholder="기타 직접 입력" class="flex-1 min-w-[100px] p-1.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-100">
                         </div>
                     </div>
                     <!-- 5줄: 메일 전문 (col-span-4) -->
@@ -4468,7 +4469,11 @@
         // 참조하게 되어 "ReferenceError: Cannot access 'contactSortMode' before initialization"로
         // 매번 로딩이 중간에 멈춰버리고, 그 이후 항목(집필 일정/글자수 기록/장르 목록/연락처 등)이
         // 전부 빈 기본값으로 남아버리는 문제가 있었음. 선언을 로딩 코드보다 앞으로 옮겨서 해결.
-        let contactSortMode = 'date'; // 'date' or 'penName' or 'manual'
+        // 'date'/'penName' 버튼을 누르면 그 기준으로 한 번 정렬해서 배열 순서 자체를 바꿔두고,
+        // 그 뒤로는 화면에서 매번 다시 정렬하지 않고 배열 순서 그대로 보여준다.
+        // 그래서 버튼을 누른 다음 카드를 자유롭게 드래그해도(순서가 배열에 바로 반영됨) 흐트러지지 않는다.
+        // contactSortMode는 지금 어느 버튼이 눌려있는지 표시용으로만 쓰고, 정렬 로직에는 안 쓴다.
+        let contactSortMode = 'date'; // 'date' or 'penName'
         let taskCalDate = new Date();
         let writeGenreFilter = '전체';
         let taskGenreFilter = '전체';
@@ -4649,6 +4654,7 @@
             migrateCounterBaseToPosition(); // '지금부터 카운터' 기준점을 원고 위치 기준으로 다시 계산
             taskSchedules = parsed.taskSchedules || {};
             contacts = parsed.contacts || [];
+            sortContactsInPlace(contactSortMode); // 불러온 순서가 예전 자동 정렬 결과와 같게, 최초 1회만 정렬
             penNames = parsed.penNames || [];
             submissions = parsed.submissions || [];
             webtoonSubs = parsed.webtoonSubs || {};
@@ -9288,8 +9294,27 @@
         // contactSortMode는 이제 스크립트 상단에서 선언됨 (로딩 순서 버그 수정)
         let contactDragSrcId = null;
 
+        // 'date'/'penName' 기준으로 contacts 배열 자체의 순서를 한 번 바꾼다 (화면에서 매번 다시 정렬하지 않음)
+        function sortContactsInPlace(mode) {
+            if (mode === 'date') {
+                contacts.sort((a,b) => {
+                    const aDate = a.contactDate || (a.createdAt ? new Date(a.createdAt).toISOString().slice(0,10) : '');
+                    const bDate = b.contactDate || (b.createdAt ? new Date(b.createdAt).toISOString().slice(0,10) : '');
+                    return bDate.localeCompare(aDate); // 최신순
+                });
+            } else if (mode === 'penName') {
+                contacts.sort((a,b) => {
+                    const penCmp = (a.penName || 'ㅎ').localeCompare(b.penName || 'ㅎ', 'ko');
+                    if (penCmp !== 0) return penCmp;
+                    const starCmp = (b.stars || 0) - (a.stars || 0); // 별 갯수 높은 순
+                    if (starCmp !== 0) return starCmp;
+                    return (a.publisher || '').localeCompare(b.publisher || '', 'ko'); // 그 뒤엔 출판사 이름 순
+                });
+            }
+        }
         function setContactSort(mode) {
             contactSortMode = mode;
+            sortContactsInPlace(mode); // 이 기준으로 한 번 정렬 — 이후엔 카드를 자유롭게 드래그해서 다시 순서를 바꿀 수 있음
             save(true);
             renderContactsList();
         }
@@ -9304,33 +9329,17 @@
         const WEBTOON_PEN_HEART_COLORS = { '후아유99': '#0369a1', '도민아': '#f9a8d4', '타락감자': '#eab308', '오렌지말머리': '#f97316', '후아유69': '#6b7280' };
         function renderContactsList() {
             const container = document.getElementById('publisher-status-list');
-            // 정렬
-            let sorted = [...contacts];
-            if (contactSortMode === 'date') {
-                sorted.sort((a,b) => {
-                    const aDate = a.contactDate || (a.createdAt ? new Date(a.createdAt).toISOString().slice(0,10) : '');
-                    const bDate = b.contactDate || (b.createdAt ? new Date(b.createdAt).toISOString().slice(0,10) : '');
-                    return bDate.localeCompare(aDate); // 최신순
-                });
-            } else if (contactSortMode === 'penName') {
-                sorted.sort((a,b) => {
-                    const penCmp = (a.penName || 'ㅎ').localeCompare(b.penName || 'ㅎ', 'ko');
-                    if (penCmp !== 0) return penCmp;
-                    const starCmp = (b.stars || 0) - (a.stars || 0); // 별 갯수 높은 순
-                    if (starCmp !== 0) return starCmp;
-                    return (a.publisher || '').localeCompare(b.publisher || '', 'ko'); // 그 뒤엔 출판사 이름 순
-                });
-            }
-            // 'manual'은 contacts 배열 순서 그대로 (드래그로 변경한 순서)
+            // 정렬은 버튼을 누른 시점에 contacts 배열 순서 자체를 이미 바꿔놨으므로, 여기선 그 순서 그대로 보여준다.
+            // (드래그로 순서를 바꿔도 이 배열 순서에 바로 반영되어 흐트러지지 않음)
+            let sorted = contacts;
 
             const sortBtnCls = (m) => `px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${contactSortMode === m ? 'text-white shadow-sm' : 'text-slate-500 bg-slate-100 hover:bg-slate-200'}`;
             const sortBtnStyle = (m) => contactSortMode === m ? 'background:var(--primary)' : '';
 
             const headerRow = `<div class="flex items-center justify-between mb-4 px-1 flex-wrap gap-2">
                 <div class="flex items-center gap-2">
-                    <button onclick="setContactSort('date')" class="${sortBtnCls('date')}" style="${sortBtnStyle('date')}">날짜순</button>
-                    <button onclick="setContactSort('penName')" class="${sortBtnCls('penName')}" style="${sortBtnStyle('penName')}">필명순</button>
-                    <button onclick="setContactSort('manual')" class="${sortBtnCls('manual')}" style="${sortBtnStyle('manual')}">직접 정렬</button>
+                    <button onclick="setContactSort('date')" class="${sortBtnCls('date')}" style="${sortBtnStyle('date')}" title="이 기준으로 한 번 정렬합니다. 이후엔 카드를 드래그해서 자유롭게 순서를 바꿀 수 있어요.">날짜순</button>
+                    <button onclick="setContactSort('penName')" class="${sortBtnCls('penName')}" style="${sortBtnStyle('penName')}" title="이 기준으로 한 번 정렬합니다. 이후엔 카드를 드래그해서 자유롭게 순서를 바꿀 수 있어요.">필명순</button>
                 </div>
                 <button onclick="openContactModal()" class="px-4 py-2 rounded-lg text-sm font-bold text-white shadow-md hover:-translate-y-0.5 transition-all flex items-center gap-2" style="background:var(--primary)"><i class="fa-solid fa-plus"></i> 컨택 추가</button>
             </div>`;
@@ -9376,6 +9385,7 @@
                 if (c.edit1) editParts.push('1교');
                 if (c.edit2) editParts.push('2교');
                 if (c.editReview) editParts.push('리뷰');
+                if (c.editEtc) editParts.push(c.editEtc);
                 const editText = editParts.join(' · ');
                 
                 const settlementParts = [];
@@ -9433,7 +9443,6 @@
             const [moved] = contacts.splice(srcIdx, 1);
             contacts.splice(tgtIdx, 0, moved);
             contactDragSrcId = null;
-            contactSortMode = 'manual'; // 드래그하면 자동으로 직접 정렬 모드로
             save();
             renderContactsList();
         }
@@ -9586,6 +9595,7 @@
             document.getElementById('contact-edit-1').checked = !!c?.edit1;
             document.getElementById('contact-edit-2').checked = !!c?.edit2;
             document.getElementById('contact-edit-review').checked = !!c?.editReview;
+            document.getElementById('contact-edit-etc').value = c?.editEtc || '';
 
             // 별점
             currentContactStars = c?.stars || 0;
@@ -9618,6 +9628,7 @@
                 edit1: document.getElementById('contact-edit-1').checked,
                 edit2: document.getElementById('contact-edit-2').checked,
                 editReview: document.getElementById('contact-edit-review').checked,
+                editEtc: document.getElementById('contact-edit-etc').value.trim(),
                 stars: currentContactStars,
                 status: document.getElementById('contact-status').value,
                 email: document.getElementById('contact-email').value

@@ -13914,6 +13914,7 @@
         const TL_BAR_GAP = 6;     // 겹칠 때 아래로 밀리는 간격
         const TL_GAP_MERGE = 7;   // 이 일수 이하로 떨어진 일정은 한 덩어리로 묶어서 표시
         const TL_MIN_DAYS = 3;    // 이 일수 이하 짧은 일정은 막대로 표시하지 않음
+        const TL_LIGHT_WEEKLY = 10000;   // 일주일 평균 이 글자수 미만인 집필 구간(예: 주 1회 4천자)은 연간 일정·쉬는 구간에서 뺀다
 
         function openYearTimeline() {
             timelineYear = writeCalDate.getFullYear();
@@ -13991,14 +13992,19 @@
                     if (last && idx - last.endIdx <= TL_GAP_MERGE) { last.endIdx = idx; last.days++; last.chars += g.dayChars[ds] || 0; }
                     else segs.push({ startIdx: idx, endIdx: idx, days: 1, chars: g.dayChars[ds] || 0 });
                 });
-                works.push({
+                // 띄엄띄엄 조금씩 쓰는 구간은 뺀다 — 구간 전체 기간(최소 1주) 기준 일주일 평균이 1만자 미만이면
+                // 막대로도 안 그리고, 쉬는 구간·집필일·목표 합계에도 안 넣는다
+                const light = sg => sg.chars / Math.max(sg.endIdx - sg.startIdx + 1, 7) * 7 < TL_LIGHT_WEEKLY;
+                segs.splice(0, segs.length, ...segs.filter(sg => !light(sg)));
+                const editOnly = !segs.length;
+                if (!editOnly) works.push({
                     workId, title, color, segs,
                     genre: resolved.genre || '', catText,
                     totalChars: g.chars, workDays: sorted.length,
                     goalWithSpace: resolved.goalWithSpace || 0,
                     firstDate: sorted[0], lastDate: sorted[sorted.length-1]
                 });
-                segs.forEach((sg, i) => items.push({
+                if (!editOnly) segs.forEach((sg, i) => items.push({
                     kind: 'work', group: 'write', workId, title, color,
                     startIdx: sg.startIdx, endIdx: sg.endIdx, days: sg.days,
                     spanDays: sg.endIdx - sg.startIdx + 1,   // 구간 전체 길이 (쉬는 날 포함)

@@ -11468,6 +11468,233 @@
             set('tax-r-local', '₩ ' + taxFmt(local));
             clearTimeout(taxEstSaveTimer); taxEstSaveTimer = setTimeout(()=>save(true), 600);
         }
+        // ════════ 인사이트 > 작품 분석 ════════
+        // 1) 작품 수명 곡선  2) 집필 하루당 수익  3) 신작 의존도
+        function ymToIdx(ym) { const [y, m] = String(ym).split('-').map(Number); return y * 12 + (m - 1); }
+        function idxToYm(i) { return `${Math.floor(i / 12)}-${String(i % 12 + 1).padStart(2, '0')}`; }
+        // 작품의 월별 인세 — 선인세는 뺀다 (출간 전에 미리 받는 돈이라 수명 곡선·신작/구작 구분을 왜곡함)
+        function getWorkRoyaltyByMonth(w) {
+            const adv = advanceMonthSums(getWorkAdvances(w));
+            const out = {};
+            Object.entries(monthlyData).forEach(([ym, d]) => {
+                const v = (Number(d[w.id]) || 0) - (adv[ym] || 0);
+                if (v) out[ym] = v;
+            });
+            return out;
+        }
+        // 이번 달은 아직 정산이 다 안 들어왔을 수 있어서 '지난달'까지만 분석한다
+        function analysisLastIdx() { const n = new Date(); return n.getFullYear() * 12 + n.getMonth() - 1; }
+
+        // 1) 작품 수명 곡선: 출간 후 n개월째에 작품 1개가 평균 얼마를 벌었는지 (장르별)
+        //    n개월째 평균은 '출간한 지 n개월 이상 지난 작품'만으로 낸다 — 최근작 때문에 뒤쪽 평균이 깎이지 않게
+        function buildLifecycleData() {
+            const MAXM = 24, lastIdx = analysisLastIdx();
+            const byGenre = {};
+            masterWorks.forEach(w => {
+                if (w.isPending || !w.publishDate) return;
+                const pIdx = ymToIdx(w.publishDate.slice(0, 7));
+                const age = lastIdx - pIdx;
+                if (age < 0) return;
+                const g = w.genre || '기타';
+                const G = byGenre[g] || (byGenre[g] = { sums: Array(MAXM + 1).fill(0), counts: Array(MAXM + 1).fill(0), works: 0 });
+                G.works++;
+                const roy = getWorkRoyaltyByMonth(w);
+                for (let i = 0; i <= Math.min(age, MAXM); i++) { G.sums[i] += roy[idxToYm(pIdx + i)] || 0; G.counts[i]++; }
+            });
+            const genreOrder = g => { const i = genreList.findIndex(x => x.name === g); return i < 0 ? 999 : i; };
+            return Object.entries(byGenre).map(([genre, G]) => {
+                // 표본이 2작품 이상 있는 개월차까지만 본다
+                let horizon = -1;
+                for (let i = 0; i <= MAXM; i++) { if (G.counts[i] >= 2) horizon = i; else break; }
+                if (horizon < 5) return null;
+                const avg = G.sums.slice(0, horizon + 1).map((s, i) => s / G.counts[i]);
+                const total = avg.reduce((a, b) => a + b, 0);
+                if (total <= 0) return null;
+                let cum = 0; const cumPct = avg.map(v => { cum += v; return cum / total * 100; });
+                const reach = p => { const i = cumPct.findIndex(c => c >= p); return i < 0 ? null : i + 1; };
+                const pctAt = m => m - 1 <= horizon ? Math.round(cumPct[m - 1]) : null;
+                return { genre, works: G.works, horizon: horizon + 1, avg, total, half: reach(50), p80: reach(80), at3: pctAt(3), at6: pctAt(6), at12: pctAt(12) };
+            }).filter(Boolean).sort((a, b) => genreOrder(a.genre) - genreOrder(b.genre));
+        }
+
+        // 2) 집필 하루당 수익: 이 작품이 지금까지 벌어다 준 돈(선인세 포함) ÷ 집필 기록이 있는 날 수
+        function buildWritingDayValueData() {
+            const days = {}, chars = {};
+            let firstDate = null;
+            Object.entries(writerDailyData).forEach(([ds, o]) => {
+                Object.entries((o && o.works) || {}).forEach(([key, v]) => {
+                    const s = Object.values((v && v.hours) || {}).reduce((a, b) => a + (Number(b.diff) || 0), 0);
+                    if (s <= 0) return;
+                    const id = key.split('::')[0];   // 외전(작품ID::외전ID)도 본편 작품으로 합친다
+                    (days[id] = days[id] || new Set()).add(ds);
+                    chars[id] = (chars[id] || 0) + s;
+                    if (!firstDate || ds < firstDate) firstDate = ds;
+                });
+            });
+            const reg = getAllWorkRegisteredCharTotals();
+            const lastIdx = analysisLastIdx();
+            let writtenNoIncome = 0;
+            const rows = masterWorks.map(w => {
+                const d = days[w.id];
+                if (!d || d.size < 3) return null;
+                let income = 0;
+                Object.values(monthlyData).forEach(m => { income += Number(m[w.id]) || 0; });
+                if (income <= 0) { writtenNoIncome++; return null; }
+                const coverage = reg[w.id] ? chars[w.id] / reg[w.id] : null;
+                const months = (!w.isPending && w.publishDate) ? Math.max(lastIdx - ymToIdx(w.publishDate.slice(0, 7)) + 1, 0) : null;
+                return { w, days: d.size, chars: chars[w.id], income, perDay: income / d.size, coverage, months };
+            }).filter(Boolean).sort((a, b) => b.perDay - a.perDay);
+            return { rows, firstDate, writtenNoIncome };
+        }
+
+        // 3) 신작 의존도: 연도별 수입을 선인세 / 신작(출간 12개월 미만) / 구작(12개월 이상)으로 나눈다
+        function buildNewVsOldData() {
+            const years = {};
+            masterWorks.forEach(w => {
+                const pIdx = (!w.isPending && w.publishDate) ? ymToIdx(w.publishDate.slice(0, 7)) : null;
+                const adv = advanceMonthSums(getWorkAdvances(w));
+                Object.entries(monthlyData).forEach(([ym, d]) => {
+                    const amt = Number(d[w.id]) || 0;
+                    if (!amt) return;
+                    const y = ym.slice(0, 4);
+                    const Y = years[y] || (years[y] = { adv: 0, fresh: 0, old: 0, unknown: 0, lastMonth: 0 });
+                    Y.lastMonth = Math.max(Y.lastMonth, Number(ym.slice(5, 7)));
+                    const a = adv[ym] || 0;
+                    Y.adv += a;
+                    const roy = amt - a;
+                    if (!roy) return;
+                    if (pIdx === null) Y.unknown += roy;
+                    else if (ymToIdx(ym) - pIdx >= 12) Y.old += roy;
+                    else Y.fresh += roy;
+                });
+            });
+            return Object.entries(years).sort((a, b) => a[0].localeCompare(b[0])).map(([year, Y]) => {
+                const total = Y.adv + Y.fresh + Y.old + Y.unknown;
+                return { year, total, ...Y };
+            }).filter(r => r.total > 0);
+        }
+
+        function renderWorkAnalysisTabHtml(life, dayVal, newOld) {
+            const won = v => '₩ ' + taxFmt(v);
+            const man = v => v >= 10000 ? `${taxFmt(v / 10000)}만` : `${taxFmt(v)}`;
+            const badge = g => `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 whitespace-nowrap" style="background-color:${hexToRgba(getGenreColor(g), genreBadgeOpacity)};color:#334155">${escapeHtml(g)}</span>`;
+
+            // ── 1) 수명 곡선 ──
+            const lifeRows = life.map(l => `
+                <tr class="border-b border-slate-50">
+                    <td class="py-2 pr-2">${badge(l.genre)}</td>
+                    <td class="py-2 px-2 text-right text-slate-500">${l.works}개</td>
+                    <td class="py-2 px-2 text-right font-bold text-slate-700">${won(Math.round(l.total))}</td>
+                    <td class="py-2 px-2 text-right text-slate-600">${l.at3 !== null ? l.at3 + '%' : '-'}</td>
+                    <td class="py-2 px-2 text-right text-slate-600">${l.at6 !== null ? l.at6 + '%' : '-'}</td>
+                    <td class="py-2 px-2 text-right text-slate-600">${l.at12 !== null ? l.at12 + '%' : '-'}</td>
+                    <td class="py-2 pl-2 text-right font-bold" style="color:var(--primary)">${l.half ? l.half + '개월' : '-'}</td>
+                </tr>`).join('');
+            const lifeTips = life.filter(l => l.half).map(l =>
+                `<b style="color:var(--primary)">${escapeHtml(l.genre)}</b>은(는) 출간 후 <b>${l.half}개월</b>이면 ${l.horizon}개월치 수익의 절반, <b>${l.p80 || '-'}개월</b>이면 80%가 들어와요.`);
+            const lifeHtml = life.length === 0
+                ? `<p class="text-xs text-slate-400">출간일과 정산 기록이 있는 작품이 아직 충분하지 않아요. (장르마다 출간 6개월 넘은 작품이 2개 이상 필요해요)</p>`
+                : `<div class="relative mb-4" style="height:240px;"><canvas id="lifecycle-chart"></canvas></div>
+                   <div class="overflow-x-auto"><table class="w-full text-[13px]" style="min-width:560px;">
+                       <thead><tr class="text-[11px] text-slate-400 border-b border-slate-100">
+                           <th class="py-2 pr-2 text-left font-bold">장르</th><th class="py-2 px-2 text-right font-bold">작품</th>
+                           <th class="py-2 px-2 text-right font-bold">작품당 평균 수익</th><th class="py-2 px-2 text-right font-bold">첫 3개월</th>
+                           <th class="py-2 px-2 text-right font-bold">첫 6개월</th><th class="py-2 px-2 text-right font-bold">첫 12개월</th>
+                           <th class="py-2 pl-2 text-right font-bold">절반 도달</th></tr></thead>
+                       <tbody>${lifeRows}</tbody></table></div>
+                   <ul class="mt-3 space-y-1">${lifeTips.map(t => `<li class="text-xs text-slate-600 flex gap-2"><i class="fa-solid fa-lightbulb text-amber-400 mt-0.5 shrink-0"></i><span>${t}</span></li>`).join('')}</ul>
+                   <p class="text-[11px] text-slate-400 mt-2">※ '작품당 평균 수익'과 비중은 장르마다 표본이 2작품 이상 있는 기간(최대 24개월)까지의 인세 기준이에요. 선인세는 빠져 있고, 정산이 익월·익익월이라 첫 1~2개월은 적게 잡혀요.</p>`;
+
+            // ── 2) 집필 하루당 수익 ──
+            const dvRows = dayVal.rows.map((r, i) => {
+                const partial = r.coverage !== null && r.coverage < 0.6
+                    ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-400 shrink-0" title="집필 기록을 시작하기 전에 쓴 분량이 있어서, 실제로는 더 여러 날 쓴 작품이에요">기록 일부 ${Math.round(r.coverage * 100)}%</span>` : '';
+                const age = r.months !== null ? ` · 출간 ${r.months}개월째` : ' · 출간 전';
+                return `<div class="flex items-center gap-3 py-2.5 ${i < dayVal.rows.length - 1 ? 'border-b border-slate-50' : ''}">
+                    <span class="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold text-white shrink-0" style="background:${i === 0 ? 'var(--primary)' : '#cbd5e1'}">${i + 1}</span>
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-2 min-w-0">${badge(r.w.genre || '')}<span class="text-sm font-medium text-slate-700 truncate">${escapeHtml(r.w.title)}</span>${partial}</div>
+                        <p class="text-[11px] text-slate-400 mt-0.5">집필 ${r.days}일 · ${man(r.chars)}자${age} · 총 ${won(r.income)}</p>
+                    </div>
+                    <span class="text-sm font-bold text-slate-700 shrink-0 text-right">${won(Math.round(r.perDay))}<span class="text-[10px] text-slate-400 font-normal">/일</span></span>
+                </div>`;
+            }).join('');
+            const dvHtml = dayVal.rows.length === 0
+                ? `<p class="text-xs text-slate-400">집필 기록(3일 이상)과 정산 수입이 둘 다 있는 작품이 아직 없어요.</p>`
+                : dvRows + `<p class="text-[11px] text-slate-400 mt-3">※ 집필 기록은 ${dayVal.firstDate || '-'}부터 있어요. 수익은 지금까지 들어온 금액(선인세 포함)이라 최근 출간작은 앞으로 더 올라가요.${dayVal.writtenNoIncome ? ` 아직 수입이 없는 집필작 ${dayVal.writtenNoIncome}개는 빠졌어요.` : ''}</p>`;
+
+            // ── 3) 신작 의존도 ──
+            const seg = (v, total, color, label) => v > 0 ? `<div style="width:${v / total * 100}%;background:${color}" class="h-full flex items-center justify-center overflow-hidden" title="${label} ${won(v)} (${Math.round(v / total * 100)}%)">${v / total >= 0.09 ? `<span class="text-[10px] font-bold text-white px-1 whitespace-nowrap">${Math.round(v / total * 100)}%</span>` : ''}</div>` : '';
+            const C_OLD = '#94a3b8', C_ADV = '#f59e0b', C_UNK = '#cbd5e1';
+            const nowY = String(new Date().getFullYear());
+            const noRows = newOld.map(r => `
+                <div class="flex items-center gap-3 py-1.5">
+                    <span class="w-20 shrink-0 text-xs font-bold text-slate-600">${r.year}년${r.year === nowY ? `<span class="block text-[10px] font-normal text-slate-400">${r.lastMonth}월까지</span>` : ''}</span>
+                    <div class="flex-1 h-6 rounded-lg overflow-hidden flex bg-slate-100">
+                        ${seg(r.fresh, r.total, 'var(--primary)', '신작')}${seg(r.old, r.total, C_OLD, '구작')}${seg(r.adv, r.total, C_ADV, '선인세')}${seg(r.unknown, r.total, C_UNK, '출간일 없음')}
+                    </div>
+                    <span class="w-24 shrink-0 text-right text-xs font-bold text-slate-700">${man(r.total)}원</span>
+                </div>`).join('');
+            const cur = newOld.find(r => r.year === nowY), prev = newOld.find(r => r.year === String(Number(nowY) - 1));
+            const oldPct = r => r && r.total ? Math.round(r.old / r.total * 100) : null;
+            let noTip = '';
+            if (cur) {
+                const cp = oldPct(cur), pp = oldPct(prev);
+                noTip = `올해 수입 중 출간 1년 넘은 구작에서 나온 돈은 <b style="color:var(--primary)">${cp}%</b>예요${pp !== null ? ` (작년 ${pp}%)` : ''}. `
+                    + (cp < 30 ? '대부분 최근 1년 안에 낸 작품이 벌고 있어서, 신작 출간이 멈추면 수입이 빠르게 줄 수 있어요.' : cp >= 50 ? '구작이 수입의 절반 이상을 받쳐주고 있어서 비교적 안정적인 편이에요.' : '신작과 구작이 고르게 섞여 있어요.');
+            }
+            const legend = [['var(--primary)', '신작 (출간 12개월 미만)'], [C_OLD, '구작 (12개월 이상)'], [C_ADV, '선인세'], [C_UNK, '출간일 없음']]
+                .map(([c, t]) => `<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm" style="background:${c}"></span>${t}</span>`).join('');
+            const noHtml = newOld.length === 0 ? `<p class="text-xs text-slate-400">정산 데이터가 없어요.</p>`
+                : `<div class="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500 mb-3">${legend}</div>${noRows}
+                   ${noTip ? `<p class="text-xs text-slate-600 mt-3 flex gap-2"><i class="fa-solid fa-lightbulb text-amber-400 mt-0.5 shrink-0"></i><span>${noTip}</span></p>` : ''}`;
+
+            return `
+            <div class="glass-card p-6">
+                <h3 class="text-sm font-bold text-slate-500 flex items-center gap-2 mb-1"><i class="fa-solid fa-chart-line text-violet-500"></i> 작품 수명 곡선</h3>
+                <p class="text-[11px] text-slate-400 mb-4">출간 후 몇 개월째에 작품 1개가 평균 얼마를 버는지 (장르별 · 선인세 제외)</p>
+                ${lifeHtml}
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <div class="glass-card p-6">
+                    <h3 class="text-sm font-bold text-slate-500 flex items-center gap-2 mb-1"><i class="fa-solid fa-mug-hot text-amber-500"></i> 집필 하루당 수익</h3>
+                    <p class="text-[11px] text-slate-400 mb-3">지금까지 번 돈 ÷ 집필 기록이 있는 날 수</p>
+                    ${dvHtml}
+                </div>
+                <div class="glass-card p-6">
+                    <h3 class="text-sm font-bold text-slate-500 flex items-center gap-2 mb-1"><i class="fa-solid fa-seedling text-emerald-500"></i> 신작 의존도</h3>
+                    <p class="text-[11px] text-slate-400 mb-3">연도별 수입이 어디서 나왔는지</p>
+                    ${noHtml}
+                </div>
+            </div>`;
+        }
+        let lifecycleChartInstance = null;
+        function drawLifecycleChart(life) {
+            if (lifecycleChartInstance) { lifecycleChartInstance.destroy(); lifecycleChartInstance = null; }
+            const el = document.getElementById('lifecycle-chart');
+            if (!el || typeof Chart === 'undefined' || life.length === 0) return;
+            const maxLen = Math.max(...life.map(l => l.avg.length));
+            lifecycleChartInstance = new Chart(el, {
+                type: 'line',
+                data: {
+                    labels: Array.from({ length: maxLen }, (_, i) => `${i + 1}개월`),
+                    datasets: life.map(l => ({
+                        label: l.genre, data: l.avg.map(v => Math.round(v)),
+                        borderColor: getGenreColor(l.genre), backgroundColor: getGenreColor(l.genre),
+                        borderWidth: 2, pointRadius: 2, tension: 0.3, spanGaps: false
+                    }))
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } },
+                        tooltip: { callbacks: { label: c => `${c.dataset.label}: ₩ ${formatCurrency(c.parsed.y)}` } } },
+                    scales: { x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+                        y: { grid: { color: '#f3f4f6' }, ticks: { font: { size: 10 }, callback: v => v >= 10000 ? (v / 10000).toLocaleString() + '만' : v } } }
+                }
+            });
+        }
+
         let taxGoalSubTab = 'goal'; // 'goal' 또는 'tax' (목표를 기본으로 먼저 보여줌)
         let charEffShowAll = false; // 글자수 탭: false면 상단 연도 기준, true면 전체 기간
         function toggleCharEffScope(){
@@ -11498,6 +11725,7 @@
             const subTabBtns = `
                 <div class="flex items-center gap-1 bg-slate-100 rounded-lg p-1 no-print">
                     <button onclick="setTaxGoalSubTab('goal')" class="px-3.5 py-1.5 rounded-md text-sm font-bold transition-all ${taxGoalSubTab==='goal' ? 'bg-white shadow-sm text-slate-700' : 'text-slate-400 hover:text-slate-600'}"><i class="fa-solid fa-bullseye mr-1.5"></i>목표</button>
+                    <button onclick="setTaxGoalSubTab('analysis')" class="px-3.5 py-1.5 rounded-md text-sm font-bold transition-all ${taxGoalSubTab==='analysis' ? 'bg-white shadow-sm text-slate-700' : 'text-slate-400 hover:text-slate-600'}"><i class="fa-solid fa-chart-line mr-1.5"></i>작품 분석</button>
                     <button onclick="setTaxGoalSubTab('chars')" class="px-3.5 py-1.5 rounded-md text-sm font-bold transition-all ${taxGoalSubTab==='chars' ? 'bg-white shadow-sm text-slate-700' : 'text-slate-400 hover:text-slate-600'}"><i class="fa-solid fa-keyboard mr-1.5"></i>글자수</button>
                     <button onclick="setTaxGoalSubTab('tax')" class="px-3.5 py-1.5 rounded-md text-sm font-bold transition-all ${taxGoalSubTab==='tax' ? 'bg-white shadow-sm text-slate-700' : 'text-slate-400 hover:text-slate-600'}"><i class="fa-solid fa-receipt mr-1.5"></i>세무</button>
                 </div>`;
@@ -11593,6 +11821,9 @@
             ${renderStrengthAnalysisSectionHtml(strengthData)}`;
 
             const charsSectionHtml = renderCharEfficiencyTabHtml(charEffData);
+            // 작품 분석은 전체 기간 기준이라 그 탭을 볼 때만 계산 (연도 이동 버튼도 숨김)
+            const lifeData = taxGoalSubTab === 'analysis' ? buildLifecycleData() : null;
+            const analysisSectionHtml = taxGoalSubTab === 'analysis' ? renderWorkAnalysisTabHtml(lifeData, buildWritingDayValueData(), buildNewVsOldData()) : '';
 
             panel.innerHTML = `
             <div class="flex items-center justify-between flex-wrap gap-3 no-print">
@@ -11601,11 +11832,12 @@
                     ${subTabBtns}
                 </div>
                 <div class="flex items-center gap-2">
-                    ${yearNavBtns}
+                    ${taxGoalSubTab === 'analysis' ? '' : yearNavBtns}
                     <button onclick="openYearSummaryReport()" class="px-3 py-2 rounded-lg bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200 hover:bg-blue-100 transition-all"><i class="fa-solid fa-chart-pie mr-1"></i> 요약</button>
                 </div>
             </div>
-            ${taxGoalSubTab === 'tax' ? taxSectionHtml : taxGoalSubTab === 'chars' ? charsSectionHtml : goalSectionHtml}`;
+            ${taxGoalSubTab === 'tax' ? taxSectionHtml : taxGoalSubTab === 'chars' ? charsSectionHtml : taxGoalSubTab === 'analysis' ? analysisSectionHtml : goalSectionHtml}`;
+            if (taxGoalSubTab === 'analysis') drawLifecycleChart(lifeData);
             recomputeTaxEstimate();
             if (taxGoalSubTab === 'goal') renderTaxGoalMemoList();
         }

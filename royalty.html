@@ -13992,24 +13992,23 @@
                     if (last && idx - last.endIdx <= TL_GAP_MERGE) { last.endIdx = idx; last.days++; last.chars += g.dayChars[ds] || 0; }
                     else segs.push({ startIdx: idx, endIdx: idx, days: 1, chars: g.dayChars[ds] || 0 });
                 });
-                // 띄엄띄엄 조금씩 쓰는 구간은 뺀다 — 구간 전체 기간(최소 1주) 기준 일주일 평균이 1만자 미만이면
-                // 막대로도 안 그리고, 쉬는 구간·집필일·목표 합계에도 안 넣는다
+                // 띄엄띄엄 조금씩 쓰는 구간(구간 전체 기간·최소 1주 기준 일주일 평균 1만자 미만)은 막대로 안 그리고
+                // 쉬는 구간·집필일 계산에도 안 넣는다. 확정 작품 수·목표 글자수·아래 표(works)에는 그대로 센다.
                 const light = sg => sg.chars / Math.max(sg.endIdx - sg.startIdx + 1, 7) * 7 < TL_LIGHT_WEEKLY;
-                segs.splice(0, segs.length, ...segs.filter(sg => !light(sg)));
-                const editOnly = !segs.length;
-                if (!editOnly) works.push({
+                const barSegs = segs.filter(sg => !light(sg));
+                works.push({
                     workId, title, color, segs,
                     genre: resolved.genre || '', catText,
                     totalChars: g.chars, workDays: sorted.length,
                     goalWithSpace: resolved.goalWithSpace || 0,
                     firstDate: sorted[0], lastDate: sorted[sorted.length-1]
                 });
-                if (!editOnly) segs.forEach((sg, i) => items.push({
+                barSegs.forEach((sg, i) => items.push({
                     kind: 'work', group: 'write', workId, title, color,
                     startIdx: sg.startIdx, endIdx: sg.endIdx, days: sg.days,
                     spanDays: sg.endIdx - sg.startIdx + 1,   // 구간 전체 길이 (쉬는 날 포함)
                     chars: sg.chars,
-                    part: segs.length > 1 ? `${i+1}/${segs.length}` : '',
+                    part: barSegs.length > 1 ? `${i+1}/${barSegs.length}` : '',
                     catText: i === 0 ? catText : ''
                 }));
 
@@ -14101,7 +14100,8 @@
                 });
             });
 
-            const totalChars = items.filter(it => it.kind === 'work').reduce((n, it) => n + it.chars, 0);
+            // 확정 목표 글자수 = 달력에 찍힌 집필 카드 전부 (막대에서 뺀 '조금씩 쓰는 구간'도 포함)
+            const totalChars = works.reduce((n, w) => n + (Number(w.totalChars) || 0), 0);
             const busyDays = busy.filter(Boolean).length;
 
             return { y, daysInYear, items, works, spans, restSegs, midBreakSegs, busy, busyDays, monthly, totalChars };

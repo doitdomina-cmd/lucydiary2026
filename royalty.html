@@ -129,6 +129,8 @@
         body.sidebar-collapsed #sidebar-collapse-btn { left: 0; }
         body.sidebar-collapsed #sidebar-collapse-icon { transform: rotate(180deg); }
         @media (max-width: 1024px) { body.sidebar-web #sidebar-collapse-btn { display: none; } }
+        /* 정산 입금일 월 카드 — PC(앱·웹)는 같은 높이로 맞춘 큰 카드, 폰 폭에서는 내용만큼만 (빈 공간 없이) */
+        @media (max-width: 767px) { .settle-month-card { min-height: 0 !important; } }
         /* 웹(브라우저)으로 볼 때만 — 메뉴 항목이 많아서 화면 높이보다 길어져 스크롤이 생기던 것을
            항목 간 여백을 줄여서 스크롤 없이 한 화면에 다 들어오게 한다. 데스크톱 앱은 그대로 둠 */
         body.sidebar-web .nav-btn { padding-top: 7px !important; padding-bottom: 7px !important; margin-top: 1px !important; margin-bottom: 1px !important; }
@@ -5331,8 +5333,14 @@
         }
 
         function resetData() { if(confirm("초기화하시겠습니까?")) { try { if(fs) fs.unlinkSync(dataFilePath); } catch(e) {} localStorage.clear(); location.reload(); } }
-        function setTheme(theme) { activeTheme = theme; localStorage.setItem('theme_v6', theme); document.querySelectorAll('.theme-dot').forEach(d => { d.classList.remove('active'); if(d.dataset.theme === theme) d.classList.add('active'); }); if (theme === 'custom') { setCustomTheme(localStorage.getItem('custom_color_v6') || '#b07d7d'); } else { document.body.className = `theme-${theme}`; document.body.style.removeProperty('--primary'); document.body.style.removeProperty('--primary-light'); } updateDashboardStats(); }
-        function setCustomTheme(color) { activeTheme = 'custom'; localStorage.setItem('theme_v6', 'custom'); localStorage.setItem('custom_color_v6', color); document.querySelectorAll('.theme-dot').forEach(d => d.classList.remove('active')); document.getElementById('custom-theme-dot').classList.add('active'); document.getElementById('custom-theme-dot').style.backgroundColor = color; document.body.className = ''; document.documentElement.style.setProperty('--primary', color); const r = parseInt(color.substr(1,2), 16), g = parseInt(color.substr(3,2), 16), b = parseInt(color.substr(5,2), 16); document.documentElement.style.setProperty('--primary-light', `rgba(${r},${g},${b},0.1)`); updateDashboardStats(); }
+        // body의 theme-* 클래스만 교체 — className을 통째로 바꾸면 sidebar-web(웹 표시)·sidebar-collapsed(메뉴 접힘) 같은
+        // 다른 클래스까지 지워져서, 웹에서 메뉴 접기 버튼이 사라지는 문제가 있었음
+        function applyThemeClass(theme) {
+            [...document.body.classList].filter(c => c.startsWith('theme-')).forEach(c => document.body.classList.remove(c));
+            if (theme) document.body.classList.add('theme-' + theme);
+        }
+        function setTheme(theme) { activeTheme = theme; localStorage.setItem('theme_v6', theme); document.querySelectorAll('.theme-dot').forEach(d => { d.classList.remove('active'); if(d.dataset.theme === theme) d.classList.add('active'); }); if (theme === 'custom') { setCustomTheme(localStorage.getItem('custom_color_v6') || '#b07d7d'); } else { applyThemeClass(theme); document.body.style.removeProperty('--primary'); document.body.style.removeProperty('--primary-light'); } updateDashboardStats(); }
+        function setCustomTheme(color) { activeTheme = 'custom'; localStorage.setItem('theme_v6', 'custom'); localStorage.setItem('custom_color_v6', color); document.querySelectorAll('.theme-dot').forEach(d => d.classList.remove('active')); document.getElementById('custom-theme-dot').classList.add('active'); document.getElementById('custom-theme-dot').style.backgroundColor = color; applyThemeClass(null); document.documentElement.style.setProperty('--primary', color); const r = parseInt(color.substr(1,2), 16), g = parseInt(color.substr(3,2), 16), b = parseInt(color.substr(5,2), 16); document.documentElement.style.setProperty('--primary-light', `rgba(${r},${g},${b},0.1)`); updateDashboardStats(); }
         function setPageBackgroundColor(color) { document.documentElement.style.setProperty('--bg-main', color); localStorage.setItem('bg_main_v6', color); }
         function switchTab(tabName) { 
             document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active')); 
@@ -10831,7 +10839,7 @@
             }).join('') + `</div>`;
             const closeAction = opts.onMonthClick || `openMonthDetail(${year},${month})`;
             const cardH = opts.height || 380;
-            return { monthTotal, html: `<div class="bg-white border border-slate-200 rounded-2xl p-4 hover:shadow-xl transition-all duration-300 flex flex-col min-h-[${cardH}px] relative"><div class="flex justify-between items-center border-b border-slate-50 pb-3 shrink-0"><span onclick="${closeAction}" class="text-sm font-black text-slate-600 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 px-2.5 py-1 rounded-lg cursor-pointer transition-all select-none">${month}월</span><span class="text-sm font-bold whitespace-nowrap ${monthTotal > 0 ? 'text-emerald-600' : 'text-slate-300'}">₩ ${formatCurrency(monthTotal)}</span></div>${listHtml}</div>` };
+            return { monthTotal, html: `<div class="bg-white border border-slate-200 rounded-2xl p-4 hover:shadow-xl transition-all duration-300 flex flex-col min-h-[${cardH}px] relative settle-month-card"><div class="flex justify-between items-center border-b border-slate-50 pb-3 shrink-0"><span onclick="${closeAction}" class="text-sm font-black text-slate-600 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 px-2.5 py-1 rounded-lg cursor-pointer transition-all select-none">${month}월</span><span class="text-sm font-bold whitespace-nowrap ${monthTotal > 0 ? 'text-emerald-600' : 'text-slate-300'}">₩ ${formatCurrency(monthTotal)}</span></div>${listHtml}</div>` };
         }
         function renderSettlementSchedule() {
             const container = document.getElementById('settlement-schedule-list'); document.getElementById('settlement-year-display').innerText = settlementViewYear;

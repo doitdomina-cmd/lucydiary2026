@@ -14483,7 +14483,7 @@
                     <h4 class="text-sm font-bold mb-2" style="color:${accent}">${title}</h4>
                     <div class="overflow-x-auto rounded-xl border border-slate-100 scroll-invisible">${inner}</div>
                 </div>`;
-            const tableHtml = (cols, rows, accent) => rows.length ? `
+            const tableHtml = (cols, rows, accent, footRow) => rows.length ? `
                 <table class="w-full text-[13px] border-collapse" style="min-width:640px;">
                     <thead><tr style="background:${accent}18;">
                         ${cols.map(c => `<th class="text-left p-2 font-bold whitespace-nowrap" style="color:${accent}">${c}</th>`).join('')}
@@ -14491,6 +14491,9 @@
                     <tbody>${rows.map((r, i) => `<tr style="${i % 2 ? 'background:#fafafa;' : ''} border-top:1px solid #f1f5f9;">
                         ${r.map(v => `<td class="p-2 whitespace-nowrap text-slate-600">${v}</td>`).join('')}
                     </tr>`).join('')}</tbody>
+                    ${footRow ? `<tfoot><tr style="background:${accent}10; border-top:2px solid ${accent}33;">
+                        ${footRow.map(v => `<td class="p-2 whitespace-nowrap font-bold" style="color:${accent}">${v}</td>`).join('')}
+                    </tr></tfoot>` : ''}
                 </table>` : `<p class="text-[13px] text-slate-300 text-center py-4">없음</p>`;
 
             // 확정 일정 (작품별, 달력 카드 기준)
@@ -14499,8 +14502,11 @@
                 `${w.firstDate} ~ ${w.lastDate}`, `${w.workDays}일`,
                 `${num(w.totalChars)}자`, w.workDays ? `${num(Math.round(w.totalChars / w.workDays))}자/일` : '-'
             ]);
+            const wDaysSum = works.reduce((n, w) => n + (Number(w.workDays) || 0), 0);
+            const wCharsSum = works.reduce((n, w) => n + (Number(w.totalChars) || 0), 0);
             const confirmedHtml = wrap('■ 확정 일정 (달력 카드 기준)', '#0f766e',
-                tableHtml(['작품', '장르', '집필 기간', '일수', '글자수', '평균'], workRows, '#0f766e'));
+                tableHtml(['작품', '장르', '집필 기간', '일수', '글자수', '평균'], workRows, '#0f766e',
+                    ['합계', `${works.length}작품`, '', `${wDaysSum}일`, `${num(wCharsSum)}자`, wDaysSum ? `${num(Math.round(wCharsSum / wDaysSum))}자/일` : '-']));
 
             // 기간 일정 · 집필
             const writeSpanRows = spans.filter(sp => (sp.span.type || 'write') === 'write').map(({ span: s, stats: st }) => {
@@ -14514,8 +14520,15 @@
                     `${num(st.totalChars)}자 <span style="color:#94a3b8;">(공미 ${num(Math.round(st.totalChars * NOSPACE_TO_WITHSPACE_RATIO))}자)</span>`,
                     `${num(s.dailyChars)}자/일`, s.memo || '-'];
             });
+            const writeSpanList = spans.filter(sp => (sp.span.type || 'write') === 'write');
+            const wsTotalDays = writeSpanList.reduce((n, sp) => n + (Number(sp.stats.totalDays) || 0), 0);
+            const wsWorkDays = writeSpanList.reduce((n, sp) => n + (Number(sp.stats.workDays) || 0), 0);
+            const wsChars = writeSpanList.reduce((n, sp) => n + (Number(sp.stats.totalChars) || 0), 0);
             const writeSpanHtml = wrap('■ 기간 일정 · 집필', '#b45309',
-                tableHtml(['일정 제목', '연결 작품', '기간', '총일수', '집필일', '쉬는 날', '예상 글자수', '하루 집필량', '메모'], writeSpanRows, '#b45309'));
+                tableHtml(['일정 제목', '연결 작품', '기간', '총일수', '집필일', '쉬는 날', '예상 글자수', '하루 집필량', '메모'], writeSpanRows, '#b45309',
+                    ['합계', `${writeSpanList.length}개`, '', `${wsTotalDays}일`, `${wsWorkDays}일`, '',
+                     `${num(wsChars)}자 <span style="opacity:.6;font-weight:500;">(공미 ${num(Math.round(wsChars * NOSPACE_TO_WITHSPACE_RATIO))}자)</span>`,
+                     wsWorkDays ? `${num(Math.round(wsChars / wsWorkDays))}자/일` : '-', '']));
 
             // 기간 일정 · 휴식 등 (휴식/교정/여행/시놉기획)
             const restSpanRows = spans.filter(sp => (sp.span.type || 'write') !== 'write').map(({ span: s, stats: st }) => {
@@ -14523,8 +14536,10 @@
                 const workTitle = s.workId ? (resolveWorkItem(s.workId).displayTitle || '-') : '-';
                 return [`${t.icon} ${t.label}`, s.title, workTitle, `${s.startDate} ~ ${s.endDate}`, `${st.totalDays}일`, s.memo || '-'];
             });
+            const restSpanDaysSum = spans.filter(sp => (sp.span.type || 'write') !== 'write').reduce((n, sp) => n + (Number(sp.stats.totalDays) || 0), 0);
             const restSpanHtml = wrap('■ 기간 일정 · 휴식 등 (휴식·교정·여행·시놉기획)', '#92400e',
-                tableHtml(['종류', '일정 제목', '연결 작품', '기간', '총일수', '메모'], restSpanRows, '#92400e'));
+                tableHtml(['종류', '일정 제목', '연결 작품', '기간', '총일수', '메모'], restSpanRows, '#92400e',
+                    ['합계', `${restSpanRows.length}개`, '', '', `${restSpanDaysSum}일`, '']));
 
             // 월별 목표 — 확정(카드) 글자수와 예정(아직 카드 없는 집필형 기간 일정) 글자수를 나눠서 같이 보여준다
             const confirmedSpanIdsForMonth = new Set();
@@ -14549,8 +14564,12 @@
                     `${num(Math.round(confirmedChars / daysInMonth))}자/일`,
                     `${num(Math.round(combinedChars / daysInMonth))}자/일`];
             });
+            const mSum = monthRows.reduce((acc, r) => { r.forEach((v, i) => { if (i > 0) acc[i] = (acc[i] || 0) + (Number(String(v).replace(/[^0-9]/g, '')) || 0); }); return acc; }, []);
+            const yearDays = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0 ? 366 : 365;
             const monthHtml = wrap('■ 월별 목표', '#4f46e5',
-                tableHtml(['월', '확정 글자수', '예정 글자수', '합계', '집필 일수(확정)', '집필 일수(합계)', '하루 평균(확정)', '하루 평균(합계)'], monthRows, '#4f46e5'));
+                tableHtml(['월', '확정 글자수', '예정 글자수', '합계', '집필 일수(확정)', '집필 일수(합계)', '하루 평균(확정)', '하루 평균(합계)'], monthRows, '#4f46e5',
+                    ['합계', `${num(mSum[1])}자`, `${num(mSum[2])}자`, `${num(mSum[3])}자`, `${mSum[4] || 0}일`, `${mSum[5] || 0}일`,
+                     `${num(Math.round((mSum[1] || 0) / yearDays))}자/일`, `${num(Math.round((mSum[3] || 0) / yearDays))}자/일`]));
 
             // 일정이 비어 있는 구간 (2일 이상)
             const restRows = restSegs.map(sg => [`${tlIndexToDate(sg.startIdx, y)} ~ ${tlIndexToDate(sg.endIdx, y)}`, `${sg.days}일`]);

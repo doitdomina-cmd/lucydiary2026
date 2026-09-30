@@ -13992,10 +13992,23 @@
                     if (last && idx - last.endIdx <= TL_GAP_MERGE) { last.endIdx = idx; last.days++; last.chars += g.dayChars[ds] || 0; }
                     else segs.push({ startIdx: idx, endIdx: idx, days: 1, chars: g.dayChars[ds] || 0 });
                 });
-                // 띄엄띄엄 조금씩 쓰는 구간(구간 전체 기간·최소 1주 기준 일주일 평균 1만자 미만)은 막대로 안 그리고
-                // 쉬는 구간·집필일 계산에도 안 넣는다. 확정 작품 수·목표 글자수·아래 표(works)에는 그대로 센다.
-                const light = sg => sg.chars / Math.max(sg.endIdx - sg.startIdx + 1, 7) * 7 < TL_LIGHT_WEEKLY;
-                const barSegs = segs.filter(sg => !light(sg));
+                // 띄엄띄엄 조금씩 쓰는 카드(예: 주 1회 4천자)는 막대로 안 그리고 쉬는 구간·집필일 계산에도 안 넣는다.
+                // 카드마다 앞뒤 6일(2주 폭) 안의 글자수로 일주일 평균을 내서 1만자 미만이면 '조금씩 쓰는 카드'로 본다
+                // — 그래서 주 1회 카드 뒤에 몰아 쓰는 기간이 붙어 있으면, 앞의 주 1회 부분만 빠지고 뒤쪽만 막대가 된다.
+                // 확정 작품 수·목표 글자수·아래 표(works)에는 그대로 센다.
+                const dayPts = sorted.map(ds => [tlDayIndex(ds, y), g.dayChars[ds] || 0]);
+                const barDays = sorted.filter((ds, k) => {
+                    const idx = dayPts[k][0];
+                    const near = dayPts.reduce((n, [j, c]) => n + (Math.abs(j - idx) <= 6 ? c : 0), 0);
+                    return near / 13 * 7 >= TL_LIGHT_WEEKLY;
+                });
+                const barSegs = [];
+                barDays.forEach(ds => {
+                    const idx = tlDayIndex(ds, y);
+                    const last = barSegs[barSegs.length-1];
+                    if (last && idx - last.endIdx <= TL_GAP_MERGE) { last.endIdx = idx; last.days++; last.chars += g.dayChars[ds] || 0; }
+                    else barSegs.push({ startIdx: idx, endIdx: idx, days: 1, chars: g.dayChars[ds] || 0 });
+                });
                 works.push({
                     workId, title, color, segs,
                     genre: resolved.genre || '', catText,

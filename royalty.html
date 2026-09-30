@@ -10448,7 +10448,7 @@
                 const settlePub = w.settlementPublisher || w.publisher;
                 const day = (publisherData[settlePub] || {}).paymentDay || '미정';
                 if (!dayMap[day]) dayMap[day] = [];
-                dayMap[day].push({ publisher: settlePub, title: w.title, amount });
+                dayMap[day].push({ publisher: settlePub, title: w.title, genre: w.genre || '', amount });
                 totalSum += amount;
             });
             const sortedDays = Object.keys(dayMap).sort((a, b) => {
@@ -10472,11 +10472,32 @@
                     const dayTotal = Object.values(pubMap).reduce((s, v) => s + v, 0);
                     const pubRows = Object.entries(pubMap)
                         .sort((a, b) => b[1] - a[1])
-                        .map(([pub, amt]) => `
+                        .map(([pub, amt]) => {
+                            if (compact) return `
                             <div class="flex justify-between items-center py-2 ${dividerCls}">
                                 <span class="${pubTextCls} text-slate-600 font-medium">${pub}</span>
                                 <span class="${pubTextCls} font-bold text-slate-700">₩ ${formatCurrency(amt)}</span>
-                            </div>`).join('');
+                            </div>`;
+                            // 월 상세 모달: 출판사 줄을 누르면 그 출판사 작품별 금액이 바로 아래에 펼쳐진다
+                            const workRows = items.filter(it => it.publisher === pub)
+                                .sort((a, b) => b.amount - a.amount)
+                                .map(it => {
+                                    const gc = getGenreColor(it.genre);
+                                    const badge = it.genre ? `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 whitespace-nowrap" style="background-color:${hexToRgba(gc, genreBadgeOpacity)};color:#334155">${it.genre}</span>` : '';
+                                    return `<div class="flex justify-between items-center gap-3 py-1.5">
+                                        <span class="flex items-center gap-2 min-w-0 text-[13px] text-slate-600">${badge}<span class="truncate" title="${it.title}">${it.title}</span></span>
+                                        <span class="text-[13px] text-slate-500 shrink-0">₩ ${formatCurrency(it.amount)}</span>
+                                    </div>`;
+                                }).join('');
+                            return `
+                            <div class="${dividerCls}">
+                                <div onclick="toggleSettleWorks(this)" class="flex justify-between items-center py-2 cursor-pointer select-none group">
+                                    <span class="${pubTextCls} text-slate-600 font-medium flex items-center gap-2"><i class="fa-solid fa-chevron-right text-[9px] text-slate-300 group-hover:text-slate-500 transition-transform settle-chevron"></i>${pub}</span>
+                                    <span class="${pubTextCls} font-bold text-slate-700">₩ ${formatCurrency(amt)}</span>
+                                </div>
+                                <div class="settle-works hidden pl-5 pb-2 mb-1 border-l-2 border-slate-100 ml-1">${workRows}</div>
+                            </div>`;
+                        }).join('');
                     return `
                         <div class="bg-slate-50 rounded-xl p-4">
                             <div class="flex justify-between items-center mb-3">
@@ -10501,6 +10522,13 @@
         }
         function closeMonthDetail() {
             document.getElementById('month-detail-modal').classList.remove('open');
+        }
+        function toggleSettleWorks(row) {
+            const list = row.nextElementSibling;
+            if (!list) return;
+            const open = list.classList.toggle('hidden') === false;
+            const chev = row.querySelector('.settle-chevron');
+            if (chev) chev.style.transform = open ? 'rotate(90deg)' : '';
         }
         // 한 달치 '정산일별' 원시 데이터를 만든다 (연간 전체보기의 표 형태 렌더링용)
         function getMonthDayData(year, month) {

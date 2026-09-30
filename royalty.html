@@ -10823,8 +10823,7 @@
             const monthKey = `${year}-${String(month).padStart(2, '0')}`;
             let monthTotal = 0, scheduleMap = {};
             getSettlementEntries(monthKey).forEach(e => { const day = e.day; if(!scheduleMap[day]) scheduleMap[day] = { total: 0, pubs: new Set(), pubAmounts: {} }; scheduleMap[day].total += e.amount; scheduleMap[day].pubs.add(e.publisher); scheduleMap[day].pubAmounts[e.publisher] = (scheduleMap[day].pubAmounts[e.publisher] || 0) + e.amount; monthTotal += e.amount; });
-            const maxH = opts.maxH || 280;
-            let listHtml = Object.keys(scheduleMap).length === 0 ? `<div class="flex-1 flex flex-col items-center justify-center text-slate-300 text-xs opacity-50"><i class="fa-regular fa-calendar-xmark text-lg mb-1"></i>예정 없음</div>` : `<div class="space-y-2 mt-3 overflow-y-auto max-h-[${maxH}px] pr-1 custom-scrollbar">` + Object.keys(scheduleMap).sort().map(day => {
+            let listHtml = Object.keys(scheduleMap).length === 0 ? `<div class="flex-1 flex flex-col items-center justify-center text-slate-300 text-xs opacity-50"><i class="fa-regular fa-calendar-xmark text-lg mb-1"></i>예정 없음</div>` : `<div class="space-y-2 mt-3">` + Object.keys(scheduleMap).sort().map(day => {
                 const entry = scheduleMap[day];
                 const pubData = JSON.stringify(entry.pubAmounts).replace(/"/g,'&quot;');
                 const total = entry.total;
@@ -10832,7 +10831,7 @@
             }).join('') + `</div>`;
             const closeAction = opts.onMonthClick || `openMonthDetail(${year},${month})`;
             const cardH = opts.height || 380;
-            return { monthTotal, html: `<div class="bg-white border border-slate-200 rounded-2xl p-4 hover:shadow-xl transition-all duration-300 flex flex-col h-[${cardH}px] relative"><div class="flex justify-between items-center border-b border-slate-50 pb-3 shrink-0"><span onclick="${closeAction}" class="text-sm font-black text-slate-600 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 px-2.5 py-1 rounded-lg cursor-pointer transition-all select-none">${month}월</span><span class="text-sm font-bold whitespace-nowrap ${monthTotal > 0 ? 'text-emerald-600' : 'text-slate-300'}">₩ ${formatCurrency(monthTotal)}</span></div>${listHtml}</div>` };
+            return { monthTotal, html: `<div class="bg-white border border-slate-200 rounded-2xl p-4 hover:shadow-xl transition-all duration-300 flex flex-col min-h-[${cardH}px] relative"><div class="flex justify-between items-center border-b border-slate-50 pb-3 shrink-0"><span onclick="${closeAction}" class="text-sm font-black text-slate-600 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 px-2.5 py-1 rounded-lg cursor-pointer transition-all select-none">${month}월</span><span class="text-sm font-bold whitespace-nowrap ${monthTotal > 0 ? 'text-emerald-600' : 'text-slate-300'}">₩ ${formatCurrency(monthTotal)}</span></div>${listHtml}</div>` };
         }
         function renderSettlementSchedule() {
             const container = document.getElementById('settlement-schedule-list'); document.getElementById('settlement-year-display').innerText = settlementViewYear;

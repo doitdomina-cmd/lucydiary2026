@@ -11579,31 +11579,25 @@
             const man = v => v >= 10000 ? `${taxFmt(v / 10000)}만` : `${taxFmt(v)}`;
             const badge = g => `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 whitespace-nowrap" style="background-color:${hexToRgba(getGenreColor(g), genreBadgeOpacity)};color:#334155">${escapeHtml(g)}</span>`;
 
-            // ── 1) 수명 곡선 ──
-            const lifeRows = life.map(l => `
-                <tr class="border-b border-slate-50">
-                    <td class="py-2 pr-2">${badge(l.genre)}</td>
-                    <td class="py-2 px-2 text-right text-slate-500">${l.works}개</td>
-                    <td class="py-2 px-2 text-right font-bold text-slate-700">${won(Math.round(l.total))}</td>
-                    <td class="py-2 px-2 text-right text-slate-600">${l.at3 !== null ? l.at3 + '%' : '-'}</td>
-                    <td class="py-2 px-2 text-right text-slate-600">${l.at6 !== null ? l.at6 + '%' : '-'}</td>
-                    <td class="py-2 px-2 text-right text-slate-600">${l.at12 !== null ? l.at12 + '%' : '-'}</td>
-                    <td class="py-2 pl-2 text-right font-bold" style="color:var(--primary)">${l.half ? l.half + '개월' : '-'}</td>
-                </tr>`).join('');
-            const lifeTips = life.filter(l => l.half).map(l =>
-                `<b style="color:var(--primary)">${escapeHtml(l.genre)}</b>은(는) 출간 후 <b>${l.half}개월</b>이면 ${l.horizon}개월치 수익의 절반, <b>${l.p80 || '-'}개월</b>이면 80%가 들어와요.`);
+            // ── 1) 수명 곡선 — 장르마다 금액 규모가 너무 달라서 장르별로 그래프를 따로 그린다 ──
+            const stat = (label, val) => `<div class="rounded-lg px-2 py-1.5 bg-slate-50 text-center"><p class="text-[10px] text-slate-400">${label}</p><p class="text-xs font-bold text-slate-700">${val}</p></div>`;
+            const lifeCards = life.map((l, i) => `
+                <div class="rounded-2xl p-4 border border-slate-100 bg-white">
+                    <div class="flex items-center justify-between gap-2 mb-2">
+                        <div class="flex items-center gap-2">${badge(l.genre)}<span class="text-[11px] text-slate-400">작품 ${l.works}개 · ${l.horizon}개월 기준</span></div>
+                        <span class="text-xs text-slate-500">작품당 평균 <b class="text-slate-700">${man(Math.round(l.total))}원</b></span>
+                    </div>
+                    <div class="relative" style="height:150px;"><canvas id="lifecycle-chart-${i}"></canvas></div>
+                    <div class="grid grid-cols-5 gap-1.5 mt-3">
+                        ${stat('첫 3개월', l.at3 !== null ? l.at3 + '%' : '-')}${stat('첫 6개월', l.at6 !== null ? l.at6 + '%' : '-')}${stat('첫 12개월', l.at12 !== null ? l.at12 + '%' : '-')}
+                        <div class="rounded-lg px-2 py-1.5 text-center" style="background:var(--primary-light)"><p class="text-[10px]" style="color:var(--primary)">절반 도달</p><p class="text-xs font-bold" style="color:var(--primary)">${l.half ? l.half + '개월' : '-'}</p></div>
+                        ${stat('80% 도달', l.p80 ? l.p80 + '개월' : '-')}
+                    </div>
+                </div>`).join('');
             const lifeHtml = life.length === 0
                 ? `<p class="text-xs text-slate-400">출간일과 정산 기록이 있는 작품이 아직 충분하지 않아요. (장르마다 출간 6개월 넘은 작품이 2개 이상 필요해요)</p>`
-                : `<div class="relative mb-4" style="height:240px;"><canvas id="lifecycle-chart"></canvas></div>
-                   <div class="overflow-x-auto"><table class="w-full text-[13px]" style="min-width:560px;">
-                       <thead><tr class="text-[11px] text-slate-400 border-b border-slate-100">
-                           <th class="py-2 pr-2 text-left font-bold">장르</th><th class="py-2 px-2 text-right font-bold">작품</th>
-                           <th class="py-2 px-2 text-right font-bold">작품당 평균 수익</th><th class="py-2 px-2 text-right font-bold">첫 3개월</th>
-                           <th class="py-2 px-2 text-right font-bold">첫 6개월</th><th class="py-2 px-2 text-right font-bold">첫 12개월</th>
-                           <th class="py-2 pl-2 text-right font-bold">절반 도달</th></tr></thead>
-                       <tbody>${lifeRows}</tbody></table></div>
-                   <ul class="mt-3 space-y-1">${lifeTips.map(t => `<li class="text-xs text-slate-600 flex gap-2"><i class="fa-solid fa-lightbulb text-amber-400 mt-0.5 shrink-0"></i><span>${t}</span></li>`).join('')}</ul>
-                   <p class="text-[11px] text-slate-400 mt-2">※ '작품당 평균 수익'과 비중은 장르마다 표본이 2작품 이상 있는 기간(최대 24개월)까지의 인세 기준이에요. 선인세는 빠져 있고, 정산이 익월·익익월이라 첫 1~2개월은 적게 잡혀요.</p>`;
+                : `<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">${lifeCards}</div>
+                   <p class="text-[11px] text-slate-400 mt-3">※ 비중은 장르마다 표본이 2작품 이상 있는 기간(최대 24개월)까지의 인세 기준이에요. 선인세는 빠져 있고, 정산이 익월·익익월이라 첫 1~2개월은 적게 잡혀요.</p>`;
 
             // ── 2) 집필 하루당 수익 ──
             const dvRows = dayVal.rows.map((r, i) => {
@@ -11668,30 +11662,32 @@
                 </div>
             </div>`;
         }
-        let lifecycleChartInstance = null;
+        let lifecycleChartInstances = [];
         function drawLifecycleChart(life) {
-            if (lifecycleChartInstance) { lifecycleChartInstance.destroy(); lifecycleChartInstance = null; }
-            const el = document.getElementById('lifecycle-chart');
-            if (!el || typeof Chart === 'undefined' || life.length === 0) return;
-            const maxLen = Math.max(...life.map(l => l.avg.length));
-            lifecycleChartInstance = new Chart(el, {
-                type: 'line',
-                data: {
-                    labels: Array.from({ length: maxLen }, (_, i) => `${i + 1}개월`),
-                    datasets: life.map(l => ({
-                        label: l.genre, data: l.avg.map(v => Math.round(v)),
-                        borderColor: getGenreColor(l.genre), backgroundColor: getGenreColor(l.genre),
-                        borderWidth: 2, pointRadius: 2, tension: 0.3, spanGaps: false
-                    }))
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
-                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } },
-                        tooltip: { callbacks: { label: c => `${c.dataset.label}: ₩ ${formatCurrency(c.parsed.y)}` } } },
-                    scales: { x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-                        y: { grid: { color: '#f3f4f6' }, ticks: { font: { size: 10 }, callback: v => v >= 10000 ? (v / 10000).toLocaleString() + '만' : v } } }
-                }
+            lifecycleChartInstances.forEach(c => c.destroy());
+            lifecycleChartInstances = [];
+            if (!life || typeof Chart === 'undefined') return;
+            life.forEach((l, i) => {
+                const el = document.getElementById('lifecycle-chart-' + i);
+                if (!el) return;
+                const color = getGenreColor(l.genre);
+                lifecycleChartInstances.push(new Chart(el, {
+                    type: 'line',
+                    data: {
+                        labels: l.avg.map((_, m) => `${m + 1}개월`),
+                        datasets: [{ label: l.genre, data: l.avg.map(v => Math.round(v)),
+                            borderColor: color, backgroundColor: hexToRgba(color, 0.15), fill: true,
+                            borderWidth: 2, pointRadius: 2, tension: 0.3 }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: { legend: { display: false },
+                            tooltip: { callbacks: { label: c => `작품당 평균 ₩ ${formatCurrency(c.parsed.y)}` } } },
+                        scales: { x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 0, autoSkipPadding: 6 } },
+                            y: { beginAtZero: true, grid: { color: '#f3f4f6' }, ticks: { font: { size: 10 }, maxTicksLimit: 5, callback: v => v >= 10000 ? (v / 10000).toLocaleString() + '만' : v } } }
+                    }
+                }));
             });
         }
 

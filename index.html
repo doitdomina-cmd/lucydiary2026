@@ -9008,23 +9008,36 @@ async function loadRoyaltyFromFirebase(){
     const workById={};
     masterWorks.forEach(function(w){workById[w.id]=w;});
 
+    // 선인세: 인세 앱의 작품별 '선인세 입금 내역'(w.advances = [{id,date,amount}])도 그 달 monthlyData 칸에
+    // 더해져 있으므로, 그만큼 인세에서 빼서 실제로 들어온 날짜의 별도 수입 항목으로 만든다.
     const royalty={};
     Object.keys(monthlyData).forEach(function(ym){
       const pubTotals={};
+      const advItems=[];
       Object.entries(monthlyData[ym]||{}).forEach(function(entry){
-        const workId=entry[0],amount=entry[1];
+        const workId=entry[0];
+        let amount=Number(entry[1])||0;
         if(!amount)return;
         const w=workById[workId];
         if(!w)return;
         const pub=w.settlementPublisher||w.publisher;
         if(!pub)return;
+        (Array.isArray(w.advances)?w.advances:[]).forEach(function(a){
+          if(String(a.date||'').slice(0,7)!==ym)return;
+          const amt=Number(a.amount)||0;
+          if(!amt)return;
+          const dd=String(a.date).slice(8,10);
+          advItems.push({publisher:pub,isAdv:true,title:w.title,advKey:workId+'|'+(a.id||a.date),amount:amt,paymentDay:dd?String(Number(dd)):''});
+          amount-=amt;
+        });
         pubTotals[pub]=(pubTotals[pub]||0)+amount;
       });
       const items=Object.keys(pubTotals)
         .filter(function(pub){return pubTotals[pub]!==0;})
         .map(function(pub){
           return {publisher:pub,amount:pubTotals[pub],paymentDay:(publisherData[pub]||{}).paymentDay||''};
-        });
+        })
+        .concat(advItems);
       if(items.length)royalty[ym]=items;
     });
     if(Object.keys(royalty).length===0)throw new Error('정산 내역이 없어요');
@@ -9072,12 +9085,13 @@ function previewRoyalty(ym){
   const items=royalty[ym];
   const prev=document.getElementById('roy-preview');
   if(!prev)return;
-  let html='<div style="font-size:0.82em;color:var(--t3);margin-bottom:8px">등록될 수입 내역 (출판사별 입금일에 등록)</div>';
+  let html='<div style="font-size:0.82em;color:var(--t3);margin-bottom:8px">등록될 수입 내역 (출판사별 입금일에 등록 · 선인세는 실제 입금일에 따로 등록)</div>';
   let total=0;
   items.forEach(function(item){
     const day=item.paymentDay==='말일'?'말일':item.paymentDay?item.paymentDay+'일':'?';
     html+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:0.88em">';
-    html+='<span><span style="color:var(--t3);margin-right:6px">'+day+'</span>'+item.publisher+'</span>';
+    const advTag=item.isAdv?' <span style="font-size:0.8em;font-weight:600;color:var(--primary,var(--accent));margin-left:4px">선인세</span><span style="color:var(--t3);font-size:0.85em;margin-left:4px">'+item.title+'</span>':'';
+    html+='<span><span style="color:var(--t3);margin-right:6px">'+day+'</span>'+item.publisher+advTag+'</span>';
     html+='<span style="font-weight:500">'+new Intl.NumberFormat('ko-KR').format(item.amount)+'원</span>';
     html+='</div>';
     total+=item.amount;
@@ -9109,9 +9123,10 @@ function importRoyaltyMonth(){
 
     if(!LD.transactions)LD.transactions=[];
 
-    // 같은 달 같은 출판사 정산이 있으면 금액/날짜 업데이트, 없으면 새로 추가
+    // 같은 달 같은 출판사 정산(선인세는 같은 선인세 건)이 있으면 금액/날짜 업데이트, 없으면 새로 추가
     const dupIdx=(LD.transactions).findIndex(function(t){
-      return t.date.slice(0,7)===ym&&t.memo&&t.memo.includes(item.publisher)&&t._royalty;
+      if(item.isAdv)return t._royaltyAdv&&t._advKey===item.advKey;
+      return t.date.slice(0,7)===ym&&t.memo&&t.memo.includes(item.publisher)&&t._royalty&&!t._royaltyAdv;
     });
     if(dupIdx>-1){
       const existing=LD.transactions[dupIdx];
@@ -9130,8 +9145,10 @@ function importRoyaltyMonth(){
       majorCategory:'인세 수익',
       minorCategory:item.publisher,
       amount:item.amount,
-      memo:item.publisher+' '+ym.replace('-','년 ')+'월 정산',
-      _royalty:true
+      memo:item.isAdv?(item.publisher+' 선인세 · '+item.title):(item.publisher+' '+ym.replace('-','년 ')+'월 정산'),
+      _royalty:true,
+      _royaltyAdv:item.isAdv?true:undefined,
+      _advKey:item.isAdv?item.advKey:undefined
     });
     added++;
   });

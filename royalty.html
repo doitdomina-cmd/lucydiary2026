@@ -11496,10 +11496,12 @@
                 const age = lastIdx - pIdx;
                 if (age < 0) return;
                 const g = w.genre || '기타';
-                const G = byGenre[g] || (byGenre[g] = { sums: Array(MAXM + 1).fill(0), counts: Array(MAXM + 1).fill(0), works: 0 });
+                const G = byGenre[g] || (byGenre[g] = { sums: Array(MAXM + 1).fill(0), counts: Array(MAXM + 1).fill(0), works: 0, list: [] });
                 G.works++;
                 const roy = getWorkRoyaltyByMonth(w);
-                for (let i = 0; i <= Math.min(age, MAXM); i++) { G.sums[i] += roy[idxToYm(pIdx + i)] || 0; G.counts[i]++; }
+                const series = [];
+                for (let i = 0; i <= Math.min(age, MAXM); i++) { const v = roy[idxToYm(pIdx + i)] || 0; series.push(v); G.sums[i] += v; G.counts[i]++; }
+                G.list.push({ title: w.title, pubYm: w.publishDate.slice(0, 7), months: age + 1, series, total: series.reduce((a, b) => a + b, 0) });
             });
             const genreOrder = g => { const i = genreList.findIndex(x => x.name === g); return i < 0 ? 999 : i; };
             return Object.entries(byGenre).map(([genre, G]) => {
@@ -11513,7 +11515,8 @@
                 let cum = 0; const cumPct = avg.map(v => { cum += v; return cum / total * 100; });
                 const reach = p => { const i = cumPct.findIndex(c => c >= p); return i < 0 ? null : i + 1; };
                 const pctAt = m => m - 1 <= horizon ? Math.round(cumPct[m - 1]) : null;
-                return { genre, works: G.works, horizon: horizon + 1, avg, total, half: reach(50), p80: reach(80), at3: pctAt(3), at6: pctAt(6), at12: pctAt(12) };
+                const worksList = G.list.sort((a, b) => b.total - a.total);   // 작품별 선 + 목록 (출간 후 24개월까지 번 돈 순)
+                return { genre, works: G.works, horizon: horizon + 1, avg, total, half: reach(50), p80: reach(80), at3: pctAt(3), at6: pctAt(6), at12: pctAt(12), worksList };
             }).filter(Boolean).sort((a, b) => genreOrder(a.genre) - genreOrder(b.genre));
         }
 
@@ -11587,11 +11590,19 @@
                         <div class="flex items-center gap-2">${badge(l.genre)}<span class="text-[11px] text-slate-400">작품 ${l.works}개 · ${l.horizon}개월 기준</span></div>
                         <span class="text-xs text-slate-500">작품당 평균 <b class="text-slate-700">${man(Math.round(l.total))}원</b></span>
                     </div>
-                    <div class="relative" style="height:150px;"><canvas id="lifecycle-chart-${i}"></canvas></div>
+                    <div class="relative" style="height:190px;"><canvas id="lifecycle-chart-${i}"></canvas></div>
+                    <div class="flex items-center gap-3 text-[10px] text-slate-400 mt-1"><span class="flex items-center gap-1"><span class="inline-block w-4 h-[3px] rounded" style="background:${getGenreColor(l.genre)}"></span>장르 평균</span><span class="flex items-center gap-1"><span class="inline-block w-4 h-[2px] rounded bg-slate-300"></span>작품별 (목록에서 누르면 강조)</span></div>
                     <div class="grid grid-cols-5 gap-1.5 mt-3">
                         ${stat('첫 3개월', l.at3 !== null ? l.at3 + '%' : '-')}${stat('첫 6개월', l.at6 !== null ? l.at6 + '%' : '-')}${stat('첫 12개월', l.at12 !== null ? l.at12 + '%' : '-')}
                         <div class="rounded-lg px-2 py-1.5 text-center" style="background:var(--primary-light)"><p class="text-[10px]" style="color:var(--primary)">절반 도달</p><p class="text-xs font-bold" style="color:var(--primary)">${l.half ? l.half + '개월' : '-'}</p></div>
                         ${stat('80% 도달', l.p80 ? l.p80 + '개월' : '-')}
+                    </div>
+                    <div class="mt-3 border-t border-slate-100 pt-2">
+                        ${l.worksList.map((w, wi) => `<button type="button" onclick="highlightLifecycleWork(${i}, ${wi})" data-lc-row="${i}-${wi}" class="lc-row w-full flex items-center justify-between gap-2 px-2 py-1 rounded-md text-left hover:bg-slate-50 ${wi >= 8 ? 'hidden lc-more-' + i : ''}">
+                            <span class="text-xs text-slate-600 truncate min-w-0">${escapeHtml(w.title)}</span>
+                            <span class="text-[11px] text-slate-400 shrink-0 whitespace-nowrap">${w.pubYm.replace('-', '.')} · ${w.months > 24 ? '24+' : w.months}개월 · <b class="text-slate-600">${man(Math.round(w.total))}원</b></span>
+                        </button>`).join('')}
+                        ${l.worksList.length > 8 ? `<button type="button" onclick="toggleLifecycleMore(${i}, this)" class="w-full text-center text-[11px] font-bold text-slate-400 hover:text-slate-600 pt-1">전체 ${l.worksList.length}개 보기</button>` : ''}
                     </div>
                 </div>`).join('');
             const lifeHtml = life.length === 0
@@ -11663,6 +11674,30 @@
             </div>`;
         }
         let lifecycleChartInstances = [];
+        const LC_WORK_STYLE = { borderColor: 'rgba(148,163,184,0.35)', backgroundColor: 'rgba(148,163,184,0.35)', borderWidth: 1, pointRadius: 0, pointHoverRadius: 3, tension: 0.3, order: 0 };
+        // 목록에서 작품을 누르면 그 작품 선만 진하게 (다시 누르면 해제)
+        function highlightLifecycleWork(gi, wi) {
+            const chart = lifecycleChartInstances[gi];
+            if (!chart) return;
+            chart._lcSel = chart._lcSel === wi ? null : wi;
+            chart.data.datasets.forEach((ds, j) => {
+                if (ds.label === '장르 평균' && j === chart.data.datasets.length - 1) return;
+                const on = j === chart._lcSel;
+                Object.assign(ds, LC_WORK_STYLE, on ? { borderColor: '#334155', backgroundColor: '#334155', borderWidth: 2.5, pointRadius: 2, order: -3 } : {});
+            });
+            chart.update('none');
+            document.querySelectorAll(`[data-lc-row^="${gi}-"]`).forEach(r => {
+                const on = r.dataset.lcRow === `${gi}-${chart._lcSel}`;
+                r.style.background = on ? 'var(--primary-light)' : '';
+                r.querySelector('span').style.fontWeight = on ? '700' : '';
+            });
+        }
+        function toggleLifecycleMore(gi, btn) {
+            const rows = document.querySelectorAll('.lc-more-' + gi);
+            const show = rows.length && rows[0].classList.contains('hidden');
+            rows.forEach(r => r.classList.toggle('hidden', !show));
+            btn.textContent = show ? '접기' : `전체 ${rows.length + 8}개 보기`;
+        }
         function drawLifecycleChart(life) {
             lifecycleChartInstances.forEach(c => c.destroy());
             lifecycleChartInstances = [];
@@ -11671,19 +11706,22 @@
                 const el = document.getElementById('lifecycle-chart-' + i);
                 if (!el) return;
                 const color = getGenreColor(l.genre);
+                const len = Math.max(l.avg.length, ...l.worksList.map(w => w.series.length));
                 lifecycleChartInstances.push(new Chart(el, {
                     type: 'line',
                     data: {
-                        labels: l.avg.map((_, m) => `${m + 1}개월`),
-                        datasets: [{ label: l.genre, data: l.avg.map(v => Math.round(v)),
-                            borderColor: color, backgroundColor: hexToRgba(color, 0.15), fill: true,
-                            borderWidth: 2, pointRadius: 2, tension: 0.3 }]
+                        labels: Array.from({ length: len }, (_, m) => `${m + 1}개월`),
+                        datasets: [
+                            ...l.worksList.map(w => ({ label: w.title, data: w.series.map(v => Math.round(v)), ...LC_WORK_STYLE })),
+                            { label: '장르 평균', data: l.avg.map(v => Math.round(v)), borderColor: color, backgroundColor: color,
+                              borderWidth: 3, pointRadius: 0, pointHoverRadius: 4, tension: 0.3, order: -2 }
+                        ]
                     },
                     options: {
                         responsive: true, maintainAspectRatio: false,
-                        interaction: { mode: 'index', intersect: false },
+                        interaction: { mode: 'nearest', intersect: false },
                         plugins: { legend: { display: false },
-                            tooltip: { callbacks: { label: c => `작품당 평균 ₩ ${formatCurrency(c.parsed.y)}` } } },
+                            tooltip: { callbacks: { label: c => `${c.dataset.label}: ₩ ${formatCurrency(c.parsed.y)}` } } },
                         scales: { x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 0, autoSkipPadding: 6 } },
                             y: { beginAtZero: true, grid: { color: '#f3f4f6' }, ticks: { font: { size: 10 }, maxTicksLimit: 5, callback: v => v >= 10000 ? (v / 10000).toLocaleString() + '만' : v } } }
                     }

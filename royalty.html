@@ -2190,6 +2190,13 @@
                         </label>
                     </div>
                 </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-500 ml-1 mb-1 flex items-center justify-between">
+                        <span>선인세 입금 내역 <span class="font-normal text-slate-400">· 실제 입금액(원), 월별 정산에 자동 반영</span></span>
+                        <button type="button" onclick="addAdvRow('wtm')" class="text-[11px] font-bold text-emerald-600 hover:text-emerald-700">+ 추가</button>
+                    </label>
+                    <div id="wtm-adv-list" class="space-y-1.5"></div>
+                </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="text-xs font-bold text-slate-500 ml-1 mb-1 block">작화가님 이름</label>
@@ -2396,6 +2403,13 @@
                         <button type="button" onclick="addWmmExtraRow()" class="text-[11px] font-bold text-emerald-600 hover:text-emerald-700">+ 추가</button>
                     </label>
                     <div id="wmm-extras-list" class="space-y-1.5"></div>
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-500 ml-1 mb-1 flex items-center justify-between">
+                        <span>선인세 입금 내역 <span class="font-normal text-slate-400">· 실제 입금액(원), 월별 정산에 자동 반영</span></span>
+                        <button type="button" onclick="addAdvRow('wmm')" class="text-[11px] font-bold text-emerald-600 hover:text-emerald-700">+ 추가</button>
+                    </label>
+                    <div id="wmm-adv-list" class="space-y-1.5"></div>
                 </div>
                 <div>
                     <label class="text-xs font-bold text-slate-500 ml-1 mb-1 block">플랫폼</label>
@@ -7653,9 +7667,12 @@
                         const advHtml2 = advAmt2 ? `<span class="sheet-adv-badge" style="color:#16a34a;font-size:12px;font-weight:400;margin-left:auto;padding-left:6px;white-space:nowrap;flex-shrink:0;">선인세 ${advAmt2}</span>` : '';
                         const rateTxt2 = (currentGenreTab !== '웹툰' && w.rate) ? ` | ${w.rate}%` : '';
                         html += `<tr><td class="sticky-col pl-6"><div class="font-bold text-slate-700 text-sm truncate w-[240px] mb-1">${w.title}</div><div class="text-[11px] text-slate-400 flex items-center"><span class="sheet-pub-name">${(currentGenreTab === '웹툰' ? (w.studio || '-') : w.publisher)}${rateTxt2} | </span>${dateDisplay}${advHtml2}</div></td>`;
+                        const advSums = advanceMonthSums(getWorkAdvances(w));
                         months.forEach(m => {
                             const val = (monthlyData[m] || {})[w.id] || 0;
-                            html += `<td><input type="text" class="cell-input" value="₩ ${formatCurrency(val)}" ${readonlyAttr} onchange="updateRoyalty('${m}', '${w.id}', this.value)" onfocus="this.value = this.value.replace(/[^0-9]/g, ''); this.select();" onblur="this.value = '₩ ' + formatCurrency(this.value.replace(/[^0-9]/g, ''))"></td>`;
+                            // 선인세가 들어온 달은 칸 숫자를 테마색으로 (선인세 입금 내역에서 자동으로 채워진 금액)
+                            const advAttr = advSums[m] ? `style="color:var(--primary);font-weight:700" title="선인세 ₩ ${formatCurrency(advSums[m])} 포함 — 선인세는 작품 관리/웹툰 관리의 '선인세 입금 내역'에서 고쳐주세요"` : '';
+                            html += `<td><input type="text" class="cell-input" value="₩ ${formatCurrency(val)}" ${advAttr} ${readonlyAttr} onchange="updateRoyalty('${m}', '${w.id}', this.value)" onfocus="this.value = this.value.replace(/[^0-9]/g, ''); this.select();" onblur="this.value = '₩ ' + formatCurrency(this.value.replace(/[^0-9]/g, ''))"></td>`;
                         });
                         html += `<td id="work-total-${w.id}" class="genre-total-row pr-4" style="min-width:135px;">0</td></tr>`;
                     });
@@ -8451,6 +8468,7 @@
             document.getElementById('wtm-cashsheet-done').checked = !!info.cashsheetDone;
             document.getElementById('wtm-ep1conti-done').checked = !!info.ep1ContiDone;
             document.getElementById('wtm-mg-paid-done').checked = !!info.mgPaidDone;
+            loadAdvDraft('wtm', w);
             document.getElementById('wtm-illustrator').value = info.illustrator || '';
             document.getElementById('wtm-website').value = info.website || '';
             document.getElementById('wtm-launch-platform').value = info.launchPlatform || '';
@@ -8509,6 +8527,7 @@
                 w.rs = rsVal !== '' ? parseFloat(rsVal) : null;
                 w.webtoonRate = wrVal !== '' ? parseFloat(wrVal) : null;
                 if (w.rs && w.webtoonRate) w.rate = Math.round(w.rs * w.webtoonRate / 100 * 10) / 10;
+                commitAdvDraft('wtm', w);
             }
             save();
             closeWebtoonManageModal();
@@ -8876,6 +8895,7 @@
             document.getElementById('wmm-manuscript-date').value = w.manuscriptDate || '';
             wmmExtrasDraft = (w.extras || []).map(e => ({ ...e }));
             renderWmmExtrasList();
+            loadAdvDraft('wmm', w);
             const wmmPlatformPresets = ['리디', '시리즈', '카카오', '봄툰', '미스터블루', '레진'];
             const wmmPlatformSel = document.getElementById('wmm-launch-platform-select');
             const wmmPlatformCustom = document.getElementById('wmm-launch-platform-custom');
@@ -8916,6 +8936,66 @@
         function removeWmmExtraRow(idx) {
             wmmExtrasDraft.splice(idx, 1);
             renderWmmExtrasList();
+        }
+        // 선인세 입금 내역 편집 (작품 관리 'wmm' / 웹툰 관리 'wtm' 모달 공용) — 저장 버튼을 눌러야 반영된다
+        const advDraft = { wmm: [], wtm: [] };
+        function renderAdvList(p) {
+            const list = document.getElementById(p + '-adv-list');
+            if (!list) return;
+            const rows = advDraft[p];
+            if (rows.length === 0) {
+                list.innerHTML = '<p class="text-xs text-slate-300 py-1">등록된 선인세 입금이 없습니다.</p>';
+                return;
+            }
+            const inputCls = 'p-2 bg-slate-50 rounded-lg border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100';
+            list.innerHTML = rows.map((a, i) => {
+                // 예전에 옮겨온 기록처럼 날짜(일)를 모르는 건 '월'만 입력 — '일자 미정'을 누르면 날짜 입력으로 바뀐다
+                const monthOnly = String(a.date || '').length === 7;
+                const dateHtml = monthOnly
+                    ? `<input type="month" value="${a.date}" onchange="updateAdvRow('${p}',${i},'date',this.value)" class="w-[150px] shrink-0 ${inputCls}">
+                       <button type="button" onclick="advRowToDay('${p}',${i})" class="shrink-0 text-[11px] text-slate-400 hover:text-emerald-600 px-1" title="정확한 날짜 입력하기">일자 미정</button>`
+                    : `<input type="date" value="${a.date || ''}" onchange="updateAdvRow('${p}',${i},'date',this.value)" class="w-[150px] shrink-0 ${inputCls}">`;
+                return `<div class="flex gap-1.5 items-center">
+                    ${dateHtml}
+                    <div class="relative flex-1 min-w-0">
+                        <input type="text" inputmode="numeric" value="${a.amount ? formatCurrency(a.amount) : ''}" placeholder="입금액"
+                            onchange="updateAdvRow('${p}',${i},'amount',this.value)"
+                            onblur="const d=this.value.replace(/[^0-9]/g,''); this.value = d ? formatCurrency(d) : ''"
+                            class="w-full pr-7 text-right ${inputCls}">
+                        <span class="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">원</span>
+                    </div>
+                    <button type="button" onclick="removeAdvRow('${p}',${i})" class="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-rose-50 hover:text-rose-500 text-slate-400"><i class="fa-solid fa-xmark text-xs"></i></button>
+                </div>`;
+            }).join('');
+        }
+        function loadAdvDraft(p, w) { advDraft[p] = getWorkAdvances(w).map(a => ({ ...a })); renderAdvList(p); }
+        function addAdvRow(p) {
+            const t = new Date();
+            const today = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+            advDraft[p].push({ id: 'adv_' + Date.now(), date: today, amount: 0 });
+            renderAdvList(p);
+        }
+        function updateAdvRow(p, i, field, value) {
+            const a = advDraft[p][i];
+            if (!a) return;
+            if (field === 'amount') a.amount = Number(String(value).replace(/[^0-9]/g, '')) || 0;
+            else a.date = value;
+        }
+        function advRowToDay(p, i) {
+            const a = advDraft[p][i];
+            if (!a) return;
+            a.date = a.date + '-01';
+            renderAdvList(p);
+        }
+        function removeAdvRow(p, i) { advDraft[p].splice(i, 1); renderAdvList(p); }
+        // 모달 저장 시: 날짜·금액이 다 있는 줄만 남기고, 바뀐 만큼 월별 정산 칸에 더하거나 뺀다
+        function commitAdvDraft(p, w) {
+            const newList = advDraft[p]
+                .filter(a => a.date && (Number(a.amount) || 0) !== 0)
+                .map(a => ({ id: a.id, date: a.date, amount: Number(a.amount) }))
+                .sort((x, y) => x.date.localeCompare(y.date));
+            applyAdvanceChange(w.id, getWorkAdvances(w), newList);
+            w.advances = newList;
         }
         function handleWmmPromotionChange(select) {
             const customInput = document.getElementById('wmm-promotion-custom');
@@ -8997,6 +9077,7 @@
                 w.manuscriptDate = newManuscriptDate;
                 if (oldManuscriptDate !== newManuscriptDate) syncManuscriptTaskSchedule(w, oldManuscriptDate, newManuscriptDate);
                 w.extras = wmmExtrasDraft.filter(e => e.name && e.name.trim()).map(e => ({ ...e, name: e.name.trim() }));
+                commitAdvDraft('wmm', w);
             }
             save();
             closeWorkManageModal();
@@ -10433,23 +10514,70 @@
         function saveOverseasMemo() { if (currentEditingPublisher) { savePublisherDetail(currentEditingPublisher, 'overseas', document.getElementById('overseas-memo-area').value); document.getElementById('overseas-modal').classList.remove('open'); } }
         function openCredentialsModal(pubName) { currentEditingPublisher = pubName; const info = publisherData[pubName] || {}; document.getElementById('cred-site-url').value = info.siteUrl || ''; document.getElementById('cred-login-id').value = info.loginId || ''; document.getElementById('cred-login-pw').value = info.loginPw || ''; document.getElementById('credentials-modal').classList.add('open'); }
         function saveCredentials() { if (currentEditingPublisher) { if(!publisherData[currentEditingPublisher]) publisherData[currentEditingPublisher] = {}; publisherData[currentEditingPublisher].siteUrl = document.getElementById('cred-site-url').value; publisherData[currentEditingPublisher].loginId = document.getElementById('cred-login-id').value; publisherData[currentEditingPublisher].loginPw = document.getElementById('cred-login-pw').value; save(true); document.getElementById('credentials-modal').classList.remove('open'); } }
+        // ════════ 선인세 입금 내역 ════════
+        // 작품마다 w.advances = [{ id, date: 'YYYY-MM-DD'(또는 날짜 모를 때 'YYYY-MM'), amount: 실제 입금액(원) }]
+        // 선인세도 그 달 월별 정산 칸(monthlyData)에 금액이 더해져 있다 — 그래야 대시보드·세금·연말 결산·가계부 등
+        // monthlyData를 읽는 기존 합계가 전부 그대로 맞는다. 이 목록은 '그 칸 중 얼마가 선인세이고 며칠에 들어왔는지'를
+        // 알려주는 원본이라, 목록을 바꾸면 applyAdvanceChange()가 달라진 만큼만 칸에 더하거나 뺀다.
+        function getWorkAdvances(w) { return (w && Array.isArray(w.advances)) ? w.advances : []; }
+        function advanceMonthSums(list) {
+            const sums = {};
+            (list || []).forEach(a => {
+                const ym = String(a.date || '').slice(0, 7), amt = Number(a.amount) || 0;
+                if (ym.length === 7 && amt) sums[ym] = (sums[ym] || 0) + amt;
+            });
+            return sums;
+        }
+        function applyAdvanceChange(workId, oldList, newList) {
+            const o = advanceMonthSums(oldList), n = advanceMonthSums(newList);
+            new Set([...Object.keys(o), ...Object.keys(n)]).forEach(ym => {
+                const delta = (n[ym] || 0) - (o[ym] || 0);
+                if (!delta) return;
+                if (!monthlyData[ym]) monthlyData[ym] = {};
+                monthlyData[ym][workId] = (Number(monthlyData[ym][workId]) || 0) + delta;
+            });
+        }
+        // 한 달치 정산을 '입금 건' 단위로 나눈다: 인세는 출판사 정산일에, 선인세는 실제로 들어온 날짜에.
+        // publisher는 표시·묶음용 이름 (선인세는 '출판사 선인세'로 따로 묶인다)
+        function getSettlementEntries(monthKey) {
+            const data = monthlyData[monthKey] || {};
+            const out = [];
+            Object.entries(data).forEach(([workId, amount]) => {
+                amount = Number(amount) || 0;
+                if (!amount) return;
+                const w = masterWorks.find(x => x.id === workId);
+                if (!w) return;
+                const pub = w.settlementPublisher || w.publisher;
+                let rest = amount;
+                getWorkAdvances(w).forEach(a => {
+                    if (String(a.date || '').slice(0, 7) !== monthKey) return;
+                    const amt = Number(a.amount) || 0;
+                    if (!amt) return;
+                    const dd = String(a.date).slice(8, 10);
+                    out.push({ w, publisher: pub + ' 선인세', isAdv: true, day: dd ? String(Number(dd)) : '미정', amount: amt });
+                    rest -= amt;
+                });
+                if (rest) out.push({ w, publisher: pub, isAdv: false, day: (publisherData[pub] || {}).paymentDay || '미정', amount: rest });
+            });
+            return out;
+        }
+
+        // 정산 입금일 목록의 출판사 이름 — 선인세 건은 '출판사 [선인세]'처럼 테마색 배지로 표시
+        function settlePubLabelHtml(key, isAdv) {
+            if (!isAdv) return key;
+            return `${key.replace(/ 선인세$/, '')} <span class="text-[10px] font-bold px-1.5 py-0.5 rounded ml-0.5" style="color:var(--primary);background:color-mix(in srgb, var(--primary) 12%, transparent)">선인세</span>`;
+        }
         // 특정 연-월의 '정산일별' 카드 HTML과 합계를 만드는 공용 함수 (월 상세 모달 / 연간 전체보기 모달에서 공유)
         function buildDaySettlementCards(year, month, opts) {
             opts = opts || {};
             const compact = !!opts.compact;
             const monthKey = `${year}-${String(month).padStart(2,'0')}`;
-            const data = monthlyData[monthKey] || {};
             const dayMap = {};
             let totalSum = 0;
-            Object.entries(data).forEach(([workId, amount]) => {
-                if (!amount || amount === 0) return;
-                const w = masterWorks.find(x => x.id === workId);
-                if (!w) return;
-                const settlePub = w.settlementPublisher || w.publisher;
-                const day = (publisherData[settlePub] || {}).paymentDay || '미정';
-                if (!dayMap[day]) dayMap[day] = [];
-                dayMap[day].push({ publisher: settlePub, title: w.title, genre: w.genre || '', amount });
-                totalSum += amount;
+            getSettlementEntries(monthKey).forEach(e => {
+                if (!dayMap[e.day]) dayMap[e.day] = [];
+                dayMap[e.day].push({ publisher: e.publisher, isAdv: e.isAdv, title: e.w.title, genre: e.w.genre || '', amount: e.amount });
+                totalSum += e.amount;
             });
             const sortedDays = Object.keys(dayMap).sort((a, b) => {
                 const va = a === '말일' ? 999 : a === '미정' ? 9999 : Number(a);
@@ -10470,13 +10598,17 @@
                         pubMap[item.publisher] += item.amount;
                     });
                     const dayTotal = Object.values(pubMap).reduce((s, v) => s + v, 0);
+                    const advKeys = new Set(items.filter(it => it.isAdv).map(it => it.publisher));
                     const pubRows = Object.entries(pubMap)
                         .sort((a, b) => b[1] - a[1])
                         .map(([pub, amt]) => {
+                            const isAdv = advKeys.has(pub);
+                            const pubLabel = settlePubLabelHtml(pub, isAdv);
+                            const amtStyle = isAdv ? 'style="color:var(--primary)"' : '';
                             if (compact) return `
                             <div class="flex justify-between items-center py-2 ${dividerCls}">
-                                <span class="${pubTextCls} text-slate-600 font-medium">${pub}</span>
-                                <span class="${pubTextCls} font-bold text-slate-700">₩ ${formatCurrency(amt)}</span>
+                                <span class="${pubTextCls} text-slate-600 font-medium">${pubLabel}</span>
+                                <span class="${pubTextCls} font-bold text-slate-700" ${amtStyle}>₩ ${formatCurrency(amt)}</span>
                             </div>`;
                             // 월 상세 모달: 출판사 줄을 누르면 그 출판사 작품별 금액이 바로 아래에 펼쳐진다
                             // 장르(앱의 장르 목록 순서)별로 묶고, 같은 장르 안에서는 제목 ㄱㄴㄷ 순
@@ -10488,14 +10620,14 @@
                                     const badge = it.genre ? `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 whitespace-nowrap" style="background-color:${hexToRgba(gc, genreBadgeOpacity)};color:#334155">${it.genre}</span>` : '';
                                     return `<div class="flex justify-between items-center gap-3 py-1.5">
                                         <span class="flex items-center gap-2 min-w-0 text-[13px] text-slate-600">${badge}<span class="truncate" title="${it.title}">${it.title}</span></span>
-                                        <span class="text-[13px] text-slate-500 shrink-0">₩ ${formatCurrency(it.amount)}</span>
+                                        <span class="text-[13px] text-slate-500 shrink-0" ${amtStyle}>₩ ${formatCurrency(it.amount)}</span>
                                     </div>`;
                                 }).join('');
                             return `
                             <div class="${dividerCls}">
                                 <div onclick="toggleSettleWorks(this)" class="flex justify-between items-center py-2 cursor-pointer select-none group">
-                                    <span class="${pubTextCls} text-slate-600 font-medium flex items-center gap-2"><i class="fa-solid fa-chevron-right text-[9px] text-slate-300 group-hover:text-slate-500 transition-transform settle-chevron"></i>${pub}</span>
-                                    <span class="${pubTextCls} font-bold text-slate-700">₩ ${formatCurrency(amt)}</span>
+                                    <span class="${pubTextCls} text-slate-600 font-medium flex items-center gap-2"><i class="fa-solid fa-chevron-right text-[9px] text-slate-300 group-hover:text-slate-500 transition-transform settle-chevron"></i>${pubLabel}</span>
+                                    <span class="${pubTextCls} font-bold text-slate-700" ${amtStyle}>₩ ${formatCurrency(amt)}</span>
                                 </div>
                                 <div class="settle-works hidden pl-5 pb-2 mb-1 border-l-2 border-slate-100 ml-1">${workRows}</div>
                             </div>`;
@@ -10535,19 +10667,14 @@
         // 한 달치 '정산일별' 원시 데이터를 만든다 (연간 전체보기의 표 형태 렌더링용)
         function getMonthDayData(year, month) {
             const monthKey = `${year}-${String(month).padStart(2,'0')}`;
-            const data = monthlyData[monthKey] || {};
             const dayMap = {};
             let totalSum = 0;
-            Object.entries(data).forEach(([workId, amount]) => {
-                if (!amount || amount === 0) return;
-                const w = masterWorks.find(x => x.id === workId);
-                if (!w) return;
-                const settlePub = w.settlementPublisher || w.publisher;
-                const day = (publisherData[settlePub] || {}).paymentDay || '미정';
-                if (!dayMap[day]) dayMap[day] = { total: 0, pubMap: {} };
-                dayMap[day].total += amount;
-                dayMap[day].pubMap[settlePub] = (dayMap[day].pubMap[settlePub] || 0) + amount;
-                totalSum += amount;
+            getSettlementEntries(monthKey).forEach(e => {
+                if (!dayMap[e.day]) dayMap[e.day] = { total: 0, pubMap: {}, advKeys: new Set() };
+                dayMap[e.day].total += e.amount;
+                dayMap[e.day].pubMap[e.publisher] = (dayMap[e.day].pubMap[e.publisher] || 0) + e.amount;
+                if (e.isAdv) dayMap[e.day].advKeys.add(e.publisher);
+                totalSum += e.amount;
             });
             return { totalSum, dayMap };
         }
@@ -10599,11 +10726,14 @@
                         if (entry) {
                             const pubRows = Object.entries(entry.pubMap)
                                 .sort((a, b) => a[0].localeCompare(b[0], 'ko'))
-                                .map(([pub, amt]) => `
+                                .map(([pub, amt]) => {
+                                    const isAdv = entry.advKeys && entry.advKeys.has(pub);
+                                    return `
                                     <div class="flex justify-between items-center py-1 gap-2">
-                                        <span class="text-xs text-slate-700 font-medium truncate">${pub}</span>
-                                        <span class="text-xs font-medium text-slate-700 whitespace-nowrap">₩ ${formatCurrency(amt)}</span>
-                                    </div>`).join('');
+                                        <span class="text-xs text-slate-700 font-medium truncate">${settlePubLabelHtml(pub, isAdv)}</span>
+                                        <span class="text-xs font-medium text-slate-700 whitespace-nowrap" ${isAdv ? 'style="color:var(--primary)"' : ''}>₩ ${formatCurrency(amt)}</span>
+                                    </div>`;
+                                }).join('');
                             inner = `
                                 <div class="flex items-center justify-between gap-2 mb-1.5">
                                     <span class="px-1.5 h-5 min-w-[34px] bg-rose-50 text-rose-500 rounded flex items-center justify-center text-[10px] font-black border border-rose-100">${label}</span>
@@ -10689,9 +10819,9 @@
         // 한 달치 '정산 예정' 미니 카드 HTML을 만드는 공용 함수 (12개월 그리드 / 연간 전체보기 모달에서 공유)
         function buildMonthScheduleCard(year, month, opts) {
             opts = opts || {};
-            const monthKey = `${year}-${String(month).padStart(2, '0')}`, data = monthlyData[monthKey] || {};
+            const monthKey = `${year}-${String(month).padStart(2, '0')}`;
             let monthTotal = 0, scheduleMap = {};
-            Object.entries(data).forEach(([workId, amount]) => { const w = masterWorks.find(x => x.id === workId); if(!w || amount===0) return; const settlePub = w.settlementPublisher || w.publisher; const day = (publisherData[settlePub] || {}).paymentDay || '미정'; if(!scheduleMap[day]) scheduleMap[day] = { total: 0, pubs: new Set(), pubAmounts: {} }; scheduleMap[day].total += amount; scheduleMap[day].pubs.add(settlePub); scheduleMap[day].pubAmounts[settlePub] = (scheduleMap[day].pubAmounts[settlePub] || 0) + amount; monthTotal += amount; });
+            getSettlementEntries(monthKey).forEach(e => { const day = e.day; if(!scheduleMap[day]) scheduleMap[day] = { total: 0, pubs: new Set(), pubAmounts: {} }; scheduleMap[day].total += e.amount; scheduleMap[day].pubs.add(e.publisher); scheduleMap[day].pubAmounts[e.publisher] = (scheduleMap[day].pubAmounts[e.publisher] || 0) + e.amount; monthTotal += e.amount; });
             const maxH = opts.maxH || 280;
             let listHtml = Object.keys(scheduleMap).length === 0 ? `<div class="flex-1 flex flex-col items-center justify-center text-slate-300 text-xs opacity-50"><i class="fa-regular fa-calendar-xmark text-lg mb-1"></i>예정 없음</div>` : `<div class="space-y-2 mt-3 overflow-y-auto max-h-[${maxH}px] pr-1 custom-scrollbar">` + Object.keys(scheduleMap).sort().map(day => {
                 const entry = scheduleMap[day];

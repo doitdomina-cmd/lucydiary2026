@@ -10479,8 +10479,10 @@
                                 <span class="${pubTextCls} font-bold text-slate-700">₩ ${formatCurrency(amt)}</span>
                             </div>`;
                             // 월 상세 모달: 출판사 줄을 누르면 그 출판사 작품별 금액이 바로 아래에 펼쳐진다
+                            // 장르(앱의 장르 목록 순서)별로 묶고, 같은 장르 안에서는 제목 ㄱㄴㄷ 순
+                            const genreIdx = g => { const i = genreList.findIndex(x => x.name === g); return i < 0 ? 999 : i; };
                             const workRows = items.filter(it => it.publisher === pub)
-                                .sort((a, b) => b.amount - a.amount)
+                                .sort((a, b) => (genreIdx(a.genre) - genreIdx(b.genre)) || a.title.localeCompare(b.title, 'ko'))
                                 .map(it => {
                                     const gc = getGenreColor(it.genre);
                                     const badge = it.genre ? `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 whitespace-nowrap" style="background-color:${hexToRgba(gc, genreBadgeOpacity)};color:#334155">${it.genre}</span>` : '';

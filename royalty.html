@@ -12645,6 +12645,7 @@
             document.getElementById('write-calendar-body').innerHTML = html;
             if (typeof window.clearCalSelection === 'function') window.clearCalSelection();
             renderWriteSpans(); // 기간 일정 막대를 달력 위에 겹쳐 그림
+            watchWriteCalendarResize();
 
             // 이번달 목표 합계 업데이트
             try {
@@ -16141,6 +16142,30 @@
 
             save(); closeWriteSpanModal(); renderWriteCalendar(); refreshOpenYearTimeline();
             meShowToast(`집필 카드 ${created}개를 만들었어요.${skipped ? ` (이미 있던 ${skipped}일은 건너뜀)` : ''}`);
+        }
+
+        // 막대는 그린 순간의 칸 위치를 재서 붙이는데, 그 뒤에 달력 크기가 바뀌면(스크롤바가 생겨 폭이 줄거나 글꼴이 늦게
+        // 로드돼서 긴 제목이 두 줄로 바뀌는 등) 위쪽 주가 길어져 아래 막대들이 위로 밀려 보였다 — 드래그해야 제자리로 왔음.
+        // 달력 크기가 바뀔 때마다 막대 위치를 다시 잰다.
+        let _writeCalResizeObs = null, _writeCalResizeRaf = 0;
+        function watchWriteCalendarResize() {
+            const el = document.getElementById('write-calendar-body');
+            if (!el || typeof ResizeObserver === 'undefined') return;
+            if (_writeCalResizeObs && _writeCalResizeObs._el === el) return;   // 이미 보고 있음
+            if (_writeCalResizeObs) _writeCalResizeObs.disconnect();
+            let last = '';
+            _writeCalResizeObs = new ResizeObserver(entries => {
+                const r = entries[0].contentRect;
+                const key = Math.round(r.width) + 'x' + Math.round(r.height);
+                if (key === last) return;
+                last = key;
+                if (spanMoveState || spanResizeState) return;   // 드래그 중에는 드래그 쪽에서 다시 그림
+                cancelAnimationFrame(_writeCalResizeRaf);
+                _writeCalResizeRaf = requestAnimationFrame(() => renderWriteSpans());
+            });
+            _writeCalResizeObs._el = el;
+            _writeCalResizeObs.observe(el);
+            if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => renderWriteSpans());
         }
 
         // 달력 위에 기간 막대를 겹쳐 그린다.

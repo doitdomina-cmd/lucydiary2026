@@ -3742,6 +3742,13 @@
                     </div>
                 </div>
             </div>
+
+            <div class="mx-5 border-t border-slate-100"></div>
+
+            <div id="wwi-progress-section" class="px-5 py-4">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-2 flex items-center gap-1"><i class="fa-solid fa-pen-nib"></i> 현재 집필 정보</p>
+                <div id="wwi-progress-body" class="space-y-2"></div>
+            </div>
         </div>
         <div id="write-main-modal" class="modal-content h-auto max-h-[95vh]" style="overflow-y:auto;">
             <div class="flex justify-between items-center mb-6">
@@ -13191,6 +13198,55 @@
                 dateInput.classList.remove('hidden'); dateInput.value = w.publishDate || '';
                 monthInput.classList.add('hidden'); monthInput.value = '';
             }
+            renderWwiProgress(w);
+        }
+
+        // '현재 집필 정보' — 달력에 만들어 둔 집필 카드 기준 계획 분량, 지금까지 쓴 분량, 오늘부터 남은 분량과 하루 분량.
+        // 계획 분량은 카드 누적 숫자(괄호 안 첫 숫자)와 같은 방식: '지금부터 카운터' 리셋 날짜 이후 카드 목표를 전부 더한 값.
+        function renderWwiProgress(w) {
+            const body = document.getElementById('wwi-progress-body');
+            if (!body) return;
+            const t = new Date();
+            const today = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+            const resetDate = writeCounterResetDate[w.id] || '';
+            let planned = 0, lastDate = '';
+            const cardDaysLeft = new Set();
+            Object.entries(writeSchedules).forEach(([ds, list]) => (list || []).forEach(s => {
+                if (s.workId !== w.id || s.category) return;
+                if (resetDate && ds < resetDate) return;
+                const g = Number(s.goal) || 0;
+                planned += g;
+                if (ds > lastDate) lastDate = ds;
+                if (ds >= today && g > 0) cardDaysLeft.add(ds);
+            }));
+            const fmt = n => Math.round(n).toLocaleString();
+            const nospace = n => fmt(n * NOSPACE_TO_WITHSPACE_RATIO);
+            const row = (label, main, sub, hi) => `
+                <div class="rounded-xl pl-3 pr-3 py-2" style="background:${hi ? 'var(--primary-light)' : '#f8fafc'}">
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-xs font-bold ${hi ? '' : 'text-slate-500'}" ${hi ? 'style="color:var(--primary)"' : ''}>${label}</span>
+                        <span class="font-bold text-sm ${hi ? '' : 'text-slate-700'}" ${hi ? 'style="color:var(--primary)"' : ''}>${main}</span>
+                    </div>
+                    ${sub ? `<p class="text-[10px] text-slate-400 text-right mt-0.5">${sub}</p>` : ''}
+                </div>`;
+            if (!planned) { body.innerHTML = `<p class="text-xs text-slate-400">이 작품의 집필 카드가 아직 없어요.</p>`; return; }
+
+            const written = writerGetWorkTotal(w.id);
+            const remain = Math.max(0, planned - written);
+            let html = row('계획 글자수', `${fmt(planned)}자`, `공미 ${nospace(planned)}자 · 마지막 카드 ${lastDate.slice(5).replace('-', '/')}`)
+                     + row('지금까지 쓴 글자수', `${fmt(written)}자`, `공미 ${nospace(written)}자`)
+                     + row('오늘부터 남은 글자수', `${fmt(remain)}자`, `공미 ${nospace(remain)}자`);
+            if (remain <= 0) {
+                html += `<p class="text-xs font-bold text-center py-1" style="color:var(--primary)">계획한 분량을 다 썼어요 🎉</p>`;
+            } else if (lastDate < today) {
+                html += `<p class="text-xs text-slate-400 text-center py-1">오늘 이후 집필 카드가 없어요.</p>`;
+            } else {
+                const daysLeft = Math.round((new Date(lastDate) - new Date(today)) / 86400000) + 1;
+                const cardDays = cardDaysLeft.size;
+                html += row('하루에 써야 할 글자수', `${fmt(remain / daysLeft)}자`,
+                    `${lastDate.slice(5).replace('-', '/')}까지 ${daysLeft}일 기준${cardDays && cardDays !== daysLeft ? ` · 남은 카드 ${cardDays}일 기준 ${fmt(remain / cardDays)}자` : ''}`, true);
+            }
+            body.innerHTML = html;
         }
 
         // 패널에서 공포/공미 글자수를 바꾸면 원작품(masterWorks)에 바로 저장하고,

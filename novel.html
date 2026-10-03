@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>웹소설 집필실</title>
+<link rel="manifest" href="novel-manifest.json">
+<link rel="icon" href="icon-192.png">
+<meta name="theme-color" content="#f6f7f4">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+:root {
+    --bg: #f6f7f4; --panel: #ffffff; --panel2: #fbfbf9; --line: #e4e6e0; --text: #23261f; --muted: #8a8f84;
+    --accent: #6aa12f; --accent-soft: #eef6e4; --danger: #d9534f; --paper: #fffefa;
+    --note-yellow: #fff6c7; --note-pink: #ffe1ea; --note-green: #e3f5d6; --note-blue: #dfeefe; --note-purple: #ece4fb;
+    --shadow: 0 1px 2px rgba(0,0,0,.06);
+}
+:root[data-theme="dark"] {
+    --bg: #17191a; --panel: #1f2223; --panel2: #232627; --line: #33383a; --text: #e6e8e3; --muted: #8d948f;
+    --accent: #8cc455; --accent-soft: #263420; --paper: #1c1f20;
+    --note-yellow: #3b3720; --note-pink: #3d2730; --note-green: #253522; --note-blue: #213140; --note-purple: #2f2840;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--text); font-family: 'Noto Sans KR', system-ui, sans-serif; font-size: 13px; overflow: hidden; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+input, select, textarea { font: inherit; color: inherit; }
+select { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; max-width: 100%; }
+.hidden { display: none !important; }
+
+/* ===== 상단 바 ===== */
+header { height: 46px; display: flex; align-items: center; gap: 8px; padding: 0 10px; background: var(--panel); border-bottom: 1px solid var(--line); }
+header .brand { font-weight: 700; color: var(--accent); white-space: nowrap; }
+header .work-select { font-weight: 700; max-width: 220px; }
+header .spacer { flex: 1; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+.seg button { padding: 4px 8px; font-size: 12px; color: var(--muted); }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button.on { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+.seg-label { font-size: 11px; color: var(--muted); margin-right: 2px; }
+.icon-btn { padding: 5px 8px; border-radius: 6px; color: var(--muted); white-space: nowrap; }
+.icon-btn:hover { background: var(--accent-soft); color: var(--accent); }
+.icon-btn.on { color: var(--accent); background: var(--accent-soft); }
+.sync-badge { font-size: 11px; padding: 4px 8px; border-radius: 999px; border: 1px solid var(--line); white-space: nowrap; color: var(--muted); }
+.sync-badge.ok { color: var(--accent); border-color: var(--accent); }
+.sync-badge.warn { color: #d08a1a; border-color: #d08a1a; }
+.sync-badge.err { color: var(--danger); border-color: var(--danger); }
+.menu { position: relative; }
+.menu-pop { position: absolute; right: 0; top: 34px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.12); padding: 6px; z-index: 50; min-width: 200px; }
+.menu-pop button { display: block; width: 100%; text-align: left; padding: 7px 10px; border-radius: 6px; }
+.menu-pop button:hover { background: var(--accent-soft); }
+.menu-pop hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
+
+/* ===== 메인 레이아웃 ===== */
+main { height: calc(100% - 46px); display: flex; }
+.col { display: flex; flex-direction: column; min-width: 0; background: var(--panel); }
+.col-head { height: 34px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 8px; border-bottom: 1px solid var(--line); font-weight: 700; font-size: 12px; }
+.col-head .spacer { flex: 1; }
+.resizer { width: 5px; flex: none; cursor: col-resize; background: var(--line); opacity: .5; }
+.resizer:hover, .resizer.drag { background: var(--accent); opacity: 1; }
+#col-tree { width: 220px; }
+#col-synop { width: 340px; }
+#col-editor { flex: 1; background: var(--bg); }
+#col-notes { width: 260px; }
+
+/* 회차 트리 */
+.tree { flex: 1; overflow-y: auto; padding: 6px; }
+.tree-sec { font-size: 11px; color: var(--muted); font-weight: 700; padding: 10px 6px 4px; display: flex; align-items: center; }
+.tree-sec .spacer { flex: 1; }
+.tree-item { display: flex; align-items: center; gap: 4px; padding: 5px 6px; border-radius: 6px; cursor: pointer; }
+.tree-item:hover { background: var(--panel2); }
+.tree-item.open { background: var(--accent-soft); }
+.tree-item.open .t-title { color: var(--accent); font-weight: 700; }
+.tree-item .t-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tree-item .t-meta { font-size: 10px; color: var(--muted); white-space: nowrap; }
+.tree-item .t-act { display: none; gap: 1px; }
+.tree-item:hover .t-act { display: flex; }
+.tree-item .t-act button { font-size: 11px; color: var(--muted); padding: 0 3px; border-radius: 4px; }
+.tree-item .t-act button:hover { background: var(--line); color: var(--text); }
+.tree-item.dragover { box-shadow: inset 0 2px 0 var(--accent); }
+.tree-foot { padding: 8px; border-top: 1px solid var(--line); font-size: 11px; color: var(--muted); line-height: 1.6; }
+
+/* 시놉 분할 */
+.synop-grid { flex: 1; display: grid; gap: 1px; background: var(--line); min-height: 0; }
+.synop-grid.n1 { grid-template: 1fr / 1fr; }
+.synop-grid.n2 { grid-template: 1fr 1fr / 1fr; }
+.synop-grid.n3 { grid-template: 1fr 1fr 1fr / 1fr; }
+.synop-grid.n4 { grid-template: 1fr 1fr / 1fr 1fr; }
+.pane { display: flex; flex-direction: column; min-height: 0; min-width: 0; background: var(--panel); }
+.pane.active { box-shadow: inset 0 2px 0 var(--accent); }
+.pane-head { display: flex; align-items: center; gap: 4px; padding: 4px 6px; border-bottom: 1px solid var(--line); background: var(--panel2); }
+.pane-head select { flex: 1; min-width: 0; font-size: 12px; border-color: transparent; background: transparent; font-weight: 700; }
+.pane-head select:hover { border-color: var(--line); }
+.pane textarea { flex: 1; resize: none; border: 0; outline: none; padding: 10px 12px; background: transparent; line-height: 1.7; font-size: 13px; min-height: 0; }
+.pane-empty { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 12px; text-align: center; padding: 10px; }
+
+/* 원고 에디터 분할 */
+.editor-grid { flex: 1; display: grid; gap: 1px; background: var(--line); min-height: 0; }
+.editor-grid.n1 { grid-template-columns: 1fr; }
+.editor-grid.n2 { grid-template-columns: 1fr 1fr; }
+.epane { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--paper); }
+.epane.active .pane-head { box-shadow: inset 0 2px 0 var(--accent); }
+.epane .title-input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; font-weight: 700; font-size: 13px; padding: 2px 4px; }
+.manuscript-wrap { flex: 1; overflow-y: auto; min-height: 0; }
+.manuscript { display: block; width: 100%; max-width: var(--ed-width, 720px); margin: 0 auto; min-height: 100%; resize: none; border: 0; outline: none; background: transparent; padding: 28px 28px 40vh;
+    font-family: var(--ed-font, 'Nanum Myeongjo', serif); font-size: var(--ed-size, 16px); line-height: var(--ed-lh, 1.9); overflow: hidden; }
+.epane-foot { flex: none; display: flex; align-items: center; gap: 10px; padding: 4px 10px; border-top: 1px solid var(--line); font-size: 11px; color: var(--muted); background: var(--panel2); white-space: nowrap; overflow-x: auto; }
+.epane-foot b { color: var(--text); font-weight: 700; }
+.goal-bar { width: 80px; height: 5px; border-radius: 3px; background: var(--line); overflow: hidden; flex: none; }
+.goal-bar i { display: block; height: 100%; background: var(--accent); }
+.goal-input { width: 60px; border: 1px solid var(--line); border-radius: 4px; background: transparent; padding: 0 4px; font-size: 11px; }
+
+/* 노트 */
+.notes { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+.note { border-radius: 8px; padding: 8px 10px; box-shadow: var(--shadow); }
+.note[data-c="yellow"] { background: var(--note-yellow); }
+.note[data-c="pink"] { background: var(--note-pink); }
+.note[data-c="green"] { background: var(--note-green); }
+.note[data-c="blue"] { background: var(--note-blue); }
+.note[data-c="purple"] { background: var(--note-purple); }
+.note-head { display: flex; align-items: center; gap: 4px; }
+.note-head input { flex: 1; min-width: 0; border: 0; background: transparent; outline: none; font-weight: 700; font-size: 12px; }
+.note-head button { color: var(--muted); font-size: 11px; padding: 0 3px; }
+.note textarea { width: 100%; border: 0; outline: none; background: transparent; resize: none; font-size: 12px; line-height: 1.6; overflow: hidden; min-height: 40px; padding: 4px 0 0; }
+.note-filter { width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; background: var(--panel2); font-size: 12px; }
+
+/* 모달 */
+.modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
+.modal { background: var(--panel); border-radius: 12px; padding: 18px; width: 100%; max-width: 420px; box-shadow: 0 16px 48px rgba(0,0,0,.25); }
+.modal h3 { margin: 0 0 12px; font-size: 15px; }
+.modal label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+.modal input[type=text], .modal input[type=number], .modal select { width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; background: var(--panel2); }
+.modal .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+.btn { padding: 6px 14px; border-radius: 7px; border: 1px solid var(--line); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+.toast { position: fixed; left: 50%; bottom: 70px; transform: translateX(-50%); background: #23261f; color: #fff; padding: 8px 14px; border-radius: 8px; font-size: 12px; z-index: 200; opacity: 0; transition: opacity .2s; pointer-events: none; }
+.toast.show { opacity: .92; }
+
+/* 하단 탭 (폰) */
+nav.mtabs { display: none; }
+
+/* ===== 태블릿 ===== */
+@media (max-width: 1180px) {
+    #col-notes { width: 220px; }
+    #col-synop { width: 280px; }
+    .hide-tablet { display: none !important; }
+}
+/* ===== 폰 ===== */
+@media (max-width: 760px) {
+    header { gap: 4px; padding: 0 6px; }
+    header .brand, .hide-phone { display: none !important; }
+    header .work-select { max-width: 150px; }
+    main { height: calc(100% - 46px - 54px - env(safe-area-inset-bottom)); }
+    .resizer { display: none; }
+    .col { width: 100% !important; display: none; }
+    body[data-mtab="tree"] #col-tree, body[data-mtab="synop"] #col-synop,
+    body[data-mtab="editor"] #col-editor, body[data-mtab="notes"] #col-notes { display: flex !important; }
+    .synop-grid { grid-template: 1fr / 1fr !important; }
+    .synop-grid .pane:not(.active) { display: none; }
+    .editor-grid { grid-template-columns: 1fr !important; }
+    .editor-grid .epane:not(.active) { display: none; }
+    .manuscript { padding: 18px 16px 40vh; }
+    .tree-item .t-act { display: flex; }
+    nav.mtabs { display: flex; position: fixed; left: 0; right: 0; bottom: 0; height: calc(54px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); background: var(--panel); border-top: 1px solid var(--line); z-index: 40; }
+    nav.mtabs button { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 11px; color: var(--muted); }
+    nav.mtabs button span { font-size: 18px; line-height: 1; }
+    nav.mtabs button.on { color: var(--accent); font-weight: 700; }
+}
+</style>
+</head>
+<body data-mtab="editor">
+
+<header>
+    <span class="brand">✒️ 집필실</span>
+    <select class="work-select" id="work-select" title="작품 선택"></select>
+    <span class="hide-phone" style="display:inline-flex;align-items:center;gap:4px;margin-left:6px">
+        <span class="seg-label">시놉</span>
+        <span class="seg" id="seg-synop"></span>
+        <span class="seg-label" style="margin-left:6px">원고</span>
+        <span class="seg" id="seg-editor"></span>
+    </span>
+    <button class="icon-btn hide-phone" id="btn-toggle-tree" title="회차 목록 보이기/숨기기">☰ 목록</button>
+    <button class="icon-btn hide-phone" id="btn-toggle-synop" title="시놉 영역 보이기/숨기기">▤ 시놉</button>
+    <button class="icon-btn hide-phone" id="btn-toggle-notes" title="노트 영역 보이기/숨기기">🗒 노트</button>
+    <span class="spacer"></span>
+    <span class="sync-badge" id="sync-badge">로컬 저장</span>
+    <div class="menu">
+        <button class="icon-btn" id="btn-menu" title="메뉴">⋯</button>
+        <div class="menu-pop hidden" id="menu-pop">
+            <button data-act="login">☁️ 구글 로그인 (기기 간 동기화)</button>
+            <button data-act="logout" class="hidden">로그아웃</button>
+            <hr>
+            <button data-act="new-work">＋ 새 작품</button>
+            <button data-act="rename-work">작품 이름 바꾸기</button>
+            <button data-act="delete-work">작품 삭제</button>
+            <hr>
+            <button data-act="typo">가 글꼴 · 크기 · 줄간격</button>
+            <button data-act="theme">🌙 다크 모드 전환</button>
+            <hr>
+            <button data-act="export-ep">현재 회차 TXT 저장</button>
+            <button data-act="export-work">작품 전체 TXT 저장</button>
+            <button data-act="backup">백업 파일 저장 (JSON)</button>
+            <button data-act="restore">백업 파일 불러오기</button>
+        </div>
+    </div>
+</header>
+
+<main>
+    <section class="col" id="col-tree">
+        <div class="col-head">회차 목록<span class="spacer"></span></div>
+        <div class="tree" id="tree"></div>
+        <div class="tree-foot" id="tree-foot"></div>
+    </section>
+    <div class="resizer" data-for="col-tree"></div>
+
+    <section class="col" id="col-synop">
+        <div class="col-head">시놉시스<span class="spacer"></span><button class="icon-btn" id="btn-new-synop" title="새 시놉 문서">＋</button></div>
+        <div class="synop-grid" id="synop-grid"></div>
+    </section>
+    <div class="resizer" data-for="col-synop"></div>
+
+    <section class="col" id="col-editor">
+        <div class="editor-grid" id="editor-grid"></div>
+    </section>
+    <div class="resizer" data-for="col-notes" data-reverse="1"></div>
+
+    <section class="col" id="col-notes">
+        <div class="col-head">노트 · 설정<span class="spacer"></span><button class="icon-btn" id="btn-new-note" title="새 노트">＋</button></div>
+        <div style="padding:8px 8px 0"><input class="note-filter" id="note-filter" placeholder="노트 검색"></div>
+        <div class="notes" id="notes"></div>
+    </section>
+</main>
+
+<nav class="mtabs" id="mtabs">
+    <button data-tab="tree"><span>☰</span>목록</button>
+    <button data-tab="synop"><span>▤</span>시놉</button>
+    <button data-tab="editor"><span>✎</span>원고</button>
+    <button data-tab="notes"><span>🗒</span>노트</button>
+</nav>
+
+<div class="toast" id="toast"></div>
+<input type="file" id="file-restore" accept=".json,application/json" class="hidden">
+
+<script>
+'use strict';
+/* =====================================================================
+   웹소설 집필실
+   - 모든 데이터(작품/회차/시놉/노트/화면 배치)는 "아이템" 단위로 저장
+   - 로컬(localStorage)에 즉시 저장 + 구글 로그인 시 Firestore에 아이템별로 동기화
+   - 화면 배치(분할 수, 열린 문서, 패널 너비)도 아이템으로 동기화되어
+     PC·태블릿·폰 어디서 열어도 같은 화면으로 이어쓸 수 있음
+   ===================================================================== */
+
+const LS_KEY = 'novel-writer-v1';
+const LS_PREF = 'novel-writer-pref'; // 기기별 설정 (글꼴, 테마, 모바일 탭)
+const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyC1I0GQHJ4U5t0bIgWyXWlKT6pZZMZh2yI",
+    projectId: "syno-eb309",
+    authDomain: "syno-eb309.firebaseapp.com",
+    collection: "novelWriter"
+};
+const NOTE_COLORS = ['yellow', 'pink', 'green', 'blue', 'purple'];
+
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const uid = p => p + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const fmt = n => n.toLocaleString('ko-KR');
+
+let clientId = null;
+try { clientId = localStorage.getItem('novel-writer-client') || null; } catch (e) {}
+if (!clientId) { clientId = uid('c'); try { localStorage.setItem('novel-writer-client', clientId); } catch (e) {} }
+
+/* ---------- 상태 ---------- */
+let items = {};           // id -> item
+const dirty = new Set();  // 클라우드에 올려야 할 아이템 id
+let pref = { theme: 'light', font: 'myeongjo', size: 16, lh: 1.9, width: 720, mtab: 'editor' };
+
+function loadLocal() {
+    try { const raw = localStorage.getItem(LS_KEY); if (raw) items = JSON.parse(raw).items || {}; } catch (e) { items = {}; }
+    try { const raw = localStorage.getItem(LS_PREF); if (raw) pref = { ...pref, ...JSON.parse(raw) }; } catch (e) {}
+}
+let saveTimer = null;
+function scheduleSave() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveLocal, 300);
+    scheduleCloudPush();
+}
+function saveLocal() {
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ items })); }
+    catch (e) { toast('로컬 저장 실패: 저장 공간이 부족할 수 있어요. 백업 파일을 저장해 두세요.'); }
+}
+function savePref() { try { localStorage.setItem(LS_PREF, JSON.stringify(pref)); } catch (e) {} }
+
+function touch(it) {
+    it.rev = Date.now();
+    it.by = clientId;
+    items[it.id] = it;
+    dirty.add(it.id);
+    scheduleSave();
+}
+function create(kind, fields) {
+    const it = { id: uid(kind[0]), kind, title: '', body: '', order: Date.now(), deleted: false, ...fields };
+    touch(it);
+    return it;
+}
+function remove(it) { it.deleted = true; it.body = ''; touch(it); }
+
+const alive = it => it && !it.deleted;
+const works = () => Object.values(items).filter(i => i.kind === 'work' && alive(i)).sort((a, b) => a.order - b.order);
+const ofWork = (kind, workId = layout().workId) => Object.values(items)
+    .filter(i => i.kind === kind && alive(i) && i.workId === workId).sort((a, b) => a.order - b.order);
+const get = id => (id && alive(items[id])) ? items[id] : null;
+
+function layout() {
+    if (!items.layout) items.layout = { id: 'layout', kind: 'layout', rev: 0 };
+    const L = items.layout;
+    L.synopN ??= 2; L.editorN ??= 1; L.synopPanes ??= []; L.editorPanes ??= [];
+    L.activeSynop ??= 0; L.activeEditor ??= 0;
+    L.show ??= { tree: true, synop: true, notes: true };
+    L.widths ??= {};
+    L.perWork ??= {}; // 작품별로 마지막에 열어둔 문서
+    return L;
+}
+function setLayout(fn) { const L = layout(); fn(L); touch(L); }
+
+/* 글자수: 공백 포함 / 공백 제외(공미) */
+function countChars(text) {
+    const s = text || '';
+    return { all: s.replace(/\n/g, '').length, noSpace: s.replace(/\s/g, '').length };
+}
+
+/* ---------- 첫 실행 기본 데이터 ---------- */
+function ensureSeed() {
+    if (!works().length) {
+        const w = create('work', { title: '새 작품', order: 1 });
+        const e1 = create('episode', { workId: w.id, title: '1화', order: 1, goal: 5000 });
+        const s1 = create('synop', { workId: w.id, title: '전체 시놉시스', order: 1, body: '로그라인:\n\n주요 사건 흐름:\n1부 -\n2부 -\n' });
+        const s2 = create('synop', { workId: w.id, title: '1화 플롯', order: 2, body: '' });
+        create('note', { workId: w.id, title: '주인공', color: 'yellow', order: 1, body: '이름:\n나이:\n특징:' });
+        setLayout(L => { L.workId = w.id; L.synopPanes = [s1.id, s2.id]; L.editorPanes = [e1.id]; });
+    }
+    const L = layout();
+    if (!get(L.workId)) setLayout(L => { L.workId = works()[0].id; });
+}
+
+/* 작품 전환 시, 열린 문서가 다른 작품 것이면 그 작품의 문서로 교체 */
+function sanitizePanes() {
+    const L = layout();
+    const fix = (ids, kind, n) => {
+        const pool = ofWork(kind);
+        const out = [];
+        for (let i = 0; i < n; i++) {
+            const it = get(ids[i]);
+            out.push(it && it.workId === L.workId ? it.id : (pool[i] || pool[0] || {}).id || null);
+        }
+        return out;
+    };
+    const sp = fix(L.synopPanes, 'synop', 4), ep = fix(L.editorPanes, 'episode', 2);
+    if (JSON.stringify(sp) !== JSON.stringify(L.synopPanes.slice(0, 4)) || JSON.stringify(ep) !== JSON.stringify(L.editorPanes.slice(0, 2))) {
+        setLayout(L => { L.synopPanes = sp; L.editorPanes = ep; });
+    }
+}
+
+/* ---------- 렌더링 ---------- */
+function renderAll() {
+    ensureSeed();
+    sanitizePanes();
+    applyPref();
+    renderHeader();
+    renderTree();
+    renderSynops();
+    renderEditors();
+    renderNotes();
+    applyWidths();
+}
+
+function renderHeader() {
+    const L = layout();
+    $('#work-select').innerHTML = works().map(w => `<option value="${w.id}" ${w.id === L.workId ? 'selected' : ''}>${esc(w.title || '제목 없음')}</option>`).join('')
+        + '<option value="__new">＋ 새 작품…</option>';
+    $('#seg-synop').innerHTML = [1, 2, 3, 4].map(n => `<button class="${L.synopN === n ? 'on' : ''}" data-n="${n}">${n}</button>`).join('');
+    $('#seg-editor').innerHTML = [1, 2].map(n => `<button class="${L.editorN === n ? 'on' : ''}" data-n="${n}">${n}</button>`).join('');
+    $('#btn-toggle-tree').classList.toggle('on', L.show.tree);
+    $('#btn-toggle-synop').classList.toggle('on', L.show.synop);
+    $('#btn-toggle-notes').classList.toggle('on', L.show.notes);
+    const desktop = !isPhone();
+    $('#col-tree').classList.toggle('hidden', desktop && !L.show.tree);
+    $('#col-synop').classList.toggle('hidden', desktop && !L.show.synop);
+    $('#col-notes').classList.toggle('hidden', desktop && !L.show.notes);
+    $$('.resizer').forEach(r => r.classList.toggle('hidden', $('#' + r.dataset.for).classList.contains('hidden')));
+    document.body.dataset.mtab = pref.mtab;
+    $$('#mtabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === pref.mtab));
+}
+
+function renderTree() {
+    const L = layout();
+    const eps = ofWork('episode'), syn = ofWork('synop');
+    const openEp = new Set(L.editorPanes.slice(0, L.editorN)), openSy = new Set(L.synopPanes.slice(0, L.synopN));
+    const row = (it, kind) => {
+        const c = kind === 'episode' ? countChars(it.body).noSpace : null;
+        return `<div class="tree-item ${(kind === 'episode' ? openEp : openSy).has(it.id) ? 'open' : ''}" draggable="true" data-id="${it.id}" data-kind="${kind}">
+            <span class="t-title">${esc(it.title || '제목 없음')}</span>
+            ${c !== null ? `<span class="t-meta">${fmt(c)}</span>` : ''}
+            <span class="t-act"><button data-a="rename" title="이름 바꾸기">✎</button><button data-a="delete" title="삭제">✕</button></span>
+        </div>`;
+    };
+    $('#tree').innerHTML = `
+        <div class="tree-sec">원고 (${eps.length}화)<span class="spacer"></span><button class="icon-btn" data-a="new-ep" title="새 회차">＋</button></div>
+        ${eps.map(e => row(e, 'episode')).join('')}
+        <div class="tree-sec">시놉 문서<span class="spacer"></span><button class="icon-btn" data-a="new-synop" title="새 시놉 문서">＋</button></div>
+        ${syn.map(s => row(s, 'synop')).join('')}`;
+    const total = eps.reduce((a, e) => a + countChars(e.body).noSpace, 0);
+    $('#tree-foot').innerHTML = `작품 전체 <b>${fmt(total)}</b>자 (공미)<br>회차 평균 ${eps.length ? fmt(Math.round(total / eps.length)) : 0}자`;
+}
+
+function synopOptions(selId) {
+    return ofWork('synop').map(s => `<option value="${s.id}" ${s.id === selId ? 'selected' : ''}>${esc(s.title || '제목 없음')}</option>`).join('')
+        + '<option value="__new">＋ 새 시놉 문서…</option>';
+}
+function renderSynops() {
+    const L = layout();
+    const grid = $('#synop-grid');
+    grid.className = 'synop-grid n' + L.synopN;
+    if (L.activeSynop >= L.synopN) L.activeSynop = 0;
+    let html = '';
+    for (let i = 0; i < L.synopN; i++) {
+        const it = get(L.synopPanes[i]);
+        html += `<div class="pane ${i === L.activeSynop ? 'active' : ''}" data-pane="${i}">
+            <div class="pane-head"><select data-role="synop-pick">${it ? '' : '<option value="">— 문서 선택 —</option>'}${synopOptions(it?.id)}</select></div>
+            ${it ? `<textarea data-id="${it.id}" data-field="body" placeholder="시놉시스, 플롯, 장면 메모를 자유롭게…">${esc(it.body)}</textarea>`
+                 : '<div class="pane-empty">위에서 시놉 문서를 고르거나<br>새로 만들어 주세요</div>'}
+        </div>`;
+    }
+    grid.innerHTML = html;
+}
+
+function episodeOptions(selId) {
+    return ofWork('episode').map(e => `<option value="${e.id}" ${e.id === selId ? 'selected' : ''}>${esc(e.title || '제목 없음')}</option>`).join('')
+        + '<option value="__new">＋ 새 회차…</option>';
+}
+function renderEditors() {
+    const L = layout();
+    const grid = $('#editor-grid');
+    grid.className = 'editor-grid n' + L.editorN;
+    if (L.activeEditor >= L.editorN) L.activeEditor = 0;
+    let html = '';
+    for (let i = 0; i < L.editorN; i++) {
+        const it = get(L.editorPanes[i]);
+        html += `<div class="epane ${i === L.activeEditor ? 'active' : ''}" data-pane="${i}">
+            <div class="pane-head">
+                <select data-role="ep-pick" style="flex:none;max-width:40%">${it ? '' : '<option value="">— 회차 선택 —</option>'}${episodeOptions(it?.id)}</select>
+                ${it ? `<input class="title-input" data-id="${it.id}" data-field="title" value="${esc(it.title)}" placeholder="회차 제목">` : '<span style="flex:1"></span>'}
+            </div>
+            ${it ? `<div class="manuscript-wrap"><textarea class="manuscript" data-id="${it.id}" data-field="body" spellcheck="false" placeholder="여기에 원고를 써 주세요.">${esc(it.body)}</textarea></div>
+                <div class="epane-foot" data-foot="${it.id}"></div>`
+                 : '<div class="pane-empty">회차 목록에서 회차를 고르거나 새로 만들어 주세요</div>'}
+        </div>`;
+    }
+    grid.innerHTML = html;
+    $$('.manuscript', grid).forEach(autoGrow);
+    for (let i = 0; i < L.editorN; i++) { const it = get(L.editorPanes[i]); if (it) renderFoot(it); }
+}
+function renderFoot(it) {
+    $$(`[data-foot="${it.id}"]`).forEach(el => {
+        const c = countChars(it.body);
+        const goal = it.goal || 0;
+        const pct = goal ? Math.min(100, Math.round(c.noSpace / goal * 100)) : 0;
+        el.innerHTML = `<span>공백 포함 <b>${fmt(c.all)}</b></span><span>공백 제외 <b>${fmt(c.noSpace)}</b></span>
+            <span style="flex:1"></span>
+            <span>목표</span><input class="goal-input" type="number" min="0" step="500" data-goal="${it.id}" value="${goal || ''}" placeholder="공미">
+            ${goal ? `<span class="goal-bar"><i style="width:${pct}%"></i></span><span>${pct}%</span>` : ''}`;
+    });
+}
+function autoGrow(ta) { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; }
+
+let noteFilter = '';
+function renderNotes() {
+    const q = noteFilter.trim().toLowerCase();
+    const list = ofWork('note').filter(n => !q || (n.title + '\n' + n.body).toLowerCase().includes(q));
+    $('#notes').innerHTML = list.map(n => `<div class="note" data-c="${n.color || 'yellow'}" data-note="${n.id}">
+            <div class="note-head">
+                <input data-id="${n.id}" data-field="title" value="${esc(n.title)}" placeholder="제목">
+                <button data-a="color" title="색 바꾸기">●</button><button data-a="up" title="위로">↑</button><button data-a="delete" title="삭제">✕</button>
+            </div>
+            <textarea data-id="${n.id}" data-field="body" placeholder="인물, 설정, 떡밥, 자료…">${esc(n.body)}</textarea>
+        </div>`).join('') || `<div class="pane-empty">${q ? '검색 결과가 없어요' : '＋ 를 눌러 노트를 추가하세요'}</div>`;
+    $$('#notes textarea').forEach(autoGrow);
+}
+
+function applyPref() {
+    document.documentElement.dataset.theme = pref.theme;
+    const s = document.documentElement.style;
+    s.setProperty('--ed-font', pref.font === 'gothic' ? "'Noto Sans KR', sans-serif" : "'Nanum Myeongjo', serif");
+    s.setProperty('--ed-size', pref.size + 'px');
+    s.setProperty('--ed-lh', pref.lh);
+    s.setProperty('--ed-width', pref.width + 'px');
+}
+function applyWidths() {
+    const W = layout().widths;
+    ['col-tree', 'col-synop', 'col-notes'].forEach(id => { $('#' + id).style.width = W[id] ? W[id] + 'px' : ''; });
+}
+const isPhone = () => matchMedia('(max-width: 760px)').matches;
+
+/* ---------- 입력 처리 ---------- */
+document.addEventListener('input', e => {
+    const t = e.target;
+    if (t.id === 'note-filter') { noteFilter = t.value; renderNotes(); return; }
+    if (t.dataset.goal) {
+        const it = get(t.dataset.goal); if (!it) return;
+        it.goal = Math.max(0, parseInt(t.value, 10) || 0); touch(it);
+        const caret = t.selectionStart; renderFoot(it);
+        const n = $(`[data-goal="${it.id}"]`); if (n) { n.focus(); try { n.setSelectionRange(caret, caret); } catch (_) {} }
+        return;
+    }
+    const id = t.dataset.id, field = t.dataset.field;
+    if (!id || !field) return;
+    const it = get(id); if (!it) return;
+    it[field] = t.value;
+    touch(it);
+    if (t.tagName === 'TEXTAREA' && (t.classList.contains('manuscript') || t.closest('.note'))) autoGrow(t);
+    // 같은 문서가 다른 분할 창에도 열려 있으면 함께 갱신
+    $$(`[data-id="${id}"][data-field="${field}"]`).forEach(o => { if (o !== t) { o.value = t.value; if (o.classList.contains('manuscript')) autoGrow(o); } });
+    if (it.kind === 'episode') { renderFoot(it); scheduleTreeRefresh(); }
+    if (field === 'title') scheduleTreeRefresh();
+});
+let treeTimer = null;
+function scheduleTreeRefresh() {
+    clearTimeout(treeTimer);
+    treeTimer = setTimeout(() => {
+        renderTree();
+        // 선택 박스의 제목도 갱신 (포커스된 select는 건드리지 않음)
+        $$('select[data-role="ep-pick"], select[data-role="synop-pick"]').forEach(sel => {
+            if (sel === document.activeElement) return;
+            const v = sel.value; const isEp = sel.dataset.role === 'ep-pick';
+            sel.innerHTML = (v ? '' : `<option value="">— 선택 —</option>`) + (isEp ? episodeOptions(v) : synopOptions(v));
+        });
+    }, 400);
+}
+
+// 어떤 분할 창을 쓰고 있는지 기억 (목록에서 문서를 누르면 그 창에 열림)
+document.addEventListener('focusin', e => {
+    const p = e.target.closest('.pane[data-pane], .epane[data-pane]');
+    if (!p) return;
+    const i = +p.dataset.pane, L = layout();
+    if (p.classList.contains('epane') && L.activeEditor !== i) { setLayout(L => L.activeEditor = i); $$('.epane').forEach(x => x.classList.toggle('active', +x.dataset.pane === i)); }
+    if (p.classList.contains('pane') && L.activeSynop !== i) { setLayout(L => L.activeSynop = i); $$('.synop-grid .pane').forEach(x => x.classList.toggle('active', +x.dataset.pane === i)); }
+});
+document.addEventListener('focusout', () => setTimeout(flushPendingRemote, 50));
+
+document.addEventListener('change', async e => {
+    const t = e.target;
+    if (t.id === 'work-select') {
+        if (t.value === '__new') { await newWork(); return; }
+        switchWork(t.value); return;
+    }
+    if (t.dataset.role === 'synop-pick' || t.dataset.role === 'ep-pick') {
+        const isEp = t.dataset.role === 'ep-pick';
+        const i = +t.closest('[data-pane]').dataset.pane;
+        let id = t.value;
+        if (id === '__new') {
+            const it = isEp ? await newEpisode(false) : await newSynop(false);
+            if (!it) { isEp ? renderEditors() : renderSynops(); return; }
+            id = it.id;
+        }
+        setLayout(L => { (isEp ? L.editorPanes : L.synopPanes)[i] = id; isEp ? (L.activeEditor = i) : (L.activeSynop = i); });
+        isEp ? renderEditors() : renderSynops();
+        renderTree();
+    }
+});
+
+/* 헤더 */
+$('#seg-synop').addEventListener('click', e => { const n = +e.target.dataset.n; if (!n) return; setLayout(L => { L.synopN = n; L.show.synop = true; }); sanitizePanes(); renderAll(); });
+$('#seg-editor').addEventListener('click', e => { const n = +e.target.dataset.n; if (!n) return; setLayout(L => { L.editorN = n; }); sanitizePanes(); renderAll(); });
+['tree', 'synop', 'notes'].forEach(k => $('#btn-toggle-' + k).addEventListener('click', () => { setLayout(L => L.show[k] = !L.show[k]); renderHeader(); }));
+$('#btn-new-synop').addEventListener('click', () => newSynop(true));
+$('#btn-new-note').addEventListener('click', () => {
+    const n = create('note', { workId: layout().workId, title: '', color: NOTE_COLORS[ofWork('note').length % NOTE_COLORS.length], order: -Date.now() });
+    noteFilter = ''; $('#note-filter').value = '';
+    renderNotes();
+    $(`[data-note="${n.id}"] input`)?.focus();
+});
+$('#mtabs').addEventListener('click', e => {
+    const b = e.target.closest('button[data-tab]'); if (!b) return;
+    pref.mtab = b.dataset.tab; savePref(); renderHeader();
+});
+
+/* 메뉴 */
+$('#btn-menu').addEventListener('click', e => { e.stopPropagation(); $('#menu-pop').classList.toggle('hidden'); });
+document.addEventListener('click', e => { if (!e.target.closest('.menu')) $('#menu-pop').classList.add('hidden'); });
+$('#menu-pop').addEventListener('click', async e => {
+    const a = e.target.closest('button')?.dataset.act; if (!a) return;
+    $('#menu-pop').classList.add('hidden');
+    const L = layout(), w = get(L.workId);
+    if (a === 'login') cloudSignIn();
+    if (a === 'logout') cloudSignOut();
+    if (a === 'new-work') newWork();
+    if (a === 'rename-work') { const t = await ask('작품 이름', w.title); if (t != null) { w.title = t.trim() || '제목 없음'; touch(w); renderHeader(); } }
+    if (a === 'delete-work') {
+        if (works().length <= 1) { toast('마지막 작품은 삭제할 수 없어요.'); return; }
+        if (!confirm(`'${w.title}' 작품과 모든 회차·시놉·노트를 삭제할까요?\n(삭제 전에 백업 파일 저장을 권장해요)`)) return;
+        Object.values(items).filter(i => i.workId === w.id && alive(i)).forEach(remove);
+        remove(w);
+        setLayout(L => { L.workId = works()[0].id; });
+        renderAll();
+    }
+    if (a === 'theme') { pref.theme = pref.theme === 'dark' ? 'light' : 'dark'; savePref(); applyPref(); }
+    if (a === 'typo') typoModal();
+    if (a === 'export-ep') {
+        const ep = get(L.editorPanes[L.activeEditor]);
+        if (!ep) { toast('열린 회차가 없어요.'); return; }
+        download(`${w.title}_${ep.title}.txt`, `${ep.title}\n\n${ep.body}`, 'text/plain');
+    }
+    if (a === 'export-work') download(`${w.title}.txt`, ofWork('episode').map(ep => `${ep.title}\n\n${ep.body}`).join('\n\n\n'), 'text/plain');
+    if (a === 'backup') download(`집필실_백업_${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify({ app: 'novel-writer', version: 1, items }, null, 1), 'application/json');
+    if (a === 'restore') $('#file-restore').click();
+});
+$('#file-restore').addEventListener('change', async e => {
+    const f = e.target.files[0]; e.target.value = '';
+    if (!f) return;
+    try {
+        const data = JSON.parse(await f.text());
+        if (data.app !== 'novel-writer' || !data.items) throw new Error('형식이 다름');
+        if (!confirm('백업 파일의 내용을 불러올까요?\n같은 문서는 백업 내용으로 바뀌고, 다른 문서는 그대로 유지돼요.')) return;
+        Object.values(data.items).forEach(it => { if (it && it.id) touch({ ...it }); });
+        renderAll();
+        toast('백업을 불러왔어요.');
+    } catch (err) { alert('백업 파일을 읽지 못했어요. (' + err.message + ')'); }
+});
+
+/* 회차/시놉 목록 */
+$('#tree').addEventListener('click', async e => {
+    const btn = e.target.closest('button[data-a]');
+    const row = e.target.closest('.tree-item');
+    if (btn?.dataset.a === 'new-ep') { newEpisode(true); return; }
+    if (btn?.dataset.a === 'new-synop') { newSynop(true); return; }
+    if (!row) return;
+    const it = get(row.dataset.id); if (!it) return;
+    if (btn?.dataset.a === 'rename') {
+        const t = await ask('이름 바꾸기', it.title); if (t == null) return;
+        it.title = t.trim() || '제목 없음'; touch(it); renderAll(); return;
+    }
+    if (btn?.dataset.a === 'delete') {
+        if (!confirm(`'${it.title}'을(를) 삭제할까요?`)) return;
+        remove(it); renderAll(); return;
+    }
+    openDoc(it);
+});
+$('#tree').addEventListener('dblclick', async e => {
+    const row = e.target.closest('.tree-item'); if (!row || e.target.closest('button')) return;
+    const it = get(row.dataset.id); const t = await ask('이름 바꾸기', it.title);
+    if (t != null) { it.title = t.trim() || '제목 없음'; touch(it); renderAll(); }
+});
+// 드래그로 순서 바꾸기
+let dragId = null;
+$('#tree').addEventListener('dragstart', e => { const r = e.target.closest('.tree-item'); if (r) { dragId = r.dataset.id; e.dataTransfer.effectAllowed = 'move'; } });
+$('#tree').addEventListener('dragover', e => {
+    const r = e.target.closest('.tree-item'); if (!r || !dragId) return;
+    if (items[dragId]?.kind !== r.dataset.kind) return;
+    e.preventDefault(); $$('.tree-item.dragover').forEach(x => x.classList.remove('dragover')); r.classList.add('dragover');
+});
+$('#tree').addEventListener('dragleave', e => e.target.closest('.tree-item')?.classList.remove('dragover'));
+$('#tree').addEventListener('drop', e => {
+    e.preventDefault();
+    const r = e.target.closest('.tree-item'); $$('.tree-item.dragover').forEach(x => x.classList.remove('dragover'));
+    if (!r || !dragId || r.dataset.id === dragId) { dragId = null; return; }
+    const moving = get(dragId), target = get(r.dataset.id); dragId = null;
+    if (!moving || !target || moving.kind !== target.kind) return;
+    const list = ofWork(moving.kind).filter(x => x.id !== moving.id);
+    list.splice(list.findIndex(x => x.id === target.id), 0, moving);
+    list.forEach((x, i) => { if (x.order !== i + 1) { x.order = i + 1; touch(x); } });
+    renderAll();
+});
+
+function openDoc(it) {
+    const isEp = it.kind === 'episode';
+    setLayout(L => {
+        const panes = isEp ? L.editorPanes : L.synopPanes;
+        const n = isEp ? L.editorN : L.synopN;
+        const already = panes.slice(0, n).indexOf(it.id);
+        if (already >= 0) { isEp ? (L.activeEditor = already) : (L.activeSynop = already); }
+        else panes[isEp ? L.activeEditor : L.activeSynop] = it.id;
+        if (!isEp) L.show.synop = true;
+    });
+    if (isPhone()) { pref.mtab = isEp ? 'editor' : 'synop'; savePref(); }
+    renderAll();
+}
+
+/* 노트 */
+$('#notes').addEventListener('click', e => {
+    const b = e.target.closest('button[data-a]'); if (!b) return;
+    const n = get(b.closest('[data-note]').dataset.note); if (!n) return;
+    if (b.dataset.a === 'color') { n.color = NOTE_COLORS[(NOTE_COLORS.indexOf(n.color) + 1) % NOTE_COLORS.length]; touch(n); renderNotes(); }
+    if (b.dataset.a === 'up') {
+        const list = ofWork('note'); const i = list.indexOf(n);
+        if (i > 0) { const p = list[i - 1]; [n.order, p.order] = [p.order, n.order]; if (n.order === p.order) n.order -= 1; touch(n); touch(p); renderNotes(); }
+    }
+    if (b.dataset.a === 'delete') { if ((n.body || n.title) && !confirm('이 노트를 삭제할까요?')) return; remove(n); renderNotes(); }
+});
+
+/* 새 문서 */
+async function newEpisode(open) {
+    const eps = ofWork('episode');
+    const t = await ask('새 회차 제목', `${eps.length + 1}화`); if (t == null) return null;
+    const last = eps[eps.length - 1];
+    const it = create('episode', { workId: layout().workId, title: t.trim() || `${eps.length + 1}화`, order: (last?.order || 0) + 1, goal: last?.goal || 5000 });
+    if (open) openDoc(it); else renderTree();
+    return it;
+}
+async function newSynop(open) {
+    const t = await ask('새 시놉 문서 제목', ''); if (t == null) return null;
+    const syn = ofWork('synop');
+    const it = create('synop', { workId: layout().workId, title: t.trim() || '새 시놉', order: (syn[syn.length - 1]?.order || 0) + 1 });
+    if (open) openDoc(it); else renderTree();
+    return it;
+}
+async function newWork() {
+    const t = await ask('새 작품 제목', ''); if (t == null) { renderHeader(); return; }
+    const w = create('work', { title: t.trim() || '새 작품', order: Date.now() });
+    const e1 = create('episode', { workId: w.id, title: '1화', order: 1, goal: 5000 });
+    const s1 = create('synop', { workId: w.id, title: '전체 시놉시스', order: 1 });
+    switchWork(w.id, { synop: [s1.id], editor: [e1.id] });
+}
+function switchWork(id, preset) {
+    setLayout(L => {
+        // 지금 작품에서 열어둔 문서를 기억해 두었다가, 다시 돌아오면 복원
+        L.perWork[L.workId] = { synop: L.synopPanes.slice(), editor: L.editorPanes.slice() };
+        const saved = preset || L.perWork[id] || { synop: [], editor: [] };
+        L.workId = id; L.synopPanes = saved.synop.slice(); L.editorPanes = saved.editor.slice();
+    });
+    renderAll();
+}
+
+/* ---------- 패널 너비 조절 ---------- */
+$$('.resizer').forEach(r => r.addEventListener('pointerdown', e => {
+    const col = $('#' + r.dataset.for), rev = !!r.dataset.reverse;
+    const startX = e.clientX, startW = col.getBoundingClientRect().width;
+    r.classList.add('drag'); r.setPointerCapture(e.pointerId);
+    const move = ev => { col.style.width = Math.max(150, Math.min(700, startW + (ev.clientX - startX) * (rev ? -1 : 1))) + 'px'; };
+    const up = () => {
+        r.classList.remove('drag'); r.removeEventListener('pointermove', move); r.removeEventListener('pointerup', up);
+        setLayout(L => L.widths[r.dataset.for] = Math.round(col.getBoundingClientRect().width));
+    };
+    r.addEventListener('pointermove', move); r.addEventListener('pointerup', up);
+}));
+
+/* ---------- 작은 UI 도우미 ---------- */
+function toast(msg) {
+    const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2400);
+}
+function ask(title, value) {
+    return new Promise(resolve => {
+        const bg = document.createElement('div'); bg.className = 'modal-bg';
+        bg.innerHTML = `<div class="modal"><h3>${esc(title)}</h3><input type="text" value="${esc(value || '')}">
+            <div class="row"><button class="btn" data-x="0">취소</button><button class="btn primary" data-x="1">확인</button></div></div>`;
+        document.body.appendChild(bg);
+        const inp = $('input', bg); inp.focus(); inp.select();
+        const done = ok => { bg.remove(); resolve(ok ? inp.value : null); };
+        bg.addEventListener('click', e => { if (e.target === bg) done(false); const x = e.target.dataset.x; if (x) done(x === '1'); });
+        inp.addEventListener('keydown', e => { if (e.isComposing) return; if (e.key === 'Enter') done(true); if (e.key === 'Escape') done(false); });
+    });
+}
+function typoModal() {
+    const bg = document.createElement('div'); bg.className = 'modal-bg';
+    bg.innerHTML = `<div class="modal"><h3>원고 글꼴 · 크기 · 줄간격</h3>
+        <label>글꼴</label><select data-k="font"><option value="myeongjo">나눔명조</option><option value="gothic">본고딕</option></select>
+        <label>글자 크기 (px)</label><input type="number" data-k="size" min="12" max="28" step="1">
+        <label>줄간격</label><input type="number" data-k="lh" min="1.2" max="3" step="0.1">
+        <label>본문 폭 (px)</label><input type="number" data-k="width" min="400" max="1400" step="20">
+        <p style="font-size:11px;color:var(--muted);margin:10px 0 0">글꼴 설정은 이 기기에만 적용돼요.</p>
+        <div class="row"><button class="btn primary" data-x="1">닫기</button></div></div>`;
+    document.body.appendChild(bg);
+    $$('[data-k]', bg).forEach(el => {
+        el.value = pref[el.dataset.k];
+        el.addEventListener('input', () => {
+            const k = el.dataset.k; pref[k] = k === 'font' ? el.value : (parseFloat(el.value) || pref[k]);
+            savePref(); applyPref(); $$('.manuscript').forEach(autoGrow);
+        });
+    });
+    bg.addEventListener('click', e => { if (e.target === bg || e.target.dataset.x) bg.remove(); });
+}
+function download(name, text, type) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type: type + ';charset=utf-8' }));
+    a.download = name.replace(/[\\/:*?"<>|]/g, '_');
+    a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); saveLocal(); flushCloud(); toast('저장했어요.'); }
+});
+
+/* =====================================================================
+   클라우드 동기화 (Firestore)
+   경로: novelWriter/{구글 uid}/items/{아이템 id}
+   - 아이템마다 rev(수정 시각)를 비교해 더 최신 쪽이 이김
+   - 입력 중인 칸의 원격 변경은 잠시 보류했다가 포커스가 빠지면 반영
+   ===================================================================== */
+let fbApp = null, fbAuth = null, fbDb = null, fbUser = null, fbUnsub = null;
+let cloudTimer = null, cloudBusy = false, cloudReady = false;
+const pendingRemote = new Map();
+
+function setBadge(text, kind) { const b = $('#sync-badge'); b.textContent = text; b.className = 'sync-badge ' + (kind || ''); }
+
+function cloudInit() {
+    if (typeof firebase === 'undefined') { setBadge('오프라인 · 로컬 저장', 'warn'); return; }
+    try {
+        fbApp = (firebase.apps || []).find(a => a.name === 'novelWriterApp') || firebase.initializeApp(FIREBASE_CONFIG, 'novelWriterApp');
+        fbAuth = fbApp.auth(); fbDb = fbApp.firestore();
+        try { fbDb.settings({ ignoreUndefinedProperties: true }); } catch (e) {}
+        fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(() => {});
+        fbAuth.onAuthStateChanged(user => {
+            fbUser = user && !user.isAnonymous ? user : null;
+            $('[data-act="login"]').classList.toggle('hidden', !!fbUser);
+            $('[data-act="logout"]').classList.toggle('hidden', !fbUser);
+            if (fbUser) cloudStart(); else { cloudStop(); setBadge('로컬 저장 · 로그인하면 동기화', ''); }
+        });
+    } catch (e) { console.error(e); setBadge('동기화 사용 불가', 'err'); }
+}
+async function cloudSignIn() {
+    if (!fbAuth) { toast('인터넷 연결을 확인해 주세요.'); return; }
+    try { await fbAuth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); toast('로그인했어요. 동기화를 시작합니다.'); }
+    catch (e) { alert('구글 로그인 실패 (' + (e.code || e.message) + ')\n주소창 오른쪽의 팝업 차단도 확인해 주세요.'); }
+}
+async function cloudSignOut() { if (fbAuth) await fbAuth.signOut(); toast('로그아웃했어요. 이 기기에는 계속 저장돼요.'); }
+const itemsCol = () => fbDb.collection(FIREBASE_CONFIG.collection).doc(fbUser.uid).collection('items');
+
+function cloudStart() {
+    cloudStop();
+    setBadge('동기화 준비 중…', 'warn');
+    let first = true;
+    fbUnsub = itemsCol().onSnapshot(snap => {
+        const remoteRev = {};
+        let changed = false;
+        snap.docChanges().forEach(ch => {
+            if (ch.type === 'removed' || ch.doc.metadata.hasPendingWrites) return;
+            const r = ch.doc.data();
+            remoteRev[r.id] = r.rev || 0;
+            if (r.by === clientId && !first) return; // 내가 올린 것의 메아리
+            const local = items[r.id];
+            if (!local || (r.rev || 0) > (local.rev || 0)) { if (applyRemote(r)) changed = true; }
+        });
+        if (first) {
+            first = false;
+            // 클라우드에 없거나 더 오래된 로컬 아이템은 올려 보냄 (처음 로그인한 기기의 기존 글 포함)
+            Object.values(items).forEach(it => { if ((remoteRev[it.id] ?? -1) < (it.rev || 0)) dirty.add(it.id); });
+            cloudReady = true;
+            flushCloud();
+        }
+        if (changed) { saveLocal(); refreshAfterRemote(); }
+        if (!dirty.size) setBadge('☁ 동기화됨', 'ok');
+    }, err => {
+        console.error(err);
+        cloudReady = false;
+        setBadge('동기화 오류', 'err');
+        toast('클라우드 동기화 실패: ' + (err.code || err.message));
+    });
+}
+function cloudStop() { if (fbUnsub) fbUnsub(); fbUnsub = null; cloudReady = false; }
+
+// 원격 아이템 반영. 지금 입력 중인 칸이면 보류.
+function applyRemote(r) {
+    const el = document.activeElement;
+    if (el && el.dataset && el.dataset.id === r.id) { pendingRemote.set(r.id, r); return false; }
+    items[r.id] = r;
+    return true;
+}
+function flushPendingRemote() {
+    if (!pendingRemote.size) return;
+    const el = document.activeElement;
+    let changed = false;
+    for (const [id, r] of pendingRemote) {
+        if (el && el.dataset && el.dataset.id === id) continue;
+        pendingRemote.delete(id);
+        if ((r.rev || 0) > (items[id]?.rev || 0)) { items[id] = r; changed = true; }
+    }
+    if (changed) { saveLocal(); refreshAfterRemote(); }
+}
+// 입력 중인 칸은 그대로 두고 나머지만 다시 그림
+function refreshAfterRemote() {
+    const el = document.activeElement;
+    const editing = el && el.dataset && el.dataset.id;
+    if (!editing) { renderAll(); return; }
+    $$('[data-id][data-field]').forEach(f => {
+        if (f === el) return;
+        const it = items[f.dataset.id];
+        if (it && f.value !== (it[f.dataset.field] ?? '')) { f.value = it[f.dataset.field] ?? ''; if (f.tagName === 'TEXTAREA') autoGrow(f); }
+    });
+    renderTree();
+}
+
+function scheduleCloudPush() {
+    if (!fbUser) return;
+    setBadge('저장 중…', 'warn');
+    clearTimeout(cloudTimer);
+    cloudTimer = setTimeout(flushCloud, 1500);
+}
+async function flushCloud() {
+    if (!fbUser || !cloudReady || cloudBusy || !dirty.size) return;
+    cloudBusy = true;
+    const ids = [...dirty].slice(0, 400);
+    try {
+        const batch = fbDb.batch();
+        ids.forEach(id => { const it = items[id]; if (it) batch.set(itemsCol().doc(id), it); });
+        ids.forEach(id => dirty.delete(id));
+        await batch.commit();
+        setBadge(dirty.size ? '저장 중…' : '☁ 동기화됨', dirty.size ? 'warn' : 'ok');
+    } catch (e) {
+        console.error(e);
+        ids.forEach(id => dirty.add(id));
+        setBadge('동기화 대기 (오프라인?)', 'err');
+    } finally {
+        cloudBusy = false;
+        if (dirty.size) { clearTimeout(cloudTimer); cloudTimer = setTimeout(flushCloud, 3000); }
+    }
+}
+window.addEventListener('online', flushCloud);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { saveLocal(); flushCloud(); } });
+window.addEventListener('beforeunload', saveLocal);
+window.addEventListener('resize', () => { clearTimeout(window._rz); window._rz = setTimeout(renderHeader, 150); });
+
+/* ---------- 시작 ---------- */
+loadLocal();
+renderAll();
+cloudInit();
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    navigator.serviceWorker.register('novel-sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>

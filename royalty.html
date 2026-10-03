@@ -15850,7 +15850,7 @@
         }
 
 
-        function openWriteSpanModal(id, dateStr) {
+        function openWriteSpanModal(id, dateStr, jumpToMonth) {
             closeWriteModal();
             currentEditSpanId = id || null;
 
@@ -15878,9 +15878,10 @@
             if (id) {
                 const span = writeSpans.find(s => s.id === id);
                 if (!span) return;
-                // 연간 일정 한눈에 보기에서 박스를 눌러 들어온 경우, 뒤에 있는 집필 관리 달력도
-                // 이 기간 일정이 시작하는 '월'로 같이 옮겨둔다 (모달 닫으면 바로 그 달이 보이게)
-                if (span.startDate) {
+                // 연간 일정 한눈에 보기에서 박스를 눌러 들어온 경우에만, 뒤에 있는 집필 관리 달력도
+                // 이 기간 일정이 시작하는 '월'로 같이 옮겨둔다 (모달 닫으면 바로 그 달이 보이게).
+                // 집필 관리 달력에서 막대를 누른 경우엔 보던 달 그대로 둔다.
+                if (jumpToMonth && span.startDate) {
                     const [sy, sm] = span.startDate.split('-').map(Number);
                     writeCalDate = new Date(sy, sm - 1, 1);
                     try { renderWriteCalendar(); } catch (e) {}
@@ -16458,7 +16459,7 @@
             if (!st) return;
 
             if (st.moved) { save(); renderYearTimeline(); }
-            else openWriteSpanModal(st.spanId, null);   // 옮기지 않았으면 그냥 클릭 → 편집 창
+            else openWriteSpanModal(st.spanId, null, true);   // 옮기지 않았으면 그냥 클릭 → 편집 창 (뒤 달력도 그 달로)
         }
 
         // 연간 집필 일정에서 '기간 일정' 막대의 양쪽 끝을 드래그해서 시작일/종료일만 조절하는 처리

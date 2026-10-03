@@ -9,9 +9,6 @@
 <meta name="theme-color" content="#f6f7f4">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
 :root {
     --bg: #f6f7f4; --panel: #ffffff; --panel2: #fbfbf9; --line: #e4e6e0; --text: #23261f; --muted: #8a8f84;
@@ -19,10 +16,19 @@
     --note-yellow: #fff6c7; --note-pink: #ffe1ea; --note-green: #e3f5d6; --note-blue: #dfeefe; --note-purple: #ece4fb;
     --shadow: 0 1px 2px rgba(0,0,0,.06);
 }
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --bg: #17191a; --panel: #1f2223; --panel2: #232627; --line: #33383a; --text: #e6e8e3; --muted: #8d948f;
+        --accent: #8cc455; --accent-soft: #263420; --paper: #1c1f20;
+        --note-yellow: #3b3720; --note-pink: #3d2730; --note-green: #253522; --note-blue: #213140; --note-purple: #2f2840;
+        color-scheme: dark;
+    }
+}
 :root[data-theme="dark"] {
     --bg: #17191a; --panel: #1f2223; --panel2: #232627; --line: #33383a; --text: #e6e8e3; --muted: #8d948f;
     --accent: #8cc455; --accent-soft: #263420; --paper: #1c1f20;
     --note-yellow: #3b3720; --note-pink: #3d2730; --note-green: #253522; --note-blue: #213140; --note-purple: #2f2840;
+    color-scheme: dark;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; }
@@ -331,12 +337,6 @@ nav.mtabs { display: none; }
 
 const LEGACY_LS_KEY = 'novel-writer-v1';   // 1차 버전(localStorage) 데이터
 const LS_PREF = 'novel-writer-pref';       // 기기별 설정 (테마, 폰 탭)
-const FIREBASE_CONFIG = {
-    apiKey: "AIzaSyC1I0GQHJ4U5t0bIgWyXWlKT6pZZMZh2yI",
-    projectId: "syno-eb309",
-    authDomain: "syno-eb309.firebaseapp.com",
-    collection: "novelWriter"
-};
 const NOTE_COLORS = ['yellow', 'pink', 'green', 'blue', 'purple'];
 const HILITES = ['#ffc9c9', '#ffd8a8', '#fff3a3', '#c9f0b5', '#b8ebdc', '#c5dcff', '#e0d0ff'];
 const FORE_COLORS = ['#23261f', '#d93025', '#e8710a', '#188038', '#1a73e8', '#8e24aa', '#80868b'];
@@ -469,7 +469,7 @@ const store = {
 let items = {};            // id -> item
 const dirty = new Set();   // 클라우드에 올려야 할 아이템 id
 const localDirty = new Set(); // 이 기기 저장소에 써야 할 아이템 id
-let pref = { theme: 'light', mtab: 'editor' };
+let pref = { theme: 'auto', mtab: 'editor' };
 let useIDB = false;
 
 async function loadLocal() {
@@ -863,7 +863,7 @@ function renderNotes() {
 function autoGrow(ta) { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; }
 
 function applyPref() {
-    document.documentElement.dataset.theme = pref.theme;
+    if (pref.theme === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = pref.theme;
     const S = settings(), s = document.documentElement.style;
     const fam = S.font === 'gothic' ? "'Noto Sans KR', sans-serif"
         : S.font === 'custom' && S.customFont ? `'${S.customFont.replace(/'/g, '')}', 'Nanum Myeongjo', serif`
@@ -1084,10 +1084,41 @@ function ask(title, value, type = 'text') {
         inp.addEventListener('keydown', e => { if (e.isComposing) return; if (e.key === 'Enter') done(true); if (e.key === 'Escape') done(false); });
     });
 }
-function download(name, text, type) {
+function confirmBox(msg, okLabel = '확인') {
+    return new Promise(resolve => {
+        const bg = document.createElement('div'); bg.className = 'modal-bg';
+        bg.innerHTML = `<div class="modal"><p style="margin:0;line-height:1.7">${esc(msg)}</p>
+            <div class="row2"><button class="btn" data-x="0">취소</button><button class="btn primary" data-x="1">${esc(okLabel)}</button></div></div>`;
+        document.body.appendChild(bg);
+        $('[data-x="1"]', bg).focus();
+        const done = ok => { bg.remove(); document.removeEventListener('keydown', key, true); resolve(ok); };
+        const key = e => { if (e.key === 'Escape') { e.stopPropagation(); done(false); } };
+        document.addEventListener('keydown', key, true);
+        bg.addEventListener('click', e => { if (e.target === bg) done(false); const x = e.target.dataset.x; if (x) done(x === '1'); });
+    });
+}
+async function copyText(text, label) {
+    try { await navigator.clipboard.writeText(text); toast(label + ' 클립보드에 복사했어요. 연재처에 붙여넣으면 돼요.'); }
+    catch (e) {
+        const ta = document.createElement('textarea'); ta.value = text; ta.style.cssText = 'position:fixed;opacity:0';
+        document.body.appendChild(ta); ta.select();
+        let ok = false; try { ok = document.execCommand('copy'); } catch (_) {}
+        ta.remove();
+        toast(ok ? label + ' 클립보드에 복사했어요.' : '복사하지 못했어요. 본문을 직접 선택해서 복사해 주세요.');
+    }
+}
+// 파일 저장: claude.ai 미리보기 페이지에서는 저장 확인창을 거치고, 일반 브라우저에서는 바로 내려받음
+async function download(name, text, type) {
+    const filename = name.replace(/[\\/:*?"<>|]/g, '_');
+    const dl = window.claude && window.claude.use ? await window.claude.use('downloads').catch(() => null) : null;
+    if (dl) {
+        try { await dl.save({ filename, data: text }); toast('저장했어요.'); }
+        catch (e) { if (e && e.code !== 'declined') toast('이 화면에서는 파일을 저장할 수 없어요. (' + (e.code || e.message) + ')'); }
+        return;
+    }
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([text], { type: type + ';charset=utf-8' }));
-    a.download = name.replace(/[\\/:*?"<>|]/g, '_');
+    a.download = filename;
     a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
@@ -1211,7 +1242,7 @@ function rowMenu(anchor, it, at) {
         if (m === 'new-doc') newDoc(it.id);
         if (m === 'new-folder') newFolder(it.id);
         if (m === 'ref-folder') { it.ref = !it.ref; touch(it); renderAll(); }
-        if (m === 'del-synop') { if (confirm(`'${it.title}' 시놉 문서를 삭제할까요?`)) { it.deleted = true; it.body = ''; touch(it); renderAll(); } }
+        if (m === 'del-synop') { if (await confirmBox(`'${it.title}' 시놉 문서를 삭제할까요?`, '삭제')) { it.deleted = true; it.body = ''; touch(it); renderAll(); } }
     });
 }
 
@@ -1219,12 +1250,12 @@ $('#btn-new-doc').addEventListener('click', () => newDoc(null));
 $('#btn-new-folder').addEventListener('click', () => newFolder(null));
 $('#btn-new-synop').addEventListener('click', () => newSynop(true));
 
-$('#tree').addEventListener('click', e => {
+$('#tree').addEventListener('click', async e => {
     const a = e.target.closest('[data-a]')?.dataset.a;
     if (a === 'new-synop') { newSynop(true); return; }
     if (a === 'trash-toggle') { setWL(W => W.trashOpen = !W.trashOpen); renderTree(); return; }
     if (a === 'trash-empty') {
-        if (!confirm('휴지통을 비울까요? 비우면 되돌릴 수 없어요.')) return;
+        if (!await confirmBox('휴지통을 비울까요? 비우면 되돌릴 수 없어요.', '비우기')) return;
         Object.values(items).filter(i => isBinder(i) && live(i) && i.trashed && i.workId === curWorkId()).forEach(purgeItem);
         renderAll(); return;
     }
@@ -1232,7 +1263,7 @@ $('#tree').addEventListener('click', e => {
     if (tr) {
         const it = get(tr.dataset.id); if (!it) return;
         if (a === 'restore') restoreItem(it);
-        if (a === 'purge' && confirm(`'${it.title}'을(를) 완전히 삭제할까요? 되돌릴 수 없어요.`)) { purgeItem(it); renderAll(); }
+        if (a === 'purge' && await confirmBox(`'${it.title}'을(를) 완전히 삭제할까요? 되돌릴 수 없어요.`, '완전히 삭제')) { purgeItem(it); renderAll(); }
         return;
     }
     const row = e.target.closest('.row[data-id]'); if (!row) return;
@@ -1358,7 +1389,7 @@ $('#btn-new-note').addEventListener('click', () => {
     renderNotes();
     $(`[data-note="${n.id}"] input`)?.focus();
 });
-$('#notes').addEventListener('click', e => {
+$('#notes').addEventListener('click', async e => {
     const b = e.target.closest('button[data-a]'); if (!b) return;
     const n = get(b.closest('[data-note]').dataset.note); if (!n) return;
     if (b.dataset.a === 'color') { n.color = NOTE_COLORS[(NOTE_COLORS.indexOf(n.color) + 1) % NOTE_COLORS.length]; touch(n); renderNotes(); }
@@ -1366,7 +1397,7 @@ $('#notes').addEventListener('click', e => {
         const list = ofWork('note'); const i = list.indexOf(n);
         if (i > 0) { const p = list[i - 1]; [n.order, p.order] = [p.order, n.order]; if (n.order === p.order) n.order -= 1; touch(n); touch(p); renderNotes(); }
     }
-    if (b.dataset.a === 'delete') { if ((n.body || n.title) && !confirm('이 노트를 삭제할까요?')) return; n.deleted = true; n.body = ''; touch(n); renderNotes(); }
+    if (b.dataset.a === 'delete') { if ((n.body || n.title) && !await confirmBox('이 노트를 삭제할까요?', '삭제')) return; n.deleted = true; n.body = ''; touch(n); renderNotes(); }
 });
 $('#mtabs').addEventListener('click', e => {
     const b = e.target.closest('button[data-tab]'); if (!b) return;
@@ -1401,10 +1432,9 @@ $('#btn-menu').addEventListener('click', e => {
     if (curPop) { closePop(); return; }
     const W = WL();
     const pop = showPop(e.currentTarget, `
-        <button data-act="${fbUser ? 'logout' : 'login'}">${fbUser ? '로그아웃 (' + esc(fbUser.email || '') + ')' : '☁️ 구글 로그인 (기기 간 동기화)'}</button><hr>
         <button data-act="new-work">＋ 새 작품</button><button data-act="rename-work">작품 이름 바꾸기</button><button data-act="delete-work" class="danger">작품 삭제</button><hr>
-        <button data-act="typo">가 글꼴 · 크기 · 줄간격 · 문단</button><button data-act="theme">${pref.theme === 'dark' ? '☀️ 밝은 화면' : '🌙 다크 모드'}</button><hr>
-        <button data-act="export-ep">현재 회차 TXT 저장</button><button data-act="export-work">작품 전체 TXT 저장</button>
+        <button data-act="typo">가 글꼴 · 크기 · 줄간격 · 문단</button><button data-act="theme">화면 밝기: ${{ auto: '기기 설정 따라감', light: '밝게', dark: '어둡게' }[pref.theme] || '기기 설정 따라감'} ▸</button><hr>
+        <button data-act="copy-ep">현재 회차 복사 (클립보드)</button><button data-act="export-ep">현재 회차 TXT 저장</button><button data-act="export-work">작품 전체 TXT 저장</button>
         <button data-act="backup">백업 파일 저장 (JSON)</button><button data-act="restore">백업 파일 불러오기</button>`);
     pop.style.left = ''; pop.style.right = '8px';
     pop.addEventListener('click', menuAction);
@@ -1413,20 +1443,23 @@ async function menuAction(e) {
     const a = e.target.closest('button')?.dataset.act; if (!a) return;
     closePop();
     const w = get(curWorkId());
-    if (a === 'login') cloudSignIn();
-    if (a === 'logout') cloudSignOut();
     if (a === 'new-work') newWork();
     if (a === 'rename-work') { const t = await ask('작품 이름', w.title); if (t != null) { w.title = t.trim() || '제목 없음'; touch(w); renderAll(); } }
     if (a === 'delete-work') {
         if (works().length <= 1) { toast('마지막 작품은 삭제할 수 없어요.'); return; }
-        if (!confirm(`'${w.title}' 작품과 모든 원고·시놉·노트를 삭제할까요?\n(삭제 전에 백업 파일 저장을 권장해요)`)) return;
+        if (!await confirmBox(`'${w.title}' 작품과 모든 원고·시놉·노트를 삭제할까요? 삭제 전에 백업 파일 저장을 권장해요.`, '작품 삭제')) return;
         Object.values(items).filter(i => i.workId === w.id && live(i)).forEach(i => { i.deleted = true; i.body = ''; touch(i); });
         w.deleted = true; touch(w);
         layout().workId = works()[0].id; touch(layout());
         renderAll();
     }
-    if (a === 'theme') { pref.theme = pref.theme === 'dark' ? 'light' : 'dark'; savePref(); applyPref(); }
+    if (a === 'theme') { pref.theme = { auto: 'dark', dark: 'light', light: 'auto' }[pref.theme] || 'dark'; savePref(); applyPref(); toast('화면 밝기: ' + { auto: '기기 설정 따라감', light: '밝게', dark: '어둡게' }[pref.theme]); }
     if (a === 'typo') typoModal();
+    if (a === 'copy-ep') {
+        const W = WL(); const ep = get(W.panes[W.activeEditor].active);
+        if (!ep) { toast('열린 회차가 없어요.'); return; }
+        copyText(htmlToLines(ep.body).join('\n'), `'${ep.title}'을(를)`);
+    }
     if (a === 'export-ep') {
         const W = WL(); const ep = get(W.panes[W.activeEditor].active);
         if (!ep) { toast('열린 회차가 없어요.'); return; }
@@ -1442,11 +1475,11 @@ $('#file-restore').addEventListener('change', async e => {
     try {
         const data = JSON.parse(await f.text());
         if (data.app !== 'novel-writer' || !data.items) throw new Error('형식이 다름');
-        if (!confirm('백업 파일의 내용을 불러올까요?\n같은 문서는 백업 내용으로 바뀌고, 다른 문서는 그대로 유지돼요.')) return;
+        if (!await confirmBox('백업 파일의 내용을 불러올까요? 같은 문서는 백업 내용으로 바뀌고, 다른 문서는 그대로 유지돼요.', '불러오기')) return;
         Object.values(data.items).forEach(it => { if (it && it.id) { const c = { ...it }; normalize(c); touch(c); } });
         renderAll();
         toast('백업을 불러왔어요.');
-    } catch (err) { alert('백업 파일을 읽지 못했어요. (' + err.message + ')'); }
+    } catch (err) { toast('백업 파일을 읽지 못했어요. 집필실에서 저장한 JSON 파일인지 확인해 주세요.'); }
 });
 
 async function newWork() {
@@ -1503,128 +1536,14 @@ $$('.resizer').forEach(r => r.addEventListener('pointerdown', e => {
 }));
 
 /* =====================================================================
-   클라우드 동기화 (Firestore)
-   경로: novelWriter/{구글 uid}/items/{아이템 id}
-   - 아이템마다 rev(수정 시각)를 비교해 더 최신 쪽이 이김
-   - 입력 중인 칸의 원격 변경은 잠시 보류했다가 포커스가 빠지면 반영
+   클라우드 동기화: 구글 로그인은 마지막 단계에서 붙임.
+   지금은 이 기기에만 저장하고, 올려야 할 아이템(dirty)만 계속 기록해 둠.
    ===================================================================== */
-let fbApp = null, fbAuth = null, fbDb = null, fbUser = null, fbUnsub = null;
-let cloudTimer = null, cloudBusy = false, cloudReady = false;
-const pendingRemote = new Map();
-
 function setBadge(text, kind) { const b = $('#sync-badge'); b.textContent = text; b.className = 'sync-badge ' + (kind || ''); }
-
-function cloudInit() {
-    if (typeof firebase === 'undefined') { setBadge('오프라인 · 이 기기에 저장', 'warn'); return; }
-    try {
-        fbApp = (firebase.apps || []).find(a => a.name === 'novelWriterApp') || firebase.initializeApp(FIREBASE_CONFIG, 'novelWriterApp');
-        fbAuth = fbApp.auth(); fbDb = fbApp.firestore();
-        try { fbDb.settings({ ignoreUndefinedProperties: true }); } catch (e) {}
-        fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(() => {});
-        fbAuth.onAuthStateChanged(user => {
-            fbUser = user && !user.isAnonymous ? user : null;
-            if (fbUser) cloudStart(); else { cloudStop(); setBadge('이 기기에 저장 · 로그인하면 동기화', ''); }
-        });
-    } catch (e) { console.error(e); setBadge('동기화 사용 불가', 'err'); }
-}
-async function cloudSignIn() {
-    if (!fbAuth) { toast('인터넷 연결을 확인해 주세요.'); return; }
-    try { await fbAuth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); toast('로그인했어요. 동기화를 시작합니다.'); }
-    catch (e) { alert('구글 로그인 실패 (' + (e.code || e.message) + ')\n주소창 오른쪽의 팝업 차단도 확인해 주세요.'); }
-}
-async function cloudSignOut() { if (fbAuth) await fbAuth.signOut(); toast('로그아웃했어요. 이 기기에는 계속 저장돼요.'); }
-const itemsCol = () => fbDb.collection(FIREBASE_CONFIG.collection).doc(fbUser.uid).collection('items');
-
-function cloudStart() {
-    cloudStop();
-    setBadge('동기화 준비 중…', 'warn');
-    let first = true;
-    fbUnsub = itemsCol().onSnapshot(snap => {
-        const remoteRev = {};
-        let changed = false;
-        snap.docChanges().forEach(ch => {
-            if (ch.type === 'removed' || ch.doc.metadata.hasPendingWrites) return;
-            const r = ch.doc.data();
-            remoteRev[r.id] = r.rev || 0;
-            if (r.by === clientId && !first) return; // 내가 올린 것의 메아리
-            const local = items[r.id];
-            if (!local || (r.rev || 0) > (local.rev || 0)) { if (applyRemote(r)) changed = true; }
-        });
-        if (first) {
-            first = false;
-            Object.values(items).forEach(it => { if ((remoteRev[it.id] ?? -1) < (it.rev || 0)) dirty.add(it.id); });
-            cloudReady = true;
-            flushCloud();
-        }
-        if (changed) { saveLocal(); refreshAfterRemote(); }
-        if (!dirty.size) setBadge('☁ 동기화됨', 'ok');
-    }, err => {
-        console.error(err);
-        cloudReady = false;
-        setBadge('동기화 오류', 'err');
-        toast('클라우드 동기화 실패: ' + (err.code || err.message));
-    });
-}
-function cloudStop() { if (fbUnsub) fbUnsub(); fbUnsub = null; cloudReady = false; }
-
-function applyRemote(r) {
-    normalize(r);
-    const el = document.activeElement;
-    if (el && el.dataset && el.dataset.id === r.id) { pendingRemote.set(r.id, r); return false; }
-    items[r.id] = r; localDirty.add(r.id);
-    return true;
-}
-function flushPendingRemote() {
-    if (!pendingRemote.size) return;
-    const el = document.activeElement;
-    let changed = false;
-    for (const [id, r] of pendingRemote) {
-        if (el && el.dataset && el.dataset.id === id) continue;
-        pendingRemote.delete(id);
-        if ((r.rev || 0) > (items[id]?.rev || 0)) { items[id] = r; localDirty.add(id); changed = true; }
-    }
-    if (changed) { saveLocal(); refreshAfterRemote(); }
-}
-// 입력 중인 칸은 그대로 두고 나머지만 다시 그림
-function refreshAfterRemote() {
-    const el = document.activeElement;
-    const editing = el && el.dataset && el.dataset.id;
-    if (!editing) { renderAll(); return; }
-    $$('[data-id][data-field]').forEach(f => {
-        if (f === el) return;
-        const it = items[f.dataset.id]; if (!it) return;
-        if (f.classList.contains('manuscript')) { if (f.innerHTML !== it.body) f.innerHTML = sanitizeHtml(it.body); }
-        else if (f.value !== (it[f.dataset.field] ?? '')) { f.value = it[f.dataset.field] ?? ''; if (f.tagName === 'TEXTAREA') autoGrow(f); }
-    });
-    renderTree(); renderToday();
-}
-
-function scheduleCloudPush() {
-    if (!fbUser) return;
-    setBadge('저장 중…', 'warn');
-    clearTimeout(cloudTimer);
-    cloudTimer = setTimeout(flushCloud, 1500);
-}
-async function flushCloud() {
-    if (!fbUser || !cloudReady || cloudBusy || !dirty.size) return;
-    cloudBusy = true;
-    const ids = [...dirty].slice(0, 400);
-    try {
-        const batch = fbDb.batch();
-        ids.forEach(id => { const it = items[id]; if (it) batch.set(itemsCol().doc(id), it); });
-        ids.forEach(id => dirty.delete(id));
-        await batch.commit();
-        setBadge(dirty.size ? '저장 중…' : '☁ 동기화됨', dirty.size ? 'warn' : 'ok');
-        if (useIDB) store.setKV('dirty', [...dirty]).catch(() => {});
-    } catch (e) {
-        console.error(e);
-        ids.forEach(id => dirty.add(id));
-        setBadge('동기화 대기 (오프라인?)', 'err');
-    } finally {
-        cloudBusy = false;
-        if (dirty.size) { clearTimeout(cloudTimer); cloudTimer = setTimeout(flushCloud, 3000); }
-    }
-}
+function scheduleCloudPush() {}
+function flushCloud() {}
+const pendingRemote = new Map();
+function flushPendingRemote() {}
 window.addEventListener('online', flushCloud);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { saveLocal(); flushCloud(); } });
 window.addEventListener('pagehide', saveLocal);
@@ -1636,7 +1555,7 @@ window.addEventListener('resize', () => { clearTimeout(window._rz); window._rz =
     buildSelbar();
     renderAll();
     if (localDirty.size) saveLocal();
-    cloudInit();
+    setBadge('이 기기에 저장됨', 'ok');
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
         navigator.serviceWorker.register('novel-sw.js').catch(() => {});
     }

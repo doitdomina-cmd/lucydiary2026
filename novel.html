@@ -390,6 +390,40 @@ kbd { font: 12px/1.4 ui-monospace, monospace; background: var(--panel2); border:
 .pv-stack { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 12px 12px 40px; }
 .pv-page { background: #fffefa; color: #222; box-shadow: 0 2px 10px rgba(0,0,0,.15); position: relative; flex: none; word-break: keep-all; overflow-wrap: anywhere; overflow: hidden; }
 .pv-no { position: absolute; bottom: 8px; left: 0; right: 0; text-align: center; font: 10px 'Noto Sans KR', sans-serif; color: #aaa; }
+/* 시놉시스 보드 (파트 · 블록) */
+.sb { flex: 1; min-height: 0; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 10px; background: var(--panel2); }
+.sb-card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px 6px; display: flex; flex-direction: column; gap: 2px; box-shadow: var(--shadow); }
+.sb-card.sb-dragging, .sb-block.sb-dragging { opacity: .35; }
+.sb-card.sb-over-top { box-shadow: 0 -3px 0 var(--accent); }
+.sb-card.sb-over-bottom { box-shadow: 0 3px 0 var(--accent); }
+.sb-card-head { display: flex; align-items: center; gap: 3px; }
+.sb-grip, .sb-bgrip { cursor: grab; color: var(--muted); user-select: none; font-size: 12px; line-height: 1; padding: 2px; opacity: .55; flex: none; }
+.sb-grip:hover, .sb-bgrip:hover { opacity: 1; color: var(--accent); }
+.sb-title { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; font-weight: 700; font-size: 14px; padding: 2px; }
+.sb-count { font-size: 10px; font-weight: 700; color: var(--muted); background: var(--panel2); border: 1px solid var(--line); border-radius: 999px; min-width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.sb-place { border: 0; outline: none; background: transparent; font-size: 11px; color: var(--muted); padding: 0 2px 4px 22px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+.sb-blocks { display: flex; flex-direction: column; gap: 4px; min-height: 24px; border-radius: 6px; }
+.sb-blocks.sb-over-list { outline: 2px dashed var(--accent); outline-offset: 2px; }
+.sb-block { display: flex; align-items: flex-start; gap: 3px; border: 1px solid var(--line); border-radius: 7px; padding: 4px 4px 4px 2px; background: var(--panel); position: relative; }
+.sb-block:focus-within { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent); }
+.sb-block.sb-over-top { box-shadow: inset 0 3px 0 var(--accent); }
+.sb-block.sb-over-bottom { box-shadow: inset 0 -3px 0 var(--accent); }
+.sb-bgrip { margin-top: 2px; letter-spacing: -2px; min-width: 16px; text-align: center; padding: 3px 2px; }
+.sb-markers { font-size: 11px; margin-top: 3px; flex: none; }
+.sb-text { flex: 1; min-width: 0; outline: none; font-size: 13px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; min-height: 1.6em; }
+.sb-text.empty::before { content: attr(data-ph); color: var(--muted); opacity: .7; pointer-events: none; }
+.sb-bmenu { opacity: 0; margin-top: 1px; }
+.sb-block:hover .sb-bmenu, .sb-block:focus-within .sb-bmenu { opacity: 1; }
+.sb-add { align-self: flex-start; font-size: 11px; color: var(--muted); padding: 3px 4px; margin-top: 2px; }
+.sb-add:hover, .sb-add-card:hover { color: var(--accent); }
+.sb-add-card { align-self: flex-start; font-size: 12px; color: var(--muted); padding: 6px 8px; border: 1px dashed var(--line); border-radius: 8px; width: 100%; text-align: left; }
+.sb-mk { display: flex; gap: 2px; padding: 4px; }
+.sb-mk button { width: 30px; height: 30px; border-radius: 6px; padding: 0; text-align: center; opacity: .45; }
+.sb-mk button.on { opacity: 1; background: var(--accent-soft); }
+.pop button[disabled] { opacity: .35; cursor: default; }
+.tl-whole-text { white-space: pre-wrap; color: var(--muted); line-height: 1.6; max-height: 220px; overflow-y: auto; }
+@media (max-width: 760px) { .sb-bmenu { opacity: 1; } }
+.selbar.in-synop [data-fold] { display: none; }
 .crop-stage { position: relative; display: flex; justify-content: center; background: var(--panel2); border-radius: 8px; padding: 8px; }
 .crop-stage canvas { max-width: 100%; touch-action: none; cursor: crosshair; }
 
@@ -739,6 +773,7 @@ function normalize(it) {
     let changed = false;
     if (it.kind === 'episode' && it.fmt !== 'html') { it.body = textToHtml(it.body); it.fmt = 'html'; changed = true; }
     if ((it.kind === 'episode' || it.kind === 'folder') && it.parentId === undefined) { it.parentId = null; changed = true; }
+    if (it.kind === 'synop' && !Array.isArray(it.cards)) { it.cards = synopFromText(it.body); changed = true; }
     if (it.kind === 'note') {
         // 1단계까지의 노트(제목+본문, 색 이름) → 포스트잇
         if (it.title) { it.body = it.title + (it.body ? '\n' + it.body : ''); it.title = ''; changed = true; }
@@ -893,8 +928,8 @@ function ensureSeed() {
         const e1 = create('episode', { workId: w.id, parentId: f1.id, title: '1화', order: 1, goal: 5000 });
         const fs = create('folder', { workId: w.id, title: '설정', order: 2, ref: true });
         create('episode', { workId: w.id, parentId: fs.id, title: '인물 - 주인공', order: 1, body: textToHtml('이름:\n나이:\n특징:\n') });
-        const s1 = create('synop', { workId: w.id, title: '전체 시놉시스', order: 1, body: '로그라인:\n\n주요 사건 흐름:\n1부 -\n2부 -\n' });
-        const s2 = create('synop', { workId: w.id, title: '1화 플롯', order: 2, body: '' });
+        const s1 = create('synop', { workId: w.id, title: '전체 시놉시스', order: 1, cards: [newCard('로그라인', [newBlock('한 줄로 이 작품을 소개해 보세요.')]), newCard('1부', [newBlock('주요 사건'), newBlock()]), newCard('2부')] });
+        const s2 = create('synop', { workId: w.id, title: '1화 플롯', order: 2, cards: [newCard('도입'), newCard('전개'), newCard('절단신공')] });
         create('note', { workId: w.id, docId: e1.id, color: '#fff3a8', body: '이 회차 메모를 포스트잇으로 붙여 두세요.\n머리 부분을 끌면 옮겨져요.', x: 14, y: 14, w: 170 });
         create('note', { workId: w.id, docId: null, color: '#b9fbc0', body: '작품 공통 메모는 모든 회차 보드에 보여요.', x: 40, y: 150, w: 170 });
         const L = layout(); L.workId = w.id;
@@ -1031,11 +1066,11 @@ function renderSynops() {
         const it = get(W.synopPanes[i]);
         html += `<div class="pane ${i === W.activeSynop ? 'active' : ''}" data-pane="${i}">
             <div class="pane-head"><select data-role="synop-pick">${it ? '' : '<option value="">— 문서 선택 —</option>'}${synopOptions(it?.id)}</select></div>
-            ${it ? `<textarea data-id="${it.id}" data-field="body" placeholder="시놉시스, 플롯, 장면 메모를 자유롭게…">${esc(it.body)}</textarea>`
-                 : '<div class="pane-empty">위에서 시놉 문서를 고르거나<br>새로 만들어 주세요</div>'}
+            ${it ? synopBoardHtml(it) : '<div class="pane-empty">위에서 시놉 문서를 고르거나<br>새로 만들어 주세요</div>'}
         </div>`;
     }
     grid.innerHTML = html;
+    $$('.sb-text', grid).forEach(syncEmpty);
 }
 
 function docOptions(selId) {
@@ -1247,6 +1282,11 @@ function activeEditorEl() {
     return $(`.epane[data-pane="${W.activeEditor}"] .manuscript`) || $('.manuscript');
 }
 function runCmd(cmd, val) {
+    const ae = document.activeElement;
+    if (ae && ae.classList && ae.classList.contains('sb-text')) {
+        try { document.execCommand('styleWithCSS', false, true); } catch (e) {}
+        document.execCommand(cmd, false, val ?? null); updateSelbar(); return;
+    }
     const ed = activeEditorEl();
     if (!ed) return;
     if (ed.getAttribute('contenteditable') !== 'true') { toast('잠긴 문서예요. 🔓 를 눌러 잠금을 풀어 주세요.'); return; }
@@ -1300,8 +1340,9 @@ function updateSelbar() {
     const sel = getSelection();
     if (!sel || sel.isCollapsed || !sel.rangeCount) { bar.classList.add('hidden'); return; }
     const node = sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
-    const ed = node && node.closest('.manuscript[contenteditable="true"]');
+    const ed = node && node.closest('.manuscript[contenteditable="true"], .sb-text');
     if (!ed) { bar.classList.add('hidden'); return; }
+    bar.classList.toggle('in-synop', ed.classList.contains('sb-text'));
     const r = sel.getRangeAt(0).getBoundingClientRect();
     if (!r.width && !r.height) { bar.classList.add('hidden'); return; }
     bar.classList.remove('hidden');
@@ -1431,7 +1472,7 @@ async function newFolder(parentId = null) {
 async function newSynop(open) {
     const t = await ask('새 시놉 문서 제목', ''); if (t == null) return null;
     const syn = ofWork('synop');
-    const it = create('synop', { workId: curWorkId(), title: t.trim() || '새 시놉', order: (syn[syn.length - 1]?.order || 0) + 1 });
+    const it = create('synop', { workId: curWorkId(), title: t.trim() || '새 시놉', order: (syn[syn.length - 1]?.order || 0) + 1, cards: [newCard()] });
     if (open) openSynop(it.id); else renderTree();
     return it;
 }
@@ -1771,7 +1812,7 @@ async function newWork() {
     const f1 = create('folder', { workId: w.id, title: '1부', order: 1 });
     const e1 = create('episode', { workId: w.id, parentId: f1.id, title: '1화', order: 1, goal: 5000 });
     create('folder', { workId: w.id, title: '설정', order: 2, ref: true });
-    const s1 = create('synop', { workId: w.id, title: '전체 시놉시스', order: 1 });
+    const s1 = create('synop', { workId: w.id, title: '전체 시놉시스', order: 1, cards: [newCard('로그라인')] });
     layout().workId = w.id;
     setWL(W => { W.synopPanes = [s1.id]; W.panes[0].tabs = [e1.id]; W.panes[0].active = e1.id; });
     renderAll();
@@ -2775,7 +2816,7 @@ function exportWorkZip() {
     walk(null, root);
     const trash = Object.values(items).filter(i => i.kind === 'episode' && live(i) && i.workId === w.id && inTrash(i));
     trash.forEach(d => files.push({ name: `${root}_휴지통/${safeName(d.title)}.md`, data: docMd(d) }));
-    ofWork('synop').forEach((s, i, a) => files.push({ name: `${root}_시놉시스/${pad(i, a.length)} ${safeName(s.title)}.md`, data: `# ${s.title}\n\n${s.body || ''}\n` }));
+    ofWork('synop').forEach((s, i, a) => files.push({ name: `${root}_시놉시스/${pad(i, a.length)} ${safeName(s.title)}.md`, data: synopMd(s) }));
     const fn = get('free_' + w.id);
     if (fn && fn.body) files.push({ name: `${root}_프리노트.md`, data: `# 프리 노트\n\n${fn.body}\n` });
     const notes = ofWork('note');
@@ -3302,7 +3343,7 @@ function renderStructure() {
         <textarea data-pid="${d.id}" data-pf="summary" placeholder="시놉시스를 적어 보세요" rows="2">${esc(d.summary || '')}</textarea>
         <div class="tl-meta">${isRefDoc(d) ? '자료' : fmt(docCount(d).noSpace) + '자'}</div></div>`;
     return `<div class="tl" style="font-size:${size}px">
-        ${whole ? `<div class="tl-whole"><div class="tl-group-title">📖 ${esc(whole.title)}</div><textarea data-pid="${whole.id}" data-pf="body" placeholder="작품 전체 시놉시스">${esc(whole.body || '')}</textarea></div>` : ''}
+        ${whole ? `<div class="tl-whole"><div class="tl-group-title">📖 ${esc(whole.title)} <small>시놉 창에서 고쳐요</small></div><div class="tl-whole-text">${esc(synopPlain(whole)) || '<span class="modal-note">비어 있어요</span>'}</div></div>` : ''}
         ${groupsForStructure().map(g => `<section class="tl-group" data-group="${g.id}">
             <div class="tl-group-title">${g.folder ? (g.folder.ref ? '📚 ' : '📁 ') : ''}${esc(g.title)} <small>${g.docs.length}편</small>${g.trial ? ' <span class="trial-badge">시험 순서</span>' : ''}</div>
             ${g.folder ? `<textarea class="tl-folder-sum" data-pid="${g.folder.id}" data-pf="summary" placeholder="이 폴더(부)의 흐름을 한 줄로" rows="1">${esc(g.folder.summary || '')}</textarea>` : ''}
@@ -3895,6 +3936,209 @@ document.addEventListener('click', e => {
     const z = e.target.closest && e.target.closest('[data-pv-z]'); if (!z) return;
     setWL(W => { W.pageZoom = Math.max(0.5, Math.min(2, Math.round(((W.pageZoom || 1) + +z.dataset.pvZ) * 10) / 10)); });
     renderEditors();
+});
+
+/* =====================================================================
+   시놉시스 보드: 시놉 문서 = 파트(카드) 여러 개, 파트 안에 블록(글 상자) 여러 개
+   (에피소드 기획 보드와 같은 방식)
+   ===================================================================== */
+const SB_COLORS = ['', '#fff3a8', '#ffd6a5', '#ffc8dd', '#cfbaf0', '#a3c4f3', '#98f5e1', '#b9fbc0'];
+const SB_MARKERS = ['⭐', '❗', '❓', '💡', '❤️', '🔥'];
+const newBlock = (html = '') => ({ id: uid('b'), html, color: '', markers: [] });
+const newCard = (title = '', blocks) => ({ id: uid('k'), title, place: '', color: '', blocks: blocks || [newBlock()] });
+// 예전 시놉(글 한 덩어리) → 파트 하나 + 빈 줄로 나눈 블록들
+function synopFromText(text) {
+    const parts = String(text || '').replace(/\r\n?/g, '\n').split(/\n\s*\n/).map(s => s.trim()).filter(Boolean);
+    return [newCard('', parts.length ? parts.map(p => newBlock(esc(p).replace(/\n/g, '<br>'))) : [newBlock()])];
+}
+function synopPlain(doc) {
+    return (doc.cards || []).map(c => [c.title, c.place].filter(Boolean).join(' · ') + '\n' + c.blocks.map(b => (b.markers || []).join('') + htmlToLines(b.html).join('\n')).join('\n')).join('\n\n').trim();
+}
+function synopMd(doc) {
+    return `# ${doc.title}\n\n` + (doc.cards || []).map(c => `## ${c.title || '(제목 없는 파트)'}${c.place ? ` — ${c.place}` : ''}\n\n` + c.blocks.map(b => '- ' + (b.markers || []).join('') + htmlToLines(b.html).join('\n  ')).join('\n')).join('\n\n') + '\n';
+}
+function sbCtx(el) {
+    const doc = get(el.closest('[data-sbdoc]')?.dataset.sbdoc);
+    if (!doc) return {};
+    const card = (doc.cards || []).find(c => c.id === el.closest('[data-card]')?.dataset.card);
+    const block = card && card.blocks.find(b => b.id === el.closest('[data-block]')?.dataset.block);
+    return { doc, card, block };
+}
+function synopBoardHtml(doc) {
+    const cards = doc.cards || [];
+    return `<div class="sb" data-sbdoc="${doc.id}">${cards.map(c => `
+        <div class="sb-card" data-card="${c.id}" style="${c.color ? `border-top:3px solid ${esc(c.color)}` : ''}">
+            <div class="sb-card-head"><span class="sb-grip" draggable="true" title="끌어서 파트 순서 바꾸기">⠿</span>
+                <input class="sb-title" data-sbf="title" value="${esc(c.title)}" placeholder="파트 제목" spellcheck="false">
+                <span class="sb-count" title="블록 수">${c.blocks.length}</span>
+                <button class="mini" data-sb="add-block" title="블록 추가">＋</button><button class="mini" data-sb="card-menu" title="파트 메뉴">⋯</button></div>
+            <input class="sb-place" data-sbf="place" value="${esc(c.place || '')}" placeholder="장소 · 한 줄 메모" spellcheck="false">
+            <div class="sb-blocks" data-card="${c.id}">${c.blocks.map(b => `
+                <div class="sb-block" data-block="${b.id}" style="${b.color ? `background:${esc(b.color)};color:#2b2a26` : ''}">
+                    <span class="sb-bgrip" draggable="true" title="끌어서 순서 바꾸기 · 다른 파트로 옮기기">⋮⋮</span>
+                    ${(b.markers || []).length ? `<span class="sb-markers">${b.markers.join('')}</span>` : ''}
+                    <div class="sb-text" contenteditable="true" spellcheck="false" data-id="${doc.id}" data-ph="내용을 적어 보세요">${sanitizeHtml(b.html)}</div>
+                    <button class="mini sb-bmenu" data-sb="block-menu" title="블록 메뉴">⋯</button></div>`).join('')}</div>
+            <button class="sb-add" data-sb="add-block">＋ 새 블록</button>
+        </div>`).join('')}
+        <button class="sb-add-card" data-sb="add-card">＋ 새 파트</button></div>`;
+}
+function rerenderSynop(doc, focusBlockId) {
+    renderSynops();
+    if (focusBlockId) {
+        const el = $(`.sb[data-sbdoc="${doc.id}"] [data-block="${focusBlockId}"] .sb-text`);
+        if (el) { el.focus(); const r = document.createRange(); r.selectNodeContents(el); r.collapse(false); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+    }
+}
+function syncEmpty(el) { el.classList.toggle('empty', !el.textContent.trim() && !el.querySelector('img')); }
+
+// 입력: 블록 글 · 파트 제목/장소
+document.addEventListener('input', e => {
+    const t = e.target;
+    if (t.classList && t.classList.contains('sb-text')) {
+        const { doc, block } = sbCtx(t); if (!block) return;
+        block.html = t.innerHTML; touch(doc); syncEmpty(t);
+        $$(`.sb[data-sbdoc="${doc.id}"] [data-block="${block.id}"] .sb-text`).forEach(o => { if (o !== t) { o.innerHTML = t.innerHTML; syncEmpty(o); } });
+        e.stopImmediatePropagation();
+        return;
+    }
+    if (t.dataset && t.dataset.sbf) {
+        const { doc, card } = sbCtx(t); if (!card) return;
+        card[t.dataset.sbf] = t.value; touch(doc);
+        $$(`.sb[data-sbdoc="${doc.id}"] [data-card="${card.id}"] [data-sbf="${t.dataset.sbf}"]`).forEach(o => { if (o !== t) o.value = t.value; });
+        e.stopImmediatePropagation();
+    }
+}, true);
+// 블록 안에 붙여넣기는 글자만
+document.addEventListener('paste', e => {
+    const t = e.target.closest && e.target.closest('.sb-text'); if (!t) return;
+    e.preventDefault();
+    const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+    if (text) document.execCommand('insertText', false, text.replace(/\r\n?/g, '\n'));
+}, true);
+// 블록에서 Enter 두 번 → 새 블록 (마지막 빈 줄에서 Enter)
+document.addEventListener('keydown', e => {
+    const t = e.target.closest && e.target.closest('.sb-text'); if (!t || e.isComposing) return;
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        const { doc, card, block } = sbCtx(t);
+        const nb = newBlock(); card.blocks.splice(card.blocks.indexOf(block) + 1, 0, nb); touch(doc); rerenderSynop(doc, nb.id);
+    }
+    if (e.key === 'Backspace' && !t.textContent && !t.querySelector('img')) {
+        const { doc, card, block } = sbCtx(t);
+        if (card && card.blocks.length > 1) {
+            e.preventDefault();
+            const i = card.blocks.indexOf(block); card.blocks.splice(i, 1); touch(doc);
+            rerenderSynop(doc, card.blocks[Math.max(0, i - 1)].id);
+        }
+    }
+});
+
+async function sbClick(e) {
+    const btn = e.target.closest('[data-sb]'); if (!btn) return;
+    const { doc, card, block } = sbCtx(btn); if (!doc) return;
+    const a = btn.dataset.sb;
+    doc.cards ||= [];
+    if (a === 'add-card') { const c = newCard(); doc.cards.push(c); touch(doc); rerenderSynop(doc); $(`.sb[data-sbdoc="${doc.id}"] [data-card="${c.id}"] .sb-title`)?.focus(); return; }
+    if (a === 'add-block') { const nb = newBlock(); card.blocks.push(nb); touch(doc); rerenderSynop(doc, nb.id); return; }
+    if (a === 'card-menu') {
+        const i = doc.cards.indexOf(card);
+        const pop = showPop(btn, `<div class="swatches" style="grid-template-columns:repeat(4,26px)">${SB_COLORS.map(c => `<button class="swatch ${c ? '' : 'none'}" style="background:${c || 'var(--panel)'}" data-cc="${c}" title="${c ? '파트 색' : '색 없음'}"></button>`).join('')}</div><hr>
+            <button data-m="up" ${i ? '' : 'disabled'}>↑ 위로</button><button data-m="down" ${i < doc.cards.length - 1 ? '' : 'disabled'}>↓ 아래로</button>
+            <button data-m="dup">파트 복제</button><button data-m="copy">파트 글 복사</button><hr><button data-m="del" class="danger">파트 지우기</button>`);
+        pop.addEventListener('click', ev => {
+            const cc = ev.target.closest('[data-cc]'); const m = ev.target.closest('[data-m]')?.dataset.m;
+            if (cc) { card.color = cc.dataset.cc; touch(doc); closePop(); rerenderSynop(doc); return; }
+            if (!m) return; closePop();
+            if (m === 'up' || m === 'down') { const j = i + (m === 'up' ? -1 : 1); [doc.cards[i], doc.cards[j]] = [doc.cards[j], doc.cards[i]]; }
+            if (m === 'dup') doc.cards.splice(i + 1, 0, { ...JSON.parse(JSON.stringify(card)), id: uid('k'), title: card.title ? card.title + ' (사본)' : '', blocks: card.blocks.map(b => ({ ...b, id: uid('b') })) });
+            if (m === 'copy') { copyText(synopPlain({ cards: [card] }), '파트 글을'); return; }
+            if (m === 'del') {
+                const removed = doc.cards.splice(i, 1)[0];
+                touch(doc); rerenderSynop(doc);
+                toast('파트를 지웠어요.', '되돌리기', () => { doc.cards.splice(i, 0, removed); touch(doc); rerenderSynop(doc); });
+                return;
+            }
+            touch(doc); rerenderSynop(doc);
+        });
+        return;
+    }
+    if (a === 'block-menu') {
+        const i = card.blocks.indexOf(block);
+        const pop = showPop(btn, `<div class="swatches" style="grid-template-columns:repeat(4,26px)">${SB_COLORS.map(c => `<button class="swatch ${c ? '' : 'none'}" style="background:${c || 'var(--panel)'}" data-bc="${c}" title="${c ? '블록 색' : '색 없음'}"></button>`).join('')}</div>
+            <div class="sb-mk">${SB_MARKERS.map(m => `<button data-mk="${m}" class="${(block.markers || []).includes(m) ? 'on' : ''}" title="표시 켜기·끄기">${m}</button>`).join('')}</div><hr>
+            <button data-m="up" ${i ? '' : 'disabled'}>↑ 위로</button><button data-m="down" ${i < card.blocks.length - 1 ? '' : 'disabled'}>↓ 아래로</button>
+            <button data-m="below">아래에 새 블록 (Ctrl+Enter)</button><hr><button data-m="del" class="danger">블록 지우기</button>`);
+        pop.addEventListener('mousedown', ev => ev.preventDefault());
+        pop.addEventListener('click', ev => {
+            const bc = ev.target.closest('[data-bc]'), mk = ev.target.closest('[data-mk]'), m = ev.target.closest('[data-m]')?.dataset.m;
+            if (bc) { block.color = bc.dataset.bc; touch(doc); closePop(); rerenderSynop(doc); return; }
+            if (mk) { const ms = block.markers || []; block.markers = ms.includes(mk.dataset.mk) ? ms.filter(x => x !== mk.dataset.mk) : [...ms, mk.dataset.mk]; touch(doc); mk.classList.toggle('on'); rerenderSynop(doc); return; }
+            if (!m) return; closePop();
+            if (m === 'up' || m === 'down') { const j = i + (m === 'up' ? -1 : 1); [card.blocks[i], card.blocks[j]] = [card.blocks[j], card.blocks[i]]; touch(doc); rerenderSynop(doc); }
+            if (m === 'below') { const nb = newBlock(); card.blocks.splice(i + 1, 0, nb); touch(doc); rerenderSynop(doc, nb.id); }
+            if (m === 'del') {
+                const removed = card.blocks.splice(i, 1)[0];
+                if (!card.blocks.length) card.blocks.push(newBlock());
+                touch(doc); rerenderSynop(doc);
+                toast('블록을 지웠어요.', '되돌리기', () => { if (card.blocks.length === 1 && !card.blocks[0].html) card.blocks = []; card.blocks.splice(i, 0, removed); touch(doc); rerenderSynop(doc); });
+            }
+        });
+    }
+}
+$('#synop-grid').addEventListener('click', sbClick);
+
+// 끌어서 옮기기: 블록(같은 문서 안 다른 파트로도) · 파트 순서
+let sbDrag = null;
+const sbGrid = $('#synop-grid');
+sbGrid.addEventListener('dragstart', e => {
+    const bg = e.target.closest('.sb-bgrip'), cg = e.target.closest('.sb-grip');
+    if (!bg && !cg) return;
+    const { doc, card, block } = sbCtx(e.target);
+    sbDrag = { kind: bg ? 'block' : 'card', docId: doc.id, cardId: card.id, blockId: block?.id };
+    const el = bg ? e.target.closest('.sb-block') : e.target.closest('.sb-card');
+    try { e.dataTransfer.setDragImage(el, 10, 10); e.dataTransfer.setData('text/plain', ''); } catch (_) {}
+    e.dataTransfer.effectAllowed = 'move';
+    setTimeout(() => el.classList.add('sb-dragging'), 0);
+});
+const clearSbMarks = () => $$('.sb-over-top, .sb-over-bottom, .sb-dragging, .sb-over-list').forEach(x => x.classList.remove('sb-over-top', 'sb-over-bottom', 'sb-dragging', 'sb-over-list'));
+sbGrid.addEventListener('dragend', () => { sbDrag = null; clearSbMarks(); });
+sbGrid.addEventListener('dragover', e => {
+    if (!sbDrag) return;
+    const sb = e.target.closest('.sb'); if (!sb || sb.dataset.sbdoc !== sbDrag.docId) return;
+    const tgt = sbDrag.kind === 'block' ? (e.target.closest('.sb-block') || e.target.closest('.sb-blocks')) : e.target.closest('.sb-card');
+    if (!tgt) return;
+    e.preventDefault();
+    $$('.sb-over-top, .sb-over-bottom, .sb-over-list').forEach(x => x.classList.remove('sb-over-top', 'sb-over-bottom', 'sb-over-list'));
+    if (tgt.classList.contains('sb-blocks')) { tgt.classList.add('sb-over-list'); return; }
+    const r = tgt.getBoundingClientRect();
+    tgt.classList.add(e.clientY < r.top + r.height / 2 ? 'sb-over-top' : 'sb-over-bottom');
+});
+sbGrid.addEventListener('drop', e => {
+    if (!sbDrag) return;
+    const d = sbDrag; sbDrag = null;
+    const doc = get(d.docId); if (!doc) return;
+    e.preventDefault();
+    const above = el => { const r = el.getBoundingClientRect(); return e.clientY < r.top + r.height / 2; };
+    if (d.kind === 'block') {
+        const from = doc.cards.find(c => c.id === d.cardId);
+        const bi = from.blocks.findIndex(b => b.id === d.blockId); if (bi < 0) return;
+        const tBlock = e.target.closest('.sb-block'), tList = e.target.closest('.sb-blocks');
+        if (!tList) { clearSbMarks(); return; }
+        const to = doc.cards.find(c => c.id === tList.dataset.card);
+        const [moved] = from.blocks.splice(bi, 1);
+        let at = to.blocks.length;
+        if (tBlock && tBlock.dataset.block !== moved.id) { at = to.blocks.findIndex(b => b.id === tBlock.dataset.block); if (!above(tBlock)) at++; }
+        to.blocks.splice(at, 0, moved);
+        if (!from.blocks.length) from.blocks.push(newBlock());
+    } else {
+        const tCard = e.target.closest('.sb-card'); if (!tCard || tCard.dataset.card === d.cardId) { clearSbMarks(); return; }
+        const ci = doc.cards.findIndex(c => c.id === d.cardId);
+        const [moved] = doc.cards.splice(ci, 1);
+        let at = doc.cards.findIndex(c => c.id === tCard.dataset.card); if (!above(tCard)) at++;
+        doc.cards.splice(at, 0, moved);
+    }
+    touch(doc); clearSbMarks(); rerenderSynop(doc);
 });
 
 /* ---------- 시작 ---------- */

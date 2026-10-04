@@ -1,4 +1,4 @@
-const CACHE_NAME = 'novel-writer-v12';
+const CACHE_NAME = 'novel-writer-v13';
 const ASSETS = ['./novel.html', './novel-manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (event) => {

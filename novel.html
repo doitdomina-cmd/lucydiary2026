@@ -219,6 +219,22 @@ main { height: calc(100% - 82px); display: flex; }
 /* 원고 속 사진 */
 .manuscript img { display: inline-block; vertical-align: bottom; cursor: pointer; border-radius: 2px; }
 .manuscript img.sel { outline: 3px solid var(--accent); outline-offset: 2px; }
+.modal-note { font-size: 12px; color: var(--muted); line-height: 1.6; margin: 8px 0 0; }
+.modal-note.warn { color: #c47a00; }
+.modal label.check { display: flex; align-items: center; gap: 6px; color: var(--text); font-size: 13px; margin-top: 12px; }
+.fmt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 6px; }
+.fmt { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; text-align: left; background: var(--panel); }
+.fmt small { color: var(--muted); font-size: 11px; }
+.fmt.on { border-color: var(--accent); background: var(--accent-soft); }
+.fmt.on b { color: var(--accent); }
+.rules { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.rule-row { display: flex; align-items: center; gap: 10px; justify-content: space-between; }
+.rule-row span { font-size: 13px; display: flex; flex-direction: column; }
+.rule-row small { font-size: 11px; color: var(--muted); }
+.rule-row select, .rule-row input { width: 120px !important; flex: none; }
+.copy-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 16px; margin-top: 10px; }
+.copy-preview { margin: 0; height: 300px; overflow: auto; white-space: pre-wrap; font: 12px/1.7 'Nanum Myeongjo', serif; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+@media (max-width: 640px) { .copy-grid { grid-template-columns: 1fr; } .copy-preview { height: 200px; } }
 .crop-stage { position: relative; display: flex; justify-content: center; background: var(--panel2); border-radius: 8px; padding: 8px; }
 .crop-stage canvas { max-width: 100%; touch-action: none; cursor: crosshair; }
 
@@ -319,6 +335,7 @@ nav.mtabs { display: none; }
     <span class="sep"></span>
     <button class="tb" id="btn-img" title="사진 넣기">🖼</button>
     <span class="spacer"></span>
+    <button class="tb small" id="btn-export" title="docx·epub·txt 등으로 내보내기">⇪ 내보내기</button>
     <button class="tb small" id="btn-hl" title="작품 전체의 형광펜 모아보기">🖍 모아보기</button>
     <button class="tb small" id="btn-focus" title="원고만 보기 (Ctrl+Shift+M)">⛶ 원고만 보기</button>
 </div>
@@ -366,7 +383,7 @@ nav.mtabs { display: none; }
 <button class="focus-exit" id="focus-exit">원고만 보기 끝내기 (Esc)</button>
 <div class="selbar hidden" id="selbar"></div>
 <div class="toast" id="toast"></div>
-<input type="file" id="file-restore" accept=".json,application/json" class="hidden">
+<input type="file" id="file-restore" accept=".json,.zip,application/json,application/zip" class="hidden">
 <input type="file" id="file-img" accept="image/*" class="hidden">
 <div class="selbar hidden" id="imgbar"></div>
 
@@ -905,6 +922,7 @@ function renderFoot(it) {
             <span style="flex:1"></span>
             <span>목표</span><input class="goal-input" type="number" min="0" step="500" data-goal="${it.id}" value="${goal || ''}" placeholder="글자">
             ${goal ? `<span class="goal-bar"><i style="width:${pct}%"></i></span><span>${pct}%</span>` : ''}
+            <button class="mini" data-a="copy" title="줄바꿈 규칙대로 클립보드에 복사">📋 복사</button>
             <button class="mini" data-a="zoom-out" title="글자 작게">－</button><span>${settings().size}px</span><button class="mini" data-a="zoom-in" title="글자 크게">＋</button>`;
     });
 }
@@ -1178,13 +1196,21 @@ async function download(name, text, type) {
     const dl = window.claude && window.claude.use ? await window.claude.use('downloads').catch(() => null) : null;
     if (dl) {
         try { await dl.save({ filename, data: text }); toast('저장했어요.'); }
-        catch (e) { if (e && e.code !== 'declined') toast('이 화면에서는 파일을 저장할 수 없어요. (' + (e.code || e.message) + ')'); }
+        catch (e) {
+            if (e && e.code === 'declined') return;
+            toast(e && (e.code === 'rejected_extension' || e.code === 'extension_not_enabled')
+                ? '이 미리보기 화면에서는 이 형식을 저장할 수 없어요. GitHub 주소로 열면 저장돼요.'
+                : '파일을 저장하지 못했어요. (' + (e && (e.code || e.message)) + ')');
+        }
         return;
     }
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([text], { type: type + ';charset=utf-8' }));
+    a.href = URL.createObjectURL(text instanceof Blob ? text : new Blob([text], { type: (type || 'text/plain') + ';charset=utf-8' }));
     a.download = filename;
-    a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
 }
 
 /* =====================================================================
@@ -1418,6 +1444,7 @@ $('#editor-grid').addEventListener('click', async e => {
         setWL(W => { const P = W.panes[i]; const cur = P.active; P.active = P.ref; if (!P.tabs.includes(P.ref)) P.tabs[P.tabs.indexOf(cur)] = P.ref; P.ref = cur; });
         renderAll(); return;
     }
+    if (a === 'copy') { openCopy(p.active); return; }
     if (a === 'zoom-in' || a === 'zoom-out') {
         const S = settings(); S.size = Math.max(11, Math.min(30, S.size + (a === 'zoom-in' ? 1 : -1))); touch(S);
         applyPref(); $$('.epane-foot').forEach(f => { const it = get(f.dataset.foot); if (it) renderFoot(it); });
@@ -1485,8 +1512,8 @@ $('#btn-menu').addEventListener('click', e => {
         <button data-act="new-work">＋ 새 작품</button><button data-act="rename-work">작품 이름 바꾸기</button><button data-act="delete-work" class="danger">작품 삭제</button><hr>
         <button data-act="hl">🖍 형광펜 모아보기</button><button data-act="fullboard">🗂 작품 전체 메모 보드</button><hr>
         <button data-act="typo">가 글꼴 · 크기 · 줄간격 · 문단</button><button data-act="theme">화면 밝기: ${{ auto: '기기 설정 따라감', light: '밝게', dark: '어둡게' }[pref.theme] || '기기 설정 따라감'} ▸</button><hr>
-        <button data-act="copy-ep">현재 회차 복사 (클립보드)</button><button data-act="export-ep">현재 회차 TXT 저장</button><button data-act="export-work">작품 전체 TXT 저장</button>
-        <button data-act="backup">백업 파일 저장 (JSON)</button><button data-act="restore">백업 파일 불러오기</button>`);
+        <button data-act="copy-ep">📋 현재 회차 복사 (줄바꿈 규칙)</button><button data-act="export">⇪ 내보내기 (docx·epub·txt…)</button><hr>
+        <button data-act="zip">🗜 작품 백업 내려받기 (ZIP)</button><button data-act="backup">전체 백업 저장 (JSON)</button><button data-act="restore">백업 불러오기 (ZIP·JSON)</button>`);
     pop.style.left = ''; pop.style.right = '8px';
     pop.addEventListener('click', menuAction);
 });
@@ -1508,31 +1535,25 @@ async function menuAction(e) {
     if (a === 'typo') typoModal();
     if (a === 'hl') openHighlights();
     if (a === 'fullboard') openFullBoard();
-    if (a === 'copy-ep') {
-        const W = WL(); const ep = get(W.panes[W.activeEditor].active);
-        if (!ep) { toast('열린 회차가 없어요.'); return; }
-        copyText(htmlToLines(ep.body).join('\n'), `'${ep.title}'을(를)`);
-    }
-    if (a === 'export-ep') {
-        const W = WL(); const ep = get(W.panes[W.activeEditor].active);
-        if (!ep) { toast('열린 회차가 없어요.'); return; }
-        download(`${w.title}_${ep.title}.txt`, `${ep.title}\n\n${htmlToLines(ep.body).join('\n')}`, 'text/plain');
-    }
-    if (a === 'export-work') download(`${w.title}.txt`, flatDocs().filter(d => !isRefDoc(d)).map(ep => `${ep.title}\n\n${htmlToLines(ep.body).join('\n')}`).join('\n\n\n'), 'text/plain');
-    if (a === 'backup') download(`집필실_백업_${todayKey()}.json`, JSON.stringify({ app: 'novel-writer', version: 2, items }, null, 1), 'application/json');
+    if (a === 'copy-ep') openCopy();
+    if (a === 'export') openExport();
+    if (a === 'zip') exportWorkZip();
+    if (a === 'backup') download(`집필실_백업_${todayKey()}.json`, JSON.stringify({ app: 'novel-writer', version: 3, items }), 'application/json');
     if (a === 'restore') $('#file-restore').click();
 }
 $('#file-restore').addEventListener('change', async e => {
     const f = e.target.files[0]; e.target.value = '';
     if (!f) return;
-    try {
-        const data = JSON.parse(await f.text());
-        if (data.app !== 'novel-writer' || !data.items) throw new Error('형식이 다름');
-        if (!await confirmBox('백업 파일의 내용을 불러올까요? 같은 문서는 백업 내용으로 바뀌고, 다른 문서는 그대로 유지돼요.', '불러오기')) return;
-        Object.values(data.items).forEach(it => { if (it && it.id) { const c = { ...it }; normalize(c); touch(c); } });
-        renderAll();
-        toast('백업을 불러왔어요.');
-    } catch (err) { toast('백업 파일을 읽지 못했어요. 집필실에서 저장한 JSON 파일인지 확인해 주세요.'); }
+    let data;
+    try { data = await importBackupFile(f); }
+    catch (err) { toast('백업을 읽지 못했어요. ' + (err.message || '')); return; }
+    const n = Object.keys(data.items).length;
+    if (!await confirmBox(`백업 내용(${n}개 항목)을 불러올까요? 같은 문서는 백업 내용으로 바뀌고, 다른 문서는 그대로 유지돼요.`, '불러오기')) return;
+    Object.values(data.items).forEach(it => { if (it && it.id) { const c = { ...it }; normalize(c); touch(c); } });
+    if (data.workId && data.layout && !layout().works[data.workId]) { layout().works[data.workId] = data.layout; touch(layout()); }
+    if (data.workId && get(data.workId)) { layout().workId = data.workId; touch(layout()); }
+    renderAll();
+    toast('백업을 불러왔어요.');
 });
 
 async function newWork() {
@@ -2068,6 +2089,512 @@ function jumpToHighlight(docId, idx) {
     }, 60);
 }
 $('#btn-hl').addEventListener('click', openHighlights);
+
+/* =====================================================================
+   원고 → 문단 블록 (내보내기·복사 공용)
+   블록 = { runs: [{ text, b, i, u, s, color, bg, img, width }], align }
+   ===================================================================== */
+function toBlocks(html) {
+    const t = document.createElement('template'); t.innerHTML = sanitizeHtml(html);
+    const blocks = []; let cur = null;
+    const nb = align => { cur = { runs: [], align: align || '' }; blocks.push(cur); return cur; };
+    const isBlock = n => n.nodeType === 1 && (n.tagName === 'P' || n.tagName === 'DIV');
+    const walk = (node, st) => {
+        const kids = [...node.childNodes];
+        kids.forEach((n, i) => {
+            if (n.nodeType === 3) { if (!n.data) return; if (!cur) nb(); cur.runs.push({ ...st, text: n.data.replace(/\n/g, ' ') }); return; }
+            if (n.nodeType !== 1) return;
+            if (n.tagName === 'BR') {
+                const trailing = kids.slice(i + 1).every(k => k.nodeType === 3 && !k.data);
+                if (!cur) nb();
+                if (!trailing) nb(cur.align);
+                return;
+            }
+            if (n.tagName === 'IMG') { if (!cur) nb(); cur.runs.push({ ...st, text: '', img: n.getAttribute('data-img'), width: n.style.width }); return; }
+            if (isBlock(n)) { nb(n.style.textAlign); walk(n, st); cur = null; return; }
+            const s2 = { ...st }, tg = n.tagName;
+            if (tg === 'B' || tg === 'STRONG') s2.b = true;
+            if (tg === 'I' || tg === 'EM') s2.i = true;
+            if (tg === 'U') s2.u = true;
+            if (tg === 'S' || tg === 'STRIKE' || tg === 'DEL') s2.s = true;
+            if (tg === 'MARK') s2.bg = '#fff3a3';
+            const fw = n.style.fontWeight; if (fw === 'bold' || +fw >= 600) s2.b = true;
+            if (n.style.fontStyle === 'italic') s2.i = true;
+            const td = (n.style.textDecorationLine || '') + ' ' + (n.style.textDecoration || '');
+            if (td.includes('underline')) s2.u = true;
+            if (td.includes('line-through')) s2.s = true;
+            if (n.style.color) { const c = toHex(n.style.color); s2.color = c === '#23261f' ? undefined : c; }
+            const bg = n.style.backgroundColor;
+            if (bg) s2.bg = (bg === 'transparent' || /rgba\([^)]*,\s*0\)$/.test(bg)) ? undefined : toHex(bg);
+            walk(n, s2);
+        });
+    };
+    walk(t.content, {});
+    return blocks;
+}
+const blockText = b => b.runs.map(r => r.text).join('');
+const SCENE_RE = /^([*＊#◇◆○●◎※☆★=~\-─—·]\s*){1,7}$/;
+function blockKind(b) {
+    if (b.runs.some(r => r.img)) return 'n';
+    const t = blockText(b).trim();
+    if (!t) return 'empty';
+    if (SCENE_RE.test(t)) return 'scene';
+    return /^["“”'‘’「『]/.test(t) ? 'd' : 'n';
+}
+
+/* =====================================================================
+   줄바꿈 규칙: 문단 사이 빈 줄 수를 문단 종류(지문·대사·장면 전환)에 따라 맞춤
+   'keep' = 원고 그대로, 숫자 = 그만큼 빈 줄
+   ===================================================================== */
+function lineRules() {
+    const S = settings();
+    S.lineRules = { nn: 'keep', nd: 'keep', dd: 'keep', scene: 'keep', mark: '', ...(S.lineRules || {}) };
+    return S.lineRules;
+}
+function applyLineRules(blocks, R) {
+    const allKeep = ['nn', 'nd', 'dd', 'scene'].every(k => R[k] === 'keep') && !R.mark;
+    if (allKeep) return blocks;
+    const out = [];
+    let prev = null, blanks = 0;
+    for (const b of blocks) {
+        const k = blockKind(b);
+        if (k === 'empty') { blanks++; continue; }
+        const blk = (k === 'scene' && R.mark) ? { runs: [{ text: R.mark }], align: b.align } : b;
+        if (prev) {
+            const pk = blockKind(prev);
+            const r = (k === 'scene' || pk === 'scene') ? R.scene : (pk === 'd' && k === 'd') ? R.dd : (pk === 'n' && k === 'n') ? R.nn : R.nd;
+            const n = r === 'keep' ? blanks : +r;
+            for (let i = 0; i < n; i++) out.push({ runs: [], align: '' });
+        }
+        out.push(blk);
+        prev = b; blanks = 0;
+    }
+    return out;
+}
+function rulesHtml(R) {
+    const opt = v => ['keep', '0', '1', '2', '3'].map(o => `<option value="${o}" ${String(v) === o ? 'selected' : ''}>${o === 'keep' ? '원고 그대로' : o + '줄'}</option>`).join('');
+    const row = (k, label, hint) => `<div class="rule-row"><span>${label}<small>${hint}</small></span><select data-rule="${k}">${opt(R[k])}</select></div>`;
+    return `<div class="rules">
+        ${row('nn', '지문 ↔ 지문', '서술 문단 사이')}
+        ${row('nd', '지문 ↔ 대사', '서술에서 대사로 넘어갈 때')}
+        ${row('dd', '대사 ↔ 대사', '대화가 이어질 때')}
+        ${row('scene', '장면 전환 앞뒤', '*** 같은 구분 기호 줄')}
+        <div class="rule-row"><span>장면 전환 기호<small>비워 두면 원고에 쓴 기호 그대로</small></span><input type="text" data-rule="mark" value="${esc(R.mark)}" placeholder="예: ***" maxlength="12"></div>
+    </div>`;
+}
+function bindRules(root, onChange) {
+    $$('[data-rule]', root).forEach(el => el.addEventListener(el.tagName === 'INPUT' ? 'input' : 'change', () => {
+        const R = lineRules(); R[el.dataset.rule] = el.value; touch(settings()); onChange && onChange();
+    }));
+}
+
+/* =====================================================================
+   원클릭 복사 (연재처에 붙여넣기용)
+   ===================================================================== */
+function blocksToPlain(blocks) { return blocks.map(blockText).join('\n'); }
+function openCopy(docId) {
+    const ep = get(docId || activeDocId());
+    if (!ep) { toast('열린 회차가 없어요.'); return; }
+    const bg = document.createElement('div'); bg.className = 'modal-bg';
+    bg.innerHTML = `<div class="modal wide"><div style="display:flex;align-items:center;margin-bottom:8px"><h3 style="margin:0;flex:1">📋 복사하기 — ${esc(ep.title)}</h3><button class="mini" data-x="0">✕</button></div>
+        <p class="modal-note">서식 없이 글자만 복사해요. 연재처마다 다른 문단 간격을 규칙으로 맞춰 두면 다음에도 그대로 써요.</p>
+        <div class="copy-grid"><div>${rulesHtml(lineRules())}</div><div><div class="modal-note" style="margin:0 0 4px">미리보기</div><pre class="copy-preview"></pre></div></div>
+        <div class="row2"><span class="copy-count" style="margin-right:auto"></span><button class="btn" data-x="0">닫기</button><button class="btn primary" data-x="copy">복사하기</button></div></div>`;
+    document.body.appendChild(bg);
+    const result = () => blocksToPlain(applyLineRules(toBlocks(ep.body), lineRules()));
+    const refresh = () => {
+        const txt = result();
+        $('.copy-preview', bg).textContent = txt;
+        const c = countChars(txt);
+        $('.copy-count', bg).textContent = `공백 포함 ${fmt(c.all)}자 · 공백 제외 ${fmt(c.noSpace)}자`;
+    };
+    bindRules(bg, refresh); refresh();
+    bg.addEventListener('click', e => {
+        const x = e.target.closest('[data-x]')?.dataset.x;
+        if (e.target === bg || x === '0') { bg.remove(); return; }
+        if (x === 'copy') { copyText(result(), `'${ep.title}'을(를)`); bg.remove(); }
+    });
+}
+
+/* =====================================================================
+   ZIP (압축 없이 묶기) · 읽기
+   ===================================================================== */
+const CRC_T = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(u8) { let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = CRC_T[(c ^ u8[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+function makeZip(files) {
+    const enc = new TextEncoder(), parts = [], central = [];
+    let offset = 0;
+    const d = new Date();
+    const dt = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+    const tm = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1);
+    for (const f of files) {
+        const name = enc.encode(f.name);
+        const data = typeof f.data === 'string' ? enc.encode(f.data) : f.data;
+        const crc = crc32(data);
+        const lh = new DataView(new ArrayBuffer(30));
+        lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true); lh.setUint16(8, 0, true);
+        lh.setUint16(10, tm, true); lh.setUint16(12, dt, true); lh.setUint32(14, crc, true);
+        lh.setUint32(18, data.length, true); lh.setUint32(22, data.length, true); lh.setUint16(26, name.length, true); lh.setUint16(28, 0, true);
+        parts.push(new Uint8Array(lh.buffer), name, data);
+        const ch = new DataView(new ArrayBuffer(46));
+        ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true); ch.setUint16(10, 0, true);
+        ch.setUint16(12, tm, true); ch.setUint16(14, dt, true); ch.setUint32(16, crc, true);
+        ch.setUint32(20, data.length, true); ch.setUint32(24, data.length, true); ch.setUint16(28, name.length, true);
+        ch.setUint32(42, offset, true);
+        central.push(new Uint8Array(ch.buffer), name);
+        offset += 30 + name.length + data.length;
+    }
+    const cdSize = central.reduce((a, b) => a + b.length, 0);
+    const end = new DataView(new ArrayBuffer(22));
+    end.setUint32(0, 0x06054b50, true); end.setUint16(8, files.length, true); end.setUint16(10, files.length, true);
+    end.setUint32(12, cdSize, true); end.setUint32(16, offset, true);
+    return new Blob([...parts, ...central, new Uint8Array(end.buffer)], { type: 'application/zip' });
+}
+async function readZip(buf) {
+    const u8 = new Uint8Array(buf), dv = new DataView(buf);
+    let e = u8.length - 22;
+    while (e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--;
+    if (e < 0) throw new Error('ZIP 파일이 아니에요.');
+    const count = dv.getUint16(e + 10, true);
+    let p = dv.getUint32(e + 16, true);
+    const out = {}, dec = new TextDecoder();
+    for (let i = 0; i < count; i++) {
+        const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true);
+        const nlen = dv.getUint16(p + 28, true), xlen = dv.getUint16(p + 30, true), clen = dv.getUint16(p + 32, true);
+        const loc = dv.getUint32(p + 42, true);
+        const name = dec.decode(u8.subarray(p + 46, p + 46 + nlen));
+        const start = loc + 30 + dv.getUint16(loc + 26, true) + dv.getUint16(loc + 28, true);
+        let data = u8.subarray(start, start + csize);
+        if (method === 8) {
+            if (!window.DecompressionStream) throw new Error('이 브라우저에서는 압축된 ZIP을 읽을 수 없어요.');
+            data = new Uint8Array(await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
+        }
+        out[name] = data;
+        p += 46 + nlen + xlen + clen;
+    }
+    return out;
+}
+function dataUrlBytes(url) {
+    const [head, b64] = url.split(',');
+    const bin = atob(b64), u8 = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    return { bytes: u8, mime: (head.match(/data:([^;]+)/) || [])[1] || 'image/jpeg' };
+}
+const safeName = s => String(s || '제목 없음').replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').trim().slice(0, 80) || '제목 없음';
+const xe = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* =====================================================================
+   형식별 만들기
+   docs = [{ title, blocks }]
+   ===================================================================== */
+function exportFont() {
+    const S = settings();
+    return S.font === 'gothic' ? '맑은 고딕' : S.font === 'custom' && S.customFont ? S.customFont : '바탕';
+}
+function runHtml(r, imgSrc) {
+    if (r.img) { const src = imgSrc(r.img); return src ? `<img src="${xe(src)}" alt=""${r.width ? ` style="width:${xe(r.width)}"` : ''}/>` : '[이미지]'; }
+    let h = xe(r.text);
+    if (r.b) h = `<b>${h}</b>`;
+    if (r.i) h = `<i>${h}</i>`;
+    if (r.u) h = `<u>${h}</u>`;
+    if (r.s) h = `<s>${h}</s>`;
+    const st = [r.color ? `color:${r.color}` : '', r.bg ? `background-color:${r.bg}` : ''].filter(Boolean).join(';');
+    return st ? `<span style="${st}">${h}</span>` : h;
+}
+function blocksHtml(blocks, imgSrc) {
+    return blocks.map(b => {
+        const inner = b.runs.map(r => runHtml(r, imgSrc)).join('');
+        const al = b.align && b.align !== 'left' && b.align !== 'start' ? ` style="text-align:${xe(b.align)}"` : '';
+        return inner.trim() ? `<p${al}>${inner}</p>` : '<p class="blank">&#160;</p>';
+    }).join('\n');
+}
+function makeHtmlDoc(title, docs, withTitles) {
+    const S = settings();
+    const imgSrc = id => items[id]?.data || '';
+    const body = docs.map((d, i) => `<section${i ? ' class="pb"' : ''}>${withTitles ? `<h2>${xe(d.title)}</h2>` : ''}\n${blocksHtml(d.blocks, imgSrc)}</section>`).join('\n');
+    return `<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8"><title>${xe(title)}</title>
+<style>
+body { font-family: '${xe(exportFont())}', 'Nanum Myeongjo', serif; font-size: ${S.size}px; line-height: ${S.lh}; max-width: ${S.width}px; margin: 40px auto; padding: 0 20px; color: #222; }
+p { margin: 0 0 ${S.gap}em; text-indent: ${S.indent}em; white-space: pre-wrap; }
+p.blank { text-indent: 0; }
+h2 { font-size: 1.3em; margin: 0 0 1.5em; }
+img { max-width: 100%; }
+@media print { body { margin: 0; max-width: none; } .pb { break-before: page; } }
+</style></head><body>
+${body}
+</body></html>`;
+}
+function makeTxt(docs, withTitles) {
+    return docs.map(d => (withTitles ? d.title + '\r\n\r\n' : '') + d.blocks.map(b => b.runs.map(r => r.img ? '[이미지]' : r.text).join('')).join('\r\n')).join('\r\n\r\n\r\n');
+}
+function makeMd(docs, withTitles) {
+    const mdRun = r => {
+        if (r.img) return '[이미지]';
+        let t = r.text; if (!t.trim()) return t;
+        if (r.b) t = `**${t}**`;
+        if (r.i) t = `*${t}*`;
+        if (r.s) t = `~~${t}~~`;
+        if (r.u) t = `<u>${t}</u>`;
+        if (r.bg) t = `==${t}==`;
+        return t;
+    };
+    return docs.map(d => (withTitles ? `# ${d.title}\n\n` : '') + d.blocks.map(b => b.runs.map(mdRun).join('')).join('\n')).join('\n\n---\n\n') + '\n';
+}
+function makeRtf(docs, withTitles) {
+    const S = settings();
+    const colors = [];
+    const ci = c => { if (!c) return 0; let i = colors.indexOf(c); if (i < 0) { colors.push(c); i = colors.length - 1; } return i + 1; };
+    const re = s => {
+        let o = '';
+        for (const ch of s) {
+            const code = ch.charCodeAt(0);
+            if (ch === '\\' || ch === '{' || ch === '}') o += '\\' + ch;
+            else if (ch.length > 1 || code > 127) { for (let k = 0; k < ch.length; k++) { let u = ch.charCodeAt(k); if (u > 32767) u -= 65536; o += `\\u${u}?`; } }
+            else o += ch;
+        }
+        return o;
+    };
+    const line = Math.round(240 * Math.max(1, S.lh * 0.85)), fi = Math.round(S.indent * S.size * 0.75 * 20);
+    const al = a => a === 'center' ? '\\qc' : a === 'right' ? '\\qr' : a === 'justify' ? '\\qj' : '\\ql';
+    let body = '';
+    docs.forEach((d, di) => {
+        if (di) body += '\\page\n';
+        if (withTitles) body += `\\pard\\sl${line}\\slmult1\\fi0\\ql{\\b\\fs28 ${re(d.title)}}\\par\\pard\\sl${line}\\slmult1\\par\n`;
+        d.blocks.forEach(b => {
+            body += `\\pard\\sl${line}\\slmult1\\fi${blockText(b).trim() ? fi : 0}${al(b.align)} `;
+            b.runs.forEach(r => {
+                if (r.img) { body += re('[이미지]'); return; }
+                const f = (r.b ? '\\b' : '') + (r.i ? '\\i' : '') + (r.u ? '\\ul' : '') + (r.s ? '\\strike' : '') + (r.color ? `\\cf${ci(r.color)}` : '') + (r.bg ? `\\chcbpat${ci(r.bg)}\\highlight${ci(r.bg)}` : '');
+                body += f ? `{${f} ${re(r.text)}}` : re(r.text);
+            });
+            body += '\\par\n';
+        });
+    });
+    const ct = colors.map(c => `\\red${parseInt(c.slice(1, 3), 16)}\\green${parseInt(c.slice(3, 5), 16)}\\blue${parseInt(c.slice(5, 7), 16)};`).join('');
+    const rtfFont = { '바탕': 'Batang', '맑은 고딕': 'Malgun Gothic' }[exportFont()] || exportFont();
+    return `{\\rtf1\\ansi\\ansicpg949\\deff0{\\fonttbl{\\f0\\fnil\\fcharset129 ${re(rtfFont)};}}{\\colortbl ;${ct}}\n\\paperw11906\\paperh16838\\margl1440\\margr1440\\margt1701\\margb1440\\f0\\fs${Math.round(S.size * 0.75 * 2)}\n${body}}`;
+}
+function makeDocx(docs, withTitles) {
+    const S = settings(), font = xe(exportFont());
+    const sz = Math.round(S.size * 0.75 * 2);
+    const line = Math.round(240 * Math.max(1, S.lh * 0.85));
+    const fi = Math.round(S.indent * S.size * 0.75 * 20);
+    const run = r => {
+        if (r.img) return '<w:r><w:t>[이미지]</w:t></w:r>';
+        let pr = '';
+        if (r.b) pr += '<w:b/><w:bCs/>';
+        if (r.i) pr += '<w:i/><w:iCs/>';
+        if (r.s) pr += '<w:strike/>';
+        if (r.color) pr += `<w:color w:val="${r.color.slice(1).toUpperCase()}"/>`;
+        if (r.u) pr += '<w:u w:val="single"/>';
+        if (r.bg) pr += `<w:shd w:val="clear" w:color="auto" w:fill="${r.bg.slice(1).toUpperCase()}"/>`;
+        return `<w:r>${pr ? `<w:rPr>${pr}</w:rPr>` : ''}<w:t xml:space="preserve">${xe(r.text)}</w:t></w:r>`;
+    };
+    const jc = a => a === 'center' ? 'center' : a === 'right' ? 'right' : a === 'justify' ? 'both' : '';
+    let body = '';
+    docs.forEach((d, di) => {
+        if (di) body += '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
+        if (withTitles) body += `<w:p><w:pPr><w:spacing w:after="${line}"/><w:ind w:firstLine="0"/></w:pPr><w:r><w:rPr><w:b/><w:bCs/><w:sz w:val="${sz + 8}"/><w:szCs w:val="${sz + 8}"/></w:rPr><w:t xml:space="preserve">${xe(d.title)}</w:t></w:r></w:p>`;
+        d.blocks.forEach(b => {
+            const j = jc(b.align);
+            const empty = !blockText(b).trim() && !b.runs.some(r => r.img);
+            const ppr = (empty ? '<w:ind w:firstLine="0"/>' : '') + (j ? `<w:jc w:val="${j}"/>` : '');
+            body += `<w:p>${ppr ? `<w:pPr>${ppr}</w:pPr>` : ''}${b.runs.map(run).join('')}</w:p>`;
+        });
+    });
+    const W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
+    const files = [
+        { name: '[Content_Types].xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>` },
+        { name: '_rels/.rels', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>` },
+        { name: 'word/_rels/document.xml.rels', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>` },
+        { name: 'word/styles.xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles ${W}><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="${font}" w:hAnsi="${font}" w:eastAsia="${font}" w:cs="${font}"/><w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/><w:lang w:val="ko-KR" w:eastAsia="ko-KR"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="0" w:line="${line}" w:lineRule="auto"/>${fi ? `<w:ind w:firstLine="${fi}"/>` : ''}</w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style></w:styles>` },
+        { name: 'word/document.xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document ${W}><w:body>${body}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1701" w:right="1440" w:bottom="1440" w:left="1440" w:header="851" w:footer="992" w:gutter="0"/></w:sectPr></w:body></w:document>` }
+    ];
+    return makeZip(files);
+}
+function makeEpub(title, docs, withTitles) {
+    const uuid = 'urn:uuid:' + (crypto.randomUUID ? crypto.randomUUID() : uid('b'));
+    const modified = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+    const imgs = new Map();
+    const imgSrc = id => {
+        const it = items[id]; if (!it || !it.data) return '';
+        if (!imgs.has(id)) { const { bytes, mime } = dataUrlBytes(it.data); imgs.set(id, { bytes, mime, file: `images/${id}.${mime === 'image/png' ? 'png' : 'jpg'}` }); }
+        return imgs.get(id).file;
+    };
+    const chapters = docs.map((d, i) => ({
+        file: `ch${String(i + 1).padStart(3, '0')}.xhtml`, title: d.title,
+        xhtml: `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="ko" lang="ko"><head><meta charset="UTF-8"/><title>${xe(d.title)}</title><link rel="stylesheet" type="text/css" href="style.css"/></head>
+<body>${withTitles ? `<h2>${xe(d.title)}</h2>` : ''}
+${blocksHtml(d.blocks, imgSrc)}
+</body></html>`
+    }));
+    const S = settings();
+    const files = [
+        { name: 'mimetype', data: 'application/epub+zip' },
+        { name: 'META-INF/container.xml', data: `<?xml version="1.0" encoding="UTF-8"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>` },
+        { name: 'OEBPS/style.css', data: `body { font-family: serif; line-height: ${S.lh}; }\np { margin: 0 0 ${S.gap}em; text-indent: ${S.indent}em; }\np.blank { text-indent: 0; }\nh2 { font-size: 1.3em; margin: 1em 0 1.5em; }\nimg { max-width: 100%; }\n` },
+        { name: 'OEBPS/nav.xhtml', data: `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="ko" lang="ko"><head><meta charset="UTF-8"/><title>차례</title></head>
+<body><nav epub:type="toc" id="toc"><h1>차례</h1><ol>${chapters.map(c => `<li><a href="${c.file}">${xe(c.title)}</a></li>`).join('')}</ol></nav></body></html>` },
+        { name: 'OEBPS/toc.ncx', data: `<?xml version="1.0" encoding="UTF-8"?>
+<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><head><meta name="dtb:uid" content="${uuid}"/></head><docTitle><text>${xe(title)}</text></docTitle><navMap>${chapters.map((c, i) => `<navPoint id="np${i + 1}" playOrder="${i + 1}"><navLabel><text>${xe(c.title)}</text></navLabel><content src="${c.file}"/></navPoint>`).join('')}</navMap></ncx>` },
+        ...chapters.map(c => ({ name: 'OEBPS/' + c.file, data: c.xhtml }))
+    ];
+    imgs.forEach(v => files.push({ name: 'OEBPS/' + v.file, data: v.bytes }));
+    files.push({ name: 'OEBPS/content.opf', data: `<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid" xml:lang="ko"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="bookid">${uuid}</dc:identifier><dc:title>${xe(title)}</dc:title><dc:language>ko</dc:language><meta property="dcterms:modified">${modified}</meta></metadata>
+<manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/><item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/><item id="css" href="style.css" media-type="text/css"/>${chapters.map((c, i) => `<item id="c${i + 1}" href="${c.file}" media-type="application/xhtml+xml"/>`).join('')}${[...imgs.values()].map((v, i) => `<item id="img${i + 1}" href="${v.file}" media-type="${v.mime}"/>`).join('')}</manifest>
+<spine toc="ncx">${chapters.map((c, i) => `<itemref idref="c${i + 1}"/>`).join('')}</spine></package>` });
+    return makeZip(files);
+}
+function printHtml(html) {
+    const fr = document.createElement('iframe');
+    fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+    document.body.appendChild(fr);
+    fr.contentDocument.open(); fr.contentDocument.write(html); fr.contentDocument.close();
+    setTimeout(() => { try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch (e) { toast('인쇄 창을 열지 못했어요.'); } setTimeout(() => fr.remove(), 60000); }, 400);
+}
+
+/* =====================================================================
+   내보내기 창
+   ===================================================================== */
+const IN_PREVIEW = !!(window.claude && window.claude.use);
+const FORMATS = [
+    { k: 'docx', name: '워드 문서', ext: '.docx', desc: '한컴 한글에서도 열리고, 한글에서 다른 이름으로 저장하면 HWP로 바꿀 수 있어요. 출판사 투고·공모전 제출에 추천해요.' },
+    { k: 'epub', name: '전자책', ext: '.epub', desc: '전자책 뷰어(리디, 구글 플레이 북 등)에서 독자처럼 읽어 볼 때 써요. 원고 속 사진도 들어가요.' },
+    { k: 'txt', name: '텍스트', ext: '.txt', desc: '글자만 담아요. 연재처 업로드나 다른 프로그램으로 옮길 때 써요.' },
+    { k: 'rtf', name: '서식 텍스트', ext: '.rtf', desc: '굵게·형광펜 같은 서식을 담은 범용 문서예요. 대부분의 워드프로세서에서 열려요.' },
+    { k: 'html', name: '웹 문서', ext: '.html', desc: '브라우저로 열어 보는 문서예요. 사진과 서식이 그대로 들어가요.' },
+    { k: 'md', name: '마크다운', ext: '.md', desc: '노션·옵시디언 같은 메모 앱으로 옮길 때 써요. 형광펜은 ==이렇게== 표시돼요.' },
+    { k: 'pdf', name: 'PDF 인쇄', ext: '인쇄', desc: '인쇄 창이 열려요. 프린터에서 "PDF로 저장"을 고르면 PDF 파일이 돼요.' }
+];
+function docsForScope(scope) {
+    const W = WL(), cur = get(W.panes[W.activeEditor].active);
+    if (scope === 'current') return cur ? [cur] : [];
+    if (scope === 'folder') {
+        if (!cur) return [];
+        const out = [];
+        const walk = pid => children(pid).forEach(c => c.kind === 'folder' ? walk(c.id) : out.push(c));
+        walk(cur.parentId || null);
+        return cur.parentId ? out : out.filter(d => !isRefDoc(d));
+    }
+    return flatDocs().filter(d => !isRefDoc(d));
+}
+function openExport() {
+    const S = settings();
+    const W = WL(), cur = get(W.panes[W.activeEditor].active);
+    let fmtK = S.exportFmt || 'docx';
+    if (IN_PREVIEW && fmtK === 'pdf') fmtK = 'docx';
+    let scope = cur ? 'current' : 'work';
+    const bg = document.createElement('div'); bg.className = 'modal-bg';
+    document.body.appendChild(bg);
+    const folderName = cur && cur.parentId ? get(cur.parentId)?.title : null;
+    const render = () => {
+        const f = FORMATS.find(x => x.k === fmtK);
+        const n = docsForScope(scope).length;
+        bg.innerHTML = `<div class="modal wide"><div style="display:flex;align-items:center;margin-bottom:10px"><h3 style="margin:0;flex:1">내보내기${cur ? ' — ' + esc(cur.title) : ''}</h3><button class="mini" data-x="0">✕</button></div>
+            <div class="fmt-grid">${FORMATS.filter(x => !(IN_PREVIEW && x.k === 'pdf')).map(x => `<button class="fmt ${x.k === fmtK ? 'on' : ''}" data-fmt="${x.k}"><b>${x.name}</b><small>${x.ext}</small></button>`).join('')}</div>
+            <p class="modal-note">${f.desc}</p>
+            <label>범위</label>
+            <select data-scope>
+                <option value="current" ${scope === 'current' ? 'selected' : ''} ${cur ? '' : 'disabled'}>지금 회차${cur ? ' (' + esc(cur.title) + ')' : ''}</option>
+                <option value="folder" ${scope === 'folder' ? 'selected' : ''} ${cur ? '' : 'disabled'}>같은 폴더 전체${folderName ? ' (' + esc(folderName) + ')' : ''}</option>
+                <option value="work" ${scope === 'work' ? 'selected' : ''}>작품 전체 (자료 폴더 빼고)</option>
+            </select>
+            <label class="check"><input type="checkbox" data-titles ${S.exportTitles !== false ? 'checked' : ''}> 회차 제목 넣기</label>
+            <label>문단 간격 (지문·대사 사이 빈 줄)</label>
+            ${rulesHtml(lineRules())}
+            ${fmtK === 'rtf' && IN_PREVIEW ? '<p class="modal-note warn">이 미리보기 화면에서는 .rtf 저장이 막혀 있어요. GitHub 주소로 열면 저장돼요.</p>' : ''}
+            <div class="row2"><span class="modal-note" style="margin:0 auto 0 0">${n}편</span><button class="btn" data-x="0">취소</button><button class="btn primary" data-x="go" ${n ? '' : 'disabled'}>${fmtK === 'pdf' ? '인쇄 창 열기' : '내보내기'}</button></div></div>`;
+        bindRules(bg);
+        $('[data-scope]', bg).addEventListener('change', e => { scope = e.target.value; render(); });
+        $('[data-titles]', bg).addEventListener('change', e => { S.exportTitles = e.target.checked; touch(S); });
+    };
+    render();
+    bg.addEventListener('click', async e => {
+        const fb = e.target.closest('[data-fmt]');
+        if (fb) { fmtK = fb.dataset.fmt; S.exportFmt = fmtK; touch(S); render(); return; }
+        const x = e.target.closest('[data-x]')?.dataset.x;
+        if (e.target === bg || x === '0') { bg.remove(); return; }
+        if (x !== 'go') return;
+        const list = docsForScope(scope);
+        if (!list.length) return;
+        const R = lineRules(), withTitles = S.exportTitles !== false;
+        const docs = list.map(d => ({ title: d.title, blocks: applyLineRules(toBlocks(d.body), R) }));
+        const w = get(curWorkId());
+        const base = safeName(scope === 'current' ? `${w.title}_${list[0].title}` : scope === 'folder' && folderName ? `${w.title}_${folderName}` : w.title);
+        const bookTitle = scope === 'current' ? list[0].title : w.title;
+        bg.remove();
+        if (fmtK === 'docx') download(base + '.docx', makeDocx(docs, withTitles));
+        if (fmtK === 'epub') download(base + '.epub', makeEpub(bookTitle, docs, withTitles));
+        if (fmtK === 'txt') download(base + '.txt', makeTxt(docs, withTitles), 'text/plain');
+        if (fmtK === 'rtf') download(base + '.rtf', makeRtf(docs, withTitles), 'application/rtf');
+        if (fmtK === 'html') download(base + '.html', makeHtmlDoc(bookTitle, docs, withTitles), 'text/html');
+        if (fmtK === 'md') download(base + '.md', makeMd(docs, withTitles), 'text/markdown');
+        if (fmtK === 'pdf') printHtml(makeHtmlDoc(bookTitle, docs, withTitles));
+    });
+}
+
+/* =====================================================================
+   작품 ZIP 백업: 폴더 구조 그대로 + 원고는 .md + 다시 불러올 수 있는 데이터
+   ===================================================================== */
+function exportWorkZip() {
+    const w = get(curWorkId());
+    const root = safeName(w.title) + '/';
+    const files = [];
+    const pad = (i, n) => String(i + 1).padStart(String(n).length < 2 ? 2 : String(n).length, '0');
+    const docMd = d => `# ${d.title}\n\n` + makeMd([{ title: d.title, blocks: toBlocks(d.body) }], false);
+    const walk = (pid, path) => {
+        const list = children(pid);
+        list.forEach((c, i) => {
+            const name = `${pad(i, list.length)} ${safeName(c.title)}`;
+            if (c.kind === 'folder') walk(c.id, path + name + '/');
+            else files.push({ name: path + name + '.md', data: docMd(c) });
+        });
+    };
+    walk(null, root);
+    const trash = Object.values(items).filter(i => i.kind === 'episode' && live(i) && i.workId === w.id && inTrash(i));
+    trash.forEach(d => files.push({ name: `${root}_휴지통/${safeName(d.title)}.md`, data: docMd(d) }));
+    ofWork('synop').forEach((s, i, a) => files.push({ name: `${root}_시놉시스/${pad(i, a.length)} ${safeName(s.title)}.md`, data: `# ${s.title}\n\n${s.body || ''}\n` }));
+    const fn = get('free_' + w.id);
+    if (fn && fn.body) files.push({ name: `${root}_프리노트.md`, data: `# 프리 노트\n\n${fn.body}\n` });
+    const notes = ofWork('note');
+    if (notes.length) {
+        const byDoc = {};
+        notes.forEach(n => { (byDoc[n.docId || ''] ||= []).push(n); });
+        files.push({ name: `${root}_메모보드.md`, data: '# 메모 보드\n\n' + Object.entries(byDoc).map(([d, list]) => `## ${d ? (get(d)?.title || '지운 회차') : '작품 공통'}\n\n` + list.map(n => `- ${(n.img ? '[사진] ' : '') + (n.body || '').replace(/\n/g, '\n  ')}`).join('\n')).join('\n\n') + '\n' });
+    }
+    // 다시 불러오기용 전체 데이터 (사진·보드 위치·화면 배치 포함)
+    const own = {};
+    Object.values(items).forEach(i => { if (i.workId === w.id || i.id === w.id) own[i.id] = i; });
+    files.push({ name: `${root}_집필실데이터.json`, data: JSON.stringify({ app: 'novel-writer', version: 3, workId: w.id, layout: layout().works[w.id] || null, items: own }) });
+    download(safeName(w.title) + '.zip', makeZip(files));
+}
+async function importBackupFile(f) {
+    let data;
+    const buf = await f.arrayBuffer();
+    const u8 = new Uint8Array(buf);
+    if (u8[0] === 0x50 && u8[1] === 0x4b) {
+        const zip = await readZip(buf);
+        const key = Object.keys(zip).find(k => k.endsWith('_집필실데이터.json'));
+        if (!key) throw new Error('집필실에서 만든 작품 ZIP이 아니에요.');
+        data = JSON.parse(new TextDecoder().decode(zip[key]));
+    } else data = JSON.parse(new TextDecoder().decode(u8));
+    if (data.app !== 'novel-writer' || !data.items) throw new Error('집필실 백업 파일이 아니에요.');
+    return data;
+}
+
+$('#btn-export').addEventListener('click', openExport);
 
 /* ---------- 시작 ---------- */
 (async () => {

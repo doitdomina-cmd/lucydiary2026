@@ -426,6 +426,46 @@ kbd { font: 12px/1.4 ui-monospace, monospace; background: var(--panel2); border:
 .selbar.in-synop [data-fold] { display: none; }
 .sq-box { background: var(--accent-soft); border-radius: 10px; padding: 10px 12px; }
 .sq-box label.check { margin-top: 0; }
+/* 작품 기획 */
+.plan-view { flex: 1; min-height: 0; overflow-y: auto; background: var(--paper); }
+.plan { max-width: 860px; margin: 0 auto; padding: 22px 24px 60px; }
+.plan-hero { display: flex; flex-direction: column; gap: 4px; margin-bottom: 18px; }
+.plan-kicker { font-size: 12px; color: var(--accent); font-weight: 700; letter-spacing: .04em; }
+.plan-title { border: 0; outline: none; background: transparent; font: 700 26px/1.3 'Nanum Myeongjo', serif; color: var(--text); padding: 2px 0; border-bottom: 2px solid var(--line); }
+.plan-title:focus { border-bottom-color: var(--accent); }
+.plan-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+.plan-sec { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
+.plan-sec.wide { grid-column: 1 / -1; }
+@media (max-width: 900px) { .plan-grid { grid-template-columns: minmax(0, 1fr); } }
+.pl-label { font-size: 12px; font-weight: 700; color: var(--muted); margin-top: 6px; }
+.pl-label:first-child { margin-top: 0; }
+.pl-label small { font-weight: 400; }
+.pl-label-row { display: flex; align-items: center; justify-content: space-between; }
+.pl-input { width: 100%; border: 1px solid var(--line); border-radius: 8px; background: var(--panel2); padding: 7px 10px; outline: none; font-size: 13px; line-height: 1.65; resize: vertical; }
+.pl-input:focus { border-color: var(--accent); background: var(--panel); }
+.pl-two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.genre-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.pc-list { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.pc { border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--panel2); display: flex; flex-direction: column; gap: 4px; }
+.pc-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pc input, .pc textarea, .pc select { border: 0; outline: none; background: transparent; font-size: 13px; }
+.pc-name { font-weight: 700; font-size: 15px !important; width: 140px; }
+.pc-age { flex: 1; min-width: 100px; color: var(--muted); }
+.pc select { color: var(--accent); font-weight: 700; padding: 0; }
+.pc-tools { display: flex; gap: 1px; margin-left: auto; }
+.pc-line { width: 100%; }
+.pc-desc { width: 100%; resize: none; overflow: hidden; color: var(--muted); line-height: 1.6; }
+.row.plan-row .r-title { font-weight: 700; }
+/* 회차 개요 칸 */
+.ed-main { flex: 1; min-height: 0; display: flex; }
+.ed-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.outline { width: 230px; flex: none; display: flex; flex-direction: column; border-left: 1px solid var(--line); background: var(--panel2); }
+.ol-head { display: flex; align-items: center; gap: 4px; padding: 6px 8px 4px 10px; font-size: 12px; color: var(--muted); }
+.ol-head b { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 120px; }
+.outline textarea { flex: 1; border: 0; outline: none; resize: none; background: transparent; padding: 4px 12px; font-size: 13px; line-height: 1.7; min-height: 120px; }
+.ol-note { font-size: 10px; color: var(--muted); padding: 4px 10px 8px; opacity: .8; }
+.editor-grid.n3 .outline, .editor-grid.n4 .outline { width: 170px; }
+@media (max-width: 760px) { .ed-main { flex-direction: column; } .outline { width: auto !important; border-left: 0; border-bottom: 1px solid var(--line); order: -1; max-height: 34vh; } .outline textarea { min-height: 70px; } }
 .crop-stage { position: relative; display: flex; justify-content: center; background: var(--panel2); border-radius: 8px; padding: 8px; }
 .crop-stage canvas { max-width: 100%; touch-action: none; cursor: crosshair; }
 
@@ -870,7 +910,7 @@ function isRefDoc(it) {
     for (let p = get(it.parentId), guard = 0; p && guard < 50; p = get(p.parentId), guard++) if (p.ref) return true;
     return false;
 }
-const openable = it => it && it.kind === 'episode' && live(it) && !inTrash(it) && it.workId === curWorkId();
+const openable = it => it && live(it) && it.workId === curWorkId() && ((it.kind === 'episode' && !inTrash(it)) || it.kind === 'plan');
 function flatDocs(parentId = null, out = []) {
     children(parentId).forEach(c => { if (c.kind === 'folder') flatDocs(c.id, out); else out.push(c); });
     return out;
@@ -935,7 +975,8 @@ function ensureSeed() {
         create('note', { workId: w.id, docId: e1.id, color: '#fff3a8', body: '이 회차 메모를 포스트잇으로 붙여 두세요.\n머리 부분을 끌면 옮겨져요.', x: 14, y: 14, w: 170 });
         create('note', { workId: w.id, docId: null, color: '#b9fbc0', body: '작품 공통 메모는 모든 회차 보드에 보여요.', x: 40, y: 150, w: 170 });
         const L = layout(); L.workId = w.id;
-        setWL(W => { W.synopPanes = [s1.id, s2.id]; W.panes[0].tabs = [e1.id]; W.panes[0].active = e1.id; });
+        const pl = ensurePlan(w.id);
+        setWL(W => { W.synopPanes = [s1.id, s2.id]; W.panes[0].tabs = [pl.id, e1.id]; W.panes[0].active = pl.id; });
     }
     if (!get(curWorkId())) { layout().workId = works()[0].id; touch(layout()); }
 }
@@ -1033,6 +1074,7 @@ function renderTree() {
     const syn = ofWork('synop');
     const openSy = new Set(W.synopPanes.slice(0, W.synopN));
     $('#tree').innerHTML = `
+        <div class="row plan-row ${open.has(planId()) ? 'open' : ''}" data-plan="1" style="padding-left:4px"><span class="caret"></span><span class="ico">📘</span><span class="r-title">작품 기획</span><span class="r-meta">로그라인 · 인물</span></div>
         <div class="tree-sec">원고 · 자료</div>
         ${rows.join('') || '<div class="pane-empty">＋문서 로 첫 회차를 만들어 보세요</div>'}
         <div class="tree-sec">시놉 문서<span class="spacer"></span><button data-a="new-synop">＋</button></div>
@@ -1103,23 +1145,29 @@ function renderEditors() {
         html += `<div class="epane ${i === W.activeEditor ? 'active' : ''}" data-pane="${i}">
             <div class="pane-head">${head}
                 <button class="mini ${p.single ? 'on' : ''}" data-a="single" title="${p.single ? '탭 모드로 전환' : '한 회차만 보기로 전환'}">${p.single ? '▭' : '⧉'}</button>
-                ${it ? `<button class="mini" data-a="history" title="버전 기록">🕘</button>` : ''}
-                ${it ? `<button class="mini ${it.locked ? 'on' : ''}" data-a="lock" title="${it.locked ? '잠금 해제' : '잠금 (편집 막기)'}">${it.locked ? '🔒' : '🔓'}</button>` : ''}
+                ${it && it.kind === 'episode' ? `<button class="mini ${W.hideOutline ? '' : 'on'}" data-a="outline" title="회차 개요 칸 보이기/숨기기">📝</button>` : ''}
+                ${it && it.kind === 'episode' ? `<button class="mini" data-a="history" title="버전 기록">🕘</button>` : ''}
+                ${it && it.kind === 'episode' ? `<button class="mini ${it.locked ? 'on' : ''}" data-a="lock" title="${it.locked ? '잠금 해제' : '잠금 (편집 막기)'}">${it.locked ? '🔒' : '🔓'}</button>` : ''}
                 ${W.editorN > 1 ? '<button class="mini" data-a="close-pane" title="이 분할 창 닫기">✕</button>' : ''}
             </div>
-            ${it ? `<div class="crumb">${esc([get(curWorkId())?.title, ...pathOf(it), it.title].filter(Boolean).join(' › '))}${it.locked ? '<span class="lock-badge">· 잠김</span>' : ''}</div>
+            ${it && it.kind === 'plan' ? `<div class="plan-view" data-plan-id="${it.id}">${planHtml(it)}</div>` : ''}
+            ${it && it.kind === 'episode' ? `<div class="crumb">${esc([get(curWorkId())?.title, ...pathOf(it), it.title].filter(Boolean).join(' › '))}${it.locked ? '<span class="lock-badge">· 잠김</span>' : ''}</div>
+                <div class="ed-main"><div class="ed-col">
                 ${p.pageView ? '<div class="page-view"></div>' : `<div class="ed-wrap" data-scroll="${it.id}">${editorHtml(it)}</div>`}
                 ${ref ? `<div class="ref-box"><div class="ref-head">📎 참고창 <b>${esc(ref.title)}</b><button class="mini" data-a="ref-swap" title="참고창과 본문 바꾸기">⇅</button><button class="mini" data-a="close-ref" title="참고창 닫기">✕</button></div>
                     <div class="ed-wrap">${editorHtml(ref, 'ref')}</div></div>` : ''}
-                <div class="epane-foot" data-foot="${it.id}"></div>`
-                 : '<div class="pane-empty">바인더에서 문서를 눌러 열어 주세요<br>(⋯ 메뉴 → 옆 분할에 열기 / 참고창으로 열기)</div>'}
+                </div>${W.hideOutline ? '' : outlineHtml(it)}</div>
+                <div class="epane-foot" data-foot="${it.id}"></div>` : ''}
+            ${!it ? 
+'<div class="pane-empty">바인더에서 문서를 눌러 열어 주세요<br>(⋯ 메뉴 → 옆 분할에 열기 / 참고창으로 열기)</div>' : ''}
         </div>`;
     }
     grid.innerHTML = html;
     fillImages(grid);
     $$('.manuscript', grid).forEach(decorateFolds);
-    for (let i = 0; i < W.editorN; i++) { const it = get(W.panes[i].active); if (it) renderFoot(it); }
-    for (let i = 0; i < W.editorN; i++) { const p = W.panes[i], it = get(p.active); if (p.pageView && it) renderPageView($(`.epane[data-pane="${i}"]`, grid), it); }
+    for (let i = 0; i < W.editorN; i++) { const it = get(W.panes[i].active); if (it && it.kind === 'episode') renderFoot(it); }
+    $$('.plan-view textarea, .pc-desc', grid).forEach(autoGrow);
+    for (let i = 0; i < W.editorN; i++) { const p = W.panes[i], it = get(p.active); if (p.pageView && it && it.kind === 'episode') renderPageView($(`.epane[data-pane="${i}"]`, grid), it); }
     restoreScroll();
 }
 // 같은 기기 안에서 탭을 오갈 때 스크롤 위치 유지
@@ -1599,6 +1647,7 @@ $('#tree').addEventListener('click', async e => {
         if (a === 'purge' && await confirmBox(`'${it.title}'을(를) 완전히 삭제할까요? 되돌릴 수 없어요.`, '완전히 삭제')) { purgeItem(it); renderAll(); }
         return;
     }
+    if (e.target.closest('.row[data-plan]')) { openDoc(ensurePlan().id); return; }
     const row = e.target.closest('.row[data-id]'); if (!row) return;
     const it = get(row.dataset.id); if (!it) return;
     if (a === 'more') { rowMenu(e.target, it); return; }
@@ -1688,6 +1737,7 @@ $('#editor-grid').addEventListener('click', async e => {
     }
     if (a === 'copy') { openCopy(p.active); return; }
     if (a === 'history') { openHistory(p.active); return; }
+    if (a === 'outline') { setWL(W => { W.hideOutline = !W.hideOutline; }); renderEditors(); return; }
     if (a === 'spell') { openSpell(p.active); return; }
     if (a === 'mobile') { openMobilePreview(p.active); return; }
     if (a === 'pages') { setWL(W => { W.panes[i].pageView = !W.panes[i].pageView; }); renderAll(); return; }
@@ -1817,8 +1867,10 @@ async function newWork() {
     create('folder', { workId: w.id, title: '설정', order: 2, ref: true });
     const s1 = create('synop', { workId: w.id, title: '전체 시놉시스', order: 1, cards: [newCard('로그라인')] });
     layout().workId = w.id;
-    setWL(W => { W.synopPanes = [s1.id]; W.panes[0].tabs = [e1.id]; W.panes[0].active = e1.id; });
+    const pl = ensurePlan(w.id);
+    setWL(W => { W.synopPanes = [s1.id]; W.panes[0].tabs = [pl.id, e1.id]; W.panes[0].active = pl.id; });
     renderAll();
+    toast('📘 작품 기획부터 채워 보세요. 로그라인·장르·줄거리·등장인물을 적는 곳이에요.');
 }
 function switchWork(id) { layout().workId = id; touch(layout()); renderAll(); }
 
@@ -2056,7 +2108,7 @@ $('#free-note').addEventListener('pointerup', e => {
    - "붙여 보기": 다른 회차 메모를 이 보드에 참조로 붙임 (원본은 제자리)
    - 보드마다 위치를 따로 기억 (pins[보드id])
    ===================================================================== */
-function activeDocId() { const W = WL(); return W.panes[W.activeEditor]?.active || null; }
+function activeDocId() { const W = WL(), id = W.panes[W.activeEditor]?.active; return id && items[id]?.kind === 'episode' ? id : null; }
 const notesOfWork = () => ofWork('note');
 function boardNotes(B) {
     return notesOfWork().filter(n => !n.docId || n.docId === B || (B && n.pins && n.pins[B]));
@@ -2733,7 +2785,7 @@ const FORMATS = [
     { k: 'pdf', name: 'PDF 인쇄', ext: '인쇄', desc: '인쇄 창이 열려요. 프린터에서 "PDF로 저장"을 고르면 PDF 파일이 돼요.' }
 ];
 function docsForScope(scope) {
-    const W = WL(), cur = get(W.panes[W.activeEditor].active);
+    const cur = get(activeDocId());
     if (scope === 'current') return cur ? [cur] : [];
     if (scope === 'folder') {
         if (!cur) return [];
@@ -2746,7 +2798,7 @@ function docsForScope(scope) {
 }
 function openExport() {
     const S = settings();
-    const W = WL(), cur = get(W.panes[W.activeEditor].active);
+    const cur = get(activeDocId());
     let fmtK = S.exportFmt || 'docx';
     if (IN_PREVIEW && fmtK === 'pdf') fmtK = 'docx';
     let scope = cur ? 'current' : 'work';
@@ -2820,6 +2872,8 @@ function exportWorkZip() {
     const trash = Object.values(items).filter(i => i.kind === 'episode' && live(i) && i.workId === w.id && inTrash(i));
     trash.forEach(d => files.push({ name: `${root}_휴지통/${safeName(d.title)}.md`, data: docMd(d) }));
     ofWork('synop').forEach((s, i, a) => files.push({ name: `${root}_시놉시스/${pad(i, a.length)} ${safeName(s.title)}.md`, data: synopMd(s) }));
+    const plan = get('plan_' + w.id);
+    if (plan) files.push({ name: `${root}_작품기획.md`, data: planMd(plan) });
     const fn = get('free_' + w.id);
     if (fn && fn.body) files.push({ name: `${root}_프리노트.md`, data: `# 프리 노트\n\n${fn.body}\n` });
     const notes = ofWork('note');
@@ -3859,8 +3913,8 @@ function openSpell(docId) {
    ===================================================================== */
 function openMobilePreview(docId) {
     const W = WL();
-    const doc = get(docId || W.panes[W.activeEditor].active);
-    if (!doc) { toast('미리 볼 회차를 원고 창에 열어 주세요.'); return; }
+    const doc = get(docId || activeDocId());
+    if (!doc || doc.kind !== 'episode') { toast('미리 볼 회차를 원고 창에 열어 주세요.'); return; }
     const P = pref.mobilePrev = { font: 'myeongjo', size: 16, lh: 1.8, mode: 'scroll', rules: true, ...(pref.mobilePrev || {}) };
     let page = 0;
     const bg = document.createElement('div'); bg.className = 'modal-bg';
@@ -4223,6 +4277,115 @@ sbGrid.addEventListener('drop', e => {
     }
     touch(doc); clearSbMarks(); rerenderSynop(doc);
 });
+
+/* =====================================================================
+   📘 작품 기획: 작품마다 하나. 로그라인·장르·줄거리·등장인물 등
+   원고 창의 탭으로 열림 (id: plan_작품id)
+   ===================================================================== */
+const GENRES = ['로맨스판타지', '현대판타지', '판타지', '무협', '로맨스', 'BL', '현대물', '드라마', '스릴러', '라이트노벨'];
+const ROLES = ['주인공', '주요 인물', '조연', '악역', '단역'];
+const CHAR_COLORS = ['#e2b33c', '#e07a5f', '#c4587a', '#7a5cc4', '#3d74c4', '#2a8c7b', '#6aa12f', '#8a8f84'];
+const planId = (wid = curWorkId()) => 'plan_' + wid;
+function ensurePlan(wid = curWorkId()) {
+    return get(planId(wid)) || create('plan', { id: planId(wid), workId: wid, title: '작품 기획', genre: '', keywords: '', platform: '', length: '', logline: '', story: '', point: '', world: '', chars: [] });
+}
+function planHtml(pl) {
+    const w = get(pl.workId) || {};
+    const field = (f, label, ph, rows) => `<label class="pl-label">${label}</label>${rows
+        ? `<textarea class="pl-input" data-id="${pl.id}" data-field="${f}" rows="${rows}" placeholder="${esc(ph)}">${esc(pl[f] || '')}</textarea>`
+        : `<input class="pl-input" data-id="${pl.id}" data-field="${f}" value="${esc(pl[f] || '')}" placeholder="${esc(ph)}">`}`;
+    const chars = pl.chars || [];
+    return `<div class="plan">
+        <div class="plan-hero"><span class="plan-kicker">📘 작품 기획</span>
+            <input class="plan-title" data-id="${w.id}" data-field="title" value="${esc(w.title || '')}" placeholder="작품 제목"></div>
+        <div class="plan-grid">
+            <section class="plan-sec">
+                <label class="pl-label">장르</label>
+                <input class="pl-input" data-id="${pl.id}" data-field="genre" value="${esc(pl.genre || '')}" placeholder="예: 현대판타지 · 헌터물">
+                <div class="genre-chips">${GENRES.map(g => `<button class="chip ${(pl.genre || '').includes(g) ? 'on' : ''}" data-genre="${g}">${g}</button>`).join('')}</div>
+                ${field('keywords', '키워드 · 태그', '예: 회귀, 성장, 사이다, 길드')}
+                <div class="pl-two"><div>${field('platform', '연재처', '예: 카카오페이지')}</div><div>${field('length', '목표 분량', '예: 회당 5,000자 · 150화')}</div></div>
+            </section>
+            <section class="plan-sec">
+                ${field('logline', '로그라인 (한두 문장으로 이 작품을 소개)', '예: F급 포터로 회귀한 남자가, 아무도 모르는 게이트의 공략법으로 S급 헌터들을 앞지른다.', 3)}
+                ${field('point', '기획 의도 · 핵심 재미', '독자가 이 작품을 계속 읽게 만드는 재미는 무엇인가요?', 3)}
+            </section>
+            <section class="plan-sec wide">${field('story', '간단 줄거리', '시작 → 전개 → 위기 → 결말 순으로 큰 흐름을 적어 보세요.', 6)}</section>
+            <section class="plan-sec wide">
+                <div class="pl-label-row"><label class="pl-label">등장인물 <small>${chars.length}명</small></label><button class="btn" data-pa="add-char">＋ 인물 추가</button></div>
+                <div class="pc-list">${chars.map((c, i) => `<div class="pc" data-ch="${c.id}" style="border-left-color:${esc(c.color || CHAR_COLORS[i % CHAR_COLORS.length])}">
+                    <div class="pc-row"><input class="pc-name" data-cf="name" value="${esc(c.name || '')}" placeholder="이름">
+                        <select data-cf="role">${ROLES.map(r => `<option ${c.role === r ? 'selected' : ''}>${r}</option>`).join('')}</select>
+                        <input class="pc-age" data-cf="age" value="${esc(c.age || '')}" placeholder="나이 · 직업">
+                        <span class="pc-tools"><button class="mini" data-pa="color" title="색">●</button><button class="mini" data-pa="up" title="위로" ${i ? '' : 'disabled'}>↑</button><button class="mini" data-pa="del" title="지우기">✕</button></span></div>
+                    <input class="pc-line" data-cf="line" value="${esc(c.line || '')}" placeholder="한 줄 소개 (예: 회귀한 F급 포터. 겁은 많지만 눈치가 빠르다)">
+                    <textarea class="pc-desc" data-cf="desc" rows="2" placeholder="외모, 성격, 목표, 비밀, 다른 인물과의 관계…">${esc(c.desc || '')}</textarea></div>`).join('') || '<div class="modal-note">＋ 인물 추가로 주인공부터 적어 보세요.</div>'}</div>
+            </section>
+            <section class="plan-sec wide">${field('world', '세계관 · 설정 메모', '시대, 장소, 능력 체계, 규칙, 용어…', 4)}</section>
+        </div></div>`;
+}
+function planOf(el) { return get(el.closest('[data-plan-id]')?.dataset.planId); }
+document.addEventListener('input', e => {
+    const t = e.target;
+    if (!t.dataset || !t.dataset.cf) return;
+    const pl = planOf(t), ch = pl && (pl.chars || []).find(c => c.id === t.closest('[data-ch]').dataset.ch);
+    if (!ch) return;
+    ch[t.dataset.cf] = t.value; touch(pl);
+    if (t.tagName === 'TEXTAREA') autoGrow(t);
+});
+document.addEventListener('change', e => {
+    const t = e.target;
+    if (t.dataset && t.dataset.cf === 'role') { const pl = planOf(t); const ch = pl.chars.find(c => c.id === t.closest('[data-ch]').dataset.ch); ch.role = t.value; touch(pl); }
+    if (t.classList && t.classList.contains('plan-title')) { renderHeader(); renderTree(); }
+});
+document.addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('[data-pa], [data-genre]'); if (!b) return;
+    const pl = planOf(b); if (!pl) return;
+    if (b.dataset.genre) {
+        const g = b.dataset.genre, cur = (pl.genre || '').split(/\s*[·,]\s*/).filter(Boolean);
+        pl.genre = (cur.includes(g) ? cur.filter(x => x !== g) : [...cur, g]).join(' · ');
+        touch(pl); renderPlanViews(); return;
+    }
+    pl.chars ||= [];
+    const a = b.dataset.pa, card = b.closest('[data-ch]');
+    const i = card ? pl.chars.findIndex(c => c.id === card.dataset.ch) : -1;
+    if (a === 'add-char') {
+        const c = { id: uid('ch'), name: '', role: pl.chars.length ? '주요 인물' : '주인공', age: '', line: '', desc: '', color: CHAR_COLORS[pl.chars.length % CHAR_COLORS.length] };
+        pl.chars.push(c); touch(pl); renderPlanViews();
+        $(`[data-ch="${c.id}"] .pc-name`)?.focus(); return;
+    }
+    if (a === 'up' && i > 0) { [pl.chars[i - 1], pl.chars[i]] = [pl.chars[i], pl.chars[i - 1]]; touch(pl); renderPlanViews(); }
+    if (a === 'del') {
+        const [removed] = pl.chars.splice(i, 1); touch(pl); renderPlanViews();
+        toast(`'${removed.name || '이름 없는 인물'}'을(를) 지웠어요.`, '되돌리기', () => { pl.chars.splice(i, 0, removed); touch(pl); renderPlanViews(); });
+    }
+    if (a === 'color') {
+        const pop = showPop(b, `<div class="swatches">${CHAR_COLORS.map(c => `<button class="swatch" style="background:${c}" data-cc="${c}"></button>`).join('')}</div>`);
+        pop.addEventListener('click', ev => { const c = ev.target.dataset.cc; if (!c) return; pl.chars[i].color = c; touch(pl); closePop(); renderPlanViews(); });
+    }
+});
+function renderPlanViews() {
+    $$('.plan-view').forEach(v => {
+        const pl = get(v.dataset.planId); if (!pl) return;
+        const keep = v.scrollTop; v.innerHTML = planHtml(pl); v.scrollTop = keep;
+        $$('textarea', v).forEach(autoGrow);
+    });
+}
+function planMd(pl) {
+    const w = get(pl.workId) || {};
+    const sec = (t, v) => v ? `## ${t}\n\n${v}\n\n` : '';
+    return `# ${w.title || '작품'} — 작품 기획\n\n` + sec('장르', pl.genre) + sec('키워드', pl.keywords) + sec('연재처', pl.platform) + sec('목표 분량', pl.length)
+        + sec('로그라인', pl.logline) + sec('기획 의도 · 핵심 재미', pl.point) + sec('간단 줄거리', pl.story)
+        + ((pl.chars || []).length ? '## 등장인물\n\n' + pl.chars.map(c => `### ${c.name || '(이름 없음)'} — ${c.role || ''}${c.age ? ' · ' + c.age : ''}\n\n${[c.line, c.desc].filter(Boolean).join('\n\n')}\n`).join('\n') + '\n' : '')
+        + sec('세계관 · 설정 메모', pl.world);
+}
+
+/* 회차 개요: 원고 오른쪽에 붙는 칸. 본문에는 안 들어감 (= 타임라인 카드·시놉 창 '지금 회차 시놉시스'와 같은 내용) */
+function outlineHtml(it) {
+    return `<aside class="outline"><div class="ol-head">📝 <b>${esc(it.title || '이 회차')}</b> 개요<span style="flex:1"></span><button class="mini" data-a="outline" title="개요 칸 닫기">✕</button></div>
+        <textarea data-id="${it.id}" data-field="summary" placeholder="이 회차에서 쓸 내용을 적어 두세요.&#10;&#10;예)&#10;- 접수처에서 동명이인 사고&#10;- 대진표에 하필 S급 3위&#10;- 절단: 백하린 등장">${esc(it.summary || '')}</textarea>
+        <div class="ol-note">본문에는 안 들어가요 · 타임라인 카드와 같은 내용</div></aside>`;
+}
 
 /* ---------- 시작 ---------- */
 (async () => {

@@ -424,6 +424,8 @@ kbd { font: 12px/1.4 ui-monospace, monospace; background: var(--panel2); border:
 .tl-whole-text { white-space: pre-wrap; color: var(--muted); line-height: 1.6; max-height: 220px; overflow-y: auto; }
 @media (max-width: 760px) { .sb-bmenu { opacity: 1; } }
 .selbar.in-synop [data-fold] { display: none; }
+.sq-box { background: var(--accent-soft); border-radius: 10px; padding: 10px 12px; }
+.sq-box label.check { margin-top: 0; }
 .crop-stage { position: relative; display: flex; justify-content: center; background: var(--panel2); border-radius: 8px; padding: 8px; }
 .crop-stage canvas { max-width: 100%; touch-action: none; cursor: crosshair; }
 
@@ -1239,7 +1241,8 @@ document.addEventListener('paste', e => {
     if (file) { savedRange = null; insertImageFile(file); return; }
     const text = (e.clipboardData || window.clipboardData).getData('text/plain');
     if (!text) return;
-    const norm = text.replace(/\r\n?/g, '\n');
+    let norm = text.replace(/\r\n?/g, '\n');
+    if (smartOn()) norm = norm.split('\n').map(l => curlyText(l)).join('\n');
     if (!norm.includes('\n')) { document.execCommand('insertText', false, norm); return; }
     document.execCommand('insertHTML', false, textToHtml(norm));
 });
@@ -1756,7 +1759,7 @@ $('#btn-menu').addEventListener('click', e => {
     const pop = showPop(e.currentTarget, `
         <button data-act="new-work">＋ 새 작품</button><button data-act="rename-work">작품 이름 바꾸기</button><button data-act="delete-work" class="danger">작품 삭제</button><hr>
         <button data-act="planner">⏱ 타임라인 · 연대기 · 복선</button><button data-act="hl">🖍 형광펜 모아보기</button><button data-act="spell">✓ 맞춤법 1차 점검</button><button data-act="mobile">📱 모바일 미리보기</button><button data-act="fullboard">🗂 작품 전체 메모 보드</button><hr>
-        <button data-act="typo">가 글꼴 · 크기 · 줄간격 · 문단</button><button data-act="theme">🎨 화면 테마</button><button data-act="replace">⇄ 자동 치환</button><button data-act="keys">⌨ 단축키</button><hr>
+        <button data-act="typo">가 글꼴 · 크기 · 줄간격 · 문단</button><button data-act="theme">🎨 화면 테마</button><button data-act="replace">⇄ 자동 치환 · 따옴표</button><button data-act="keys">⌨ 단축키</button><hr>
         <button data-act="copy-ep">📋 현재 회차 복사 (줄바꿈 규칙)</button><button data-act="export">⇪ 내보내기 (docx·epub·txt…)</button><hr>
         <button data-act="zip">🗜 작품 백업 내려받기 (ZIP)</button><button data-act="backup">전체 백업 저장 (JSON)</button><button data-act="restore">백업 불러오기 (ZIP·JSON)</button>`);
     pop.style.left = ''; pop.style.right = '8px';
@@ -2381,7 +2384,7 @@ function toBlocks(html) {
         });
     };
     walk(t.content, {});
-    return blocks;
+    return smartOn() ? curlyBlocks(blocks) : blocks;
 }
 const blockText = b => b.runs.map(r => r.text).join('');
 const SCENE_RE = /^([*＊#◇◆○●◎※☆★=~\-─—·]\s*){1,7}$/;
@@ -3622,6 +3625,71 @@ function openThemes() {
 const REPLACE_PRESETS = [['...', '…'], ['--', '—'], ['<<', '《'], ['>>', '》'], ['->', '→'], ['(c)', '©']];
 function replaceRules() { const S = settings(); S.autoReplace ??= []; return S.autoReplace; }
 let replacing = false;
+/* 굽은 따옴표: 곧은 따옴표(" ')를 “ ” ‘ ’로. 한글에 붙여넣을 때 쓰는 따옴표 */
+const smartOn = () => settings().smartQuotes !== false;
+const OPEN_CTX = /[\s(\[{<《〈「『“‘—–\-]/;
+function curlyChar(ch, prev) {
+    const open = !prev || OPEN_CTX.test(prev);
+    if (ch === '"') return open ? '“' : '”';
+    return open ? '‘' : '’';
+}
+function curlyText(text, prev = '') {
+    let out = '', p = prev;
+    for (const ch of text) { const c = (ch === '"' || ch === "'") ? curlyChar(ch, p) : ch; out += c; p = c; }
+    return out;
+}
+// 방금 입력한 곧은 따옴표를 굽은 따옴표로 바꿈
+function curlyAtCaret(root) {
+    if (!smartOn()) return;
+    const sel = getSelection(); if (!sel.rangeCount || !sel.isCollapsed) return;
+    const node = sel.anchorNode, off = sel.anchorOffset;
+    if (!node || node.nodeType !== 3 || !root.contains(node) || off < 1) return;
+    const ch = node.data[off - 1];
+    if (ch !== '"' && ch !== "'") return;
+    // 같은 문단 안에서 따옴표 바로 앞 글자를 보고 여는/닫는 따옴표를 정함
+    const blk = node.parentElement.closest('p, div:not(.sb-text)');
+    const start = blk && root.contains(blk) ? blk : root;
+    const pr = document.createRange(); pr.setStart(start, 0); pr.setEnd(node, off - 1);
+    const prev = pr.toString().slice(-1);
+    const r = document.createRange(); r.setStart(node, off - 1); r.setEnd(node, off);
+    sel.removeAllRanges(); sel.addRange(r);
+    replacing = true;
+    try { document.execCommand('insertText', false, curlyChar(ch, prev)); } finally { replacing = false; }
+}
+// 블록(문단)마다 따옴표를 바꿈 (복사·내보내기·미리보기용)
+function curlyBlocks(blocks) {
+    blocks.forEach(b => { let prev = ''; b.runs.forEach(r => { if (!r.text) return; r.text = curlyText(r.text, prev); prev = r.text.slice(-1); }); });
+    return blocks;
+}
+// 원고 HTML 안의 따옴표를 모두 바꿈 (문단 단위로 앞 글자를 보며)
+function curlyHtml(html) {
+    const t = document.createElement('template'); t.innerHTML = html;
+    const paras = [...t.content.querySelectorAll('p, div')].filter(el => !el.querySelector('p, div'));
+    const groups = paras.length ? paras : [t.content];
+    let changed = 0;
+    groups.forEach(g => {
+        let prev = '';
+        const w = document.createTreeWalker(g, NodeFilter.SHOW_TEXT);
+        for (let n = w.nextNode(); n; n = w.nextNode()) {
+            const nt = curlyText(n.data, prev);
+            if (nt !== n.data) { changed += [...n.data].filter((c, i) => c !== [...nt][i]).length; n.data = nt; }
+            prev = n.data.slice(-1) || prev;
+        }
+    });
+    return { html: t.innerHTML, changed };
+}
+function convertQuotesIn(docs) {
+    let total = 0, touched = 0;
+    docs.forEach(d => {
+        if (d.locked) return;
+        const r = curlyHtml(d.body);
+        if (!r.changed) return;
+        createVersion(d, d.body, '따옴표 바꾸기 전');
+        d.body = r.html; touch(d); total += r.changed; touched++;
+    });
+    renderAll();
+    toast(total ? `${touched}편에서 따옴표 ${fmt(total)}개를 “ ” ‘ ’로 바꿨어요. 바꾸기 전 원고는 버전 기록에 있어요.` : '바꿀 곧은 따옴표가 없어요.');
+}
 function tryAutoReplace(ed) {
     const rules = replaceRules().filter(r => r.on !== false && r.from);
     if (!rules.length) return;
@@ -3639,7 +3707,12 @@ function tryAutoReplace(ed) {
 document.addEventListener('input', e => {
     if (replacing) return;
     const ed = e.target.closest && e.target.closest('.manuscript[contenteditable="true"]'); if (!ed) return;
-    if (e.inputType === 'insertText' && !e.isComposing) tryAutoReplace(ed);
+    if (e.inputType === 'insertText' && !e.isComposing) { if (e.data === '"' || e.data === "'") curlyAtCaret(ed); else tryAutoReplace(ed); }
+}, true);
+document.addEventListener('input', e => {
+    if (replacing) return;
+    const t = e.target.closest && e.target.closest('.sb-text');
+    if (t && e.inputType === 'insertText' && (e.data === '"' || e.data === "'")) curlyAtCaret(t);
 }, true);
 document.addEventListener('compositionend', e => {
     const ed = e.target.closest && e.target.closest('.manuscript[contenteditable="true"]');
@@ -3651,6 +3724,10 @@ function openAutoReplace() {
     const render = () => {
         const rules = replaceRules();
         bg.innerHTML = `<div class="modal"><div style="display:flex;align-items:center;margin-bottom:8px"><h3 style="margin:0;flex:1">⇄ 자동 치환</h3><button class="mini" data-x="close">✕</button></div>
+            <div class="sq-box"><label class="check"><input type="checkbox" data-sq ${smartOn() ? 'checked' : ''}> 따옴표는 언제나 굽은 따옴표 <b>“ ” ‘ ’</b></label>
+                <p class="modal-note" style="margin-top:4px">켜 두면 " 와 ' 를 입력하거나 붙여넣을 때 바로 “ ” ‘ ’로 바뀌고, 복사·내보내기·미리보기에도 굽은 따옴표로 나가요. 한글에 붙여넣을 때 좋아요.</p>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><button class="btn" data-sqc="cur">지금 회차 따옴표 바꾸기</button><button class="btn" data-sqc="work">작품 전체 따옴표 바꾸기</button></div></div>
+            <h4 style="margin:14px 0 4px;font-size:13px">자동 치환 규칙</h4>
             <p class="modal-note" style="margin-top:0">원고에 왼쪽 글자를 입력하면 바로 오른쪽 글자로 바뀌어요. 바뀐 뒤 Ctrl+Z를 누르면 입력한 그대로 돌아가요. 모든 기기에 똑같이 적용돼요.</p>
             <div class="rp-list">${rules.map((r, i) => `<div class="rp-row"><input type="checkbox" data-rp-on="${i}" ${r.on !== false ? 'checked' : ''} title="켜기/끄기">
                 <input type="text" data-rp-from="${i}" value="${esc(r.from)}" placeholder="입력"><span>→</span><input type="text" data-rp-to="${i}" value="${esc(r.to)}" placeholder="바꿀 글자"><button class="mini" data-rp-del="${i}">✕</button></div>`).join('') || '<p class="modal-note">아직 규칙이 없어요.</p>'}</div>
@@ -3664,6 +3741,7 @@ function openAutoReplace() {
         if (t.dataset.rpFrom != null) { rules[+t.dataset.rpFrom].from = t.value; save(); }
         if (t.dataset.rpTo != null) { rules[+t.dataset.rpTo].to = t.value; save(); }
         if (t.dataset.rpOn != null) { rules[+t.dataset.rpOn].on = t.checked; save(); }
+        if (t.matches('[data-sq]')) { settings().smartQuotes = t.checked; save(); toast(t.checked ? '이제 따옴표가 “ ” ‘ ’로 들어가요.' : '따옴표를 입력한 그대로 둬요.'); }
     });
     bg.addEventListener('click', e => {
         const t = e.target.closest('button'); if (e.target === bg || t?.dataset.x === 'close') { bg.remove(); return; }
@@ -3672,6 +3750,11 @@ function openAutoReplace() {
         if (t.dataset.x === 'add') { rules.push({ from: '', to: '', on: true }); save(); render(); $$('[data-rp-from]', bg).pop()?.focus(); }
         if (t.dataset.preset) { const [f, to] = t.dataset.preset.split('|'); rules.push({ from: f, to, on: true }); save(); render(); }
         if (t.dataset.rpDel != null) { rules.splice(+t.dataset.rpDel, 1); save(); render(); }
+        if (t.dataset.sqc) {
+            const docs = t.dataset.sqc === 'cur' ? [get(activeDocId())].filter(Boolean) : flatDocs();
+            if (!docs.length) { toast('열린 회차가 없어요.'); return; }
+            bg.remove(); convertQuotesIn(docs);
+        }
     });
 }
 function openShortcuts() {
@@ -4014,7 +4097,7 @@ document.addEventListener('paste', e => {
     const t = e.target.closest && e.target.closest('.sb-text'); if (!t) return;
     e.preventDefault();
     const text = (e.clipboardData || window.clipboardData).getData('text/plain');
-    if (text) document.execCommand('insertText', false, text.replace(/\r\n?/g, '\n'));
+    if (text) document.execCommand('insertText', false, smartOn() ? text.replace(/\r\n?/g, '\n').split('\n').map(l => curlyText(l)).join('\n') : text.replace(/\r\n?/g, '\n'));
 }, true);
 // 블록에서 Enter 두 번 → 새 블록 (마지막 빈 줄에서 Enter)
 document.addEventListener('keydown', e => {

@@ -171,6 +171,31 @@ main { height: calc(100% - 82px); display: flex; }
 .tip.show { opacity: 1; }
 .tip::after { content: ''; position: absolute; left: var(--ax, 50%); top: 100%; transform: translateX(-50%); border: 5px solid transparent; border-top-color: #2b2e28; }
 .tip.below::after { top: auto; bottom: 100%; border-top-color: transparent; border-bottom-color: #2b2e28; }
+::highlight(spell-active) { background-color: rgba(229, 72, 77, .18); }
+.spl { position: fixed; right: 12px; top: 96px; bottom: 12px; width: min(360px, calc(100vw - 24px)); z-index: 60; display: flex; flex-direction: column; background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.14); overflow: hidden; }
+.spl-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px 6px; }
+.spl-head b { font-size: 14px; }
+.spl-count { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.spl-all { padding: 4px 10px; font-size: 12px; }
+.spl-ai { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 0 12px 8px; border-bottom: 1px solid var(--line); }
+.spl-ai .btn { font-size: 12px; padding: 4px 10px; }
+.spl-msg { font-size: 11px; color: var(--muted); }
+.spl-list { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+.spl-card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; cursor: pointer; display: flex; flex-direction: column; gap: 7px; }
+.spl-card:hover { border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
+.spl-card.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.spl-top { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.spl-num { flex: none; font-size: 11px; font-weight: 700; color: var(--accent); background: var(--accent-soft); border-radius: 4px; padding: 1px 5px; font-variant-numeric: tabular-nums; }
+.spl-ctx { flex: 1; min-width: 0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: var(--ed-font); }
+.spl-ctx mark { background: none; color: var(--danger); font-weight: 700; }
+.spl-cat { flex: none; font-size: 11px; color: var(--accent); background: var(--accent-soft); border-radius: 4px; padding: 1px 6px; }
+.spl-btns { display: flex; gap: 4px; flex-wrap: wrap; }
+.spl-fix { border: 1px solid var(--line); border-radius: 6px; padding: 3px 9px; font-size: 13px; color: var(--accent); background: var(--panel); font-family: var(--ed-font); }
+.spl-fix:hover { border-color: var(--accent); background: var(--accent-soft); }
+.spl-ign { border: 1px solid var(--line); border-radius: 6px; width: 28px; color: var(--muted); display: inline-flex; align-items: center; justify-content: center; }
+.spl-ign:hover { color: var(--danger); border-color: var(--danger); }
+.spl-empty { color: var(--muted); font-size: 12px; text-align: center; padding: 30px 10px; line-height: 1.7; }
+@media (max-width: 700px) { .spl { left: 8px; right: 8px; top: auto; width: auto; height: 46vh; bottom: calc(62px + env(safe-area-inset-bottom)); } }
 .zoom-ctl { display: inline-flex; align-items: center; gap: 1px; }
 .zoom-ctl .zoom-v { min-width: 58px; font-variant-numeric: tabular-nums; }
 .para-grid { display: grid; grid-template-columns: auto 1fr auto 1fr; gap: 6px 8px; align-items: center; font-size: 12px; }
@@ -1928,7 +1953,7 @@ $('#editor-grid').addEventListener('click', async e => {
     if (a === 'copy') { openCopy(p.active); return; }
     if (a === 'history') { openHistory(p.active); return; }
     if (a === 'outline') { setWL(W => { W.hideOutline = !W.hideOutline; }); renderEditors(); return; }
-    if (a === 'spell') { openSpell(p.active); return; }
+    if (a === 'spell') { openSpellPanel(p.active); return; }
     if (a === 'mobile') { openMobilePreview(p.active); return; }
     if (a === 'pages') { setWL(W => { W.panes[i].pageView = !W.panes[i].pageView; }); renderAll(); return; }
     if (a === 'zoom-in' || a === 'zoom-out') {
@@ -2017,7 +2042,7 @@ async function menuAction(e) {
     if (a === 'theme') openSettings();
     if (a === 'replace') openAutoReplace();
     if (a === 'keys') openShortcuts();
-    if (a === 'spell') openSpell();
+    if (a === 'spell') openSpellPanel();
     if (a === 'repeat') openRepeatReport();
     if (a === 'mobile') openMobilePreview();
     if (a === 'typo') typoModal();
@@ -4000,7 +4025,7 @@ const SPELL_RULES = [
     ['(?<=\\S) {2,}(?=\\S)', ' ', '공백 두 칸'],
     // 글자 뒤에 잘못 붙은 자음·모음 (예: 입니다ㅑ). ㅋㅋ·ㅎㅎ·ㅠㅠ 같은 건 그대로 둠
     ['(?<=[가-힣])(?![ㅋㅎㅠㅜ]+(?![ㄱ-ㅣ]))[ㄱ-ㅎㅏ-ㅣ]+', '', '잘못 들어간 자음·모음']
-].map(([re, to, hint]) => ({ re: new RegExp(re, 'g'), to, hint }));
+].map(([re, to, hint]) => ({ re: new RegExp(re, 'g'), to, hint, cat: hint === '공백 두 칸' ? '띄어쓰기' : hint === '잘못 들어간 자음·모음' ? '오타' : '맞춤법' }));
 // AI 맞춤법 검사로 찾은 것 (이번에 연 동안만): 같은 방식으로 밑줄 · 고치기
 const aiSpellRules = [];
 function addAiSpell(list, text) {
@@ -4008,7 +4033,7 @@ function addAiSpell(list, text) {
     (Array.isArray(list) ? list : []).forEach(x => {
         const wrong = String(x && x.wrong || ''), right = String((x && x.right) ?? '');
         if (!wrong.trim() || wrong === right || !text.includes(wrong) || aiSpellRules.some(r => r.wrong === wrong)) return;
-        aiSpellRules.push({ wrong, re: new RegExp(wrong.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), to: right, hint: 'AI: ' + String(x.why || '맞춤법').slice(0, 60) });
+        aiSpellRules.push({ wrong, re: new RegExp(wrong.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), to: right, hint: 'AI: ' + String(x.why || '맞춤법').slice(0, 60), cat: ['띄어쓰기', '맞춤법', '오타', '문법'].includes(x.type) ? x.type : /띄어/.test(x.why || '') ? '띄어쓰기' : /오타|타자/.test(x.why || '') ? '오타' : '맞춤법' });
         n++;
     });
     return n;
@@ -4023,8 +4048,8 @@ async function aiSpellCheck(ed) {
         const out = await aiJson(`너는 한국어 맞춤법 교정자야. 아래 웹소설 원고에서 맞춤법·띄어쓰기·오타만 찾아줘.
 - 문체나 표현은 바꾸지 마. 대사 속 일부러 쓴 말투, 의성어·의태어, 인물 이름은 그대로 둬.
 - wrong은 원고에 있는 그대로(글자 하나도 바꾸지 말고) 옮겨 적고, 원고에서 위치를 찾을 수 있게 틀린 낱말이 든 어절 하나 정도로 짧게.
-- right는 wrong을 고친 것, why는 아주 짧은 이유.
-- JSON 배열로만 답해. 틀린 게 없으면 []. 예: [{"wrong":"할수있다","right":"할 수 있다","why":"띄어쓰기"}]
+- right는 wrong을 고친 것, type은 띄어쓰기·맞춤법·오타·문법 중 하나, why는 아주 짧은 이유.
+- JSON 배열로만 답해. 틀린 게 없으면 []. 예: [{"wrong":"할수있다","right":"할 수 있다","type":"띄어쓰기","why":"의존 명사"}]
 
 원고:
 ${c}`);
@@ -4042,7 +4067,7 @@ function spellScan(ed) {
             while ((m = rule.re.exec(n.data))) {
                 if (!m[0].length) { rule.re.lastIndex++; continue; }
                 const rights = [].concat(rule.to).map(t => t.replace(/\$(\d)/g, (_, k) => m[+k] || ''));
-                out.push({ node: n, start: m.index, end: m.index + m[0].length, wrong: m[0], right: rights[0], rights, hint: rule.hint,
+                out.push({ node: n, start: m.index, end: m.index + m[0].length, wrong: m[0], right: rights[0], rights, hint: rule.hint, cat: rule.cat || '맞춤법', ai: !!rule.wrong,
                     before: n.data.slice(Math.max(0, m.index - 14), m.index), after: n.data.slice(m.index + m[0].length, m.index + m[0].length + 14) });
             }
         });
@@ -4600,10 +4625,11 @@ const LIVE_SPELL_OK = typeof CSS !== 'undefined' && CSS.highlights && typeof Hig
 const liveSpellOn = () => settings().liveSpell !== false;
 const spellIgnored = () => (settings().spellIgnore ||= []);
 const sessionIgnore = new Set();
+const sessionIgnoreWords = new Set(); // 맞춤법 옆 창에서 '무시'한 낱말 (이번에 연 동안)
 const liveFindings = new Map(); // 원고 요소 → 찾은 곳들
 function scanLive(ed) {
     const ign = new Set(spellIgnored());
-    const fs = spellScan(ed).filter(f => !ign.has(f.wrong) && !sessionIgnore.has(f.wrong + '|' + f.before + '|' + f.after));
+    const fs = spellScan(ed).filter(f => !ign.has(f.wrong) && !sessionIgnore.has(f.wrong + '|' + f.before + '|' + f.after) && !sessionIgnoreWords.has(f.wrong));
     fs.forEach(f => { const r = new Range(); r.setStart(f.node, f.start); r.setEnd(f.node, f.end); f.range = r; });
     return fs;
 }
@@ -4616,6 +4642,7 @@ function refreshLiveSpell() {
     });
     CSS.highlights.set('spell-err', new Highlight(...ranges));
     scheduleRepeat();
+    if (spellPanel) renderSpellPanel();
 }
 let liveSpellTimer = null;
 function scheduleLiveSpell() { clearTimeout(liveSpellTimer); liveSpellTimer = setTimeout(refreshLiveSpell, 450); }
@@ -5425,6 +5452,90 @@ document.addEventListener('keydown', e => {
     document.addEventListener('scroll', hide, true);
     document.addEventListener('keydown', hide, true);
 })();
+
+/* =====================================================================
+   맞춤법 옆 창: 원고를 보면서 고칠 곳을 하나씩 (기본 점검 + AI 검사)
+   카드를 누르면 원고의 그 자리로, '→ 고친 말'을 누르면 바로 고침
+   ===================================================================== */
+var spellPanel = null;
+let spellPanelDoc = null, spellActive = -1, spellAiBusy = false, spellAiMsg = '';
+function spellPanelEd() { return spellPanelDoc ? $(`.ed-wrap[data-scroll] .manuscript[data-id="${spellPanelDoc}"]`) : null; }
+function openSpellPanel(docId) {
+    const W = WL();
+    const id = docId || W.panes[W.activeEditor]?.active;
+    if (!id || !$(`.ed-wrap[data-scroll] .manuscript[data-id="${id}"]`)) { toast('점검할 회차를 원고 창에 열어 주세요.'); return; }
+    spellPanelDoc = id; spellActive = -1; spellAiMsg = '';
+    if (!spellPanel) {
+        spellPanel = document.createElement('aside'); spellPanel.className = 'spl';
+        document.body.appendChild(spellPanel);
+        spellPanel.addEventListener('mousedown', e => { if (e.target.closest('button, .spl-card')) e.preventDefault(); });
+        spellPanel.addEventListener('click', onSpellPanelClick);
+    }
+    renderSpellPanel();
+}
+function closeSpellPanel() { spellPanel?.remove(); spellPanel = null; spellPanelDoc = null; CSS.highlights?.delete('spell-active'); }
+function spellPanelList() {
+    const ed = spellPanelEd(); if (!ed) return [];
+    // 원고 순서대로
+    return scanLive(ed).sort((a, b) => a.node === b.node ? a.start - b.start : (a.node.compareDocumentPosition(b.node) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
+}
+function renderSpellPanel() {
+    if (!spellPanel) return;
+    const ed = spellPanelEd();
+    const fs = spellPanelList();
+    spellPanel._fs = fs;
+    if (spellActive >= fs.length) spellActive = fs.length - 1;
+    const show = t => t === ' ' ? '␣' : t === '' ? '(지움)' : t.replace(/ /g, '␣');
+    const keep = $('.spl-list', spellPanel)?.scrollTop || 0;
+    spellPanel.innerHTML = `<div class="spl-head"><b>맞춤법</b><span class="spl-count">${ed ? (fs.length ? fs.length + '군데' : '고칠 곳 없음') : ''}</span><span style="flex:1"></span>
+            ${fs.length ? '<button class="btn primary spl-all" data-sp-all>모두 고치기</button>' : ''}<button class="mini" data-sp-close title="닫기">✕</button></div>
+        <div class="spl-ai">${aiReady()
+            ? `<button class="btn" data-sp-ai ${spellAiBusy ? 'disabled' : ''}><i class="ic ic-sparkles"></i> ${spellAiBusy ? 'AI가 읽는 중…' : 'AI로 꼼꼼히 검사'}</button>`
+            : '<button class="btn" data-sp-key><i class="ic ic-sparkles"></i> AI 키 넣고 꼼꼼히 검사</button>'}<span class="spl-msg">${esc(spellAiMsg)}</span></div>
+        <div class="spl-list">${!ed ? '<div class="spl-empty">이 회차가 원고 창에서 닫혔어요.</div>' : fs.map((f, i) => `<div class="spl-card ${i === spellActive ? 'on' : ''}" data-sp-i="${i}">
+            <div class="spl-top"><span class="spl-num">${String(i + 1).padStart(2, '0')}</span><span class="spl-ctx">${esc(f.before.slice(-12))}<mark>${esc(show(f.wrong))}</mark>${esc(f.after.slice(0, 12))}</span><span class="spl-cat">${esc(f.cat)}</span></div>
+            <div class="spl-btns">${f.rights.map(r => `<button class="spl-fix" data-sp-fix="${i}" data-r="${esc(r)}">→ ${esc(r === '' ? '지우기' : show(r))}</button>`).join('')}<button class="spl-ign" data-sp-ign="${i}" title="무시"><i class="ic ic-x"></i></button></div></div>`).join('')
+            || '<div class="spl-empty">빨간 밑줄로 잡을 곳이 없어요.<br>띄어쓰기·오타까지 보려면 AI 검사를 눌러 보세요.</div>'}</div>`;
+    $('.spl-list', spellPanel).scrollTop = keep;
+    const f = fs[spellActive];
+    if (f && LIVE_SPELL_OK) { const r = new Range(); r.setStart(f.node, f.start); r.setEnd(f.node, f.end); CSS.highlights.set('spell-active', new Highlight(r)); }
+    else CSS.highlights?.delete('spell-active');
+}
+function spellGo(f) {
+    const ed = spellPanelEd(); if (!ed) return;
+    const r = new Range(); r.setStart(f.node, f.start); r.setEnd(f.node, f.end);
+    const wrap = ed.closest('.ed-wrap'), rr = r.getBoundingClientRect(), wr = wrap.getBoundingClientRect();
+    if (rr.top < wr.top + 40 || rr.bottom > wr.bottom - 40) wrap.scrollTop += rr.top - wr.top - wr.height / 3;
+}
+async function onSpellPanelClick(e) {
+    const t = e.target.closest('button, .spl-card'); if (!t) return;
+    const ed = spellPanelEd(), fs = spellPanel._fs || [];
+    if (t.dataset.spClose != null) { closeSpellPanel(); return; }
+    if (t.dataset.spKey != null) { openSettings('ai'); return; }
+    if (t.dataset.spAi != null) {
+        if (!ed || spellAiBusy) return;
+        spellAiBusy = true; spellAiMsg = ''; renderSpellPanel();
+        try { const n = await aiSpellCheck(ed); spellAiMsg = n ? `AI가 ${n}군데를 더 찾았어요.` : 'AI도 더 찾은 곳이 없어요.'; }
+        catch (err) { spellAiMsg = AI_ERR_MSG[err.code] || 'AI 검사를 하지 못했어요.'; }
+        spellAiBusy = false; refreshLiveSpell(); renderSpellPanel(); return;
+    }
+    if (t.dataset.spAll != null) {
+        if (!ed || ed.getAttribute('contenteditable') !== 'true') { toast('잠긴 문서예요. 먼저 잠금을 풀어 주세요.'); return; }
+        // 뒤에서부터 고쳐야 앞쪽 위치가 어긋나지 않음
+        [...fs].sort((a, b) => a.node === b.node ? b.start - a.start : (a.node.compareDocumentPosition(b.node) & Node.DOCUMENT_POSITION_FOLLOWING ? 1 : -1)).forEach(f => replaceFinding(ed, f, f.right));
+        spellActive = -1; refreshLiveSpell(); toast('모두 고쳤어요. Ctrl+Z로 하나씩 되돌릴 수 있어요.'); return;
+    }
+    if (t.dataset.spFix != null) {
+        const f = fs[+t.dataset.spFix]; if (!f || !ed) return;
+        if (ed.getAttribute('contenteditable') !== 'true') { toast('잠긴 문서예요. 먼저 잠금을 풀어 주세요.'); return; }
+        spellActive = +t.dataset.spFix; replaceFinding(ed, f, t.dataset.r); return;
+    }
+    if (t.dataset.spIgn != null) {
+        const f = fs[+t.dataset.spIgn]; if (!f) return;
+        sessionIgnoreWords.add(f.wrong); refreshLiveSpell(); return;
+    }
+    if (t.dataset.spI != null) { spellActive = +t.dataset.spI; renderSpellPanel(); spellGo(fs[spellActive]); }
+}
 
 /* =====================================================================
    메인 화면: 작품 카드 목록 (장르별 / 완고·미완고로 나눠 보기)

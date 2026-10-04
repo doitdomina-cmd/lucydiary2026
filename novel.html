@@ -8,6 +8,11 @@
 <link rel="icon" href="icon-192.png">
 <meta name="theme-color" content="#f6f7f4">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<style>
+/* 리디바탕: 컴퓨터에 깔려 있으면 그걸 쓰고, 없으면 무료 웹 글꼴(눈누)을 받아 씀
+   한컴 산뜻돋움: 한컴오피스(한글)가 깔린 컴퓨터에서만 보임 (없으면 Pretendard로 보임) */
+@font-face { font-family: 'RIDIBatang'; font-display: swap; src: local('RIDIBatang'), local('리디바탕'), url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_twelve@1.0/RIDIBatang.woff') format('woff'); }
+</style>
 <link href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700&family=Nanum+Gothic:wght@400;700&family=Gowun+Batang:wght@400;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
 /* 메뉴·화면 글꼴: Pretendard (SIL Open Font License) — 오프라인에서도 보이도록 내장 */
@@ -155,6 +160,17 @@ main { height: calc(100% - 82px); display: flex; }
 .manuscript p { margin: 0; min-height: 1em;
     padding: calc(var(--ed-before, 0pt) * var(--ed-zoom, 1)) calc(var(--ed-right, 0pt) * var(--ed-zoom, 1)) calc(var(--ed-after, 0pt) * var(--ed-zoom, 1)) calc(var(--ed-left, 0pt) * var(--ed-zoom, 1));
     text-indent: calc(var(--ed-indent, 0pt) * var(--ed-zoom, 1)); }
+.ai-key { display: flex; gap: 6px; }
+.spell-ai { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 8px; }
+.sp-hint { font-size: 11px; color: var(--muted); padding: 2px 10px 4px; }
+.ai-key input { flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
+.ai-test.ok { color: var(--accent); }
+.ai-test.err { color: var(--danger); }
+:root.ed-crisp .manuscript { -webkit-text-stroke: 0.018em currentColor; }
+.tip { position: fixed; z-index: 200; pointer-events: none; background: #2b2e28; color: #fff; font-size: 12px; line-height: 1.4; padding: 5px 9px; border-radius: 6px; max-width: 260px; white-space: normal; box-shadow: 0 4px 12px rgba(0,0,0,.18); opacity: 0; transition: opacity .12s; }
+.tip.show { opacity: 1; }
+.tip::after { content: ''; position: absolute; left: var(--ax, 50%); top: 100%; transform: translateX(-50%); border: 5px solid transparent; border-top-color: #2b2e28; }
+.tip.below::after { top: auto; bottom: 100%; border-top-color: transparent; border-bottom-color: #2b2e28; }
 .zoom-ctl { display: inline-flex; align-items: center; gap: 1px; }
 .zoom-ctl .zoom-v { min-width: 58px; font-variant-numeric: tabular-nums; }
 .para-grid { display: grid; grid-template-columns: auto 1fr auto 1fr; gap: 6px 8px; align-items: center; font-size: 12px; }
@@ -1391,6 +1407,7 @@ function applyPref() {
     s.setProperty('--ed-left', P.leftPt + 'pt'); s.setProperty('--ed-right', P.rightPt + 'pt');
     s.setProperty('--ed-align', P.align);
     s.setProperty('--ed-zoom', (pref.zoom || 100) / 100);
+    document.documentElement.classList.toggle('ed-crisp', S.crisp !== false);
     applyPalette();
 }
 function applyWidths() {
@@ -2774,7 +2791,7 @@ const xe = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', 
    ===================================================================== */
 function exportFont() {
     const S = settings();
-    return { gothic: '맑은 고딕', pretendard: '맑은 고딕', nanumgothic: '나눔고딕', gowun: '바탕', myeongjo: '바탕' }[S.font] || (S.font === 'custom' && S.customFont ? S.customFont : '바탕');
+    return { gothic: '맑은 고딕', pretendard: '맑은 고딕', nanumgothic: '나눔고딕', gowun: '바탕', myeongjo: '바탕', ridibatang: '리디바탕', santteut: '한컴 산뜻돋움' }[S.font] || (S.font === 'custom' && S.customFont ? S.customFont : '바탕');
 }
 function runHtml(r, imgSrc) {
     if (r.img) { const src = imgSrc(r.img); return src ? `<img src="${xe(src)}" alt=""${r.width ? ` style="width:${xe(r.width)}"` : ''}/>` : '[이미지]'; }
@@ -3980,13 +3997,46 @@ const SPELL_RULES = [
     ['단언컨데', '단언컨대'], ['요컨데', '요컨대'], ['사겼', '사귀었'], ['바꼈', '바뀌었'], ['얽히고 ?섥히', '얽히고설키'], ['들어나(?=[다고는서지면게])', '드러나'],
     ['설레임', '설렘'], ['메세지', '메시지'], ['악세사리', '액세서리'], ['로보트', '로봇'], ['초콜렛', '초콜릿'], ['쵸콜릿', '초콜릿'], ['케잌', '케이크'], ['쥬스', '주스'],
     ['희노애락', '희로애락'], ['문안하게', '무난하게'], ['문안한', '무난한'], ['할려고', '하려고'], ['갈려고', '가려고'], ['올려고', '오려고'], ['볼려고', '보려고'],
-    ['(?<=\\S) {2,}(?=\\S)', ' ', '공백 두 칸']
+    ['(?<=\\S) {2,}(?=\\S)', ' ', '공백 두 칸'],
+    // 글자 뒤에 잘못 붙은 자음·모음 (예: 입니다ㅑ). ㅋㅋ·ㅎㅎ·ㅠㅠ 같은 건 그대로 둠
+    ['(?<=[가-힣])(?![ㅋㅎㅠㅜ]+(?![ㄱ-ㅣ]))[ㄱ-ㅎㅏ-ㅣ]+', '', '잘못 들어간 자음·모음']
 ].map(([re, to, hint]) => ({ re: new RegExp(re, 'g'), to, hint }));
+// AI 맞춤법 검사로 찾은 것 (이번에 연 동안만): 같은 방식으로 밑줄 · 고치기
+const aiSpellRules = [];
+function addAiSpell(list, text) {
+    let n = 0;
+    (Array.isArray(list) ? list : []).forEach(x => {
+        const wrong = String(x && x.wrong || ''), right = String((x && x.right) ?? '');
+        if (!wrong.trim() || wrong === right || !text.includes(wrong) || aiSpellRules.some(r => r.wrong === wrong)) return;
+        aiSpellRules.push({ wrong, re: new RegExp(wrong.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), to: right, hint: 'AI: ' + String(x.why || '맞춤법').slice(0, 60) });
+        n++;
+    });
+    return n;
+}
+async function aiSpellCheck(ed) {
+    const text = editorText(ed);
+    const chunks = [];
+    for (let i = 0; i < text.length; i += 3000) chunks.push(text.slice(i, i + 3000));
+    let found = 0;
+    for (const c of chunks) {
+        if (!c.trim()) continue;
+        const out = await aiJson(`너는 한국어 맞춤법 교정자야. 아래 웹소설 원고에서 맞춤법·띄어쓰기·오타만 찾아줘.
+- 문체나 표현은 바꾸지 마. 대사 속 일부러 쓴 말투, 의성어·의태어, 인물 이름은 그대로 둬.
+- wrong은 원고에 있는 그대로(글자 하나도 바꾸지 말고) 옮겨 적고, 원고에서 위치를 찾을 수 있게 틀린 낱말이 든 어절 하나 정도로 짧게.
+- right는 wrong을 고친 것, why는 아주 짧은 이유.
+- JSON 배열로만 답해. 틀린 게 없으면 []. 예: [{"wrong":"할수있다","right":"할 수 있다","why":"띄어쓰기"}]
+
+원고:
+${c}`);
+        found += addAiSpell(out, text);
+    }
+    return found;
+}
 function spellScan(ed) {
     const out = [];
     const tw = document.createTreeWalker(ed, NodeFilter.SHOW_TEXT, { acceptNode: n => n.parentElement.closest('.foldbar') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
     for (let n = tw.nextNode(); n; n = tw.nextNode()) {
-        SPELL_RULES.forEach(rule => {
+        SPELL_RULES.concat(aiSpellRules).forEach(rule => {
             rule.re.lastIndex = 0;
             let m;
             while ((m = rule.re.exec(n.data))) {
@@ -4023,9 +4073,10 @@ function openSpell(docId) {
         bg.innerHTML = `<div class="modal wide"><div style="display:flex;align-items:center;margin-bottom:6px"><h3 style="margin:0;flex:1">✓ 맞춤법 1차 점검 — ${esc(get(id)?.title || '')}</h3><button class="mini" data-x="close">✕</button></div>
             ${LIVE_SPELL_OK ? `<label class="check" style="margin:0 0 6px"><input type="checkbox" data-live ${liveSpellOn() ? 'checked' : ''}> 쓰는 동안 틀린 표기에 밑줄 긋기 <span class="modal-note" style="margin:0">— 밑줄을 누르면 그 자리에서 고를 수 있어요</span></label>` : ''}
             ${spellIgnored().length ? `<div class="modal-note" style="margin:0 0 6px">항상 무시: ${spellIgnored().map((w, i) => `<button class="chip" data-unign="${i}" title="다시 점검하기">${esc(w.trim() || '공백')} ×</button>`).join(' ')}</div>` : ''}
-            <p class="modal-note" style="margin-top:0">원고를 어디로도 보내지 않고 이 기기 안의 규칙으로만 확인해요. 자주 틀리는 표기를 잡는 1차 점검이라, 문맥을 봐야 하는 맞춤법은 놓칠 수 있어요.</p>
+            <p class="modal-note" style="margin-top:0">기본 점검은 원고를 어디로도 보내지 않고, 자주 틀리는 표기 약 90가지와 잘못 들어간 자음·모음만 잡아요. 띄어쓰기·문맥까지 보려면 AI 검사를 써 보세요.</p>
+            <div class="spell-ai">${aiReady() ? `<button class="btn" data-x="ai"><i class="ic ic-sparkles"></i> AI로 꼼꼼히 검사 (띄어쓰기·오타까지)</button><span class="modal-note">이 회차 원고가 AI로 보내져요</span>` : `<button class="btn" data-x="aiset"><i class="ic ic-sparkles"></i> AI 키 넣고 꼼꼼히 검사하기</button>`}<span class="spell-ai-msg modal-note"></span></div>
             <div class="spell-bar"><span>${fs.length ? `고칠 곳 <b>${fs.length}</b>군데` : '자주 틀리는 표기를 찾지 못했어요.'}</span><span style="flex:1"></span>${fs.length ? '<button class="btn primary" data-x="all">모두 고치기</button>' : ''}</div>
-            <div class="spell-list">${fs.map((f, i) => `<div class="spell-row"><button class="spell-ctx" data-go="${i}">…${esc(f.before)}<del>${esc(f.wrong)}</del><ins>${esc(f.right === ' ' ? '␣' : f.right)}</ins>${esc(f.after)}…</button>
+            <div class="spell-list">${fs.map((f, i) => `<div class="spell-row"><button class="spell-ctx" data-go="${i}">…${esc(f.before)}<del>${esc(f.wrong)}</del><ins>${esc(f.right === ' ' ? '␣' : f.right === '' ? '(지움)' : f.right)}</ins>${esc(f.after)}…</button>
                 <small>${f.hint ? esc(f.hint) : esc(f.wrong) + ' → ' + esc(f.right)}</small>
                 <span class="spell-btns"><button class="mini" data-fix="${i}">고치기</button><button class="mini" data-ign="${i}">무시</button></span></div>`).join('')}</div></div>`;
         bg._fs = fs;
@@ -4037,6 +4088,13 @@ function openSpell(docId) {
         if (e.target === bg || t?.dataset.x === 'close') { bg.remove(); return; }
         if (!t) return;
         if (t.dataset.unign != null) { spellIgnored().splice(+t.dataset.unign, 1); touch(settings()); render(); refreshLiveSpell(); return; }
+        if (t.dataset.x === 'aiset') { bg.remove(); openSettings('ai'); return; }
+        if (t.dataset.x === 'ai') {
+            t.disabled = true; t.innerHTML = '<i class="ic ic-sparkles"></i> AI가 읽는 중… (몇 초~수십 초)';
+            aiSpellCheck(ed).then(n => { render(); refreshLiveSpell(); const m = $('.spell-ai-msg', bg); if (m) m.textContent = n ? `AI가 ${n}군데를 더 찾았어요.` : 'AI도 더 찾은 곳이 없어요.'; })
+                .catch(err => { render(); const m = $('.spell-ai-msg', bg); if (m) { m.textContent = (AI_ERR_MSG[err.code] || 'AI 검사를 하지 못했어요.'); m.style.color = 'var(--danger)'; } });
+            return;
+        }
         const fs = bg._fs;
         if (t.dataset.go != null) {
             const f = fs[+t.dataset.go];
@@ -4582,7 +4640,7 @@ document.addEventListener('click', e => {
     setTimeout(() => {
         const f = findingAtCaret(ed); if (!f) return;
         const rect = f.range.getBoundingClientRect();
-        const opts = f.rights.map(r => `<button class="sp-opt" data-sp="${esc(r)}"><b>${esc(r === ' ' ? '띄어쓰기 한 칸' : r)}</b></button>`).join('');
+        const opts = f.rights.map(r => `<button class="sp-opt" data-sp="${esc(r)}"><b>${esc(r === ' ' ? '띄어쓰기 한 칸' : r === '' ? '지우기' : r)}</b></button>`).join('') + (f.hint ? `<div class="sp-hint">${esc(f.hint)}</div>` : '');
         const pop = showPop(ed, `<div class="sp-pop"><div class="sp-wrong"><del>${esc(f.wrong === '  ' || /^ +$/.test(f.wrong) ? '공백 ' + f.wrong.length + '칸' : f.wrong)}</del> 대신</div>${opts}<hr>
             <button data-sp-ign="once">이번만 무시</button><button data-sp-ign="always">'${esc(f.wrong.trim() || '공백')}' 항상 무시</button></div>`,
             { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom });
@@ -4669,7 +4727,9 @@ const SYN_GROUPS = [
     ['화가 치밀', '울컥하', '부아가 치밀', '열이 뻗치', '속이 끓'],
     ['안도하', '안도의 한숨을 내쉬', '가슴을 쓸어내리', '긴장이 풀리', '어깨에서 힘이 빠지'],
     ['당황하', '허둥대', '어쩔 줄 몰라 하', '쩔쩔매', '말을 더듬'],
-    ['기대', '몸을 기대', '등을 기대', '몸을 맡기']
+    ['기대', '몸을 기대', '등을 기대', '몸을 맡기'],
+    ['술술 풀리', '순조롭게 흘러가', '착착 맞아떨어지', '일사천리로 진행되', '거침없이 풀려나가', '막힘없이 굴러가'],
+    ['꼬이', '엉키', '틀어지', '어긋나', '삐걱거리', '꼬여 버리']
 ];
 
 /* ---- 한글 활용 (규칙 활용 + 르 불규칙. 다른 불규칙은 사전에 직접 적음) ---- */
@@ -4785,8 +4845,49 @@ document.addEventListener('input', e => { if (e.target.closest && e.target.close
 /* ---- AI 추천 (Claude 미리보기에서만) ---- */
 let synSample;
 const synSampleReady = (window.claude && window.claude.use ? window.claude.use('sample').catch(() => null) : Promise.resolve(null)).then(s => (synSample = s));
+/* AI 키: Claude 미리보기에서는 Claude가 바로, 그 밖(GitHub 주소 등)에서는 설정에 넣은 키로 부름
+   키는 이 기기(브라우저)에만 저장하고 동기화·백업 파일에는 넣지 않음 */
+const AI_PROVIDERS = {
+    gemini: { name: 'Gemini (구글, 무료)', keyUrl: 'https://aistudio.google.com/apikey', hint: '구글 AI Studio에서 정산 앱과 같은 구글 계정으로 무료 키를 만들 수 있어요.' },
+    claude: { name: 'Claude (사용한 만큼 결제)', keyUrl: 'https://console.anthropic.com/settings/keys', hint: 'Claude 구독과는 별개예요. Anthropic 콘솔에서 크레딧을 충전하고 키를 만들어야 해요. (추천 한 번에 1원 안팎)' }
+};
+const aiKey = () => (pref.aiKey || '').trim();
+const aiReady = () => !!synSample || !!aiKey();
+const aiErr = (code, msg) => Object.assign(new Error(msg || code), { code });
+function parseJsonLoose(t) {
+    t = String(t || '').replace(/```(?:json)?/g, '');
+    const a = t.indexOf('['), b = t.lastIndexOf(']');
+    return JSON.parse(a >= 0 && b > a ? t.slice(a, b + 1) : t);
+}
+async function aiJson(prompt) {
+    if (synSample) return synSample.json(prompt, { modelTier: 'quick' });
+    const key = aiKey(); if (!key) throw aiErr('no_key');
+    const fail = async r => { const t = await r.text(); return aiErr(r.status === 429 ? 'rate_limited' : /credit|billing|quota/i.test(t) && r.status !== 401 ? 'credit' : [400, 401, 403].includes(r.status) ? 'bad_key' : 'http', t.slice(0, 300)); };
+    if ((pref.aiProvider || 'gemini') === 'gemini') {
+        for (const model of ['gemini-2.5-flash', 'gemini-flash-latest']) {
+            const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.9 } })
+            });
+            if (r.status === 404) continue;
+            if (!r.ok) throw await fail(r);
+            const j = await r.json();
+            return parseJsonLoose((j.candidates?.[0]?.content?.parts || []).map(x => x.text || '').join(''));
+        }
+        throw aiErr('http', '쓸 수 있는 Gemini 모델을 찾지 못했어요.');
+    }
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+        body: JSON.stringify({ model: 'claude-sonnet-5-5', max_tokens: 500, messages: [{ role: 'user', content: prompt }] })
+    });
+    if (!r.ok) throw await fail(r);
+    const j = await r.json();
+    return parseJsonLoose((j.content || []).map(c => c.text || '').join(''));
+}
+const AI_ERR_MSG = { not_granted: 'AI 추천을 허용하지 않아서 내장 사전만 보여 드려요.', rate_limited: '잠깐 뒤에 다시 눌러 주세요.', bad_key: 'AI 키가 맞지 않아요. 설정에서 키를 확인해 주세요.', credit: 'AI 키의 사용 한도(크레딧)가 남아 있지 않아요.', no_key: '설정에서 AI 키를 넣어 주세요.' };
 async function synAskAI(context, phrase, avoid) {
-    if (!synSample) return null;
+    if (!aiReady()) return null;
     const prompt = `너는 한국 웹소설 작가의 문장 다듬기 도우미야. 아래 문단에서 [[ ]]로 표시한 표현 대신 쓸 수 있는 표현을 5개 제안해.
 - 장면과 감정에 어울리고, 원래 표현과 같은 시제·어미로 끝나서 [[ ]] 자리에 그대로 바꿔 넣을 수 있어야 해.
 - 웹소설 서술체로, 진부하지 않게, 서로 느낌이 다르게.
@@ -4796,7 +4897,7 @@ async function synAskAI(context, phrase, avoid) {
 문단: ${context}
 
 바꿀 표현: ${phrase}`;
-    const out = await synSample.json(prompt, { modelTier: 'quick' });
+    const out = await aiJson(prompt);
     return Array.isArray(out) ? out.filter(x => typeof x === 'string' && x.trim()).map(x => x.trim()).slice(0, 5) : [];
 }
 
@@ -4829,17 +4930,18 @@ function openSynPop(ed, range, match) {
             aiBox.innerHTML = list && list.length ? `<div class="syn-head"><i class="ic ic-sparkles"></i> AI 추천</div>${list.map(opt).join('')}` : '<div class="syn-none">추천을 받지 못했어요.</div>';
         } catch (e) {
             if (!pop.isConnected) return;
-            aiBox.innerHTML = `<div class="syn-none">${e && e.code === 'not_granted' ? 'AI 추천을 허용하지 않아서 내장 사전만 보여 드려요.' : e && e.code === 'rate_limited' ? '잠깐 뒤에 다시 눌러 주세요.' : 'AI 추천을 받지 못했어요.'}</div>`;
+            aiBox.innerHTML = `<div class="syn-none">${(e && AI_ERR_MSG[e.code]) || 'AI 추천을 받지 못했어요.'}</div>`;
         }
     };
     synSampleReady.then(s => {
         if (!pop.isConnected) return;
-        if (!s) { if (!sugg.length) aiBox.innerHTML = '<div class="syn-none">Claude 미리보기 주소에서 열면 AI가 문맥에 맞게 추천해 줘요.</div>'; return; }
+        if (!aiReady()) { aiBox.innerHTML = `<hr><div class="syn-none">설정에 AI 키를 넣으면 여기서 바로 AI가 문맥에 맞게 추천해 줘요.</div><button class="syn-more" data-syn-set><i class="ic ic-settings"></i> AI 키 넣으러 가기</button>`; return; }
         if (sugg.length) aiBox.innerHTML = '<hr><button class="syn-more" data-syn-ai><i class="ic ic-sparkles"></i> AI에게 문맥에 맞는 표현 더 받기</button>';
         else runAI();
     });
     pop.addEventListener('click', ev => {
         if (ev.target.closest('[data-syn-ai]')) { runAI(); return; }
+        if (ev.target.closest('[data-syn-set]')) { closePop(); openSettings('ai'); return; }
         const o = ev.target.closest('[data-syn]'); if (!o) return;
         closePop();
         if (ed.getAttribute('contenteditable') !== 'true') return;
@@ -5284,6 +5386,39 @@ document.addEventListener('keydown', e => {
 });
 
 /* =====================================================================
+   도움말 풍선: 브라우저 기본 풍선은 마우스 아래에 떠서 가려지므로, 버튼 위에 띄움
+   title 속성은 data-tip으로 옮겨서 기본 풍선이 안 뜨게 함
+   ===================================================================== */
+(() => {
+    if (matchMedia('(hover: none)').matches) return; // 터치 기기는 풍선 없음
+    const tip = document.createElement('div'); tip.className = 'tip'; document.body.appendChild(tip);
+    let cur = null, timer = null;
+    const hide = () => { clearTimeout(timer); tip.classList.remove('show'); cur = null; };
+    const show = el => {
+        const text = el.dataset.tip; if (!text || !el.isConnected) return;
+        tip.textContent = text; tip.classList.remove('below');
+        const r = el.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
+        let left = Math.max(6, Math.min(innerWidth - tw - 6, r.left + r.width / 2 - tw / 2));
+        let top = r.top - th - 8;
+        if (top < 4) { top = r.bottom + 8; tip.classList.add('below'); }
+        tip.style.left = left + 'px'; tip.style.top = top + 'px';
+        tip.style.setProperty('--ax', Math.max(8, Math.min(tw - 8, r.left + r.width / 2 - left)) + 'px');
+        tip.classList.add('show');
+    };
+    document.addEventListener('mouseover', e => {
+        const el = e.target.closest && e.target.closest('[title], [data-tip]');
+        if (el && el.hasAttribute('title')) { const t = el.getAttribute('title'); if (t) el.dataset.tip = t; el.removeAttribute('title'); }
+        if (el === cur) return;
+        hide();
+        if (!el || !el.dataset.tip || el.closest('.manuscript, .tip')) return;
+        cur = el; timer = setTimeout(() => show(el), 350);
+    });
+    document.addEventListener('mousedown', hide, true);
+    document.addEventListener('scroll', hide, true);
+    document.addEventListener('keydown', hide, true);
+})();
+
+/* =====================================================================
    메인 화면: 작품 카드 목록 (장르별 / 완고·미완고로 나눠 보기)
    카드를 누르면 그 작품의 집필 화면으로 들어감
    ===================================================================== */
@@ -5402,10 +5537,12 @@ const FONT_CHOICES = [
     ['myeongjo', '나눔명조', "'Nanum Myeongjo', serif"],
     ['nanumgothic', '나눔고딕', "'Nanum Gothic', sans-serif"],
     ['gothic', '본고딕', "'Noto Sans KR', sans-serif"],
-    ['gowun', '고운바탕', "'Gowun Batang', serif"]
+    ['gowun', '고운바탕', "'Gowun Batang', serif"],
+    ['ridibatang', '리디바탕', "'RIDIBatang', 'Nanum Myeongjo', serif"],
+    ['santteut', '한컴 산뜻돋움', "'한컴 산뜻돋움', 'Hancom Santteut Dotum', 'HCR Santteut Dotum', 'Pretendard', sans-serif"]
 ];
 const fontFamily = (key, custom) => key === 'custom' && custom ? `'${custom.replace(/'/g, '')}', 'Nanum Myeongjo', serif` : (FONT_CHOICES.find(f => f[0] === key) || FONT_CHOICES[1])[2];
-function openSettings() {
+function openSettings(focus) {
     const bg = document.createElement('div'); bg.className = 'modal-bg';
     document.body.appendChild(bg);
     const S = settings();
@@ -5424,18 +5561,39 @@ function openSettings() {
             <label>원고 도우미</label>
             ${LIVE_SPELL_OK ? `<label class="check"><input type="checkbox" data-opt="liveSpell" ${liveSpellOn() ? 'checked' : ''}> 틀린 맞춤법에 물결 밑줄</label>
             <label class="check"><input type="checkbox" data-opt="repeatMark" ${repeatOn() ? 'checked' : ''}> 한 회차에 ${SYN_REPEAT_MIN}번 이상 쓴 비슷한 표현에 점선 밑줄</label>` : ''}
+            <label class="check"><input type="checkbox" data-opt="crisp" ${S.crisp !== false ? 'checked' : ''}> 원고 글자 진하게 <small style="color:var(--muted)">(명조체 가로획이 흐리거나 끊겨 보일 때)</small></label>
             <div style="display:flex;gap:6px;margin-top:12px"><button class="btn" data-x="typo">원고 글자 크기 · 줄간격 · 문단…</button></div>
+            <label id="set-ai">AI 표현 추천 <small>(비슷한 표현에서 ‘AI 추천’을 쓸 때)</small></label>
+            ${synSample ? '<p class="modal-note" style="margin:0">지금은 Claude 미리보기 화면이라 키 없이 바로 돼요. GitHub 주소에서 쓰려면 아래에 키를 넣어 주세요.</p>' : ''}
+            <div class="seg" style="margin:4px 0 6px">${Object.entries(AI_PROVIDERS).map(([k, v]) => `<button class="${(pref.aiProvider || 'gemini') === k ? 'on' : ''}" data-aip="${k}">${v.name}</button>`).join('')}</div>
+            <div class="ai-key"><input type="password" data-aikey placeholder="여기에 키를 붙여 넣으세요" value="${esc(pref.aiKey || '')}" autocomplete="off" spellcheck="false"><button class="btn" data-x="aitest">연결 확인</button></div>
+            <p class="modal-note" style="margin:4px 0 0">${AI_PROVIDERS[pref.aiProvider || 'gemini'].hint} <a href="${AI_PROVIDERS[pref.aiProvider || 'gemini'].keyUrl}" target="_blank" rel="noopener">키 만들러 가기 ↗</a><br>키는 이 기기에만 저장돼요. (동기화·백업 파일에는 안 들어가요)</p>
+            <div class="ai-test modal-note"></div>
             <p class="modal-note">테마는 이 기기에만, 글꼴은 모든 기기에 똑같이 적용돼요. 메뉴 글꼴은 Pretendard로 고정이에요.</p></div>`;
     };
     render();
+    if (focus === 'ai') setTimeout(() => { $('#set-ai', bg)?.scrollIntoView({ block: 'center' }); $('[data-aikey]', bg)?.focus(); }, 0);
+    bg.addEventListener('input', e => { if (e.target.dataset && 'aikey' in e.target.dataset) { pref.aiKey = e.target.value.trim(); savePref(); } });
     bg.addEventListener('change', e => {
         const o = e.target.dataset && e.target.dataset.opt; if (!o) return;
-        S[o] = e.target.checked; touch(S); refreshLiveSpell(); refreshRepeat();
+        S[o] = e.target.checked; touch(S); applyPref(); refreshLiveSpell(); refreshRepeat();
     });
     bg.addEventListener('click', async e => {
         const t = e.target.closest('button'); if (e.target === bg || t?.dataset.x === 'close') { bg.remove(); return; }
         if (!t) return;
         if (t.dataset.x === 'typo') { bg.remove(); typoModal(); return; }
+        if (t.dataset.aip) { pref.aiProvider = t.dataset.aip; savePref(); render(); $('#set-ai', bg)?.scrollIntoView({ block: 'center' }); return; }
+        if (t.dataset.x === 'aitest') {
+            const out = $('.ai-test', bg); out.textContent = '확인하는 중…'; out.className = 'ai-test modal-note';
+            try {
+                if (!aiKey()) throw aiErr('no_key');
+                const keep = synSample; synSample = null; // 키 자체를 확인
+                let list; try { list = await aiJson('다음 표현과 비슷한 한국어 표현 2개를 JSON 문자열 배열로만 답해: "미간을 찌푸렸다"'); } finally { synSample = keep; }
+                out.textContent = '연결됐어요 ✓ 예: ' + (Array.isArray(list) ? list.slice(0, 2).join(', ') : '');
+                out.className = 'ai-test modal-note ok';
+            } catch (err) { out.textContent = (AI_ERR_MSG[err.code] || 'AI에 연결하지 못했어요.') + (err.code === 'http' ? ' ' + (err.message || '') : ''); out.className = 'ai-test modal-note err'; }
+            return;
+        }
         if (t.dataset.pal) {
             const [kind, id] = t.dataset.pal.split(':');
             pref.lightPal = id; pref.theme = 'light';

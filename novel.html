@@ -4864,17 +4864,25 @@ async function aiJson(prompt) {
     const key = aiKey(); if (!key) throw aiErr('no_key');
     const fail = async r => { const t = await r.text(); return aiErr(r.status === 429 ? 'rate_limited' : /credit|billing|quota/i.test(t) && r.status !== 401 ? 'credit' : [400, 401, 403].includes(r.status) ? 'bad_key' : 'http', t.slice(0, 300)); };
     if ((pref.aiProvider || 'gemini') === 'gemini') {
-        for (const model of ['gemini-2.5-flash', 'gemini-flash-latest']) {
-            const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.9 } })
-            });
-            if (r.status === 404) continue;
-            if (!r.ok) throw await fail(r);
-            const j = await r.json();
-            return parseJsonLoose((j.candidates?.[0]?.content?.parts || []).map(x => x.text || '').join(''));
+        // 새 키에서는 옛 모델이 막혀 있어서(404) 최신 모델부터. 붐비면(503) 다음 모델 → 한 바퀴 더
+        const models = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-2.5-flash'];
+        let busy = false;
+        for (let round = 0; round < 2; round++) {
+            if (round) await new Promise(res => setTimeout(res, 2500));
+            for (const model of models) {
+                const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.9 } })
+                });
+                if (r.status === 404) continue;
+                if (r.status === 503 || r.status === 500) { busy = true; continue; }
+                if (!r.ok) throw await fail(r);
+                const j = await r.json();
+                return parseJsonLoose((j.candidates?.[0]?.content?.parts || []).map(x => x.text || '').join(''));
+            }
+            if (!busy) break;
         }
-        throw aiErr('http', '쓸 수 있는 Gemini 모델을 찾지 못했어요.');
+        throw busy ? aiErr('busy') : aiErr('http', '쓸 수 있는 Gemini 모델을 찾지 못했어요.');
     }
     const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -4885,7 +4893,7 @@ async function aiJson(prompt) {
     const j = await r.json();
     return parseJsonLoose((j.content || []).map(c => c.text || '').join(''));
 }
-const AI_ERR_MSG = { not_granted: 'AI 추천을 허용하지 않아서 내장 사전만 보여 드려요.', rate_limited: '잠깐 뒤에 다시 눌러 주세요.', bad_key: 'AI 키가 맞지 않아요. 설정에서 키를 확인해 주세요.', credit: 'AI 키의 사용 한도(크레딧)가 남아 있지 않아요.', no_key: '설정에서 AI 키를 넣어 주세요.' };
+const AI_ERR_MSG = { not_granted: 'AI 추천을 허용하지 않아서 내장 사전만 보여 드려요.', rate_limited: '잠깐 뒤에 다시 눌러 주세요.', bad_key: 'AI 키가 맞지 않아요. 설정에서 키를 확인해 주세요.', credit: 'AI 키의 사용 한도(크레딧)가 남아 있지 않아요.', no_key: '설정에서 AI 키를 넣어 주세요.', busy: '지금 Gemini 쪽이 붐벼요. 잠깐 뒤에 다시 눌러 주세요.' };
 async function synAskAI(context, phrase, avoid) {
     if (!aiReady()) return null;
     const prompt = `너는 한국 웹소설 작가의 문장 다듬기 도우미야. 아래 문단에서 [[ ]]로 표시한 표현 대신 쓸 수 있는 표현을 5개 제안해.

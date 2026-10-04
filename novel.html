@@ -235,6 +235,30 @@ main { height: calc(100% - 82px); display: flex; }
 .copy-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 16px; margin-top: 10px; }
 .copy-preview { margin: 0; height: 300px; overflow: auto; white-space: pre-wrap; font: 12px/1.7 'Nanum Myeongjo', serif; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
 @media (max-width: 640px) { .copy-grid { grid-template-columns: 1fr; } .copy-preview { height: 200px; } }
+.modal.xwide { max-width: 920px; }
+.btn.danger-btn { color: var(--danger); }
+.check-inline { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
+.cmp-bar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; padding: 6px 0; }
+.cmp-bar .btn { padding: 4px 10px; font-size: 12px; }
+.cmp-head, .cmp-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 84px; gap: 10px; }
+.cmp-head { font-size: 11px; color: var(--muted); padding: 8px 8px 4px; border-bottom: 1px solid var(--line); }
+.cmp-rows { max-height: 56vh; overflow-y: auto; }
+.cmp-row { padding: 8px; border-bottom: 1px solid var(--line); align-items: start; font-size: 13px; line-height: 1.7; }
+.cmp-row.change, .cmp-row.add, .cmp-row.del { background: var(--panel2); }
+.cmp-row.same .cmp-cell { color: var(--muted); }
+.cmp-cell { white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; }
+.cmp-cell mark { background: #ffe08a; color: #2b2a26; border-radius: 2px; }
+.cmp-empty { color: var(--muted); font-size: 12px; }
+@media (max-width: 640px) { .cmp-head, .cmp-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .cmp-row > div:last-child { grid-column: 1 / -1; } }
+.ver-list { max-height: 55vh; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.ver-item { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; text-align: left; }
+.ver-item:hover { border-color: var(--accent); background: var(--accent-soft); }
+.ver-when { font-variant-numeric: tabular-nums; min-width: 92px; }
+.ver-name { font-weight: 700; color: var(--accent); flex: 1; }
+.ver-auto { color: var(--muted); flex: 1; font-size: 12px; }
+.ver-chars { font-size: 12px; font-variant-numeric: tabular-nums; }
+.ver-chars small { color: var(--muted); }
+.saved-at { color: var(--muted); }
 .crop-stage { position: relative; display: flex; justify-content: center; background: var(--panel2); border-radius: 8px; padding: 8px; }
 .crop-stage canvas { max-width: 100%; touch-action: none; cursor: crosshair; }
 
@@ -415,6 +439,8 @@ const isPhone = () => matchMedia('(max-width: 760px)').matches;
 let clientId = null;
 try { clientId = localStorage.getItem('novel-writer-client') || null; } catch (e) {}
 if (!clientId) { clientId = uid('c'); try { localStorage.setItem('novel-writer-client', clientId); } catch (e) {} }
+const tabId = clientId + '.' + Math.random().toString(36).slice(2, 7); // 같은 기기에서 창(탭)마다 다름
+const seenRev = {}; // 다른 창·기기에서 받은 마지막 판: 내 수정이 어느 판에서 갈라졌는지 알기 위함
 
 /* =====================================================================
    HTML 정리 · 텍스트 변환
@@ -567,7 +593,7 @@ async function loadLocal() {
     if (!useIDB) {
         try { const raw = localStorage.getItem(LEGACY_LS_KEY); if (raw) items = JSON.parse(raw).items || {}; } catch (e) { items = {}; }
     }
-    Object.values(items).forEach(it => { if (normalize(it)) localDirty.add(it.id); });
+    Object.values(items).forEach(it => { if (normalize(it)) localDirty.add(it.id); seenRev[it.id] = it.rev; });
 }
 
 // 예전 형식 데이터를 새 형식으로 맞춤. 바뀌었으면 true
@@ -616,21 +642,24 @@ async function saveLocal() {
         try {
             if (list.length) await store.putMany(list);
             await store.setKV('dirty', [...dirty]);
+            broadcast(list);
+            if (list.length) { lastSavedAt = Date.now(); renderSavedAt(); }
         } catch (e) {
             console.error(e);
             list.forEach(it => localDirty.add(it.id));
             toast('이 기기에 저장하지 못했어요. 백업 파일을 저장해 두세요.');
         }
     } else {
-        try { localStorage.setItem(LEGACY_LS_KEY, JSON.stringify({ items })); localDirty.clear(); }
+        try { localStorage.setItem(LEGACY_LS_KEY, JSON.stringify({ items })); localDirty.clear(); lastSavedAt = Date.now(); renderSavedAt(); }
         catch (e) { toast('저장 공간이 부족해요. 백업 파일을 저장해 두세요.'); }
     }
 }
 function savePref() { try { localStorage.setItem(LS_PREF, JSON.stringify(pref)); } catch (e) {} }
 
 function touch(it) {
-    it.rev = Date.now();
-    it.by = clientId;
+    if (seenRev[it.id] !== undefined) it.base = seenRev[it.id];
+    it.rev = Math.max(Date.now(), (it.rev || 0) + 1);
+    it.by = tabId;
     items[it.id] = it;
     dirty.add(it.id);
     localDirty.add(it.id);
@@ -891,6 +920,7 @@ function renderEditors() {
         html += `<div class="epane ${i === W.activeEditor ? 'active' : ''}" data-pane="${i}">
             <div class="pane-head">${head}
                 <button class="mini ${p.single ? 'on' : ''}" data-a="single" title="${p.single ? '탭 모드로 전환' : '한 회차만 보기로 전환'}">${p.single ? '▭' : '⧉'}</button>
+                ${it ? `<button class="mini" data-a="history" title="버전 기록">🕘</button>` : ''}
                 ${it ? `<button class="mini ${it.locked ? 'on' : ''}" data-a="lock" title="${it.locked ? '잠금 해제' : '잠금 (편집 막기)'}">${it.locked ? '🔒' : '🔓'}</button>` : ''}
                 ${W.editorN > 1 ? '<button class="mini" data-a="close-pane" title="이 분할 창 닫기">✕</button>' : ''}
             </div>
@@ -910,7 +940,14 @@ function renderEditors() {
 // 같은 기기 안에서 탭을 오갈 때 스크롤 위치 유지
 const scrollMem = {};
 function rememberScroll() { $$('.ed-wrap[data-scroll]').forEach(w => { scrollMem[w.dataset.scroll] = w.scrollTop; }); }
-function restoreScroll() { $$('.ed-wrap[data-scroll]').forEach(w => { if (scrollMem[w.dataset.scroll]) w.scrollTop = scrollMem[w.dataset.scroll]; }); }
+function restoreScroll() {
+    const saved = WL().scroll || {};
+    $$('.ed-wrap[data-scroll]').forEach(w => {
+        const id = w.dataset.scroll;
+        if (scrollMem[id] != null) w.scrollTop = scrollMem[id];
+        else if (saved[id]) w.scrollTop = saved[id] * (w.scrollHeight - w.clientHeight);
+    });
+}
 
 function renderFoot(it) {
     $$(`[data-foot="${it.id}"]`).forEach(el => {
@@ -922,9 +959,11 @@ function renderFoot(it) {
             <span style="flex:1"></span>
             <span>목표</span><input class="goal-input" type="number" min="0" step="500" data-goal="${it.id}" value="${goal || ''}" placeholder="글자">
             ${goal ? `<span class="goal-bar"><i style="width:${pct}%"></i></span><span>${pct}%</span>` : ''}
+            <span class="saved-at"></span>
             <button class="mini" data-a="copy" title="줄바꿈 규칙대로 클립보드에 복사">📋 복사</button>
             <button class="mini" data-a="zoom-out" title="글자 작게">－</button><span>${settings().size}px</span><button class="mini" data-a="zoom-in" title="글자 크게">＋</button>`;
     });
+    renderSavedAt();
 }
 
 function renderNotes() {
@@ -982,6 +1021,7 @@ document.addEventListener('input', e => {
 function onEditorInput(ed) {
     const it = get(ed.dataset.id); if (!it || it.locked) return;
     if (!ed.firstElementChild && !ed.textContent) ed.innerHTML = '<p><br></p>';
+    maybeSnapshot(it, it.body);
     it.body = serializeEditor(ed);
     touch(it);
     // 오늘 작성량: 원고(자료 폴더 제외)에서 늘어난 글자 수만 더함
@@ -1308,7 +1348,7 @@ function rowMenu(anchor, it, at) {
     if (it.kind === 'episode') {
         html = `<button data-m="open">열기</button><button data-m="split">옆 분할에 열기</button><button data-m="ref">참고창으로 열기 (본문 아래)</button><hr>
             <button data-m="rename">이름 바꾸기</button><button data-m="goal">목표 글자 수</button>
-            <button data-m="lock">${it.locked ? '🔓 잠금 해제' : '🔒 잠금 (편집 막기)'}</button><button data-m="dup">복제</button><hr>
+            <button data-m="history">🕘 버전 기록</button><button data-m="lock">${it.locked ? '🔓 잠금 해제' : '🔒 잠금 (편집 막기)'}</button><button data-m="dup">복제</button><hr>
             <button data-m="trash" class="danger">휴지통으로</button>`;
     } else if (it.kind === 'folder') {
         html = `<button data-m="new-doc">이 폴더에 새 문서</button><button data-m="new-folder">이 폴더에 새 폴더</button><hr>
@@ -1327,6 +1367,7 @@ function rowMenu(anchor, it, at) {
         if (m === 'open-synop') openSynop(it.id);
         if (m === 'rename') { const t = await ask('이름 바꾸기', it.title); if (t != null) { it.title = t.trim() || '제목 없음'; touch(it); renderAll(); } }
         if (m === 'goal') { const t = await ask('목표 글자 수 (공백 제외)', it.goal || 5000, 'number'); if (t != null) { it.goal = Math.max(0, parseInt(t, 10) || 0); touch(it); renderAll(); } }
+        if (m === 'history') openHistory(it.id);
         if (m === 'lock') { it.locked = !it.locked; touch(it); renderAll(); }
         if (m === 'dup') duplicateDoc(it);
         if (m === 'trash') trashItem(it);
@@ -1445,6 +1486,7 @@ $('#editor-grid').addEventListener('click', async e => {
         renderAll(); return;
     }
     if (a === 'copy') { openCopy(p.active); return; }
+    if (a === 'history') { openHistory(p.active); return; }
     if (a === 'zoom-in' || a === 'zoom-out') {
         const S = settings(); S.size = Math.max(11, Math.min(30, S.size + (a === 'zoom-in' ? 1 : -1))); touch(S);
         applyPref(); $$('.epane-foot').forEach(f => { const it = get(f.dataset.foot); if (it) renderFoot(it); });
@@ -1617,7 +1659,6 @@ function setBadge(text, kind) { const b = $('#sync-badge'); b.textContent = text
 function scheduleCloudPush() {}
 function flushCloud() {}
 const pendingRemote = new Map();
-function flushPendingRemote() {}
 window.addEventListener('online', flushCloud);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { saveLocal(); flushCloud(); } });
 window.addEventListener('pagehide', saveLocal);
@@ -2595,6 +2636,324 @@ async function importBackupFile(f) {
 }
 
 $('#btn-export').addEventListener('click', openExport);
+
+/* =====================================================================
+   문단 단위 비교 (버전 기록 · 충돌 사본 공용)
+   ===================================================================== */
+function paraList(html) {
+    const t = document.createElement('template'); t.innerHTML = sanitizeHtml(html);
+    const out = []; let loose = null;
+    [...t.content.childNodes].forEach(n => {
+        if (n.nodeType === 1 && (n.tagName === 'P' || n.tagName === 'DIV')) { loose = null; out.push(n.outerHTML); return; }
+        if (n.nodeType === 3 && !n.data.trim() && !loose) return;
+        if (!loose) { loose = document.createElement('p'); out.push(loose); }
+        loose.append(n.cloneNode(true));
+    });
+    return out.map(x => {
+        const html = typeof x === 'string' ? x : x.outerHTML;
+        const d = document.createElement('div'); d.innerHTML = html;
+        const text = d.textContent;
+        return { html, text, key: text.trim() ? text : (d.querySelector('img') ? html : '') };
+    });
+}
+function diffParas(a, b) {
+    const n = a.length, m = b.length;
+    const L = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+    for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--)
+        L[i][j] = a[i].key === b[j].key ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+    const rows = []; let i = 0, j = 0;
+    const flush = (dels, adds) => {
+        const k = Math.min(dels.length, adds.length);
+        for (let x = 0; x < k; x++) rows.push({ type: 'change', mi: dels[x], oi: adds[x] });
+        dels.slice(k).forEach(mi => rows.push({ type: 'del', mi, oi: null }));
+        adds.slice(k).forEach(oi => rows.push({ type: 'add', mi: null, oi, at: dels.length ? dels[dels.length - 1] + 1 : i }));
+    };
+    let dels = [], adds = [];
+    while (i < n || j < m) {
+        if (i < n && j < m && a[i].key === b[j].key) { flush(dels, adds); dels = []; adds = []; rows.push({ type: 'same', mi: i, oi: j }); i++; j++; }
+        else if (j < m && (i >= n || L[i][j + 1] >= L[i + 1][j])) { adds.push(j); j++; }
+        else { dels.push(i); i++; }
+    }
+    flush(dels, adds);
+    return rows;
+}
+// 바뀐 글자만 표시 (앞뒤 같은 부분은 그대로)
+function markDiff(x, y) {
+    let p = 0; while (p < x.length && p < y.length && x[p] === y[p]) p++;
+    let s = 0; while (s < x.length - p && s < y.length - p && x[x.length - 1 - s] === y[y.length - 1 - s]) s++;
+    const m = (t) => esc(t.slice(0, p)) + (t.length - p - s > 0 ? `<mark>${esc(t.slice(p, t.length - s))}</mark>` : '') + esc(t.slice(t.length - s));
+    return [m(x), m(y)];
+}
+
+/* 비교 창
+   mode 'conflict': other = 충돌 사본 문서 / mode 'version': other = 버전 */
+function openCompare(mainId, otherId, mode, onBack) {
+    const main = get(mainId), other = get(otherId);
+    if (!main || !other) { toast('비교할 문서를 찾지 못했어요.'); return; }
+    let onlyDiff = true, pulledOnce = false;
+    const bg = document.createElement('div'); bg.className = 'modal-bg';
+    document.body.appendChild(bg);
+    const otherLabel = mode === 'version' ? (other.name || '자동 보관') + ' · ' + whenText(other.at) : '사본';
+    const render = () => {
+        const a = paraList(main.body), b = paraList(other.body);
+        const rows = diffParas(a, b);
+        const diffCount = rows.filter(r => r.type !== 'same').length;
+        const shown = onlyDiff ? rows.filter(r => r.type !== 'same') : rows;
+        const cell = (p, cls) => p ? `<div class="cmp-cell ${cls}">${esc(p.text) || (p.key ? '[사진]' : '<span class="cmp-empty">(빈 줄)</span>')}</div>` : '<div class="cmp-cell cmp-empty">(없음)</div>';
+        bg.innerHTML = `<div class="modal xwide"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                ${onBack ? '<button class="mini" data-x="back">← 목록</button>' : ''}
+                <h3 style="margin:0;flex:1">${mode === 'version' ? '🕘 버전 비교' : '충돌 사본 비교'} — ${esc(main.title)}</h3><button class="mini" data-x="close">✕</button></div>
+            <div class="cmp-bar"><span>다른 문단 <b>${diffCount}</b>군데</span><span style="flex:1"></span>
+                <label class="check-inline"><input type="checkbox" data-only ${onlyDiff ? 'checked' : ''}> 다른 곳만 보기</label>
+                ${mode === 'version'
+                    ? `<button class="btn" data-x="name">이름 붙이기</button><button class="btn" data-x="newdoc">새 문서로 꺼내기</button><button class="btn" data-x="restore">이 버전으로 되돌리기</button><button class="btn danger-btn" data-x="delver">버전 삭제</button>`
+                    : `<button class="btn" data-x="all">사본 통째로 가져오기</button><button class="btn danger-btn" data-x="drop">사본 치우기</button>`}</div>
+            <p class="modal-note">가져오기 전에 지금 원고를 버전 기록에 자동으로 남겨 두니, 잘못 가져와도 🕘 버전 기록에서 되돌릴 수 있어요.</p>
+            <div class="cmp-head"><div>지금 원고</div><div>${esc(otherLabel)}</div><div></div></div>
+            <div class="cmp-rows">${shown.length ? shown.map(r => {
+                let left = cell(a[r.mi], ''), right = cell(b[r.oi], '');
+                if (r.type === 'change') { const [x, y] = markDiff(a[r.mi].text, b[r.oi].text); left = `<div class="cmp-cell">${x || '<span class="cmp-empty">(빈 줄)</span>'}</div>`; right = `<div class="cmp-cell">${y || '<span class="cmp-empty">(빈 줄)</span>'}</div>`; }
+                const rowIdx = rows.indexOf(r);
+                return `<div class="cmp-row ${r.type}">${left}${right}<div>${r.type === 'change' || r.type === 'add' ? `<button class="mini" data-pull="${rowIdx}">← 가져오기</button>` : ''}</div></div>`;
+            }).join('') : '<p class="modal-note" style="padding:20px 0">두 원고가 같아요.</p>'}</div></div>`;
+        bg._rows = rows; bg._a = a; bg._b = b;
+    };
+    const snapshotBefore = reason => { if (!pulledOnce) { createVersion(main, main.body, reason); pulledOnce = true; } };
+    const commit = () => { touch(main); renderEditors(); renderTree(); render(); };
+    render();
+    bg.addEventListener('change', e => { if (e.target.matches('[data-only]')) { onlyDiff = e.target.checked; render(); } });
+    bg.addEventListener('click', async e => {
+        const pull = e.target.closest('[data-pull]');
+        if (pull) {
+            if (main.locked) { toast('잠긴 문서예요. 먼저 잠금을 풀어 주세요.'); return; }
+            const r = bg._rows[+pull.dataset.pull];
+            const a = bg._a.map(p => p.html), src = bg._b[r.oi].html;
+            snapshotBefore('가져오기 전');
+            if (r.type === 'change') a[r.mi] = src; else a.splice(r.at, 0, src);
+            main.body = a.join('');
+            commit(); return;
+        }
+        const x = e.target.closest('[data-x]')?.dataset.x;
+        if (e.target === bg || x === 'close') { bg.remove(); return; }
+        if (x === 'back') { bg.remove(); onBack(); return; }
+        if (x === 'all' || x === 'restore') {
+            if (main.locked) { toast('잠긴 문서예요. 먼저 잠금을 풀어 주세요.'); return; }
+            if (!await confirmBox(x === 'all' ? '사본 내용으로 원고 전체를 바꿀까요? 지금 원고는 버전 기록에 남아요.' : '이 버전으로 되돌릴까요? 지금 원고는 버전 기록에 남아요.', x === 'all' ? '통째로 가져오기' : '되돌리기')) return;
+            snapshotBefore(x === 'all' ? '사본 가져오기 전' : '되돌리기 전');
+            main.body = other.body; commit();
+            toast(x === 'all' ? '사본 내용을 가져왔어요.' : '이 버전으로 되돌렸어요.');
+            return;
+        }
+        if (x === 'drop') {
+            if (!await confirmBox(`'${other.title}' 사본을 휴지통으로 옮길까요?`, '치우기')) return;
+            bg.remove(); trashItem(other); return;
+        }
+        if (x === 'name') { const t = await ask('버전 이름', other.name || ''); if (t != null) { other.name = t.trim() || null; touch(other); render(); } }
+        if (x === 'newdoc') {
+            const copy = create('episode', { workId: main.workId, parentId: main.parentId, title: `${main.title} (${other.name || whenText(other.at)})`, body: other.body, order: main.order + 0.5 });
+            bg.remove(); moveItem(copy, main.parentId, children(main.parentId)[children(main.parentId).findIndex(c => c.id === main.id) + 1]?.id || null);
+            toast('버전을 새 문서로 꺼냈어요.');
+        }
+        if (x === 'delver') {
+            if (!await confirmBox('이 버전을 지울까요?', '지우기')) return;
+            other.deleted = true; other.body = ''; touch(other); bg.remove(); onBack ? onBack() : null;
+        }
+    });
+}
+
+/* =====================================================================
+   버전 기록: 쓰는 동안 30분마다 이전 상태를 자동 보관 (회차마다 20개)
+   이름 붙인 버전은 개수 제한 없이 계속 보관
+   ===================================================================== */
+const VERSION_GAP = 30 * 60 * 1000, AUTO_KEEP = 20;
+const versionsOf = docId => Object.values(items).filter(v => v.kind === 'version' && live(v) && v.docId === docId).sort((a, b) => b.at - a.at);
+function whenText(t) {
+    const d = new Date(t), now = new Date();
+    const hm = d.toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' });
+    if (d.toDateString() === now.toDateString()) return '오늘 ' + hm;
+    return `${d.getMonth() + 1}/${d.getDate()} ${hm}`;
+}
+function createVersion(doc, body, reason, name) {
+    const v = create('version', { workId: doc.workId, docId: doc.id, title: doc.title, body, at: Date.now(), name: name || null, reason: reason || null });
+    const autos = versionsOf(doc.id).filter(x => !x.name);
+    autos.slice(AUTO_KEEP).forEach(x => { x.deleted = true; x.body = ''; touch(x); });
+    return v;
+}
+// 원고를 고치기 직전에 부름: 마지막 보관본이 30분 넘게 지났으면 고치기 전 상태를 보관
+function maybeSnapshot(doc, oldBody) {
+    const last = versionsOf(doc.id)[0];
+    if (last && Date.now() - last.at < VERSION_GAP) return;
+    if (last && last.body === oldBody) return;
+    if (!htmlToPlain(oldBody).trim() && !/<img/.test(oldBody)) return;
+    createVersion(doc, oldBody, '자동 보관');
+}
+function openHistory(docId) {
+    const doc = get(docId); if (!doc) return;
+    const bg = document.createElement('div'); bg.className = 'modal-bg';
+    document.body.appendChild(bg);
+    const cur = docCount(doc).noSpace;
+    const render = () => {
+        const list = versionsOf(docId);
+        bg.innerHTML = `<div class="modal wide"><div style="display:flex;align-items:center;margin-bottom:8px"><h3 style="margin:0;flex:1">🕘 버전 기록 — ${esc(doc.title)}</h3><button class="mini" data-x="close">✕</button></div>
+            <p class="modal-note" style="margin-top:0">쓰는 동안 30분마다 이전 상태를 자동으로 남겨요 (회차마다 최근 20개). 이름을 붙인 버전은 지우기 전까지 계속 남아요.</p>
+            <div style="display:flex;gap:6px;margin:10px 0"><button class="btn primary" data-x="save">＋ 지금 버전 이름 붙여 남기기</button></div>
+            <div class="ver-list">${list.length ? list.map(v => {
+                const c = countChars(htmlToPlain(v.body)).noSpace, d = c - cur;
+                return `<button class="ver-item" data-v="${v.id}"><span class="ver-when">${whenText(v.at)}</span>
+                    ${v.name ? `<span class="ver-name">${esc(v.name)}</span>` : `<span class="ver-auto">${esc(v.reason || '자동 보관')}</span>`}
+                    <span class="ver-chars">${fmt(c)}자 <small>(${d === 0 ? '지금과 같음' : (d > 0 ? '+' : '') + fmt(d)})</small></span></button>`;
+            }).join('') : '<p class="modal-note" style="padding:16px 0">아직 남은 버전이 없어요. 30분 넘게 쓰면 자동으로 생겨요.</p>'}</div></div>`;
+    };
+    render();
+    bg.addEventListener('click', async e => {
+        const x = e.target.closest('[data-x]')?.dataset.x;
+        if (e.target === bg || x === 'close') { bg.remove(); return; }
+        if (x === 'save') {
+            const t = await ask('이 버전의 이름 (예: 1차 탈고, 투고본)', '');
+            if (t == null) return;
+            createVersion(doc, doc.body, null, t.trim() || whenText(Date.now()));
+            render(); toast('지금 원고를 버전으로 남겼어요.'); return;
+        }
+        const v = e.target.closest('[data-v]');
+        if (v) { bg.remove(); openCompare(docId, v.dataset.v, 'version', () => openHistory(docId)); }
+    });
+}
+
+/* =====================================================================
+   여러 창(탭) 사이 실시간 반영 + 충돌 사본
+   - 같은 기기에서 집필실을 두 창으로 열어도 서로의 변경이 바로 반영됨
+   - 두 곳에서 같은 회차를 동시에 고치면 한쪽을 덮어쓰지 않고 충돌 사본으로 남김
+   (구글 로그인 동기화를 붙일 때도 같은 규칙을 씀)
+   ===================================================================== */
+const conflictCopyOf = {};   // 이번 세션에 만든 충돌 사본 (같은 상대와 계속 겹치면 같은 사본을 갱신)
+let bc = null;
+try { bc = new BroadcastChannel('novel-writer'); } catch (e) {}
+function broadcast(list) {
+    if (!bc || !list.length) return;
+    const send = list.filter(it => it.id !== 'layout' && it.id !== 'stats' && it.by === tabId);
+    if (send.length) try { bc.postMessage({ from: tabId, items: send }); } catch (e) {}
+}
+function editingId() { const el = document.activeElement; return el && el.dataset ? el.dataset.id : null; }
+function stamp(d) { return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}`; }
+const heldConflicts = new Set(); // 쓰는 중이라 이쪽 글을 지킨 회차: 손을 떼면 다시 알려서 양쪽이 같은 판으로 모이게 함
+function saveConflictCopy(main, body, fromBy) {
+    const key = main.id + '|' + fromBy;
+    const same = Object.values(items).find(d => d.kind === 'episode' && live(d) && !inTrash(d) && d.conflictOf === main.id && d.body === body);
+    if (same) { conflictCopyOf[key] = same.id; return same; }
+    let copy = get(conflictCopyOf[key]);
+    if (copy && !inTrash(copy)) { copy.body = body; touch(copy); return copy; }
+    copy = create('episode', { workId: main.workId, parentId: main.parentId, title: `${main.title}-충돌-${stamp(new Date())}`, body, conflictOf: main.id, order: main.order + 0.001 });
+    conflictCopyOf[key] = copy.id;
+    return copy;
+}
+let conflictNotice = null;
+function noticeConflict(main, copy, mineCopied) {
+    if (conflictNotice && document.contains(conflictNotice)) conflictNotice.remove();
+    const bg = document.createElement('div'); bg.className = 'modal-bg';
+    bg.innerHTML = `<div class="modal"><h3>이 회차를 다른 곳에서도 고쳤어요.</h3>
+        <p style="margin:0;line-height:1.7;font-size:13px">${mineCopied
+            ? `다른 곳에서 더 나중에 고친 원고를 본문으로 가져왔고,<br>이 창에서 쓰신 내용은 『${esc(copy.title)}』(으)로 따로 남겨 뒀어요.`
+            : `지금 쓰신 원고는 그대로 저장했고,<br>다른 곳의 내용은 『${esc(copy.title)}』(으)로 따로 남겨 뒀어요.`}</p>
+        <div class="row2"><button class="btn" data-x="0">나중에</button><button class="btn primary" data-x="1">차이 보기</button></div></div>`;
+    document.body.appendChild(bg);
+    conflictNotice = bg;
+    bg.addEventListener('click', e => {
+        const x = e.target.dataset.x;
+        if (e.target === bg || x === '0') bg.remove();
+        if (x === '1') { bg.remove(); openCompare(main.id, copy.id, 'conflict'); }
+    });
+}
+// 다른 곳에서 온 아이템 하나를 받아들임. 화면을 다시 그려야 하면 true
+// 원고 충돌 규칙 (어느 쪽 글도 잃지 않게)
+//  - 지금 이 창에서 쓰는 중이면: 이쪽 글은 그대로, 상대 글은 사본으로
+//  - 쓰는 중이 아니면: 더 나중에 고친 쪽이 본문, 진 쪽이 자기 글을 사본으로 남김
+function receiveItem(r) {
+    normalize(r);
+    const local = items[r.id];
+    if (!local) { items[r.id] = r; seenRev[r.id] = r.rev; return true; }
+    if (r.rev === local.rev) { seenRev[r.id] = r.rev; return false; }
+    if (r.kind !== 'episode') {
+        if (r.rev < local.rev) return false;
+        if (editingId() === r.id) { pendingRemote.set(r.id, r); return false; }
+        items[r.id] = r; seenRev[r.id] = r.rev; return true;
+    }
+    const diverged = local.by === tabId && r.base !== local.rev && local.body !== r.body;
+    if (!diverged) {
+        if (r.rev < local.rev) return false;
+        if (editingId() === r.id && local.body !== r.body) { pendingRemote.set(r.id, r); return false; }
+        items[r.id] = r; seenRev[r.id] = r.rev; return true;
+    }
+    if (editingId() === r.id) {
+        heldConflicts.add(r.id);
+        const fresh = !conflictCopyOf[r.id + '|' + r.by];
+        const copy = saveConflictCopy(local, r.body, r.by);
+        if (fresh) noticeConflict(local, copy);
+        return true;
+    }
+    if (r.rev > local.rev) {
+        const fresh = !conflictCopyOf[r.id + '|' + tabId];
+        const copy = saveConflictCopy(local, local.body, tabId);
+        items[r.id] = r; seenRev[r.id] = r.rev;
+        if (fresh) noticeConflict(r, copy, true);
+        return true;
+    }
+    broadcast([local]); // 이쪽이 더 나중 판: 상대가 자기 글을 사본으로 남기고 이쪽 판을 받도록 다시 알림
+    return false;
+}
+function flushPendingRemote() {
+    const ed = editingId();
+    for (const id of [...heldConflicts]) if (id !== ed && items[id]) { heldConflicts.delete(id); broadcast([items[id]]); }
+    if (!pendingRemote.size) return;
+    let changed = false;
+    for (const [id, r] of [...pendingRemote]) {
+        if (ed === id) continue;
+        pendingRemote.delete(id);
+        if (receiveItem(r)) changed = true;
+    }
+    if (changed) refreshAfterRemote();
+}
+function refreshAfterRemote() {
+    const el = document.activeElement;
+    if (!editingId()) { renderAll(); return; }
+    $$('[data-id][data-field]').forEach(f => {
+        if (f === el) return;
+        const it = items[f.dataset.id]; if (!it) return;
+        if (f.classList.contains('manuscript')) { if (serializeEditor(f) !== it.body) { f.innerHTML = sanitizeHtml(it.body); fillImages(f); } }
+        else if (f.value !== (it[f.dataset.field] ?? '')) { f.value = it[f.dataset.field] ?? ''; if (f.tagName === 'TEXTAREA') autoGrow(f); }
+    });
+    renderTree();
+}
+if (bc) bc.onmessage = ev => {
+    const msg = ev.data;
+    if (!msg || msg.from === tabId || !Array.isArray(msg.items)) return;
+    let changed = false;
+    msg.items.forEach(r => { if (receiveItem(r)) changed = true; });
+    if (changed) refreshAfterRemote();
+};
+
+/* =====================================================================
+   저장 시각 표시 · 스크롤 위치 기억 (작품별, 기기 간 동기화 대비)
+   ===================================================================== */
+let lastSavedAt = null;
+function renderSavedAt() {
+    const t = lastSavedAt ? '저장됨 · ' + new Date(lastSavedAt).toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' }) : '';
+    $$('.saved-at').forEach(el => { el.textContent = t; });
+}
+let scrollSaveTimer = null;
+document.addEventListener('scroll', e => {
+    const w = e.target; if (!w.matches || !w.matches('.ed-wrap[data-scroll]')) return;
+    scrollMem[w.dataset.scroll] = w.scrollTop;
+    clearTimeout(scrollSaveTimer);
+    scrollSaveTimer = setTimeout(() => {
+        const max = w.scrollHeight - w.clientHeight;
+        const ratio = max > 0 ? Math.round(w.scrollTop / max * 1000) / 1000 : 0;
+        setWL(W => {
+            W.scroll ||= {};
+            W.scroll[w.dataset.scroll] = ratio;
+            const keys = Object.keys(W.scroll); if (keys.length > 300) delete W.scroll[keys[0]];
+        });
+    }, 800);
+}, true);
 
 /* ---------- 시작 ---------- */
 (async () => {

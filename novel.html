@@ -1334,7 +1334,7 @@ function docOptions(selId) {
     return opts.join('');
 }
 function editorHtml(it, cls = '') {
-    return `<div class="manuscript ${cls}" data-id="${it.id}" data-field="body" contenteditable="${it.locked ? 'false' : 'true'}" spellcheck="false">${sanitizeHtml(it.body) || '<p><br></p>'}</div>`;
+    return `<div class="manuscript ${cls}" data-id="${it.id}" data-field="body" contenteditable="${it.locked ? 'false' : 'true'}" lang="ko" spellcheck="${settings().nativeSpell !== false}">${sanitizeHtml(it.body) || '<p><br></p>'}</div>`;
 }
 function renderEditors() {
     rememberScroll();
@@ -1489,6 +1489,7 @@ function onEditorInput(ed) {
     scheduleTreeRefresh();
     schedulePageViews(it.id);
     scheduleLiveSpell();
+    scheduleAiAuto();
 }
 function docCountBefore(it, fallback) { const c = countCache.get(it.id); return c ? c.v.noSpace : fallback; }
 function pruneStats(S) { const keys = Object.keys(S.days).sort(); while (keys.length > 400) delete S.days[keys.shift()]; }
@@ -4026,9 +4027,16 @@ const SPELL_RULES = [
     // 글자 뒤에 잘못 붙은 자음·모음 (예: 입니다ㅑ). ㅋㅋ·ㅎㅎ·ㅠㅠ 같은 건 그대로 둠
     ['(?<=[가-힣])(?![ㅋㅎㅠㅜ]+(?![ㄱ-ㅣ]))[ㄱ-ㅎㅏ-ㅣ]+', '', '잘못 들어간 자음·모음']
 ].map(([re, to, hint]) => ({ re: new RegExp(re, 'g'), to, hint, cat: hint === '공백 두 칸' ? '띄어쓰기' : hint === '잘못 들어간 자음·모음' ? '오타' : '맞춤법' }));
-// AI 맞춤법 검사로 찾은 것 (이번에 연 동안만): 같은 방식으로 밑줄 · 고치기
+// AI 맞춤법 검사로 찾은 것: 같은 방식으로 밑줄 · 고치기 (이 기기에 기억, 최근 400개)
 const aiSpellRules = [];
+let aiSpellLoaded = false;
+function ensureAiSpellLoaded() {
+    if (aiSpellLoaded) return; aiSpellLoaded = true;
+    (pref.aiSpell || []).forEach(x => { if (x && x.wrong && !aiSpellRules.some(r => r.wrong === x.wrong)) aiSpellRules.push({ ...x, re: new RegExp(x.wrong.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g') }); });
+}
+function saveAiSpell() { pref.aiSpell = aiSpellRules.slice(-400).map(({ wrong, to, hint, cat }) => ({ wrong, to, hint, cat })); savePref(); }
 function addAiSpell(list, text) {
+    ensureAiSpellLoaded();
     let n = 0;
     (Array.isArray(list) ? list : []).forEach(x => {
         const wrong = String(x && x.wrong || ''), right = String((x && x.right) ?? '');
@@ -4036,6 +4044,7 @@ function addAiSpell(list, text) {
         aiSpellRules.push({ wrong, re: new RegExp(wrong.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), to: right, hint: 'AI: ' + String(x.why || '맞춤법').slice(0, 60), cat: ['띄어쓰기', '맞춤법', '오타', '문법'].includes(x.type) ? x.type : /띄어/.test(x.why || '') ? '띄어쓰기' : /오타|타자/.test(x.why || '') ? '오타' : '맞춤법' });
         n++;
     });
+    if (n) saveAiSpell();
     return n;
 }
 async function aiSpellCheck(ed) {
@@ -4058,6 +4067,7 @@ ${c}`);
     return found;
 }
 function spellScan(ed) {
+    ensureAiSpellLoaded();
     const out = [];
     const tw = document.createTreeWalker(ed, NodeFilter.SHOW_TEXT, { acceptNode: n => n.parentElement.closest('.foldbar') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
     for (let n = tw.nextNode(); n; n = tw.nextNode()) {
@@ -4642,6 +4652,7 @@ function refreshLiveSpell() {
     });
     CSS.highlights.set('spell-err', new Highlight(...ranges));
     scheduleRepeat();
+    aiBaseline();
     if (spellPanel) renderSpellPanel();
 }
 let liveSpellTimer = null;
@@ -5454,6 +5465,64 @@ document.addEventListener('keydown', e => {
 })();
 
 /* =====================================================================
+   AI 맞춤법 자동 검사: 쓰다가 5초 멈추면, 새로 쓰거나 고친 문단만 AI에게 보내 밑줄
+   - 처음 연 원고는 기준으로만 삼고 보내지 않음 (원고 전체는 'AI로 꼼꼼히 검사'로)
+   - 한 번에 하나씩, 붐비거나 한도에 걸리면 잠깐 쉼
+   ===================================================================== */
+const aiAutoOn = () => settings().aiAuto !== false && aiReady();
+const aiSeen = new Map();          // 회차 id → 이미 본(보낸) 문단 글자들
+var aiAutoTimer = null;
+let aiAutoBusy = false, aiAutoPauseUntil = 0, aiAutoWarned = false;
+function paraTexts(ed) {
+    return [...ed.children].filter(n => n.nodeType === 1 && !n.classList.contains('foldbar')).map(n => n.textContent.trim()).filter(t => t.length >= 4 && /[가-힣]/.test(t));
+}
+function aiBaseline() { // 원고를 처음 그렸을 때 있던 문단은 '이미 봄'으로
+    $$('.ed-wrap[data-scroll] .manuscript[contenteditable="true"]').forEach(ed => {
+        const id = ed.dataset.id; if (aiSeen.has(id)) return;
+        aiSeen.set(id, new Set(paraTexts(ed)));
+    });
+}
+function scheduleAiAuto() {
+    clearTimeout(aiAutoTimer);
+    if (!aiAutoOn()) return;
+    aiAutoTimer = setTimeout(runAiAuto, 5000);
+}
+async function runAiAuto() {
+    if (!aiAutoOn() || aiAutoBusy) return;
+    if (Date.now() < aiAutoPauseUntil) { aiAutoTimer = setTimeout(runAiAuto, aiAutoPauseUntil - Date.now() + 500); return; }
+    if (!navigator.onLine) return;
+    aiBaseline();
+    const ed = document.activeElement?.closest?.('.manuscript[contenteditable="true"]') || $('.ed-wrap[data-scroll] .manuscript[contenteditable="true"]');
+    if (!ed) return;
+    const seen = aiSeen.get(ed.dataset.id) || new Set(); aiSeen.set(ed.dataset.id, seen);
+    const fresh = [];
+    let len = 0;
+    for (const t of paraTexts(ed)) { if (seen.has(t) || fresh.includes(t)) continue; if (len + t.length > 2500 && fresh.length) break; fresh.push(t); len += t.length; }
+    if (!fresh.length) return;
+    aiAutoBusy = true;
+    try {
+        const out = await aiJson(`너는 한국어 맞춤법 교정자야. 아래 웹소설 문단들에서 맞춤법·띄어쓰기·오타만 찾아줘.
+- 문체나 표현은 바꾸지 마. 대사 속 일부러 쓴 말투, 의성어·의태어, 인물 이름은 그대로 둬.
+- wrong은 원고에 있는 그대로(글자 하나도 바꾸지 말고) 옮겨 적고, 위치를 찾을 수 있게 틀린 낱말이 든 어절 하나 정도로 짧게.
+- right는 wrong을 고친 것, type은 띄어쓰기·맞춤법·오타·문법 중 하나, why는 아주 짧은 이유.
+- JSON 배열로만 답해. 틀린 게 없으면 []. 예: [{"wrong":"할수있다","right":"할 수 있다","type":"띄어쓰기","why":"의존 명사"}]
+
+문단:
+${fresh.join('\n')}`);
+        fresh.forEach(t => seen.add(t));
+        if (addAiSpell(out, editorText(ed))) refreshLiveSpell();
+    } catch (err) {
+        if (err.code === 'rate_limited' || err.code === 'busy') aiAutoPauseUntil = Date.now() + 60000;
+        else if (err.code === 'credit' || err.code === 'bad_key' || err.code === 'not_granted') {
+            aiAutoPauseUntil = Date.now() + 30 * 60000;
+            if (!aiAutoWarned) { aiAutoWarned = true; toast('AI 맞춤법 자동 검사를 잠시 멈췄어요. ' + (AI_ERR_MSG[err.code] || '')); }
+        } else aiAutoPauseUntil = Date.now() + 20000;
+    }
+    aiAutoBusy = false;
+    if (fresh.length && aiAutoOn()) aiAutoTimer = setTimeout(runAiAuto, 8000); // 남은 문단이 있으면 이어서
+}
+
+/* =====================================================================
    맞춤법 옆 창: 원고를 보면서 고칠 곳을 하나씩 (기본 점검 + AI 검사)
    카드를 누르면 원고의 그 자리로, '→ 고친 말'을 누르면 바로 고침
    ===================================================================== */
@@ -5680,6 +5749,8 @@ function openSettings(focus) {
             <label>원고 도우미</label>
             ${LIVE_SPELL_OK ? `<label class="check"><input type="checkbox" data-opt="liveSpell" ${liveSpellOn() ? 'checked' : ''}> 틀린 맞춤법에 물결 밑줄</label>
             <label class="check"><input type="checkbox" data-opt="repeatMark" ${repeatOn() ? 'checked' : ''}> 한 회차에 ${SYN_REPEAT_MIN}번 이상 쓴 비슷한 표현에 점선 밑줄</label>` : ''}
+ <label class="check"><input type="checkbox" data-opt="nativeSpell" ${S.nativeSpell !== false ? 'checked' : ''}> 윈도우(브라우저) 맞춤법 검사도 같이 쓰기 <small style="color:var(--muted)">(빨간 줄, 오른쪽 클릭으로 고치기)</small></label>
+            <label class="check"><input type="checkbox" data-opt="aiAuto" ${S.aiAuto !== false ? 'checked' : ''}> 쓰다가 멈추면 AI가 새로 쓴 문단 맞춤법 자동 검사 <small style="color:var(--muted)">${aiReady() ? '(몇 초 뒤 밑줄)' : '(아래에 AI 키를 넣으면 켜져요)'}</small></label>
             <label class="check"><input type="checkbox" data-opt="crisp" ${S.crisp !== false ? 'checked' : ''}> 원고 글자 진하게 <small style="color:var(--muted)">(명조체 가로획이 흐리거나 끊겨 보일 때)</small></label>
             <div style="display:flex;gap:6px;margin-top:12px"><button class="btn" data-x="typo">원고 글자 크기 · 줄간격 · 문단…</button></div>
             <label id="set-ai">AI 표현 추천 <small>(비슷한 표현에서 ‘AI 추천’을 쓸 때)</small></label>
@@ -5696,6 +5767,7 @@ function openSettings(focus) {
     bg.addEventListener('change', e => {
         const o = e.target.dataset && e.target.dataset.opt; if (!o) return;
         S[o] = e.target.checked; touch(S); applyPref(); refreshLiveSpell(); refreshRepeat();
+        if (o === 'nativeSpell') $$('.manuscript[data-field="body"]').forEach(m => m.setAttribute('spellcheck', String(S.nativeSpell !== false)));
     });
     bg.addEventListener('click', async e => {
         const t = e.target.closest('button'); if (e.target === bg || t?.dataset.x === 'close') { bg.remove(); return; }

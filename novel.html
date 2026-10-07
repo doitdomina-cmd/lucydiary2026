@@ -687,6 +687,8 @@ kbd { font: 12px/1.4 ui-monospace, monospace; background: var(--panel2); border:
 .pv-note { font-size: 11px; color: var(--muted); padding: 4px 12px; }
 .pv-pages { flex: 1; overflow: auto; min-height: 0; }
 .pv-stack { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 12px 12px 40px; }
+.pv-edit { font-size: 11px; color: var(--accent); padding: 0 4px; border-radius: 4px; }
+.pv-edit:hover { background: var(--accent-soft); }
 .pv-selbar { position: fixed; z-index: 60; display: flex; align-items: center; gap: 4px; padding: 5px 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 6px 20px rgba(0,0,0,.14); }
 .pv-dot { width: 18px; height: 18px; border-radius: 50%; background: var(--c); border: 2px solid var(--panel); box-shadow: 0 0 0 1px var(--line); }
 .pv-dot:hover { transform: scale(1.12); }
@@ -5375,7 +5377,7 @@ function renderPageView(paneEl, doc) {
         <select data-pv-layout>${pageLayouts().map(l => `<option value="${l.id}" ${l.id === L.id ? 'selected' : ''}>${esc(l.name)}</option>`).join('')}<option value="__new">＋ 내 판형 만들기…</option></select>
         <button class="mini" data-pv-z="-0.1">－</button><span>${Math.round((W.pageZoom || 1) * 100)}%</span><button class="mini" data-pv-z="0.1">＋</button>
         <b>${r.pages.length}쪽 · ${r.lines}줄/쪽</b><span style="flex:1"></span><button class="mini" data-a="pages">쪽 보기 끄기</button></div>
-        <div class="pv-note">${esc(L.name)} ${L.w}×${L.h}mm · ${esc(L.font)} ${L.pt}pt · ${Math.round(L.lh * 100)}% — 대략적인 크기라 실제 앱의 쪽 수와는 조금 다를 수 있어요.</div>
+        <div class="pv-note">${esc(L.name)} ${L.w}×${L.h}mm · ${esc(L.font)} ${L.pt}pt · ${Math.round(L.lh * 100)}% <button class="pv-edit" data-pv-edit title="판형 수치 고치기"><i class="ic ic-pen-line"></i> 수치 고치기</button> — 대략적인 크기라 실제 앱의 쪽 수와는 조금 다를 수 있어요.</div>
         <div class="pv-pages"><div class="pv-stack" style="zoom:${zoom}">${r.pages.map((p, i) => `<div class="pv-page" style="width:${r.pw}px;height:${r.ph}px;padding:${r.m}px;font-family:${pageFont(L.font)};font-size:${r.fpx}px;line-height:${L.lh}">
             <div class="pv-text">${p.join('')}</div><div class="pv-no">${i + 1} / ${r.pages.length}</div></div>`).join('')}</div></div>`;
     $('.pv-pages', host).scrollTop = keep;
@@ -5540,24 +5542,30 @@ document.addEventListener('click', e => {
     };
     memoInput(pvBar, old.replace(/^@/, ''), v => edit(sp => { sp.textContent = '@' + v; }), place, () => edit(sp => sp.remove()));
 });
-function newPageLayout() {
+// base가 있으면 그 판형 수치를 고침 (기본 판형은 고친 값으로 '내 판형'을 새로 만듦)
+function newPageLayout(base) {
+    const mine = base && (settings().pageLayouts || []).some(l => l.id === base.id);
+    const B = base || { name: '내 판형', w: 80, h: 140, font: '명조', pt: 10, lh: 1.5 };
     const bg = document.createElement('div'); bg.className = 'modal-bg';
-    bg.innerHTML = `<div class="modal"><h3>내 판형 만들기</h3>
-        <label>이름</label><input type="text" data-k="name" value="내 판형">
-        <label>용지 가로 × 세로 (mm)</label><div style="display:flex;gap:6px"><input type="number" data-k="w" value="80" min="40" max="300"><input type="number" data-k="h" value="140" min="60" max="400"></div>
-        <label>글꼴</label><select data-k="font"><option>명조</option><option>나눔명조</option><option>고딕</option><option>리디바탕</option></select>
-        <label>글자 크기 (pt)</label><input type="number" data-k="pt" value="10" step="0.5" min="6" max="20">
-        <label>줄간격 (%)</label><input type="number" data-k="lh" value="150" step="5" min="100" max="300">
-        <div class="row2"><button class="btn" data-x="0">취소</button><button class="btn primary" data-x="1">저장</button></div></div>`;
+    bg.innerHTML = `<div class="modal"><h3>${base ? '판형 수치 고치기' : '내 판형 만들기'}</h3>
+        ${base && !mine ? '<p class="modal-note" style="margin-top:0">기본 판형은 그대로 두고, 고친 수치로 내 판형을 새로 만들어요.</p>' : ''}
+        <label>이름</label><input type="text" data-k="name" value="${esc(base && !mine ? B.name + ' (내 판형)' : B.name)}">
+        <label>용지 가로 × 세로 (mm)</label><div style="display:flex;gap:6px"><input type="number" data-k="w" value="${B.w}" min="40" max="300"><input type="number" data-k="h" value="${B.h}" min="60" max="400"></div>
+        <label>글꼴</label><select data-k="font">${['명조', '바탕', '나눔명조', '고딕', '리디바탕'].map(f => `<option ${f === B.font ? 'selected' : ''}>${f}</option>`).join('')}</select>
+        <label>글자 크기 (pt)</label><input type="number" data-k="pt" value="${B.pt}" step="0.5" min="6" max="20">
+        <label>줄간격 (%)</label><input type="number" data-k="lh" value="${Math.round(B.lh * 100)}" step="5" min="100" max="300">
+        <div class="row2">${mine ? '<button class="btn" data-x="del" style="margin-right:auto;color:var(--danger)">이 판형 지우기</button>' : ''}<button class="btn" data-x="0">취소</button><button class="btn primary" data-x="1">저장</button></div></div>`;
     document.body.appendChild(bg);
     return new Promise(resolve => {
         bg.addEventListener('click', e => {
             const x = e.target.dataset.x;
             if (e.target === bg || x === '0') { bg.remove(); resolve(null); return; }
+            const S = settings();
+            if (x === 'del') { S.pageLayouts = (S.pageLayouts || []).filter(l => l.id !== base.id); touch(S); bg.remove(); resolve({ id: PAGE_PRESETS[0].id }); return; }
             if (x !== '1') return;
             const v = k => $(`[data-k="${k}"]`, bg).value;
-            const L = { id: uid('pl'), name: v('name').trim() || '내 판형', w: +v('w') || 80, h: +v('h') || 140, font: v('font'), pt: +v('pt') || 10, lh: (+v('lh') || 150) / 100 };
-            const S = settings(); S.pageLayouts = [...(S.pageLayouts || []), L]; touch(S);
+            const L = { id: mine ? base.id : uid('pl'), name: v('name').trim() || '내 판형', w: +v('w') || 80, h: +v('h') || 140, font: v('font'), pt: +v('pt') || 10, lh: (+v('lh') || 150) / 100 };
+            S.pageLayouts = mine ? S.pageLayouts.map(l => l.id === L.id ? L : l) : [...(S.pageLayouts || []), L]; touch(S);
             bg.remove(); resolve(L);
         });
     });
@@ -5568,6 +5576,12 @@ document.addEventListener('change', async e => {
     if (id === '__new') { const L = await newPageLayout(); if (!L) { renderEditors(); return; } id = L.id; }
     setWL(W => { W.pageLayout = id; });
     renderEditors();
+});
+document.addEventListener('click', async e => {
+    if (!(e.target.closest && e.target.closest('[data-pv-edit]'))) return;
+    const L = pageLayouts().find(l => l.id === WL().pageLayout) || PAGE_PRESETS[0];
+    const N = await newPageLayout(L); if (!N) return;
+    setWL(W => { W.pageLayout = N.id; }); renderEditors();
 });
 document.addEventListener('click', e => {
     const z = e.target.closest && e.target.closest('[data-pv-z]'); if (!z) return;

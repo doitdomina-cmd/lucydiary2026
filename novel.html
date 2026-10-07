@@ -6824,7 +6824,8 @@ setInterval(maybeDriveBackup, 5 * 60 * 1000);
    구글 드라이브 PC 앱 폴더를 고르면 드라이브에도 저절로 올라감 (드라이브 권한 1시간 제한 없음).
    바뀐 게 있으면 1시간마다, 최근 10개만 남김. 폴더 정보는 이 기기에만 기억 */
 const FOLDER_OK = 'showDirectoryPicker' in window && !IN_PREVIEW;
-const FOLDER_KEEP = 10, FOLDER_EVERY = 60 * 60 * 1000, FOLDER_PREFIX = '루시의작업실_백업_', FOLDER_PREFIX_EN = 'lucy-backup_';
+// 파일 이름은 정산 앱처럼: 원고_자동백업_2026-10-07_1730.json (+ 늘 최신으로 덮어쓰는 원고_자동백업_데이터.json)
+const FOLDER_KEEP = 10, FOLDER_EVERY = 60 * 60 * 1000, FOLDER_PREFIX = '원고_자동백업_', FOLDER_PREFIX_EN = 'lucy-backup_', FOLDER_LATEST = '원고_자동백업_데이터.json', FOLDER_OLD = '루시의작업실_백업_';
 let backupDir = null, folderBusy = false, folderAsked = false;
 async function loadBackupDir() { if (!FOLDER_OK || !useIDB) return; try { backupDir = (await store.getKV('backupDir')) || null; } catch (_) { backupDir = null; } }
 async function dirPerm(ask) {
@@ -6840,15 +6841,20 @@ async function pickBackupDir() {
 }
 async function folderBackupNow() {
     if (await dirPerm(false) !== 'granted') throw new Error('폴더에 쓰는 걸 허용해 주세요.');
-    const d = new Date(), tail = `${stamp(d)}${String(d.getSeconds()).padStart(2, '0')}.json`;
-    let name = FOLDER_PREFIX + tail, fh;
-    try { fh = await backupDir.getFileHandle(name, { create: true }); }
-    catch (e) { name = FOLDER_PREFIX_EN + tail; fh = await backupDir.getFileHandle(name, { create: true }); } // 한글 파일 이름을 못 쓰는 곳이면 영어 이름으로
-    const w = await fh.createWritable(); await w.write(JSON.stringify({ app: 'novel-writer', version: 3, items })); await w.close();
-    const list = [];
-    for await (const [n, h] of backupDir.entries()) if (h.kind === 'file' && (n.startsWith(FOLDER_PREFIX) || n.startsWith(FOLDER_PREFIX_EN)) && n.endsWith('.json')) list.push(n);
-    list.sort((a, b) => b.slice(-20).localeCompare(a.slice(-20))); // 날짜 부분으로 최신 순
-    for (const n of list.slice(FOLDER_KEEP)) await backupDir.removeEntry(n).catch(() => {});
+    const d = new Date(), p2 = n => String(n).padStart(2, '0');
+    const tail = `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}.json`;
+    const data = JSON.stringify({ app: 'novel-writer', version: 3, items });
+    const put = async n => { const fh = await backupDir.getFileHandle(n, { create: true }); const w = await fh.createWritable(); await w.write(data); await w.close(); };
+    let name = FOLDER_PREFIX + tail;
+    try { await put(name); await put(FOLDER_LATEST); }
+    catch (e) { name = FOLDER_PREFIX_EN + tail; await put(name); } // 한글 파일 이름을 못 쓰는 곳이면 영어 이름으로
+    // 날짜 붙은 백업은 최근 FOLDER_KEEP개만 (예전 이름 파일도 같이 정리)
+    const lists = { [FOLDER_PREFIX]: [], [FOLDER_PREFIX_EN]: [], [FOLDER_OLD]: [] };
+    for await (const [n, h] of backupDir.entries()) {
+        if (h.kind !== 'file' || !n.endsWith('.json') || n === FOLDER_LATEST) continue;
+        const k = Object.keys(lists).find(p => n.startsWith(p)); if (k) lists[k].push(n);
+    }
+    for (const arr of Object.values(lists)) { arr.sort().reverse(); for (const n of arr.slice(FOLDER_KEEP)) await backupDir.removeEntry(n).catch(() => {}); }
     pref.folderAt = Date.now(); pref.folderSig = backupSig(); savePref();
     return name;
 }

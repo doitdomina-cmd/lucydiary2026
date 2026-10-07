@@ -12,6 +12,7 @@
 <style>
 /* 리디바탕: 컴퓨터에 깔려 있으면 그걸 쓰고, 없으면 무료 웹 글꼴(눈누)을 받아 씀
    한컴 산뜻돋움: 한컴오피스(한글)가 깔린 컴퓨터에서만 보임 (없으면 Pretendard로 보임) */
+@font-face { font-family: 'LucyQuote'; font-display: swap; unicode-range: U+2018-201D; src: local('Nanum Myeongjo'), local('NanumMyeongjo'), local('나눔명조'), local('AppleMyungjo'), local('Batang'), local('바탕'), local('Noto Serif KR'), local('Noto Serif CJK KR'), local('RIDIBatang'), local('리디바탕'), url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_twelve@1.0/RIDIBatang.woff') format('woff'); }
 @font-face { font-family: 'RIDIBatang'; font-display: swap; src: local('RIDIBatang'), local('리디바탕'), url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_twelve@1.0/RIDIBatang.woff') format('woff'); }
 </style>
 <link href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700&family=Nanum+Gothic:wght@400;700&family=Gowun+Batang:wght@400;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
@@ -213,7 +214,18 @@ main { height: calc(100% - 82px); display: flex; }
 .editor-grid.n3 { grid-template-columns: 1fr 1fr 1fr; }
 .editor-grid.n4 { grid-template: 1fr 1fr / 1fr 1fr; }
 .epane { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--paper); }
-.epane.active > .pane-head { box-shadow: inset 0 2px 0 var(--accent); }
+.editor-grid.n1 .epane.active > .pane-head { box-shadow: none; }
+.editor-grid:not(.n1) { position: relative; gap: 8px; padding: 6px; background: var(--bg); }
+.editor-grid:not(.n1) .epane { border-radius: 8px; overflow: hidden; outline: 1px solid var(--line); outline-offset: -1px; }
+.editor-grid:not(.n1) .epane.active { outline: 2px solid var(--accent); outline-offset: -2px; }
+.pane-gut { position: absolute; z-index: 6; cursor: col-resize; touch-action: none; }
+.pane-gut.gut-row { cursor: row-resize; }
+.pane-gut::after { content: ''; position: absolute; inset: 0; margin: auto; border-radius: 2px; background: transparent; transition: background .15s; }
+.pane-gut:not(.gut-row)::after { width: 2px; }
+.pane-gut.gut-row::after { height: 2px; }
+.pane-gut:hover::after, .pane-gut.drag::after { background: var(--accent); }
+body.pane-resizing, body.pane-resizing * { cursor: col-resize !important; user-select: none !important; }
+body.pane-resizing.gut-row, body.pane-resizing.gut-row * { cursor: row-resize !important; }
 .tabs { flex: 1; min-width: 0; display: flex; gap: 2px; overflow-x: auto; scrollbar-width: thin; }
 .tab { display: flex; align-items: center; gap: 3px; padding: 3px 4px 3px 8px; border-radius: 6px 6px 0 0; font-size: 12px; white-space: nowrap; cursor: pointer; color: var(--muted); max-width: 170px; border: 1px solid transparent; }
 .tab span { overflow: hidden; text-overflow: ellipsis; }
@@ -236,6 +248,7 @@ main { height: calc(100% - 82px); display: flex; }
 .ai-test.ok { color: var(--accent); }
 .ai-test.err { color: var(--danger); }
 :root.ed-crisp .manuscript { -webkit-text-stroke: 0.018em currentColor; }
+:root.q-serif .manuscript, :root.q-serif .pv-page { font-family: 'LucyQuote', var(--ed-font, 'Nanum Myeongjo'), serif; }
 .tip { position: fixed; z-index: 200; pointer-events: none; background: #2b2e28; color: #fff; font-size: 12px; line-height: 1.4; padding: 5px 9px; border-radius: 6px; max-width: 260px; white-space: normal; box-shadow: 0 4px 12px rgba(0,0,0,.18); opacity: 0; transition: opacity .12s; }
 .tip.show { opacity: 1; }
 .tip::after { content: ''; position: absolute; left: var(--ax, 50%); top: 100%; transform: translateX(-50%); border: 5px solid transparent; border-top-color: #2b2e28; }
@@ -1022,6 +1035,7 @@ nav.mtabs { display: none; }
     .synop-grid .pane:not(.active) { display: none; }
     .editor-grid { grid-template: 1fr / 1fr !important; }
     .editor-grid .epane:not(.active) { display: none; }
+    .editor-grid { padding: 0 !important; gap: 0 !important; } .editor-grid .epane { outline: 0 !important; border-radius: 0 !important; } .pane-gut { display: none; }
     .manuscript { padding: 14px 16px 45vh; }
     .row .r-more { opacity: 1; }
     nav.mtabs { display: flex; position: fixed; left: 0; right: 0; bottom: 0; height: calc(54px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); background: var(--panel); border-top: 1px solid var(--line); z-index: 40; }
@@ -1717,6 +1731,7 @@ function renderEditors() {
         </div>`;
     }
     grid.innerHTML = html;
+    applyPaneSplit();
     fillImages(grid);
     $$('.manuscript', grid).forEach(decorateFolds);
     for (let i = 0; i < W.editorN; i++) { const it = get(W.panes[i].active); if (it && it.kind === 'episode') renderFoot(it); }
@@ -1726,6 +1741,62 @@ function renderEditors() {
     restoreScroll();
     scheduleLiveSpell();
 }
+// 분할 창 너비 조절 (기기별 저장)
+function paneSplitKeys(n) { return n === 2 ? [['c2', 2]] : n === 3 ? [['c3', 3]] : n === 4 ? [['c4', 2], ['r4', 2]] : []; }
+function paneFr(key, len) { const a = pref.paneSplit && pref.paneSplit[key]; return Array.isArray(a) && a.length === len && a.every(x => x > 0) ? a : Array(len).fill(1); }
+function applyPaneSplit() {
+    const grid = $('#editor-grid'), n = WL().editorN;
+    grid.style.gridTemplateColumns = ''; grid.style.gridTemplateRows = '';
+    $$('.pane-gut', grid).forEach(g => g.remove());
+    if (n < 2) return;
+    const fr = a => a.map(x => `minmax(0, ${x}fr)`).join(' ');
+    if (n === 4) { grid.style.gridTemplateColumns = fr(paneFr('c4', 2)); grid.style.gridTemplateRows = fr(paneFr('r4', 2)); }
+    else grid.style.gridTemplateColumns = fr(paneFr('c' + n, n));
+    const cols = n === 4 ? 1 : n - 1;
+    for (let k = 0; k < cols; k++) grid.insertAdjacentHTML('beforeend', `<div class="pane-gut" data-g="${n === 4 ? 'c4' : 'c' + n}" data-k="${k}" title="끌어서 너비 조절 · 두 번 눌러 똑같이"></div>`);
+    if (n === 4) grid.insertAdjacentHTML('beforeend', `<div class="pane-gut gut-row" data-g="r4" data-k="0" title="끌어서 높이 조절 · 두 번 눌러 똑같이"></div>`);
+    placePaneGutters();
+}
+function placePaneGutters() {
+    const grid = $('#editor-grid'); const gs = $$('.pane-gut', grid); if (!gs.length) return;
+    const panes = $$('.epane', grid);
+    gs.forEach(g => {
+        const k = +g.dataset.k, row = g.classList.contains('gut-row');
+        const a = panes[k], b = row ? panes[2] : panes[k + 1]; if (!a || !b) return;
+        if (row) { const top = a.offsetTop + a.offsetHeight, gap = b.offsetTop - top; Object.assign(g.style, { left: '0', right: '0', top: top - 3 + 'px', height: gap + 6 + 'px', width: '' }); }
+        else { const left = a.offsetLeft + a.offsetWidth, gap = b.offsetLeft - left; Object.assign(g.style, { top: '0', bottom: '0', left: left - 3 + 'px', width: gap + 6 + 'px', height: '' }); }
+    });
+}
+new ResizeObserver(() => placePaneGutters()).observe($('#editor-grid'));
+$('#editor-grid').addEventListener('dblclick', e => {
+    const g = e.target.closest('.pane-gut'); if (!g) return;
+    pref.paneSplit = pref.paneSplit || {}; delete pref.paneSplit[g.dataset.g]; savePref(); applyPaneSplit();
+});
+$('#editor-grid').addEventListener('pointerdown', e => {
+    const g = e.target.closest('.pane-gut'); if (!g) return;
+    e.preventDefault(); e.stopPropagation();
+    const grid = $('#editor-grid'), key = g.dataset.g, k = +g.dataset.k, row = g.classList.contains('gut-row');
+    const panes = $$('.epane', grid);
+    const sizes = row ? [panes[0].offsetHeight, panes[2].offsetHeight] : (key === 'c4' ? [panes[0], panes[1]] : panes).map(p => p.offsetWidth);
+    const start = row ? e.clientY : e.clientX, a0 = sizes[k], b0 = sizes[k + 1], MIN = row ? 120 : 220;
+    g.classList.add('drag'); document.body.classList.add('pane-resizing'); document.body.classList.toggle('gut-row', row);
+    try { g.setPointerCapture(e.pointerId); } catch (_) {}
+    const move = ev => {
+        let d = (row ? ev.clientY : ev.clientX) - start;
+        d = Math.max(MIN - a0, Math.min(b0 - MIN, d));
+        sizes[k] = a0 + d; sizes[k + 1] = b0 - d;
+        const tot = sizes.reduce((x, y) => x + y, 0);
+        pref.paneSplit = pref.paneSplit || {}; pref.paneSplit[key] = sizes.map(x => Math.round(x / tot * 1000) / 1000);
+        const fr = pref.paneSplit[key].map(x => `minmax(0, ${x}fr)`).join(' ');
+        if (row) grid.style.gridTemplateRows = fr; else grid.style.gridTemplateColumns = fr;
+        placePaneGutters();
+    };
+    const up = () => {
+        g.removeEventListener('pointermove', move); g.removeEventListener('pointerup', up); g.removeEventListener('pointercancel', up);
+        g.classList.remove('drag'); document.body.classList.remove('pane-resizing', 'gut-row'); savePref();
+    };
+    g.addEventListener('pointermove', move); g.addEventListener('pointerup', up); g.addEventListener('pointercancel', up);
+});
 // 같은 기기 안에서 탭을 오갈 때 스크롤 위치 유지
 const scrollMem = {};
 function rememberScroll() { $$('.ed-wrap[data-scroll]').forEach(w => { scrollMem[w.dataset.scroll] = w.scrollTop; }); }
@@ -1809,6 +1880,7 @@ function applyPref() {
     s.setProperty('--ed-align', P.align);
     s.setProperty('--ed-zoom', (pref.zoom || 100) / 100);
     document.documentElement.classList.toggle('ed-crisp', S.crisp !== false);
+    document.documentElement.classList.toggle('q-serif', S.quoteSerif !== false);
     applyPalette();
 }
 function applyWidths() {
@@ -4755,9 +4827,11 @@ function curlyChar(ch, prev) {
     if (ch === '"') return open ? '“' : '”';
     return open ? '‘' : '’';
 }
+// 곧은 따옴표처럼 쓰이는 비슷한 글자 (전각·프라임·억음 부호)
+const QUOTE_LIKE = { '＂': '"', '″': '"', '‶': '"', '〃': '"', '＇': "'", '′': "'", '‵': "'", '´': "'", '`': "'" };
 function curlyText(text, prev = '') {
     let out = '', p = prev;
-    for (const ch of text) { const c = (ch === '"' || ch === "'") ? curlyChar(ch, p) : ch; out += c; p = c; }
+    for (let ch of text) { if (QUOTE_LIKE[ch]) ch = QUOTE_LIKE[ch]; const c = (ch === '"' || ch === "'") ? curlyChar(ch, p) : ch; out += c; p = c; }
     return out;
 }
 // 방금 입력한 곧은 따옴표를 굽은 따옴표로 바꿈
@@ -4825,7 +4899,9 @@ function convertQuotesIn(docs) {
         d.body = r.html; touch(d); total += r.changed; touched++;
     });
     renderAll();
-    toast(total ? `${touched}편에서 따옴표 ${fmt(total)}개를 “ ” ‘ ’로 바꿨어요. 바꾸기 전 원고는 버전 기록에 있어요.` : '바꿀 곧은 따옴표가 없어요.');
+    const curly = docs.reduce((n, d) => n + ((d.body || '').match(/[“”‘’]/g) || []).length, 0);
+    toast(total ? `${touched}편에서 따옴표 ${fmt(total)}개를 “ ” ‘ ’로 바꿨어요. 바꾸기 전 원고는 버전 기록에 있어요.`
+        : curly ? `이미 모두 굽은 따옴표 “ ” ‘ ’예요 (${fmt(curly)}개). 얇아 보이면 ‘따옴표는 명조 모양으로 보기’를 켜 주세요.` : '바꿀 곧은 따옴표가 없어요.');
 }
 function tryAutoReplace(ed) {
     const rules = replaceRules().filter(r => r.on !== false && r.from);
@@ -4874,6 +4950,8 @@ function openAutoReplace() {
         bg.innerHTML = `<div class="modal"><div style="display:flex;align-items:center;margin-bottom:8px"><h3 style="margin:0;flex:1"><i class="ic ic-replace"></i> 자동 치환 · 따옴표</h3><button class="mini" data-x="close">✕</button></div>
             <div class="sq-box"><label class="check"><input type="checkbox" data-sq ${smartOn() ? 'checked' : ''}> 따옴표는 언제나 굽은 따옴표 <b>“ ” ‘ ’</b></label>
                 <p class="modal-note" style="margin-top:4px">켜 두면 " 와 ' 를 입력하거나 붙여넣을 때 바로 “ ” ‘ ’로 바뀌고, 복사·내보내기·미리보기에도 굽은 따옴표로 나가요. 한글에 붙여넣을 때 좋아요.</p>
+                <label class="check" style="margin-top:6px"><input type="checkbox" data-qs ${settings().quoteSerif !== false ? 'checked' : ''}> 따옴표는 명조 모양으로 보기 <b style="font-family:'LucyQuote',serif">“ ”</b></label>
+                <p class="modal-note" style="margin-top:2px">원고 글꼴이 고딕이어도 “ ” ‘ ’만 명조 모양으로 또렷하게 보여요. 글자는 그대로예요.</p>
                 <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><button class="btn" data-sqc="cur">지금 회차 따옴표 바꾸기</button><button class="btn" data-sqc="work">작품 전체 따옴표 바꾸기</button></div></div>
             <h4 style="margin:14px 0 4px;font-size:13px">자동 치환 규칙</h4>
             <p class="modal-note" style="margin-top:0">원고에 왼쪽 글자를 입력하면 바로 오른쪽 글자로 바뀌어요. 바뀐 뒤 Ctrl+Z를 누르면 입력한 그대로 돌아가요. 모든 기기에 똑같이 적용돼요.</p>
@@ -4889,6 +4967,7 @@ function openAutoReplace() {
         if (t.dataset.rpFrom != null) { rules[+t.dataset.rpFrom].from = t.value; save(); }
         if (t.dataset.rpTo != null) { rules[+t.dataset.rpTo].to = t.value; save(); }
         if (t.dataset.rpOn != null) { rules[+t.dataset.rpOn].on = t.checked; save(); }
+        if (t.matches('[data-qs]')) { settings().quoteSerif = t.checked; save(); applyPref(); }
         if (t.matches('[data-sq]')) { settings().smartQuotes = t.checked; save(); toast(t.checked ? '이제 따옴표가 “ ” ‘ ’로 들어가요.' : '따옴표를 입력한 그대로 둬요.'); }
     });
     bg.addEventListener('click', e => {

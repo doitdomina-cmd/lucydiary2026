@@ -692,7 +692,7 @@ kbd { font: 12px/1.4 ui-monospace, monospace; background: var(--panel2); border:
 .pv-bar b { color: var(--text); }
 .pv-bar select { font-size: 12px; }
 .pv-note { font-size: 11px; color: var(--muted); padding: 4px 12px; }
-.pv-pages { flex: 1; overflow: auto; min-height: 0; }
+.pv-pages { flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; }
 .pv-stack { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 12px 12px 40px; }
 .pv-set { display: inline-flex; align-items: center; gap: 3px; }
 .pv-edit { font-size: 11px; color: var(--accent); padding: 0 4px; border-radius: 4px; }
@@ -708,7 +708,7 @@ kbd { font: 12px/1.4 ui-monospace, monospace; background: var(--panel2); border:
 .pv-selbar input { border: 0; outline: none; background: transparent; font-size: 13px; width: 170px; color: var(--text); }
 ::highlight(pv-link) { background-color: color-mix(in srgb, var(--accent) 16%, transparent); }
 .pv-text { user-select: text; }
-.pv-page { background: #fffefa; color: #222; box-shadow: 0 2px 10px rgba(0,0,0,.15); position: relative; flex: none; word-break: keep-all; line-break: strict; overflow-wrap: anywhere; overflow: hidden; }
+.pv-page { background: #fffefa; color: #222; box-shadow: 0 2px 10px rgba(0,0,0,.15); position: relative; flex: none; text-align: justify; line-break: strict; overflow-wrap: anywhere; overflow: hidden; }
 .pv-page { content-visibility: auto; contain-intrinsic-size: auto 500px; }
 .pv-ep { pointer-events: none; position: absolute; top: 3px; left: 0; right: 0; text-align: center; font: 600 9px 'Pretendard', 'Noto Sans KR', sans-serif; color: #b5a9a0; letter-spacing: .04em; }
 .pv-no { position: absolute; bottom: 8px; left: 0; right: 0; text-align: center; font: 10px 'Pretendard', 'Noto Sans KR', sans-serif; color: #aaa; }
@@ -5320,12 +5320,14 @@ const pageFont = f => f === '고딕' ? "'Noto Sans KR', sans-serif" : f === '나
 // 판형의 자간(em)·문단 사이(줄)·들여쓰기(글자). 비어 있으면 원고 설정을 따름
 const pageIndent = L => L.indent != null ? L.indent + 'em' : para().indentPt + 'pt';
 const pageLs = L => (L.ls || 0) + 'em';
+// 줄바꿈: 기본은 책처럼 글자 단위로 꽉 채움, 켜면 낱말 단위
+const pageWb = L => L.wordWrap ? 'keep-all' : 'normal';
 function paginate(doc, L) {
     const pw = Math.round(L.w * MM), ph = Math.round(L.h * MM), m = Math.round(PAGE_MARGIN * MM);
     const fpx = L.pt * 4 / 3, iw = pw - 2 * m, ih = ph - 2 * m - Math.round(fpx * 1.6);
     const S = settings();
     const box = document.createElement('div');
-    box.style.cssText = `position:absolute;left:-9999px;top:0;visibility:hidden;width:${iw}px;font-family:${pageFont(L.font)};font-size:${fpx}px;line-height:${L.lh};letter-spacing:${pageLs(L)};word-break:keep-all;line-break:strict;overflow-wrap:anywhere`;
+    box.style.cssText = `position:absolute;left:-9999px;top:0;visibility:hidden;width:${iw}px;font-family:${pageFont(L.font)};font-size:${fpx}px;line-height:${L.lh};letter-spacing:${pageLs(L)};word-break:${pageWb(L)};line-break:strict;overflow-wrap:anywhere`;
     document.body.appendChild(box);
     const pStyle = `margin:0 0 ${(L.pgap || 0) * L.lh}em;text-indent:${pageIndent(L)};white-space:pre-wrap`;
     const blocks = applyLineRules(toBlocks(doc.body), lineRules());
@@ -5374,7 +5376,14 @@ function paginate(doc, L) {
     box.remove();
     return { pages, pw, ph, m, fpx, lines: Math.floor(ih / (fpx * L.lh)) };
 }
-var pvKeep = {}; // 원고 창을 다시 그려도 쪽 보기 스크롤 위치 유지
+var pvKeep = {};
+// 창 너비가 바뀌면(분할 끌기 등) 쪽 보기를 다시 맞춤
+var pvResizeT = 0;
+var pvResizeObs = new ResizeObserver(es => {
+    if (!es.some(e => e.target.isConnected && Math.abs(e.target.clientWidth - +(e.target.dataset.w || 0)) > 4)) return;
+    clearTimeout(pvResizeT);
+    pvResizeT = setTimeout(() => $$('.epane').forEach(pe => { const host = $('.page-view', pe), p = WL().panes[+pe.dataset.pane], it = p && get(p.active); if (host && p.pageView && it && Math.abs(host.clientWidth - +(host.dataset.w || 0)) > 4) renderPageView(pe, it); }), 150);
+}); // 원고 창을 다시 그려도 쪽 보기 스크롤 위치 유지
 // 쪽 보기로 볼 회차 범위: 이 화만 / 5화씩 / 10화씩 / 이 권(폴더) / 전체
 const PV_RANGES = [['1', '이 화만'], ['5', '5화씩'], ['10', '10화씩'], ['folder', '이 권 (폴더)'], ['all', '전체']];
 function pvRangeDocs(doc, range) {
@@ -5389,7 +5398,7 @@ function pvRangeDocs(doc, range) {
 const pvCache = new Map();
 function paginateCached(doc, L) {
     const P = para();
-    const key = [doc.rev, (doc.body || '').length, L.id, L.w, L.h, L.font, L.pt, L.lh, L.ls, L.pgap, L.indent, P.indentPt, JSON.stringify(lineRules()), smartOn()].join('|');
+    const key = [doc.rev, (doc.body || '').length, L.id, L.w, L.h, L.font, L.pt, L.lh, L.ls, L.pgap, L.indent, L.wordWrap, P.indentPt, JSON.stringify(lineRules()), smartOn()].join('|');
     const c = pvCache.get(doc.id);
     if (c && c.key === key) return c.r;
     const r = paginate(doc, L); pvCache.set(doc.id, { key, r });
@@ -5401,20 +5410,22 @@ function renderPageView(paneEl, doc) {
     const host = $('.page-view', paneEl); if (!host) return;
     const pane = W.panes[+paneEl.dataset.pane] || {}, range = pane.pvRange || '1';
     // 판형이 창보다 넓으면 창 너비에 맞춰 줄이고, 그 위에 사용자가 고른 배율을 곱함
-    const fit = Math.min(1, (host.clientWidth - 28) / (L.w * MM));
-    const zoom = Math.max(0.2, fit * (W.pageZoom || 1));
+    // 확대해도 쪽이 창 너비를 넘지 않게 (창 밖으로 삐져나가지 않게)
+    const maxZ = (host.clientWidth - 28) / (L.w * MM), fit = Math.min(1, maxZ);
+    const zoom = Math.max(0.2, Math.min(maxZ, fit * (W.pageZoom || 1)));
+    host.dataset.w = host.clientWidth; pvResizeObs.observe(host);
     const keep = $('.pv-pages', host)?.scrollTop ?? pvKeep[+paneEl.dataset.pane] ?? 0;
     const docs = pvRangeDocs(doc, range);
     const parts = docs.map(d => ({ d, r: paginateCached(d, L) }));
     const r0 = parts[0].r, total = parts.reduce((n, x) => n + x.r.pages.length, 0);
     let no = 0;
-    const pagesHtml = parts.map(({ d, r }) => r.pages.map((p, i) => { no++; return `<div class="pv-page" data-doc="${d.id}" style="width:${r.pw}px;height:${r.ph}px;padding:${r.m}px;font-family:${pageFont(L.font)};font-size:${r.fpx}px;line-height:${L.lh};letter-spacing:${pageLs(L)}">
+    const pagesHtml = parts.map(({ d, r }) => r.pages.map((p, i) => { no++; return `<div class="pv-page" data-doc="${d.id}" style="width:${r.pw}px;height:${r.ph}px;padding:${r.m}px;font-family:${pageFont(L.font)};font-size:${r.fpx}px;line-height:${L.lh};letter-spacing:${pageLs(L)};word-break:${pageWb(L)}">
             ${docs.length > 1 && i === 0 ? `<div class="pv-ep">${esc(d.title || '제목 없음')}</div>` : ''}<div class="pv-text">${p.join('')}</div><div class="pv-no">${docs.length > 1 ? `${esc(d.title || '')} · ` : ''}${no} / ${total}</div></div>`; }).join('')).join('');
     const rangeLabel = docs.length > 1 ? `${esc(docs[0].title || '')} ~ ${esc(docs[docs.length - 1].title || '')} (${docs.length}화) · ` : '';
     host.dataset.doc = doc.id;
     host.innerHTML = `<div class="pv-bar"><span>쪽 나눠 보기</span>
         <select data-pv-range title="쪽 보기로 볼 회차">${PV_RANGES.map(([v, n]) => `<option value="${v}" ${v === range ? 'selected' : ''}>${n}</option>`).join('')}</select>
-        <select data-pv-layout>${pageLayouts().map(l => `<option value="${l.id}" ${l.id === L.id ? 'selected' : ''}>${esc(l.name)}</option>`).join('')}<option value="__new">＋ 내 판형 만들기…</option></select><button class="mini pv-set" data-pv-edit title="글꼴·크기·줄간격·자간 (${L.w}×${L.h}mm · ${esc(L.font)} ${L.pt}pt · ${Math.round(L.lh * 100)}%)"><i class="ic ic-type"></i> 조판 설정</button>
+        <select data-pv-layout>${pageLayouts().map(l => `<option value="${l.id}" ${l.id === L.id ? 'selected' : ''}>${esc(l.name)}</option>`).join('')}<option value="__new">＋ 내 판형 만들기…</option></select><button class="mini pv-set" data-pv-edit title="조판 설정: 글꼴·크기·줄간격·자간 (${L.w}×${L.h}mm · ${esc(L.font)} ${L.pt}pt · ${Math.round(L.lh * 100)}%)"><i class="ic ic-settings"></i></button>
         <button class="mini" data-pv-z="-0.1">－</button><span>${Math.round((W.pageZoom || 1) * 100)}%</span><button class="mini" data-pv-z="0.1">＋</button>
         <b>${rangeLabel}${total}쪽 · ${r0.lines}줄/쪽</b><span style="flex:1"></span><button class="mini" data-a="pages">쪽 보기 끄기</button></div>
         <div class="pv-pages"><div class="pv-stack" style="zoom:${zoom}">${pagesHtml}</div></div>`;
@@ -5598,6 +5609,7 @@ function newPageLayout(base) {
         <label>자간 (%) <small class="modal-note">0이 보통, -5는 좁게, 5는 넓게</small></label><input type="number" data-k="ls" value="${Math.round((B.ls || 0) * 100)}" step="1" min="-15" max="30">
         <label>문단 사이 띄움 (줄) <small class="modal-note">0이면 붙여서, 1이면 한 줄 띄움</small></label><input type="number" data-k="pgap" value="${B.pgap || 0}" step="0.25" min="0" max="3">
         <label>들여쓰기 (글자) <small class="modal-note">비워 두면 원고 설정대로</small></label><input type="number" data-k="indent" value="${B.indent ?? ''}" step="0.5" min="0" max="4">
+        <label class="check" style="margin-top:8px"><input type="checkbox" data-k="wordWrap" ${B.wordWrap ? 'checked' : ''}> 낱말 단위로 줄바꿈 <small class="modal-note">끄면 책처럼 글자 단위로 줄 끝까지 꽉 채워요</small></label>
         <div class="row2">${mine ? '<button class="btn" data-x="del" style="margin-right:auto;color:var(--danger)">이 판형 지우기</button>' : ''}<button class="btn" data-x="0">취소</button><button class="btn primary" data-x="1">저장</button></div></div>`;
     document.body.appendChild(bg);
     return new Promise(resolve => {
@@ -5608,7 +5620,7 @@ function newPageLayout(base) {
             if (x === 'del') { S.pageLayouts = (S.pageLayouts || []).filter(l => l.id !== base.id); touch(S); bg.remove(); resolve({ id: PAGE_PRESETS[0].id }); return; }
             if (x !== '1') return;
             const v = k => $(`[data-k="${k}"]`, bg).value;
-            const L = { id: mine ? base.id : uid('pl'), name: v('name').trim() || '내 판형', w: +v('w') || 80, h: +v('h') || 140, font: v('font'), pt: +v('pt') || 10, lh: (+v('lh') || 150) / 100, ls: (+v('ls') || 0) / 100, pgap: +v('pgap') || 0, indent: v('indent') === '' ? null : +v('indent') };
+            const L = { id: mine ? base.id : uid('pl'), name: v('name').trim() || '내 판형', w: +v('w') || 80, h: +v('h') || 140, font: v('font'), pt: +v('pt') || 10, lh: (+v('lh') || 150) / 100, ls: (+v('ls') || 0) / 100, pgap: +v('pgap') || 0, indent: v('indent') === '' ? null : +v('indent'), wordWrap: $('[data-k="wordWrap"]', bg).checked };
             S.pageLayouts = mine ? S.pageLayouts.map(l => l.id === L.id ? L : l) : [...(S.pageLayouts || []), L]; touch(S);
             bg.remove(); resolve(L);
         });

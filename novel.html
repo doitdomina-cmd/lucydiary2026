@@ -128,7 +128,7 @@ main { height: calc(100% - 82px); display: flex; }
 .ex-preview { max-height: 150px; overflow-y: auto; white-space: pre-wrap; font: 12px/1.7 inherit; font-family: inherit; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 0; color: var(--text); }
 .fsz { display: inline-flex; align-items: center; gap: 0; }
 .fsz b { font-size: 12px; font-weight: 600; min-width: 36px; text-align: center; font-variant-numeric: tabular-nums; color: var(--text); }
-.fold-item { display: flex; flex-direction: column; gap: 3px; width: 100%; text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); }
+.fold-item { display: flex; flex-direction: column; gap: 3px; width: 100%; text-align: left; padding: 9px 10px; }
 .fold-item:hover { background: var(--panel2); }
 .fold-item small { font-size: 11px; color: var(--muted); } .fold-item small b { color: #c4553a; font-weight: 700; }
 .fold-item span { font-size: 13px; line-height: 1.6; color: var(--text); }
@@ -242,6 +242,10 @@ main { height: calc(100% - 82px); display: flex; }
 .tip.below::after { top: auto; bottom: 100%; border-top-color: transparent; border-bottom-color: #2b2e28; }
 ::highlight(spell-active) { background-color: rgba(229, 72, 77, .18); }
 .spl { position: fixed; right: 12px; top: 96px; bottom: 12px; width: min(360px, calc(100vw - 24px)); z-index: 60; display: flex; flex-direction: column; background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.14); overflow: hidden; }
+.hlp .hl-filter { gap: 6px; padding-top: 2px; }
+.hl-card { padding: 4px 4px 2px; gap: 0; cursor: default; }
+.hl-card .hl-item { padding: 6px 8px; }
+.hl-card .hl-memo { padding: 0 8px 6px 8px; }
 .rp-hot { background: #fde4dc; color: #c4553a; font-weight: 700; }
 .rp-card.hot { border-color: color-mix(in srgb, #e07a5f 45%, var(--line)); }
 .rp-foot { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
@@ -543,7 +547,7 @@ a.mini { text-decoration: none; color: inherit; display: inline-flex; align-item
 .foldbar .fold-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .foldbar.excl button[data-fa="excl"] { color: #c47a00; }
 .pane-sub { font-size: 11px; color: var(--muted); padding: 6px 12px 0; }
-/* 타임라인 · 연대기 · 복선 */
+/* 회차 흐름 · 타임라인 · 복선 */
 .planner.planner-pane { position: static; inset: auto; z-index: auto; flex: 1; min-height: 0; padding-top: 0; }
 .planner-pane .planner-head { padding: 6px 10px; }
 .planner { position: fixed; inset: 0; z-index: 95; background: var(--bg); display: flex; flex-direction: column; padding-top: env(safe-area-inset-top, 0px); }
@@ -1079,7 +1083,7 @@ nav.mtabs { display: none; }
     <button class="tb small keep-sel" id="btn-syn" title="원고에서 고른 말의 비슷한 표현 · 고른 게 없으면 반복 표현 옆 창"><i class="ic ic-repeat"></i> 비슷한 표현</button>
     <button class="tb small" id="btn-hl" title="작품 전체의 형광펜 목록"><i class="ic ic-highlighter"></i> 형광펜</button>
     <button class="tb small" id="btn-folds" title="작품 전체에서 접어 둔 단락 목록"><i class="ic ic-fold-vertical"></i> 접기 목록</button>
-    <button class="tb small" id="btn-planner" title="타임라인 · 연대기 · 복선"><i class="ic ic-chart-gantt"></i> 타임라인</button>
+    <button class="tb small" id="btn-planner" title="회차 흐름 · 타임라인 · 복선"><i class="ic ic-chart-gantt"></i> 타임라인</button>
     <button class="tb small" id="btn-focus" title="원고만 보기 (Ctrl+Shift+M)"><i class="ic ic-maximize-2"></i> 원고만 보기</button>
 </div>
 
@@ -1687,7 +1691,7 @@ function renderEditors() {
         const ref = get(p.ref);
         const head = p.single
             ? `<select data-role="ep-pick" style="flex:1;min-width:0">${it ? '' : '<option value="">— 문서 선택 —</option>'}${docOptions(it?.id)}</select>`
-            : `<div class="tabs">${p.tabs.map(id => { const d = get(id); return d ? `<div class="tab ${id === p.active ? 'on' : ''}" data-tab="${id}" title="${esc(d.title)}">${d.locked ? '<i class="ic ic-lock"></i>' : d.kind === 'plan' ? '<i class="ic ic-book-open"></i>' : d.kind === 'folder' ? '<i class="ic ic-folder"></i>' : d.kind === 'sbview' ? '<i class="ic ic-layout-dashboard"></i>' : d.kind === 'plview' ? `<i class="ic ic-${d.tab === 'chrono' ? 'history' : d.tab === 'foreshadow' ? 'flag' : 'chart-gantt'}"></i>` : d.kind === 'msel' ? '<i class="ic ic-layout-list"></i>' : ''}<span>${esc(d.title || '제목 없음')}</span><button class="x" data-a="close-tab" title="탭 닫기">✕</button></div>` : ''; }).join('')}</div>`;
+            : `<div class="tabs">${p.tabs.map(id => { const d = get(id); return d ? `<div class="tab ${id === p.active ? 'on' : ''}" data-tab="${id}" title="${esc(d.title)}">${d.locked ? '<i class="ic ic-lock"></i>' : d.kind === 'plan' ? '<i class="ic ic-book-open"></i>' : d.kind === 'folder' ? '<i class="ic ic-folder"></i>' : d.kind === 'sbview' ? '<i class="ic ic-layout-dashboard"></i>' : d.kind === 'plview' ? `<i class="ic ic-${d.tab === 'chrono' ? 'chart-gantt' : d.tab === 'foreshadow' ? 'flag' : 'layers'}"></i>` : d.kind === 'msel' ? '<i class="ic ic-layout-list"></i>' : ''}<span>${esc(d.title || '제목 없음')}</span><button class="x" data-a="close-tab" title="탭 닫기">✕</button></div>` : ''; }).join('')}</div>`;
         html += `<div class="epane ${i === W.activeEditor ? 'active' : ''}" data-pane="${i}">
             <div class="pane-head">${head}
                 <button class="mini ${p.single ? 'on' : ''}" data-a="single" title="${p.single ? '탭 모드로 전환' : '한 회차만 보기로 전환'}">${p.single ? '<i class="ic ic-square"></i>' : '<i class="ic ic-layers"></i>'}</button>
@@ -3186,44 +3190,60 @@ function getHighlights(root) {
     });
     return out;
 }
-function openHighlights() {
-    const docs = flatDocs();
+// 형광펜 목록: 맞춤법·반복 표현처럼 오른쪽 옆 창 (켜 둔 채로 원고를 보고 고칠 수 있음)
+let hlPanel = null, hlFilter = '*', hlEditing = null;
+function hlEntries() {
     const entries = [];
-    docs.forEach(d => {
+    flatDocs().forEach(d => {
         const t = document.createElement('template'); t.innerHTML = sanitizeHtml(d.body);
         const wrap = document.createElement('div'); wrap.append(t.content);
         getHighlights(wrap).forEach((h, i) => entries.push({ doc: d, idx: i, hex: h.hex, text: h.text }));
     });
-    let filter = '*', editing = null;
-    const bg = document.createElement('div'); bg.className = 'modal-bg';
-    document.body.appendChild(bg);
-    const colors = [...new Set(entries.map(e => e.hex))].sort((a, b) => HILITES.indexOf(a) - HILITES.indexOf(b));
-    const render = () => {
-        const list = filter === '*' ? entries : entries.filter(e => e.hex === filter);
-        const groups = colors.filter(c => filter === '*' || c === filter);
-        bg.innerHTML = `<div class="modal wide"><div style="display:flex;align-items:center;margin-bottom:10px"><h3 style="margin:0;flex:1"><i class="ic ic-highlighter"></i> 형광펜 목록</h3><button class="mini" data-x="close">✕</button></div>
-            <div class="hl-filter"><button class="hl-dot all ${filter === '*' ? 'on' : ''}" data-f="*" title="모든 색"></button>
-            ${colors.map(c => `<button class="hl-dot ${filter === c ? 'on' : ''}" style="background:${c}" data-f="${c}" title="${entries.filter(e => e.hex === c).length}개"></button>`).join('')}
-            <span style="font-size:11px;color:var(--muted);margin-left:auto">${docs.length}편에서 ${list.length}개</span></div>
-            <div class="hl-scroll" style="max-height:60vh;overflow-y:auto">${entries.length ? groups.map(c => {
-                const es = list.filter(e => e.hex === c);
-                return `<div class="hl-group"><span class="hl-dot" style="background:${c};width:14px;height:14px"></span>${es.length}개</div>`
-                    + es.map(e => { const k = hlKey(e.doc.id, e.hex, e.text), m = hlMemo(k); return `<div class="hl-entry"><button class="hl-item" data-doc="${e.doc.id}" data-i="${e.idx}"><small>${esc([...pathOf(e.doc), e.doc.title].join(' › '))}</small><span style="background:${c}">${esc(e.text.length > 120 ? e.text.slice(0, 120) + '…' : e.text)}</span></button>
-                        <div class="hl-memo">${editing === k ? `<input data-memo-in="${esc(k)}" value="${esc(m)}" placeholder="한 줄 메모">` : m ? `<button data-memo="${esc(k)}" title="메모 고치기">📝 ${esc(m)}</button>` : `<button data-memo="${esc(k)}" class="add">＋ 메모</button>`}</div></div>`; }).join('');
-            }).join('') : '<p style="color:var(--muted);font-size:13px;line-height:1.7;padding:16px 0">아직 칠한 형광펜이 없어요.<br>원고에서 문장을 고른 뒤 위에 뜨는 색 동그라미를 눌러 보세요.</p>'}</div></div>`;
-    };
-    render();
-    bg.addEventListener('click', e => {
-        if (e.target === bg || e.target.closest('[data-x="close"]')) { bg.remove(); return; }
-        const f = e.target.closest('[data-f]'); if (f) { filter = f.dataset.f; render(); return; }
-        const mb = e.target.closest('[data-memo]');
-        if (mb) { const sc = bg.querySelector('.hl-scroll')?.scrollTop || 0; editing = mb.dataset.memo; render(); const sb = bg.querySelector('.hl-scroll'); if (sb) sb.scrollTop = sc; const inp = bg.querySelector('[data-memo-in]'); inp?.focus(); return; }
-        if (e.target.closest('[data-memo-in]')) return;
-        const it = e.target.closest('.hl-item'); if (!it) return;
-        bg.remove();
-        jumpToHighlight(it.dataset.doc, +it.dataset.i);
-    });
+    return entries;
 }
+function openHighlights() {
+    closeSidePanels('hl');
+    if (!hlPanel) {
+        hlPanel = document.createElement('aside'); hlPanel.className = 'spl hlp';
+        document.body.appendChild(hlPanel);
+        hlPanel.addEventListener('click', onHlPanelClick);
+    }
+    renderHlPanel();
+}
+function closeHlPanel() { hlPanel?.remove(); hlPanel = null; hlEditing = null; }
+function renderHlPanel() {
+    if (!hlPanel) return;
+    if (hlPanel.contains(document.activeElement) && document.activeElement.matches('[data-memo-in]')) return; // 메모 쓰는 중엔 그대로
+    const entries = hlEntries(), docs = flatDocs();
+    const colors = [...new Set(entries.map(e => e.hex))].sort((a, b) => HILITES.indexOf(a) - HILITES.indexOf(b));
+    if (hlFilter !== '*' && !colors.includes(hlFilter)) hlFilter = '*';
+    const list = hlFilter === '*' ? entries : entries.filter(e => e.hex === hlFilter);
+    const groups = colors.filter(c => hlFilter === '*' || c === hlFilter);
+    const keep = $('.spl-list', hlPanel)?.scrollTop || 0;
+    hlPanel._entries = entries;
+    hlPanel.innerHTML = `<div class="spl-head"><b>형광펜</b><span class="spl-count">${docs.length}편에서 ${list.length}개</span><span style="flex:1"></span><button class="mini" data-hl-close title="닫기">✕</button></div>
+        <div class="spl-ai hl-filter"><button class="hl-dot all ${hlFilter === '*' ? 'on' : ''}" data-f="*" title="모든 색"></button>
+            ${colors.map(c => `<button class="hl-dot ${hlFilter === c ? 'on' : ''}" style="background:${c}" data-f="${c}" title="${entries.filter(e => e.hex === c).length}개"></button>`).join('')}</div>
+        <div class="spl-list">${entries.length ? groups.map(c => {
+            const es = list.filter(e => e.hex === c);
+            return `<div class="hl-group"><span class="hl-dot" style="background:${c};width:14px;height:14px"></span>${es.length}개</div>`
+                + es.map(e => { const k = hlKey(e.doc.id, e.hex, e.text), m = hlMemo(k); return `<div class="spl-card hl-card"><button class="hl-item" data-doc="${e.doc.id}" data-i="${e.idx}"><small>${esc([...pathOf(e.doc), e.doc.title].join(' › '))}</small><span style="background:${c}">${esc(e.text.length > 120 ? e.text.slice(0, 120) + '…' : e.text)}</span></button>
+                    <div class="hl-memo">${hlEditing === k ? `<input data-memo-in="${esc(k)}" value="${esc(m)}" placeholder="한 줄 메모">` : m ? `<button data-memo="${esc(k)}" title="메모 고치기">📝 ${esc(m)}</button>` : `<button data-memo="${esc(k)}" class="add">＋ 메모</button>`}</div></div>`; }).join('');
+        }).join('') : '<div class="spl-empty">아직 칠한 형광펜이 없어요.<br>원고에서 문장을 고른 뒤 위에 뜨는 색 동그라미를 눌러 보세요.</div>'}</div>`;
+    $('.spl-list', hlPanel).scrollTop = keep;
+}
+function onHlPanelClick(e) {
+    if (e.target.closest('[data-hl-close]')) { closeHlPanel(); return; }
+    const f = e.target.closest('[data-f]'); if (f) { hlFilter = f.dataset.f; renderHlPanel(); return; }
+    const mb = e.target.closest('[data-memo]');
+    if (mb) { hlEditing = mb.dataset.memo; renderHlPanel(); hlPanel.querySelector('[data-memo-in]')?.focus(); hlEditing = null; return; }
+    if (e.target.closest('[data-memo-in]')) return;
+    const it = e.target.closest('.hl-item'); if (!it) return;
+    jumpToHighlight(it.dataset.doc, +it.dataset.i);
+}
+// 원고를 고치면 형광펜 목록도 다시 (조금 기다렸다가)
+var hlTimer = null;
+document.addEventListener('input', e => { if (hlPanel && e.target.closest && e.target.closest('.manuscript')) { clearTimeout(hlTimer); hlTimer = setTimeout(renderHlPanel, 900); } });
 // 형광펜 한 줄 메모: 작품마다 하나 (형광펜 문장의 회차·색·글자로 찾음)
 const hlKey = (docId, hex, text) => docId + '|' + hex + '|' + String(text).trim().slice(0, 60);
 const hlMemoItem = () => get('hlmemo_' + curWorkId()) || create('hlmemo', { id: 'hlmemo_' + curWorkId(), workId: curWorkId(), memos: {} });
@@ -4235,8 +4255,9 @@ function decorateFolds(ed) {
         ps.forEach(p => { if (st.closed) p.setAttribute('data-fh', ''); else p.removeAttribute('data-fh'); });
     });
 }
-// 접기 목록: 작품 전체에서 접어 둔 단락 묶음을 모아 보고, 누르면 그 자리로
-function openFoldList() {
+// 접기 목록: 작품 전체에서 접어 둔 단락 묶음을 오른쪽 옆 창에 모아 보고, 누르면 그 자리로
+let foldPanel = null;
+function foldEntries() {
     const entries = [];
     flatDocs().forEach(d => {
         if (!/data-fold=/.test(d.body || '')) return;
@@ -4245,21 +4266,46 @@ function openFoldList() {
         [...t.content.children].forEach(p => { const f = p.getAttribute('data-fold'); if (!f) return; if (!g.has(f)) g.set(f, []); g.get(f).push(p); });
         g.forEach((ps, fid) => { const text = ps.map(p => p.textContent).join(' ').trim(); entries.push({ doc: d, fid, n: ps.length, chars: countChars(text).noSpace, text, excl: ps[0].hasAttribute('data-fold-x') }); });
     });
-    const bg = document.createElement('div'); bg.className = 'modal-bg';
-    bg.innerHTML = `<div class="modal wide"><div style="display:flex;align-items:center;margin-bottom:10px"><h3 style="margin:0;flex:1"><i class="ic ic-fold-vertical"></i> 접기 목록 <small style="font-weight:400;color:var(--muted);font-size:12px">${entries.length}군데</small></h3><button class="mini" data-x="close">✕</button></div>
-        <div style="max-height:62vh;overflow-y:auto">${entries.length ? entries.map((e, i) => `<button class="fold-item" data-fi="${i}"><small>${esc([...pathOf(e.doc), e.doc.title].join(' › '))} · 단락 ${e.n}개 · ${fmt(e.chars)}자${e.excl ? ' · <b>내보내기에서 빠짐</b>' : ''}</small><span>${esc(e.text.length > 140 ? e.text.slice(0, 140) + '…' : e.text)}</span></button>`).join('')
-            : '<p style="color:var(--muted);font-size:13px;line-height:1.7;padding:16px 0">아직 접어 둔 단락이 없어요.<br>원고에서 단락을 고른 뒤 위 도구줄의 「접기」를 눌러 보세요.</p>'}</div></div>`;
-    document.body.appendChild(bg);
-    bg.addEventListener('click', ev => {
-        if (ev.target === bg || ev.target.closest('[data-x="close"]')) { bg.remove(); return; }
-        const b = ev.target.closest('[data-fi]'); if (!b) return;
-        const e = entries[+b.dataset.fi]; bg.remove();
-        openDoc(e.doc.id);
-        setTimeout(() => {
-            const bar = $(`.epane[data-pane="${WL().activeEditor}"] .manuscript[data-id="${e.doc.id}"] .foldbar[data-fid="${e.fid}"]`); if (!bar) return;
-            bar.scrollIntoView({ block: 'center' }); bar.classList.add('flash'); setTimeout(() => bar.classList.remove('flash'), 1800);
-        }, 80);
-    });
+    return entries;
+}
+function openFoldList() {
+    closeSidePanels('fold');
+    if (!foldPanel) {
+        foldPanel = document.createElement('aside'); foldPanel.className = 'spl fdp';
+        document.body.appendChild(foldPanel);
+        foldPanel.addEventListener('click', onFoldPanelClick);
+    }
+    renderFoldPanel();
+}
+function closeFoldPanel() { foldPanel?.remove(); foldPanel = null; }
+function renderFoldPanel() {
+    if (!foldPanel) return;
+    const entries = foldEntries(), keep = $('.spl-list', foldPanel)?.scrollTop || 0;
+    foldPanel._entries = entries;
+    foldPanel.innerHTML = `<div class="spl-head"><b>접기 목록</b><span class="spl-count">${entries.length ? entries.length + '군데' : ''}</span><span style="flex:1"></span><button class="mini" data-fd-close title="닫기">✕</button></div>
+        <div class="spl-ai"><span class="spl-msg">작품 전체에서 접어 둔 단락이에요. 누르면 그 자리로 가요.</span></div>
+        <div class="spl-list">${entries.length ? entries.map((e, i) => `<button class="spl-card fold-item" data-fi="${i}"><small>${esc([...pathOf(e.doc), e.doc.title].join(' › '))} · 단락 ${e.n}개 · ${fmt(e.chars)}자${e.excl ? ' · <b>내보내기에서 빠짐</b>' : ''}</small><span>${esc(e.text.length > 140 ? e.text.slice(0, 140) + '…' : e.text)}</span></button>`).join('')
+            : '<div class="spl-empty">아직 접어 둔 단락이 없어요.<br>원고에서 단락을 고른 뒤 위 도구줄의 「접기」를 눌러 보세요.</div>'}</div>`;
+    $('.spl-list', foldPanel).scrollTop = keep;
+}
+function onFoldPanelClick(ev) {
+    if (ev.target.closest('[data-fd-close]')) { closeFoldPanel(); return; }
+    const b = ev.target.closest('[data-fi]'); if (!b) return;
+    const e = foldPanel._entries[+b.dataset.fi]; if (!e) return;
+    openDoc(e.doc.id);
+    setTimeout(() => {
+        const bar = $(`.epane[data-pane="${WL().activeEditor}"] .manuscript[data-id="${e.doc.id}"] .foldbar[data-fid="${e.fid}"]`); if (!bar) return;
+        bar.scrollIntoView({ block: 'center' }); bar.classList.add('flash'); setTimeout(() => bar.classList.remove('flash'), 1800);
+    }, 80);
+}
+var foldTimer = null;
+document.addEventListener('input', e => { if (foldPanel && e.target.closest && e.target.closest('.manuscript')) { clearTimeout(foldTimer); foldTimer = setTimeout(renderFoldPanel, 900); } });
+// 오른쪽 옆 창(맞춤법·반복 표현·형광펜·접기 목록)은 같은 자리라 하나만
+function closeSidePanels(keep) {
+    if (keep !== 'spell' && typeof closeSpellPanel === 'function') closeSpellPanel();
+    if (keep !== 'repeat' && typeof closeRepeatPanel === 'function') closeRepeatPanel();
+    if (keep !== 'hl' && typeof closeHlPanel === 'function') closeHlPanel();
+    if (keep !== 'fold' && typeof closeFoldPanel === 'function') closeFoldPanel();
 }
 $('#btn-folds').addEventListener('click', openFoldList);
 // 원고에서 고른 글자가 풀리지 않게 (맞춤법·비슷한 표현 버튼)
@@ -4322,17 +4368,17 @@ document.addEventListener('click', e => {
 });
 
 /* =====================================================================
-   타임라인 · 연대기 · 복선 (한 창에서 탭으로)
+   회차 흐름 · 타임라인 · 복선 (한 창에서 탭으로)
    ===================================================================== */
 const CARD_COLORS = ['', '#fff3a8', '#ffd6a5', '#ffc8dd', '#cfbaf0', '#a3c4f3', '#98f5e1', '#b9fbc0', '#e9ecef'];
-let plannerTab = 'structure';
+let plannerTab = 'chrono'; // 위 도구줄 '타임라인' 버튼은 타임라인 탭부터
 function openPlanner(tab) {
     if (tab) plannerTab = tab;
     let pl = $('.planner:not(.planner-pane)');
     if (!pl) {
         pl = document.createElement('div'); pl.className = 'planner';
         pl.innerHTML = `<div class="planner-head"><b><i class="ic ic-chart-gantt"></i> 타임라인</b>
-            <div class="seg pl-tabs"><button data-tab="structure">타임라인</button><button data-tab="chrono">연대기</button><button data-tab="foreshadow">복선</button></div>
+            <div class="seg pl-tabs"><button data-tab="structure">회차 흐름</button><button data-tab="chrono">타임라인</button><button data-tab="foreshadow">복선</button></div>
             <span class="pl-tools"></span><span style="flex:1"></span><button class="mini" data-x="close" title="닫기 (Esc)">✕</button></div>
             <div class="planner-body"></div>`;
         document.body.appendChild(pl);
@@ -4346,8 +4392,8 @@ function openPlanner(tab) {
 function closePlanner() { $('.planner:not(.planner-pane)')?.remove(); renderAll(); }
 function renderPlanner() { $$('.planner').forEach(renderPlannerIn); }
 // 원고 창 탭 안의 타임라인 (바인더 시놉시스 › 타임라인)
-// 바인더의 타임라인 · 연대기 · 복선은 각각 자기 화면만 (탭 없이)
-const PL_TABS = { structure: '타임라인', chrono: '연대기', foreshadow: '복선' };
+// 바인더의 회차 흐름 · 타임라인 · 복선은 각각 자기 화면만 (탭 없이)
+const PL_TABS = { structure: '회차 흐름', chrono: '타임라인', foreshadow: '복선' };
 function plannerPaneHtml(it) {
     const tab = (it && it.tab) || 'structure';
     return `<div class="planner planner-pane" data-fixed-tab="${tab}"><div class="planner-head"><b class="pl-name">${PL_TABS[tab]}</b>
@@ -4465,9 +4511,9 @@ function bindCardDrag(pl) {
     });
 }
 
-/* ----- 연대기: 이야기 속 시간 순서대로 직접 세우는 사건 카드 ----- */
+/* ----- 타임라인: 이야기 속 시간 순서대로 직접 세우는 사건 카드 ----- */
 const chronoList = () => ofWork('chrono');
-// 연대기 두 줄: 어디까지 연재됐는지 · 지금 어디를 쓰는지
+// 타임라인 두 줄: 어디까지 연재됐는지 · 지금 어디를 쓰는지
 function pubSelectHtml() {
     const w = get(curWorkId()) || {}, docs = flatDocs().filter(d => !isRefDoc(d));
     return `<label class="pub-pick" title="연재처에 올린 마지막 회차">연재된 곳 <select data-pubupto><option value="">없음</option>${docs.map(d => `<option value="${d.id}" ${w.pubUpto === d.id ? 'selected' : ''}>${esc(d.title || '제목 없음')}</option>`).join('')}</select></label>`;
@@ -4636,7 +4682,7 @@ async function plannerClick(e) {
         pop.addEventListener('click', ev => { const b = ev.target.closest('[data-cc]'); if (!b) return; doc.cardColor = b.dataset.cc; touch(doc); closePop(); renderPlanner(); });
         return;
     }
-    // 연대기
+    // 타임라인
     const nextOrder = () => (chronoList().slice(-1)[0]?.order || 0) + 1;
     if (d.c === 'add-event') { create('chrono', { workId: curWorkId(), type: 'event', title: '', body: '', time: '', status: 'draft', docIds: [], order: nextOrder() }); renderPlanner(); $('.planner-body').scrollTop = 1e9; return; }
     if (d.c === 'add-marker') { create('chrono', { workId: curWorkId(), type: 'marker', title: '', order: nextOrder() }); renderPlanner(); $('.planner-body').scrollTop = 1e9; return; }
@@ -6020,7 +6066,7 @@ const repEd = () => repDoc && $(`.ed-wrap[data-scroll] .manuscript[data-id="${re
 function openRepeatReport() {
     const W = WL(), id = W.panes[W.activeEditor]?.active;
     if (!id || !$(`.ed-wrap[data-scroll] .manuscript[data-id="${id}"]`)) { toast('점검할 회차를 원고 창에 열어 주세요.'); return; }
-    if (typeof closeSpellPanel === 'function') closeSpellPanel(); // 같은 자리라 하나만
+    closeSidePanels('repeat');
     repDoc = id;
     if (!repPanel) {
         repPanel = document.createElement('aside'); repPanel.className = 'spl rpl';
@@ -6619,7 +6665,7 @@ function openSpellPanel(docId) {
     const W = WL();
     const id = docId || W.panes[W.activeEditor]?.active;
     if (!id || !$(`.ed-wrap[data-scroll] .manuscript[data-id="${id}"]`)) { toast('점검할 회차를 원고 창에 열어 주세요.'); return; }
-    if (typeof closeRepeatPanel === 'function') closeRepeatPanel();
+    closeSidePanels('spell');
     spellPanelDoc = id; spellActive = -1; spellAiMsg = '';
     if (!spellPanel) {
         spellPanel = document.createElement('aside'); spellPanel.className = 'spl';
@@ -7120,10 +7166,10 @@ function sbTreeRows(open) {
 }
 function sbSynopRows(open) {
     const wid = curWorkId();
-    const pv = (id, title, tab) => { let it = items[id]; if (!it || it.deleted) it = create('plview', { id, workId: wid, title, tab }); return it; };
+    const pv = (id, title, tab) => { let it = items[id]; if (!it || it.deleted) it = create('plview', { id, workId: wid, title, tab }); else if (it.title !== title) { it.title = title; touch(it); } return it; };
     return sbRow(sbItem('plot', '시놉시스'), open, 4, 'layout-list')
-        + sbRow(pv(`plv_${wid}`, '타임라인', 'structure'), open, 4, 'chart-gantt')
-        + sbRow(pv(`plvc_${wid}`, '연대기', 'chrono'), open, 4, 'history')
+        + sbRow(pv(`plv_${wid}`, PL_TABS.structure, 'structure'), open, 4, 'layers')
+        + sbRow(pv(`plvc_${wid}`, PL_TABS.chrono, 'chrono'), open, 4, 'chart-gantt')
         + sbRow(pv(`plvf_${wid}`, '복선', 'foreshadow'), open, 4, 'flag');
 }
 function sbSafe(html) { const t = document.createElement('template'); t.innerHTML = sanitizeHtml(String(html || '')); return t.innerHTML; }

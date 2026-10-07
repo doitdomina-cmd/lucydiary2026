@@ -703,6 +703,8 @@ kbd { font: 12px/1.4 ui-monospace, monospace; background: var(--panel2); border:
 ::highlight(pv-link) { background-color: color-mix(in srgb, var(--accent) 16%, transparent); }
 .pv-text { user-select: text; }
 .pv-page { background: #fffefa; color: #222; box-shadow: 0 2px 10px rgba(0,0,0,.15); position: relative; flex: none; word-break: keep-all; line-break: strict; overflow-wrap: anywhere; overflow: hidden; }
+.pv-page { content-visibility: auto; contain-intrinsic-size: auto 500px; }
+.pv-ep { pointer-events: none; position: absolute; top: 3px; left: 0; right: 0; text-align: center; font: 600 9px 'Pretendard', 'Noto Sans KR', sans-serif; color: #b5a9a0; letter-spacing: .04em; }
 .pv-no { position: absolute; bottom: 8px; left: 0; right: 0; text-align: center; font: 10px 'Pretendard', 'Noto Sans KR', sans-serif; color: #aaa; }
 /* 시놉시스 보드 (파트 · 블록) */
 .sb { flex: 1; min-height: 0; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 10px; background: var(--panel2); }
@@ -1756,6 +1758,7 @@ function renderEditors() {
 '<div class="pane-empty">바인더에서 문서를 눌러 열어 주세요<br>(⋯ 메뉴 → 옆 분할에 열기 / 참고창으로 열기)</div>' : ''}
         </div>`;
     }
+    $$('.epane', grid).forEach(pe => { const x = $('.pv-pages', pe); if (x) pvKeep[+pe.dataset.pane] = x.scrollTop; });
     grid.innerHTML = html;
     applyPaneSplit();
     $$('.manuscript [data-memo]', grid).forEach(x => x.contentEditable = 'false');
@@ -4427,7 +4430,7 @@ $('#btn-spell').addEventListener('click', () => openSpellPanel());
 // 퇴고 보기: 지금 회차를 왼쪽 원고 + 오른쪽 쪽 보기로. 이미 퇴고 보기면 한 창으로 돌아감
 function reviseMode() {
     const W = WL();
-    return W.editorN === 2 && W.panes[0].active && W.panes[0].active === W.panes[1].active && !W.panes[0].pageView && W.panes[1].pageView;
+    return W.editorN === 2 && !!W.panes[0].active && !W.panes[0].pageView && !!W.panes[1].pageView;
 }
 function toggleRevise() {
     const W = WL();
@@ -5363,29 +5366,66 @@ function paginate(doc, L) {
     box.remove();
     return { pages, pw, ph, m, fpx, lines: Math.floor(ih / (fpx * L.lh)) };
 }
+var pvKeep = {}; // 원고 창을 다시 그려도 쪽 보기 스크롤 위치 유지
+// 쪽 보기로 볼 회차 범위: 이 화만 / 5화씩 / 10화씩 / 이 권(폴더) / 전체
+const PV_RANGES = [['1', '이 화만'], ['5', '5화씩'], ['10', '10화씩'], ['folder', '이 권 (폴더)'], ['all', '전체']];
+function pvRangeDocs(doc, range) {
+    const eps = flatDocs().filter(d => d.kind === 'episode' && !isRefDoc(d) && live(d));
+    if (!range || range === '1' || !eps.includes(doc)) return [doc];
+    if (range === 'all') return eps;
+    if (range === 'folder') return eps.filter(d => d.parentId === doc.parentId);
+    const n = +range, k = eps.indexOf(doc), s0 = Math.floor(k / n) * n;
+    return eps.slice(s0, s0 + n);
+}
+// 회차마다 쪽 나누기 결과를 기억 (원고가 바뀐 회차만 다시 계산)
+const pvCache = new Map();
+function paginateCached(doc, L) {
+    const P = para();
+    const key = [doc.rev, (doc.body || '').length, L.id, L.w, L.h, L.font, L.pt, L.lh, P.indentPt, JSON.stringify(lineRules()), smartOn()].join('|');
+    const c = pvCache.get(doc.id);
+    if (c && c.key === key) return c.r;
+    const r = paginate(doc, L); pvCache.set(doc.id, { key, r });
+    return r;
+}
 function renderPageView(paneEl, doc) {
     const W = WL();
     const L = pageLayouts().find(l => l.id === W.pageLayout) || PAGE_PRESETS[0];
     const host = $('.page-view', paneEl); if (!host) return;
+    const pane = W.panes[+paneEl.dataset.pane] || {}, range = pane.pvRange || '1';
     // 판형이 창보다 넓으면 창 너비에 맞춰 줄이고, 그 위에 사용자가 고른 배율을 곱함
     const fit = Math.min(1, (host.clientWidth - 28) / (L.w * MM));
     const zoom = Math.max(0.2, fit * (W.pageZoom || 1));
-    const keep = $('.pv-pages', host)?.scrollTop || 0;
-    const r = paginate(doc, L);
+    const keep = $('.pv-pages', host)?.scrollTop ?? pvKeep[+paneEl.dataset.pane] ?? 0;
+    const docs = pvRangeDocs(doc, range);
+    const parts = docs.map(d => ({ d, r: paginateCached(d, L) }));
+    const r0 = parts[0].r, total = parts.reduce((n, x) => n + x.r.pages.length, 0);
+    let no = 0;
+    const pagesHtml = parts.map(({ d, r }) => r.pages.map((p, i) => { no++; return `<div class="pv-page" data-doc="${d.id}" style="width:${r.pw}px;height:${r.ph}px;padding:${r.m}px;font-family:${pageFont(L.font)};font-size:${r.fpx}px;line-height:${L.lh}">
+            ${docs.length > 1 && i === 0 ? `<div class="pv-ep">${esc(d.title || '제목 없음')}</div>` : ''}<div class="pv-text">${p.join('')}</div><div class="pv-no">${docs.length > 1 ? `${esc(d.title || '')} · ` : ''}${no} / ${total}</div></div>`; }).join('')).join('');
+    const rangeLabel = docs.length > 1 ? `${esc(docs[0].title || '')} ~ ${esc(docs[docs.length - 1].title || '')} (${docs.length}화) · ` : '';
     host.dataset.doc = doc.id;
     host.innerHTML = `<div class="pv-bar"><span>쪽 나눠 보기</span>
+        <select data-pv-range title="쪽 보기로 볼 회차">${PV_RANGES.map(([v, n]) => `<option value="${v}" ${v === range ? 'selected' : ''}>${n}</option>`).join('')}</select>
         <select data-pv-layout>${pageLayouts().map(l => `<option value="${l.id}" ${l.id === L.id ? 'selected' : ''}>${esc(l.name)}</option>`).join('')}<option value="__new">＋ 내 판형 만들기…</option></select>
         <button class="mini" data-pv-z="-0.1">－</button><span>${Math.round((W.pageZoom || 1) * 100)}%</span><button class="mini" data-pv-z="0.1">＋</button>
-        <b>${r.pages.length}쪽 · ${r.lines}줄/쪽</b><span style="flex:1"></span><button class="mini" data-a="pages">쪽 보기 끄기</button></div>
+        <b>${rangeLabel}${total}쪽 · ${r0.lines}줄/쪽</b><span style="flex:1"></span><button class="mini" data-a="pages">쪽 보기 끄기</button></div>
         <div class="pv-note">${esc(L.name)} ${L.w}×${L.h}mm · ${esc(L.font)} ${L.pt}pt · ${Math.round(L.lh * 100)}% <button class="pv-edit" data-pv-edit title="판형 수치 고치기"><i class="ic ic-pen-line"></i> 수치 고치기</button> — 대략적인 크기라 실제 앱의 쪽 수와는 조금 다를 수 있어요.</div>
-        <div class="pv-pages"><div class="pv-stack" style="zoom:${zoom}">${r.pages.map((p, i) => `<div class="pv-page" style="width:${r.pw}px;height:${r.ph}px;padding:${r.m}px;font-family:${pageFont(L.font)};font-size:${r.fpx}px;line-height:${L.lh}">
-            <div class="pv-text">${p.join('')}</div><div class="pv-no">${i + 1} / ${r.pages.length}</div></div>`).join('')}</div></div>`;
+        <div class="pv-pages"><div class="pv-stack" style="zoom:${zoom}">${pagesHtml}</div></div>`;
     $('.pv-pages', host).scrollTop = keep;
 }
+document.addEventListener('change', e => {
+    const t = e.target; if (!t.matches || !t.matches('[data-pv-range]')) return;
+    const i = +t.closest('.epane').dataset.pane;
+    setWL(W => { W.panes[i].pvRange = t.value; });
+    renderEditors();
+    // 범위를 바꾸면 지금 회차가 있는 쪽으로
+    const pe = $(`.epane[data-pane="${i}"]`), cur = WL().panes.find((p, k) => k !== i && !p.pageView && get(p.active)?.kind === 'episode')?.active || WL().panes[i].active;
+    const pg = pe && $(`.pv-page[data-doc="${cur}"]`, pe); if (pg) pg.scrollIntoView({ block: 'start' });
+});
 let pvTimer = null;
 function schedulePageViews(docId) {
     clearTimeout(pvTimer);
-    pvTimer = setTimeout(() => { $$('.epane').forEach(pe => { const p = WL().panes[+pe.dataset.pane]; if (p && p.pageView && p.active === docId) renderPageView(pe, get(docId)); }); }, 700);
+    pvTimer = setTimeout(() => { $$('.epane').forEach(pe => { const p = WL().panes[+pe.dataset.pane], it = p && get(p.active); if (p && p.pageView && it && pvRangeDocs(it, p.pvRange).some(d => d.id === docId)) renderPageView(pe, it); }); }, 700);
 }
 /* ---- 쪽 보기 ↔ 원고 잇기: 마우스를 올리면 옆 원고가 그 자리로, 고를 곳에 글자색·@메모 ---- */
 // 쪽 보기 속 한 점 → 원고 안 글자 위치
@@ -5416,7 +5456,19 @@ function edRangeAt(ed, a, b) {
     }
     return started ? (r.collapse(true), r) : null;
 }
-let pvHoverP = null, pvHoverRaf = 0;
+let pvHoverP = null, pvHoverRaf = 0, pvSwitchT = 0;
+// 마우스를 잠깐 머물면(0.35초) 옆 원고 창을 그 화로 바꾸고 그 문단으로
+function pvSwitchTo(docId, p) {
+    clearTimeout(pvSwitchT);
+    pvSwitchT = setTimeout(() => {
+        if (pvHoverP !== p) return;
+        const W = WL(), i = W.panes.findIndex((x, k) => k < W.editorN && !x.pageView && get(x.active)?.kind === 'episode');
+        if (i < 0) return;
+        setWL(W => { const x = W.panes[i]; if (x.single) x.tabs = [docId]; else if (!x.tabs.includes(docId)) { const k = x.tabs.indexOf(x.active); if (k >= 0 && get(x.active)?.kind === 'episode') x.tabs[k] = docId; else x.tabs.push(docId); } x.active = docId; }); // 탭이 쌓이지 않게 지금 회차 탭을 바꿔 끼움
+        renderEditors();
+        pvHoverP = null; // 다시 그린 뒤 같은 문단에 다시 맞춤
+    }, 350);
+}
 function pvLinkClear() { pvHoverP = null; CSS.highlights?.delete('pv-link'); }
 document.addEventListener('mousemove', e => {
     if (pvHoverRaf) return;
@@ -5427,7 +5479,10 @@ document.addEventListener('mousemove', e => {
         if (!p) { if (pvHoverP && !(tgt.closest && tgt.closest('.pv-pages'))) pvLinkClear(); return; }
         if (p === pvHoverP || getSelection().toString()) return;
         pvHoverP = p;
-        const host = p.closest('.page-view'), ed = host && pvLiveEd(host.dataset.doc), span = pvParaSpan(p);
+        const pg = p.closest('.pv-page'), docId = pg?.dataset.doc, span = pvParaSpan(p);
+        let ed = docId && pvLiveEd(docId);
+        // 다른 화의 쪽이면 옆 원고 창을 그 화로 바꿈
+        if (!ed && docId && span) { pvSwitchTo(docId, p); return; }
         if (!ed || !span) return;
         const r = edRangeAt(ed, span[0], span[1]); if (!r) return;
         if (window.Highlight) CSS.highlights.set('pv-link', new Highlight(r));
@@ -5514,7 +5569,7 @@ document.addEventListener('mouseup', e => {
         const sel = getSelection();
         if (!pages || !sel.rangeCount || sel.isCollapsed) { if (!(pvBar && pvBar.contains(document.activeElement))) closePvBar(); return; }
         const r = sel.getRangeAt(0); if (!pages.contains(r.commonAncestorContainer)) return;
-        const host = pages.closest('.page-view'), doc = host && get(host.dataset.doc); if (!doc) return;
+        const pg = (r.startContainer.nodeType === 3 ? r.startContainer.parentElement : r.startContainer).closest('.pv-page'), doc = pg && get(pg.dataset.doc); if (!doc) return;
         let a = pvAt(r.startContainer, r.startOffset), b = pvAt(r.endContainer, r.endOffset);
         if (a == null) { const x = $('[data-at]', r.cloneContents()); a = x ? +x.dataset.at : null; }
         if (a == null || b == null || b <= a) { closePvBar(); return; }
@@ -5525,7 +5580,7 @@ document.addEventListener('mouseup', e => {
 document.addEventListener('click', e => {
     const m = e.target.closest && e.target.closest('.pv-memo, .manuscript [data-memo]'); if (!m) return;
     const host = m.closest('.page-view'), ed = m.closest('.manuscript');
-    const doc = get(host ? host.dataset.doc : ed?.dataset.id); if (!doc) return;
+    const doc = get(host ? m.closest('.pv-page')?.dataset.doc : ed?.dataset.id); if (!doc) return;
     let at;
     if (host) at = +m.dataset.at;
     else { const r = document.createRange(); r.setStart(ed, 0); r.setEndBefore(m); const tmp = document.createElement('div'); tmp.append(r.cloneContents()); tmp.querySelectorAll('.foldbar').forEach(x => x.remove()); at = tmp.textContent.length; }

@@ -694,6 +694,7 @@ kbd { font: 12px/1.4 ui-monospace, monospace; background: var(--panel2); border:
 .pv-note { font-size: 11px; color: var(--muted); padding: 4px 12px; }
 .pv-pages { flex: 1; overflow: auto; min-height: 0; }
 .pv-stack { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 12px 12px 40px; }
+.pv-set { display: inline-flex; align-items: center; gap: 3px; }
 .pv-edit { font-size: 11px; color: var(--accent); padding: 0 4px; border-radius: 4px; }
 .pv-edit:hover { background: var(--accent-soft); }
 .pv-selbar { position: fixed; z-index: 60; display: flex; align-items: center; gap: 4px; padding: 5px 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 6px 20px rgba(0,0,0,.14); }
@@ -705,8 +706,6 @@ kbd { font: 12px/1.4 ui-monospace, monospace; background: var(--panel2); border:
 .pv-sep { width: 1px; height: 16px; background: var(--line); margin: 0 2px; }
 .pv-at { font-weight: 700; color: var(--accent); padding-left: 4px; }
 .pv-selbar input { border: 0; outline: none; background: transparent; font-size: 13px; width: 170px; color: var(--text); }
-.pv-memo { display: inline-block; font: 700 0.75em/1.3 system-ui, sans-serif; color: #fff; background: var(--accent); border-radius: 4px; padding: 0 3px; margin: 0 1px; cursor: pointer; vertical-align: 0.1em; text-indent: 0; }
-.manuscript [data-memo] { font-size: 0.78em; font-family: 'Pretendard', system-ui, sans-serif; color: var(--accent); background: var(--accent-soft); border-radius: 5px; padding: 1px 5px; margin: 0 2px; cursor: pointer; white-space: nowrap; }
 ::highlight(pv-link) { background-color: color-mix(in srgb, var(--accent) 16%, transparent); }
 .pv-text { user-select: text; }
 .pv-page { background: #fffefa; color: #222; box-shadow: 0 2px 10px rgba(0,0,0,.15); position: relative; flex: none; word-break: keep-all; line-break: strict; overflow-wrap: anywhere; overflow: hidden; }
@@ -1223,6 +1222,7 @@ const seenRev = {}; // 다른 창·기기에서 받은 마지막 판: 내 수정
    ===================================================================== */
 const ALLOWED_TAGS = new Set(['P', 'DIV', 'BR', 'B', 'STRONG', 'I', 'EM', 'U', 'S', 'STRIKE', 'DEL', 'SPAN', 'MARK', 'FONT', 'IMG']);
 const ALLOWED_STYLES = ['color', 'background-color', 'text-align', 'font-weight', 'font-style', 'text-decoration', 'text-decoration-line'];
+const MEMO_COLOR = '#e5484d';
 function sanitizeHtml(html) {
     const t = document.createElement('template');
     t.innerHTML = html || '';
@@ -1253,7 +1253,7 @@ function sanitizeHtml(html) {
             const foldX = fold && n.hasAttribute('data-fold-x');
             for (const a of [...n.attributes]) n.removeAttribute(a.name);
             if (fold && /^[\w-]{1,40}$/.test(fold)) { n.setAttribute('data-fold', fold); if (foldX) n.setAttribute('data-fold-x', ''); }
-            if (memo) n.setAttribute('data-memo', '');
+            if (memo) n.style.color = MEMO_COLOR; // 예전 @메모는 빨간 보통 글로
             if (style) {
                 const tmp = document.createElement('span'); tmp.setAttribute('style', style);
                 const keep = ALLOWED_STYLES.map(p => tmp.style.getPropertyValue(p) ? `${p}: ${tmp.style.getPropertyValue(p)}` : '').filter(Boolean);
@@ -1270,7 +1270,7 @@ function textToHtml(text) {
 }
 const ENT = { amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'", nbsp: ' ' };
 // 접은 단락 중 '내보내기에서 빼기'를 켠 단락을 지움 (글자 수·내보내기용)
-const stripExcluded = html => String(html || '').replace(/<(p|div)\b[^>]*\bdata-fold-x\b[^>]*>[\s\S]*?<\/\1>/g, '').replace(/<span\b[^>]*\bdata-memo\b[^>]*>[^<]*<\/span>/g, '');
+const stripExcluded = html => String(html || '').replace(/<(p|div)\b[^>]*\bdata-fold-x\b[^>]*>[\s\S]*?<\/\1>/g, '');
 function htmlToPlain(html) {
     return String(html || '').replace(/<[^>]*>/g, '').replace(/&(amp|lt|gt|quot|#39|nbsp);/g, (_, e) => ENT[e]);
 }
@@ -1760,7 +1760,7 @@ function renderEditors() {
                 ${ref ? `<div class="ref-box"><div class="ref-head"><i class="ic ic-paperclip"></i> 참고창 <b>${esc(ref.title)}</b><button class="mini" data-a="ref-swap" title="참고창과 본문 바꾸기"><i class="ic ic-arrow-up-down"></i></button><button class="mini" data-a="close-ref" title="참고창 닫기">✕</button></div>
                     <div class="ed-wrap">${editorHtml(ref, 'ref')}</div></div>` : ''}
                 </div>${W.hideOutline || p.pageView ? '' : outlineHtml(it)}</div>
-                <div class="epane-foot" data-foot="${it.id}"></div>` : ''}
+                ${p.pageView ? '' : `<div class="epane-foot" data-foot="${it.id}"></div>`}` : ''}
             ${!it ? 
 '<div class="pane-empty">바인더에서 문서를 눌러 열어 주세요<br>(⋯ 메뉴 → 옆 분할에 열기 / 참고창으로 열기)</div>' : ''}
         </div>`;
@@ -1768,7 +1768,6 @@ function renderEditors() {
     $$('.epane', grid).forEach(pe => { const x = $('.pv-pages', pe); if (x) pvKeep[+pe.dataset.pane] = x.scrollTop; });
     grid.innerHTML = html;
     applyPaneSplit();
-    $$('.manuscript [data-memo]', grid).forEach(x => x.contentEditable = 'false');
     $('#btn-revise')?.classList.toggle('on', reviseMode());
     fillImages(grid);
     $$('.manuscript', grid).forEach(decorateFolds);
@@ -3398,7 +3397,7 @@ $('#btn-hl')?.addEventListener('click', openHighlights);
    원고 → 문단 블록 (내보내기·복사 공용)
    블록 = { runs: [{ text, b, i, u, s, color, bg, img, width }], align }
    ===================================================================== */
-// opt.memo: @메모도 넣음(쪽 보기용). 글자마다 원고 안 위치(at)를 붙여 둠
+// 글자마다 원고 안 위치(at)를 붙여 둠 (쪽 보기 ↔ 원고 잇기용)
 function toBlocks(html, opt = {}) {
     const t = document.createElement('template'); t.innerHTML = sanitizeHtml(html);
     const blocks = []; let cur = null, pos = 0;
@@ -3417,7 +3416,6 @@ function toBlocks(html, opt = {}) {
             }
             if (n.tagName === 'IMG') { if (!cur) nb(); cur.runs.push({ ...st, text: '', img: n.getAttribute('data-img'), width: n.style.width }); return; }
             if (isBlock(n)) { if (n.hasAttribute('data-fold-x')) { pos += n.textContent.length; return; } nb(n.style.textAlign); walk(n, st); cur = null; return; }
-            if (n.hasAttribute('data-memo')) { const at = pos, tx = n.textContent; pos += tx.length; if (opt.memo && tx) { if (!cur) nb(); cur.runs.push({ text: '@', memo: tx, at }); } return; }
             const s2 = { ...st }, tg = n.tagName;
             if (tg === 'B' || tg === 'STRONG') s2.b = true;
             if (tg === 'I' || tg === 'EM') s2.i = true;
@@ -5317,16 +5315,20 @@ const PAGE_PRESETS = [
 ];
 const MM = 96 / 25.4, PAGE_MARGIN = 4;
 const pageLayouts = () => [...PAGE_PRESETS, ...(settings().pageLayouts || [])];
-const pageFont = f => f === '고딕' ? "'Noto Sans KR', sans-serif" : f === '리디바탕' ? "'RIDIBatang', 'Nanum Myeongjo', serif" : "'Nanum Myeongjo', serif";
+const PAGE_FONTS = ['바탕', '명조', '나눔명조', '고운바탕', '리디바탕', '고딕', '나눔고딕'];
+const pageFont = f => f === '고딕' ? "'Noto Sans KR', sans-serif" : f === '나눔고딕' ? "'Nanum Gothic', 'Noto Sans KR', sans-serif" : f === '고운바탕' ? "'Gowun Batang', 'Nanum Myeongjo', serif" : f === '리디바탕' ? "'RIDIBatang', 'Nanum Myeongjo', serif" : "'Nanum Myeongjo', serif";
+// 판형의 자간(em)·문단 사이(줄)·들여쓰기(글자). 비어 있으면 원고 설정을 따름
+const pageIndent = L => L.indent != null ? L.indent + 'em' : para().indentPt + 'pt';
+const pageLs = L => (L.ls || 0) + 'em';
 function paginate(doc, L) {
     const pw = Math.round(L.w * MM), ph = Math.round(L.h * MM), m = Math.round(PAGE_MARGIN * MM);
     const fpx = L.pt * 4 / 3, iw = pw - 2 * m, ih = ph - 2 * m - Math.round(fpx * 1.6);
     const S = settings();
     const box = document.createElement('div');
-    box.style.cssText = `position:absolute;left:-9999px;top:0;visibility:hidden;width:${iw}px;font-family:${pageFont(L.font)};font-size:${fpx}px;line-height:${L.lh};word-break:keep-all;line-break:strict;overflow-wrap:anywhere`;
+    box.style.cssText = `position:absolute;left:-9999px;top:0;visibility:hidden;width:${iw}px;font-family:${pageFont(L.font)};font-size:${fpx}px;line-height:${L.lh};letter-spacing:${pageLs(L)};word-break:keep-all;line-break:strict;overflow-wrap:anywhere`;
     document.body.appendChild(box);
-    const pStyle = `margin:0;text-indent:${para().indentPt}pt;white-space:pre-wrap`;
-    const blocks = applyLineRules(toBlocks(doc.body, { memo: true }), lineRules());
+    const pStyle = `margin:0 0 ${(L.pgap || 0) * L.lh}em;text-indent:${pageIndent(L)};white-space:pre-wrap`;
+    const blocks = applyLineRules(toBlocks(doc.body), lineRules());
     // 문단의 [s, e) 글자를 쪽 보기 HTML로 (글자마다 원고 위치 data-at)
     const sliceHtml = (b, s, e) => {
         let c = 0, h = '';
@@ -5335,8 +5337,7 @@ function paginate(doc, L) {
             const l = r.text.length, a = Math.max(s, c), z = Math.min(e, c + l);
             if (r.img) { if ((c >= s && c < e) || (c === e && e === len)) h += '[이미지]'; }
             else if (z > a) {
-                if (r.memo) h += `<span class="pv-memo" data-at="${r.at}" data-len="${r.memo.length}" data-memo-text="${xe(r.memo)}" title="${xe(r.memo)}">@</span>`;
-                else h += r.at != null ? `<span data-at="${r.at + a - c}">${runHtml({ ...r, text: r.text.slice(a - c, z - c) }, () => '')}</span>` : runHtml({ ...r, text: r.text.slice(a - c, z - c) }, () => '');
+                h += r.at != null ? `<span data-at="${r.at + a - c}">${runHtml({ ...r, text: r.text.slice(a - c, z - c) }, () => '')}</span>` : runHtml({ ...r, text: r.text.slice(a - c, z - c) }, () => '');
             }
             c += l;
         }
@@ -5388,7 +5389,7 @@ function pvRangeDocs(doc, range) {
 const pvCache = new Map();
 function paginateCached(doc, L) {
     const P = para();
-    const key = [doc.rev, (doc.body || '').length, L.id, L.w, L.h, L.font, L.pt, L.lh, P.indentPt, JSON.stringify(lineRules()), smartOn()].join('|');
+    const key = [doc.rev, (doc.body || '').length, L.id, L.w, L.h, L.font, L.pt, L.lh, L.ls, L.pgap, L.indent, P.indentPt, JSON.stringify(lineRules()), smartOn()].join('|');
     const c = pvCache.get(doc.id);
     if (c && c.key === key) return c.r;
     const r = paginate(doc, L); pvCache.set(doc.id, { key, r });
@@ -5407,13 +5408,13 @@ function renderPageView(paneEl, doc) {
     const parts = docs.map(d => ({ d, r: paginateCached(d, L) }));
     const r0 = parts[0].r, total = parts.reduce((n, x) => n + x.r.pages.length, 0);
     let no = 0;
-    const pagesHtml = parts.map(({ d, r }) => r.pages.map((p, i) => { no++; return `<div class="pv-page" data-doc="${d.id}" style="width:${r.pw}px;height:${r.ph}px;padding:${r.m}px;font-family:${pageFont(L.font)};font-size:${r.fpx}px;line-height:${L.lh}">
+    const pagesHtml = parts.map(({ d, r }) => r.pages.map((p, i) => { no++; return `<div class="pv-page" data-doc="${d.id}" style="width:${r.pw}px;height:${r.ph}px;padding:${r.m}px;font-family:${pageFont(L.font)};font-size:${r.fpx}px;line-height:${L.lh};letter-spacing:${pageLs(L)}">
             ${docs.length > 1 && i === 0 ? `<div class="pv-ep">${esc(d.title || '제목 없음')}</div>` : ''}<div class="pv-text">${p.join('')}</div><div class="pv-no">${docs.length > 1 ? `${esc(d.title || '')} · ` : ''}${no} / ${total}</div></div>`; }).join('')).join('');
     const rangeLabel = docs.length > 1 ? `${esc(docs[0].title || '')} ~ ${esc(docs[docs.length - 1].title || '')} (${docs.length}화) · ` : '';
     host.dataset.doc = doc.id;
     host.innerHTML = `<div class="pv-bar"><span>쪽 나눠 보기</span>
         <select data-pv-range title="쪽 보기로 볼 회차">${PV_RANGES.map(([v, n]) => `<option value="${v}" ${v === range ? 'selected' : ''}>${n}</option>`).join('')}</select>
-        <select data-pv-layout>${pageLayouts().map(l => `<option value="${l.id}" ${l.id === L.id ? 'selected' : ''}>${esc(l.name)}</option>`).join('')}<option value="__new">＋ 내 판형 만들기…</option></select><button class="mini" data-pv-edit title="판형 수치 고치기 (${L.w}×${L.h}mm · ${esc(L.font)} ${L.pt}pt · ${Math.round(L.lh * 100)}%)"><i class="ic ic-pen-line"></i></button>
+        <select data-pv-layout>${pageLayouts().map(l => `<option value="${l.id}" ${l.id === L.id ? 'selected' : ''}>${esc(l.name)}</option>`).join('')}<option value="__new">＋ 내 판형 만들기…</option></select><button class="mini pv-set" data-pv-edit title="글꼴·크기·줄간격·자간 (${L.w}×${L.h}mm · ${esc(L.font)} ${L.pt}pt · ${Math.round(L.lh * 100)}%)"><i class="ic ic-type"></i> 조판 설정</button>
         <button class="mini" data-pv-z="-0.1">－</button><span>${Math.round((W.pageZoom || 1) * 100)}%</span><button class="mini" data-pv-z="0.1">＋</button>
         <b>${rangeLabel}${total}쪽 · ${r0.lines}줄/쪽</b><span style="flex:1"></span><button class="mini" data-a="pages">쪽 보기 끄기</button></div>
         <div class="pv-pages"><div class="pv-stack" style="zoom:${zoom}">${pagesHtml}</div></div>`;
@@ -5438,7 +5439,6 @@ function schedulePageViews(docId) {
 function pvAt(node, off) {
     const el = (node.nodeType === 3 ? node.parentElement : node)?.closest('[data-at]');
     if (!el) return null;
-    if (el.classList.contains('pv-memo')) return +el.dataset.at;
     const r = document.createRange(); r.setStart(el, 0);
     try { r.setEnd(node, off); } catch (e) { return +el.dataset.at; }
     return +el.dataset.at + r.toString().length;
@@ -5446,7 +5446,7 @@ function pvAt(node, off) {
 function pvParaSpan(p) {
     const xs = $$('[data-at]', p); if (!xs.length) return null;
     const last = xs[xs.length - 1];
-    return [+xs[0].dataset.at, +last.dataset.at + (last.classList.contains('pv-memo') ? +last.dataset.len : last.textContent.length)];
+    return [+xs[0].dataset.at, +last.dataset.at + last.textContent.length];
 }
 // 옆 창에 같은 회차가 원고로 열려 있으면 그 원고
 const pvLiveEd = docId => $$(`.ed-wrap[data-scroll] .manuscript[data-id="${docId}"]`).find(e => e.offsetParent);
@@ -5506,7 +5506,7 @@ function editBodyRange(doc, a, b, fn) {
     const segs = []; let c = 0;
     for (let n = w.nextNode(); n; n = w.nextNode()) {
         const l = n.data.length, s0 = Math.max(a, c), e0 = Math.min(b, c + l);
-        if (e0 > s0 && !n.parentElement?.closest('[data-memo]')) segs.push([n, s0 - c, e0 - c]);
+        if (e0 > s0) segs.push([n, s0 - c, e0 - c]);
         c += l;
     }
     segs.forEach(([n, s0, e0]) => fn(n, s0, e0, t));
@@ -5533,8 +5533,9 @@ function pvAddMemo(doc, at, text) {
     const t = document.createElement('template'); t.innerHTML = sanitizeHtml(doc.body);
     const w = document.createTreeWalker(t.content, NodeFilter.SHOW_TEXT);
     let c = 0, node = null, off = 0, last = null;
-    for (let n = w.nextNode(); n; n = w.nextNode()) { const l = n.data.length; last = n; if (at <= c + l && !n.parentElement?.closest('[data-memo]')) { node = n; off = at - c; break; } c += l; }
-    const sp = t.content.ownerDocument.createElement('span'); sp.setAttribute('data-memo', ''); sp.textContent = '@' + text.replace(/^@/, '');
+    for (let n = w.nextNode(); n; n = w.nextNode()) { const l = n.data.length; last = n; if (at <= c + l) { node = n; off = at - c; break; } c += l; }
+    // @메모는 보통 글처럼 (찾기·글자 수에 그대로), 빨간 글자로만
+    const sp = t.content.ownerDocument.createElement('span'); sp.style.color = MEMO_COLOR; sp.textContent = '@' + text.replace(/^@/, '');
     if (node) { const rest = node.splitText(off); rest.before(sp); }
     else if (last) last.after(sp); else return;
     commitBody(doc, t);
@@ -5582,39 +5583,21 @@ document.addEventListener('mouseup', e => {
         openPvBar(r.getBoundingClientRect(), doc, a, b);
     }, 0);
 });
-// @메모 누르면 고치기·지우기 (쪽 보기·원고 모두)
-document.addEventListener('click', e => {
-    const m = e.target.closest && e.target.closest('.pv-memo, .manuscript [data-memo]'); if (!m) return;
-    const host = m.closest('.page-view'), ed = m.closest('.manuscript');
-    const doc = get(host ? m.closest('.pv-page')?.dataset.doc : ed?.dataset.id); if (!doc) return;
-    let at;
-    if (host) at = +m.dataset.at;
-    else { const r = document.createRange(); r.setStart(ed, 0); r.setEndBefore(m); const tmp = document.createElement('div'); tmp.append(r.cloneContents()); tmp.querySelectorAll('.foldbar').forEach(x => x.remove()); at = tmp.textContent.length; }
-    const old = host ? m.dataset.memoText : m.textContent;
-    e.preventDefault();
-    closePvBar();
-    pvBar = document.createElement('div'); pvBar.className = 'pv-selbar'; document.body.appendChild(pvBar);
-    const rect = m.getBoundingClientRect();
-    const place = () => { const w = pvBar.offsetWidth; pvBar.style.left = Math.max(8, Math.min(innerWidth - w - 8, rect.left - w / 2)) + 'px'; pvBar.style.top = Math.max(8, rect.top - pvBar.offsetHeight - 8) + 'px'; };
-    const edit = fn => {
-        const t = document.createElement('template'); t.innerHTML = sanitizeHtml(doc.body);
-        const w = document.createTreeWalker(t.content, NodeFilter.SHOW_TEXT); let c = 0;
-        for (let n = w.nextNode(); n; n = w.nextNode()) { const sp = n.parentElement?.closest('[data-memo]'); if (sp && c === at) { fn(sp); commitBody(doc, t); return; } c += n.data.length; }
-    };
-    memoInput(pvBar, old.replace(/^@/, ''), v => edit(sp => { sp.textContent = '@' + v; }), place, () => edit(sp => sp.remove()));
-});
 // base가 있으면 그 판형 수치를 고침 (기본 판형은 고친 값으로 '내 판형'을 새로 만듦)
 function newPageLayout(base) {
     const mine = base && (settings().pageLayouts || []).some(l => l.id === base.id);
     const B = base || { name: '내 판형', w: 80, h: 140, font: '명조', pt: 10, lh: 1.5 };
     const bg = document.createElement('div'); bg.className = 'modal-bg';
-    bg.innerHTML = `<div class="modal"><h3>${base ? '판형 수치 고치기' : '내 판형 만들기'}</h3>
+    bg.innerHTML = `<div class="modal"><h3>${base ? '조판 설정' : '내 판형 만들기'}</h3>
         ${base && !mine ? '<p class="modal-note" style="margin-top:0">기본 판형은 그대로 두고, 고친 수치로 내 판형을 새로 만들어요.</p>' : ''}
         <label>이름</label><input type="text" data-k="name" value="${esc(base && !mine ? B.name + ' (내 판형)' : B.name)}">
         <label>용지 가로 × 세로 (mm)</label><div style="display:flex;gap:6px"><input type="number" data-k="w" value="${B.w}" min="40" max="300"><input type="number" data-k="h" value="${B.h}" min="60" max="400"></div>
-        <label>글꼴</label><select data-k="font">${['명조', '바탕', '나눔명조', '고딕', '리디바탕'].map(f => `<option ${f === B.font ? 'selected' : ''}>${f}</option>`).join('')}</select>
+        <label>글꼴</label><select data-k="font">${PAGE_FONTS.map(f => `<option ${f === B.font ? 'selected' : ''}>${f}</option>`).join('')}</select>
         <label>글자 크기 (pt)</label><input type="number" data-k="pt" value="${B.pt}" step="0.5" min="6" max="20">
         <label>줄간격 (%)</label><input type="number" data-k="lh" value="${Math.round(B.lh * 100)}" step="5" min="100" max="300">
+        <label>자간 (%) <small class="modal-note">0이 보통, -5는 좁게, 5는 넓게</small></label><input type="number" data-k="ls" value="${Math.round((B.ls || 0) * 100)}" step="1" min="-15" max="30">
+        <label>문단 사이 띄움 (줄) <small class="modal-note">0이면 붙여서, 1이면 한 줄 띄움</small></label><input type="number" data-k="pgap" value="${B.pgap || 0}" step="0.25" min="0" max="3">
+        <label>들여쓰기 (글자) <small class="modal-note">비워 두면 원고 설정대로</small></label><input type="number" data-k="indent" value="${B.indent ?? ''}" step="0.5" min="0" max="4">
         <div class="row2">${mine ? '<button class="btn" data-x="del" style="margin-right:auto;color:var(--danger)">이 판형 지우기</button>' : ''}<button class="btn" data-x="0">취소</button><button class="btn primary" data-x="1">저장</button></div></div>`;
     document.body.appendChild(bg);
     return new Promise(resolve => {
@@ -5625,7 +5608,7 @@ function newPageLayout(base) {
             if (x === 'del') { S.pageLayouts = (S.pageLayouts || []).filter(l => l.id !== base.id); touch(S); bg.remove(); resolve({ id: PAGE_PRESETS[0].id }); return; }
             if (x !== '1') return;
             const v = k => $(`[data-k="${k}"]`, bg).value;
-            const L = { id: mine ? base.id : uid('pl'), name: v('name').trim() || '내 판형', w: +v('w') || 80, h: +v('h') || 140, font: v('font'), pt: +v('pt') || 10, lh: (+v('lh') || 150) / 100 };
+            const L = { id: mine ? base.id : uid('pl'), name: v('name').trim() || '내 판형', w: +v('w') || 80, h: +v('h') || 140, font: v('font'), pt: +v('pt') || 10, lh: (+v('lh') || 150) / 100, ls: (+v('ls') || 0) / 100, pgap: +v('pgap') || 0, indent: v('indent') === '' ? null : +v('indent') };
             S.pageLayouts = mine ? S.pageLayouts.map(l => l.id === L.id ? L : l) : [...(S.pageLayouts || []), L]; touch(S);
             bg.remove(); resolve(L);
         });

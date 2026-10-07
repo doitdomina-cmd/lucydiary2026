@@ -2067,6 +2067,8 @@ document.addEventListener('focusin', e => {
     if (p.classList.contains('pane') && W.activeSynop !== i) { setWL(W => W.activeSynop = i); $$('.synop-grid .pane').forEach(x => x.classList.toggle('active', +x.dataset.pane === i)); }
 });
 document.addEventListener('focusout', () => setTimeout(flushPendingRemote, 50));
+window.addEventListener('blur', () => setTimeout(flushPendingRemote, 50)); // 다른 창으로 가면 미뤄 둔 글을 받아 둠
+document.addEventListener('visibilitychange', () => { if (document.hidden) flushPendingRemote(); });
 // 분할 창: 창 안 어디를 눌러도(탭 줄·경로·쪽 보기·원고) 그 창이 지금 쓰는 창이 됨
 function activateEditorPane(i) {
     if (WL().activeEditor === i) return;
@@ -4240,7 +4242,9 @@ function broadcast(list) {
     const send = list.filter(it => it.id !== 'layout' && it.id !== 'stats' && it.by === tabId);
     if (send.length) try { bc.postMessage({ from: tabId, items: send }); } catch (e) {}
 }
-function editingId() { const el = document.activeElement; return el && el.dataset ? el.dataset.id : null; }
+// 지금 이 창에서 쓰는 중인 문서. 창이 뒤에 가 있으면(다른 창·다른 앱을 보는 중) 쓰는 중이 아님:
+// 그래야 뒤에 있는 창도 다른 곳에서 고친 글을 바로 받아서, 돌아와 이어 쓸 때 옛 글 위에 쓰지 않음
+function editingId() { if (document.hidden || !document.hasFocus()) return null; const el = document.activeElement; return el && el.dataset ? el.dataset.id : null; }
 function stamp(d) { return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}`; }
 const heldConflicts = new Set(); // 쓰는 중이라 이쪽 글을 지킨 회차: 손을 떼면 다시 알려서 양쪽이 같은 판으로 모이게 함
 function saveConflictCopy(main, body, fromBy) {
@@ -4284,6 +4288,9 @@ function receiveItem(r) {
         if (editingId() === r.id) { pendingRemote.set(r.id, r); return false; }
         items[r.id] = r; seenRev[r.id] = r.rev; return true;
     }
+    // 이 창이 올렸던 옛 판이 늦게 돌아왔거나(클라우드 다시 연결 때 최근 10분치를 또 받음),
+    // 이쪽이 이미 받아서 이어 쓴 판보다 오래된 판이면: 충돌이 아니라 그냥 지난 판
+    if (r.rev < local.rev && (r.by === tabId || r.rev <= (local.base || 0))) return false;
     const diverged = local.by === tabId && r.base !== local.rev && local.body !== r.body;
     if (!diverged) {
         if (r.rev < local.rev) return false;

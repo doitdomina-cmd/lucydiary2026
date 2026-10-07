@@ -234,6 +234,10 @@ main { height: calc(100% - 82px); display: flex; }
 .tip.below::after { top: auto; bottom: 100%; border-top-color: transparent; border-bottom-color: #2b2e28; }
 ::highlight(spell-active) { background-color: rgba(229, 72, 77, .18); }
 .spl { position: fixed; right: 12px; top: 96px; bottom: 12px; width: min(360px, calc(100vw - 24px)); z-index: 60; display: flex; flex-direction: column; background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.14); overflow: hidden; }
+.rp-hot { background: #fde4dc; color: #c4553a; font-weight: 700; }
+.rp-card.hot { border-color: color-mix(in srgb, #e07a5f 45%, var(--line)); }
+.rp-foot { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+.rp-foot input { accent-color: var(--accent); margin: 0; }
 .spl-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px 6px; }
 .spl-head b { font-size: 14px; }
 .spl-count { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
@@ -2610,9 +2614,9 @@ $('#btn-menu').addEventListener('click', e => {
     if (curPop) { closePop(); return; }
     const W = WL();
     const pop = showPop(e.currentTarget, `
-        <button data-act="new-work"><i class="ic ic-plus"></i> 새 작품</button><button data-act="rename-work">작품 이름 바꾸기</button><button data-act="delete-work" class="danger">작품 삭제</button><hr>
-        <button data-act="planner"><i class="ic ic-chart-gantt"></i> 타임라인 · 시간순 · 복선</button><button data-act="hl"><i class="ic ic-highlighter"></i> 형광펜 목록</button><button data-act="spell"><i class="ic ic-spell-check"></i> 맞춤법 1차 점검</button><button data-act="repeat"><i class="ic ic-repeat"></i> 반복 표현 점검</button><button data-act="mobile"><i class="ic ic-smartphone"></i> 모바일 미리보기</button><button data-act="fullboard"><i class="ic ic-layout-dashboard"></i> 작품 전체 메모 보드</button><hr>
-        <button data-act="home"><i class="ic ic-house"></i> 작품 목록으로</button><button data-act="settings"><i class="ic ic-settings"></i> 설정 (테마 · 글꼴)</button><button data-act="typo"><i class="ic ic-type"></i> 원고 크기 · 줄간격 · 문단</button><button data-act="replace"><i class="ic ic-replace"></i> 자동 치환 · 따옴표</button><button data-act="keys"><i class="ic ic-keyboard"></i> 단축키</button><hr>
+        <button data-act="new-work"><i class="ic ic-plus"></i> 새 작품</button><button data-act="rename-work">작품 이름 바꾸기</button><button data-act="delete-work" class="danger">작품 삭제</button><button data-act="home"><i class="ic ic-house"></i> 작품 목록으로</button><hr>
+        <button data-act="spell"><i class="ic ic-spell-check"></i> 맞춤법 1차 점검</button><button data-act="repeat"><i class="ic ic-repeat"></i> 반복 표현 점검</button><button data-act="hl"><i class="ic ic-highlighter"></i> 형광펜 목록</button><button data-act="replace"><i class="ic ic-replace"></i> 자동 치환 · 따옴표</button><hr>
+        <button data-act="mobile"><i class="ic ic-smartphone"></i> 모바일 미리보기</button><button data-act="fullboard"><i class="ic ic-layout-dashboard"></i> 작품 전체 메모 보드</button><button data-act="typo"><i class="ic ic-type"></i> 원고 크기 · 줄간격 · 문단</button><button data-act="settings"><i class="ic ic-settings"></i> 설정 (테마 · 글꼴)</button><hr>
         <button data-act="copy-ep"><i class="ic ic-copy"></i> 현재 회차 복사 (줄바꿈 규칙)</button><button data-act="export"><i class="ic ic-file-down"></i> 내보내기 (docx·epub·txt…)</button><hr>
         <button data-act="zip"><i class="ic ic-archive"></i> 작품 백업 내려받기 (ZIP)</button><button data-act="backup">전체 백업 저장 (JSON)</button><button data-act="restore">백업 불러오기 (ZIP·JSON)</button>`);
     pop.style.left = ''; pop.style.right = '8px';
@@ -5783,6 +5787,7 @@ function refreshRepeat() {
         });
     });
     CSS.highlights.set('repeat-expr', new Highlight(...ranges));
+    if (repPanel) renderRepeatPanel();
 }
 var repeatTimer = null;
 function scheduleRepeat() { clearTimeout(repeatTimer); repeatTimer = setTimeout(refreshRepeat, 700); }
@@ -5955,33 +5960,56 @@ document.addEventListener('click', e => {
     }, 10);
 });
 
-/* ---- 반복 표현 점검: 이 회차에서 자주 쓴 표현 묶음 목록 ---- */
+/* ---- 반복 표현 점검: 맞춤법처럼 오른쪽 옆 창 (켜 둔 채로 원고를 계속 고칠 수 있음) ---- */
+let repPanel = null, repDoc = null, repOpen = new Set();
+const repEd = () => repDoc && $(`.ed-wrap[data-scroll] .manuscript[data-id="${repDoc}"]`);
 function openRepeatReport() {
-    const ed = $('.epane.on .ed-wrap[data-scroll] .manuscript') || $('.ed-wrap[data-scroll] .manuscript');
-    if (!ed) { toast('원고를 먼저 열어 주세요.'); return; }
-    const sc = synScanEditor(ed);
+    const W = WL(), id = W.panes[W.activeEditor]?.active;
+    if (!id || !$(`.ed-wrap[data-scroll] .manuscript[data-id="${id}"]`)) { toast('점검할 회차를 원고 창에 열어 주세요.'); return; }
+    if (typeof closeSpellPanel === 'function') closeSpellPanel(); // 같은 자리라 하나만
+    repDoc = id;
+    if (!repPanel) {
+        repPanel = document.createElement('aside'); repPanel.className = 'spl rpl';
+        document.body.appendChild(repPanel);
+        repPanel.addEventListener('mousedown', e => { if (e.target.closest('button')) e.preventDefault(); });
+        repPanel.addEventListener('click', onRepeatPanelClick);
+        repPanel.addEventListener('change', e => { if (e.target.dataset && 'repOn' in e.target.dataset) { settings().repeatMark = e.target.checked; touch(settings()); refreshRepeat(); } });
+    }
+    renderRepeatPanel();
+}
+function closeRepeatPanel() { repPanel?.remove(); repPanel = null; repDoc = null; }
+function renderRepeatPanel() {
+    if (!repPanel) return;
+    const ed = repEd(), sc = ed ? synScanEditor(ed) : { hits: [], count: {} };
+    repPanel._sc = sc;
     const groups = Object.entries(sc.count).sort((a, b) => b[1] - a[1]);
-    const bg = document.createElement('div'); bg.className = 'modal-bg';
-    bg.innerHTML = `<div class="modal"><div style="display:flex;align-items:center;margin-bottom:8px"><h3 style="margin:0;flex:1"><i class="ic ic-repeat"></i> 반복 표현 점검</h3><button class="mini" data-x="close">✕</button></div>
-        <p class="modal-note" style="margin-top:0">이 회차에서 비슷한 행동·감정 묘사를 몇 번 썼는지 세어 봤어요. 누르면 그 자리로 가요.</p>
-        <div class="rep-list">${groups.map(([gi, n]) => {
+    const hot = groups.filter(([, n]) => n >= SYN_REPEAT_MIN).length;
+    const keep = $('.spl-list', repPanel)?.scrollTop || 0;
+    repPanel.innerHTML = `<div class="spl-head"><b>반복 표현</b><span class="spl-count">${ed ? (groups.length ? `${groups.length}가지 · ${SYN_REPEAT_MIN}번 이상 ${hot}가지` : '없음') : ''}</span><span style="flex:1"></span><button class="mini" data-rp-close title="닫기">✕</button></div>
+        <div class="spl-ai"><span class="spl-msg">비슷한 행동·감정 묘사를 몇 번 썼는지 세요. 쓰는 대로 바로 바뀌어요.</span></div>
+        <div class="spl-list">${!ed ? '<div class="spl-empty">이 회차가 원고 창에서 닫혔어요.</div>' : groups.map(([gi, n], k) => {
             const used = sc.hits.filter(h => h.e.gi == gi);
-            return `<div class="rep-g ${n >= SYN_REPEAT_MIN ? 'hot' : ''}"><div class="rep-h"><b>${n}번</b> ‘${esc(SYN[gi][0].f.S)}다’ 류</div>
-                <div class="rep-uses">${used.map((h, i) => `<button class="chip" data-rep="${gi}:${i}">${esc(h.text)}</button>`).join('')}</div></div>`;
-        }).join('') || '<div class="modal-note">사전에 있는 표현이 아직 없어요.</div>'}</div>
-        <label class="check" style="margin-top:10px"><input type="checkbox" data-rep-on ${repeatOn() ? 'checked' : ''}> ${SYN_REPEAT_MIN}번 이상 쓴 표현에 점선 밑줄 긋기</label></div>`;
-    document.body.appendChild(bg);
-    bg.addEventListener('click', e => {
-        if (e.target === bg || e.target.closest('[data-x="close"]')) { bg.remove(); return; }
-        const c = e.target.closest('[data-rep]'); if (!c) return;
-        const [gi, i] = c.dataset.rep.split(':').map(Number);
-        const h = sc.hits.filter(h => h.e.gi === gi)[i]; if (!h || !h.node.isConnected) return;
-        bg.remove();
+            const open = repOpen.has(+gi) || n >= SYN_REPEAT_MIN;
+            return `<div class="spl-card rp-card ${n >= SYN_REPEAT_MIN ? 'hot' : ''}">
+                <div class="spl-top"><span class="spl-num">${String(k + 1).padStart(2, '0')}</span><span class="spl-ctx">‘${esc(SYN[gi][0].f.S)}다’ 류</span><span class="spl-cat ${n >= SYN_REPEAT_MIN ? 'rp-hot' : ''}">${n}번</span></div>
+                <div class="spl-btns">${used.map((h, i) => `<button class="spl-fix" data-rp="${gi}:${i}" title="그 자리로 가서 비슷한 표현 보기">${esc(h.text)}</button>`).join('')}</div></div>`;
+        }).join('') || '<div class="spl-empty">사전에 있는 반복 표현이 아직 없어요.</div>'}</div>
+        <label class="rp-foot"><input type="checkbox" data-rep-on ${repeatOn() ? 'checked' : ''}> ${SYN_REPEAT_MIN}번 이상 쓴 표현에 원고에서 점선 밑줄</label>`;
+    $('.spl-list', repPanel).scrollTop = keep;
+}
+function onRepeatPanelClick(e) {
+    const t = e.target.closest('button'); if (!t) return;
+    if (t.dataset.rpClose != null) { closeRepeatPanel(); return; }
+    if (t.dataset.rp) {
+        const ed = repEd(), sc = repPanel._sc; if (!ed || !sc) return;
+        const [gi, i] = t.dataset.rp.split(':').map(Number);
+        const h = sc.hits.filter(x => x.e.gi === gi)[i]; if (!h || !h.node.isConnected) return;
         const r = new Range(); r.setStart(h.node, h.start); r.setEnd(h.node, h.end);
-        ed.focus(); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
-        h.node.parentElement.scrollIntoView({ block: 'center' });
-    });
-    bg.addEventListener('change', e => { if (e.target.dataset && 'repOn' in e.target.dataset) { settings().repeatMark = e.target.checked; touch(settings()); refreshRepeat(); } });
+        const wrap = ed.closest('.ed-wrap'), rr = r.getBoundingClientRect(), wr = wrap.getBoundingClientRect();
+        if (rr.top < wr.top + 40 || rr.bottom > wr.bottom - 40) wrap.scrollTop += rr.top - wr.top - wr.height / 3;
+        ed.focus({ preventScroll: true }); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+        setTimeout(() => { const m = synMatchAt(r); if (m) openSynPop(ed, r, m); }, 30);
+    }
 }
 
 /* =====================================================================
@@ -6537,6 +6565,7 @@ function openSpellPanel(docId) {
     const W = WL();
     const id = docId || W.panes[W.activeEditor]?.active;
     if (!id || !$(`.ed-wrap[data-scroll] .manuscript[data-id="${id}"]`)) { toast('점검할 회차를 원고 창에 열어 주세요.'); return; }
+    if (typeof closeRepeatPanel === 'function') closeRepeatPanel();
     spellPanelDoc = id; spellActive = -1; spellAiMsg = '';
     if (!spellPanel) {
         spellPanel = document.createElement('aside'); spellPanel.className = 'spl';

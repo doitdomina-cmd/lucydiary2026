@@ -535,7 +535,7 @@ a.mini { text-decoration: none; color: inherit; display: inline-flex; align-item
 .foldbar .fold-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .foldbar.excl button[data-fa="excl"] { color: #c47a00; }
 .pane-sub { font-size: 11px; color: var(--muted); padding: 6px 12px 0; }
-/* 타임라인 · 시간순 · 복선 */
+/* 타임라인 · 연대기 · 복선 */
 .planner.planner-pane { position: static; inset: auto; z-index: auto; flex: 1; min-height: 0; padding-top: 0; }
 .planner-pane .planner-head { padding: 6px 10px; }
 .planner { position: fixed; inset: 0; z-index: 95; background: var(--bg); display: flex; flex-direction: column; padding-top: env(safe-area-inset-top, 0px); }
@@ -1065,7 +1065,7 @@ nav.mtabs { display: none; }
         <span class="sep"></span>
         <button class="sb-sw" data-sbc="bg-red-50" style="background:#d9a9a4" title="색"></button><button class="sb-sw" data-sbc="bg-blue-50" style="background:#a3bcd1" title="색"></button><button class="sb-sw" data-sbc="bg-green-50" style="background:#a8c3ab" title="색"></button><button class="sb-sw" data-sbc="bg-orange-50" style="background:#d3b48c" title="색"></button><button class="sb-sw" data-sbc="bg-pink-50" style="background:#d6b0bd" title="색"></button><button class="sb-sw" data-sbc="bg-purple-50" style="background:#b7abc9" title="색"></button><button class="sb-sw sb-sw-x" data-sbc="" title="색 빼기"><i class="ic ic-x"></i></button>
         <span class="sep"></span></span>
- <button class="tb small" id="btn-planner" title="타임라인 · 시간순 · 복선"><i class="ic ic-chart-gantt"></i> 타임라인</button>
+ <button class="tb small" id="btn-planner" title="타임라인 · 연대기 · 복선"><i class="ic ic-chart-gantt"></i> 타임라인</button>
     <button class="tb small" id="btn-export" title="docx·epub·txt 등으로 내보내기"><i class="ic ic-file-down"></i> 내보내기</button>
     <button class="tb small" id="btn-hl" title="작품 전체의 형광펜 목록"><i class="ic ic-highlighter"></i> 형광펜 목록</button>
     <button class="tb small" id="btn-focus" title="원고만 보기 (Ctrl+Shift+M)"><i class="ic ic-maximize-2"></i> 원고만 보기</button>
@@ -4272,7 +4272,7 @@ document.addEventListener('click', e => {
 });
 
 /* =====================================================================
-   타임라인 · 시간순 · 복선 (한 창에서 탭으로)
+   타임라인 · 연대기 · 복선 (한 창에서 탭으로)
    ===================================================================== */
 const CARD_COLORS = ['', '#fff3a8', '#ffd6a5', '#ffc8dd', '#cfbaf0', '#a3c4f3', '#98f5e1', '#b9fbc0', '#e9ecef'];
 let plannerTab = 'structure';
@@ -4282,7 +4282,7 @@ function openPlanner(tab) {
     if (!pl) {
         pl = document.createElement('div'); pl.className = 'planner';
         pl.innerHTML = `<div class="planner-head"><b><i class="ic ic-chart-gantt"></i> 타임라인</b>
-            <div class="seg pl-tabs"><button data-tab="structure">회차 카드</button><button data-tab="chrono">시간순</button><button data-tab="foreshadow">복선</button></div>
+            <div class="seg pl-tabs"><button data-tab="structure">타임라인</button><button data-tab="chrono">연대기</button><button data-tab="foreshadow">복선</button></div>
             <span class="pl-tools"></span><span style="flex:1"></span><button class="mini" data-x="close" title="닫기 (Esc)">✕</button></div>
             <div class="planner-body"></div>`;
         document.body.appendChild(pl);
@@ -4297,7 +4297,7 @@ function closePlanner() { $('.planner:not(.planner-pane)')?.remove(); renderAll(
 function renderPlanner() { $$('.planner').forEach(renderPlannerIn); }
 // 원고 창 탭 안의 타임라인 (바인더 시놉시스 › 타임라인)
 function plannerPaneHtml() {
-    return `<div class="planner planner-pane"><div class="planner-head"><div class="seg pl-tabs"><button data-tab="structure">회차 카드</button><button data-tab="chrono">시간순</button><button data-tab="foreshadow">복선</button></div>
+    return `<div class="planner planner-pane"><div class="planner-head"><div class="seg pl-tabs"><button data-tab="structure">타임라인</button><button data-tab="chrono">연대기</button><button data-tab="foreshadow">복선</button></div>
         <span class="pl-tools"></span><span style="flex:1"></span><button class="mini" data-pl-full title="전체 화면으로 보기"><i class="ic ic-maximize-2"></i></button></div><div class="planner-body"></div></div>`;
 }
 function bindPlannerPanes(root) {
@@ -4411,9 +4411,9 @@ function bindCardDrag(pl) {
     });
 }
 
-/* ----- 시간순: 이야기 속 시간 순서대로 직접 세우는 사건 카드 ----- */
+/* ----- 연대기: 이야기 속 시간 순서대로 직접 세우는 사건 카드 ----- */
 const chronoList = () => ofWork('chrono');
-// 시간순 두 줄: 어디까지 연재됐는지 · 지금 어디를 쓰는지
+// 연대기 두 줄: 어디까지 연재됐는지 · 지금 어디를 쓰는지
 function pubSelectHtml() {
     const w = get(curWorkId()) || {}, docs = flatDocs().filter(d => !isRefDoc(d));
     return `<label class="pub-pick" title="연재처에 올린 마지막 회차">연재된 곳 <select data-pubupto><option value="">없음</option>${docs.map(d => `<option value="${d.id}" ${w.pubUpto === d.id ? 'selected' : ''}>${esc(d.title || '제목 없음')}</option>`).join('')}</select></label>`;
@@ -4582,7 +4582,7 @@ async function plannerClick(e) {
         pop.addEventListener('click', ev => { const b = ev.target.closest('[data-cc]'); if (!b) return; doc.cardColor = b.dataset.cc; touch(doc); closePop(); renderPlanner(); });
         return;
     }
-    // 시간순
+    // 연대기
     const nextOrder = () => (chronoList().slice(-1)[0]?.order || 0) + 1;
     if (d.c === 'add-event') { create('chrono', { workId: curWorkId(), type: 'event', title: '', body: '', time: '', status: 'draft', docIds: [], order: nextOrder() }); renderPlanner(); $('.planner-body').scrollTop = 1e9; return; }
     if (d.c === 'add-marker') { create('chrono', { workId: curWorkId(), type: 'marker', title: '', order: nextOrder() }); renderPlanner(); $('.planner-body').scrollTop = 1e9; return; }

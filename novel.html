@@ -38,10 +38,12 @@ select { background: var(--panel); border: 1px solid var(--line); border-radius:
 
 /* ===== 상단 바 ===== */
 header { height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 10px; background: var(--panel); border-bottom: 1px solid var(--line); }
-header .brand { font-weight: 700; color: var(--accent); white-space: nowrap; }
-header .work-select { font-weight: 700; max-width: 220px; }
+header .brand { font-weight: 700; font-size: 14px; color: var(--accent); white-space: nowrap; height: 28px; padding: 0 8px; border-radius: 8px; display: inline-flex; align-items: center; gap: 4px; }
+header .brand:hover { background: var(--accent-soft); }
+/* 위쪽 줄 칸들은 높이를 28px로 맞춤 */
+header .work-select { font-weight: 700; max-width: 220px; height: 28px; padding: 0 8px; font-size: 13px; border-radius: 8px; }
 header .spacer { flex: 1; }
-.today-chip { font-size: 11px; color: var(--muted); white-space: nowrap; padding: 3px 8px; border-radius: 999px; background: var(--panel2); border: 1px solid var(--line); }
+.today-chip { font-size: 12px; color: var(--muted); white-space: nowrap; height: 28px; display: inline-flex; align-items: center; gap: 3px; padding: 0 10px; border-radius: 8px; background: var(--panel2); border: 1px solid var(--line); }
 .today-chip b { color: var(--accent); }
 .sync-badge { cursor: pointer; font-size: 11px; padding: 4px 8px; border-radius: 999px; border: 1px solid var(--line); white-space: nowrap; color: var(--muted); }
 .sync-badge.ok { color: var(--accent); border-color: var(--accent); }
@@ -75,6 +77,10 @@ header .spacer { flex: 1; }
 .tb.small { font-size: 11px; color: var(--muted); }
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; flex: none; }
 .seg button { padding: 3px 8px; font-size: 12px; color: var(--muted); }
+/* 도구줄의 원고 분할·바인더/시놉/노트 칸은 같은 높이(26px) */
+.toolbar .seg { height: 28px; align-items: stretch; }
+.toolbar .seg button { height: auto; display: inline-flex; align-items: center; padding: 0 9px; font-size: 12px; }
+.toolbar .seg-label { font-size: 12px; }
 .seg button + button { border-left: 1px solid var(--line); }
 .seg button.on { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
 .tg-seg .tb { height: 26px; border-radius: 0; padding: 0 8px; font-size: 12px; color: var(--muted); }
@@ -694,6 +700,15 @@ kbd { font: 12px/1.4 ui-monospace, monospace; background: var(--panel2); border:
 .pv-note { font-size: 11px; color: var(--muted); padding: 4px 12px; }
 .pv-pages { flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; }
 .pv-stack { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 12px 12px 40px; }
+.pv-info { flex: 1; min-width: 0; font-size: 12px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-left: 6px; }
+.pv-zv { font-size: 11px; color: var(--muted); min-width: 34px; text-align: center; }
+.pv-pop { display: flex; flex-direction: column; gap: 1px; min-width: 220px; max-height: 70vh; overflow-y: auto; }
+.pv-pop .grp { font-size: 11px; color: var(--muted); padding: 6px 8px 2px; }
+.pv-pop button { text-align: left; padding: 5px 8px; border-radius: 6px; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+.pv-pop button small { margin-left: auto; color: var(--muted); font-size: 11px; }
+.pv-pop button:hover { background: var(--panel2); }
+.pv-pop button.on { color: var(--accent); font-weight: 700; background: var(--accent-soft); }
+.pv-pop hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
 .pv-set { display: inline-flex; align-items: center; gap: 3px; }
 .pv-edit { font-size: 11px; color: var(--accent); padding: 0 4px; border-radius: 4px; }
 .pv-edit:hover { background: var(--accent-soft); }
@@ -1080,8 +1095,7 @@ nav.mtabs { display: none; }
 <body data-mtab="editor">
 
 <header>
-    <button class="icon-btn" id="btn-home" title="작품 목록 (메인 화면)"><i class="ic ic-house"></i></button>
-    <span class="brand"><i class="ic ic-feather"></i> 루시의 작업실</span>
+    <button class="brand" id="btn-home" title="작품 목록 (메인 화면)"><i class="ic ic-feather"></i> 루시의 작업실</button>
     <select class="work-select" id="work-select" title="작품 선택"></select>
     <span class="today-chip" id="today-chip" title="오늘 늘어난 원고 글자 수 (공백 제외)">오늘 <b>0</b>자</span>
     <span class="spacer"></span>
@@ -1741,20 +1755,24 @@ function renderEditors() {
         const head = p.single
             ? `<select data-role="ep-pick" style="flex:1;min-width:0">${it ? '' : '<option value="">— 문서 선택 —</option>'}${docOptions(it?.id)}</select>`
             : `<div class="tabs">${p.tabs.map(id => { const d = get(id); return d ? `<div class="tab ${id === p.active ? 'on' : ''}" data-tab="${id}" title="${esc(d.title)}">${d.locked ? '<i class="ic ic-lock"></i>' : d.kind === 'plan' ? '<i class="ic ic-book-open"></i>' : d.kind === 'folder' ? '<i class="ic ic-folder"></i>' : d.kind === 'sbview' ? '<i class="ic ic-layout-dashboard"></i>' : d.kind === 'plview' ? `<i class="ic ic-${d.tab === 'chrono' ? 'chart-gantt' : d.tab === 'foreshadow' ? 'flag' : 'layers'}"></i>` : d.kind === 'msel' ? '<i class="ic ic-layout-list"></i>' : ''}<span>${esc(d.title || '제목 없음')}</span><button class="x" data-a="close-tab" title="탭 닫기">✕</button></div>` : ''; }).join('')}</div>`;
+        const pvMode = !!(p.pageView && it && it.kind === 'episode');
         html += `<div class="epane ${i === W.activeEditor ? 'active' : ''}" data-pane="${i}">
-            <div class="pane-head">${head}
+            <div class="pane-head">${pvMode ? `<div class="pv-info" data-pv-info></div>
+                <button class="mini" data-pv-z="-0.1" title="작게">－</button><span class="pv-zv">${Math.round((W.pageZoom || 1) * 100)}%</span><button class="mini" data-pv-z="0.1" title="크게">＋</button>
+                <button class="mini" data-pv-menu title="쪽 보기 설정 (범위·판형·조판)"><i class="ic ic-settings"></i></button>
+                ${W.editorN > 1 ? '<button class="mini" data-a="close-pane" title="이 분할 창 닫기">✕</button>' : ''}` : `${head}
                 <button class="mini ${p.single ? 'on' : ''}" data-a="single" title="${p.single ? '탭 모드로 전환' : '한 회차만 보기로 전환'}">${p.single ? '<i class="ic ic-square"></i>' : '<i class="ic ic-layers"></i>'}</button>
                 ${it && it.kind === 'episode' ? `<button class="mini ${W.hideOutline ? '' : 'on'}" data-a="outline" title="회차 트릿 칸 보이기/숨기기"><i class="ic ic-notebook-text"></i></button>` : ''}
                 ${it && it.kind === 'episode' ? `<button class="mini" data-a="history" title="버전 기록"><i class="ic ic-history"></i></button>` : ''}
                 ${it && it.kind === 'episode' ? `<button class="mini ${it.locked ? 'on' : ''}" data-a="lock" title="${it.locked ? '잠금 해제' : '잠금 (편집 막기)'}">${it.locked ? '<i class="ic ic-lock"></i>' : '<i class="ic ic-lock-open"></i>'}</button>` : ''}
-                ${W.editorN > 1 ? '<button class="mini" data-a="close-pane" title="이 분할 창 닫기">✕</button>' : ''}
+                ${W.editorN > 1 ? '<button class="mini" data-a="close-pane" title="이 분할 창 닫기">✕</button>' : ''}`}
             </div>
             ${it && it.kind === 'plan' ? `<div class="plan-view" data-plan-id="${it.id}">${planHtml(it)}</div>` : ''}
             ${it && it.kind === 'folder' ? `<div class="fb-view" data-folder="${it.id}">${folderBoardHtml(it)}</div>` : ''}
             ${it && it.kind === 'sbview' ? `<div class="sbv-view" data-sbv="${it.id}">${sbViewHtml(it)}</div>` : ''}
             ${it && it.kind === 'plview' ? plannerPaneHtml(it) : ''}
             ${it && it.kind === 'msel' ? mselPaneHtml(it) : ''}
-            ${it && it.kind === 'episode' ? `<div class="crumb">${esc([get(curWorkId())?.title, ...pathOf(it), it.title].filter(Boolean).join(' › '))}${it.locked ? '<span class="lock-badge">· 잠김</span>' : ''}</div>
+            ${it && it.kind === 'episode' ? `${pvMode ? '' : `<div class="crumb">${esc([get(curWorkId())?.title, ...pathOf(it), it.title].filter(Boolean).join(' › '))}${it.locked ? '<span class="lock-badge">· 잠김</span>' : ''}</div>`}
                 <div class="ed-main"><div class="ed-col">
                 ${p.pageView ? '<div class="page-view"></div>' : `<div class="ed-wrap" data-scroll="${it.id}">${editorHtml(it)}</div>`}
                 ${ref ? `<div class="ref-box"><div class="ref-head"><i class="ic ic-paperclip"></i> 참고창 <b>${esc(ref.title)}</b><button class="mini" data-a="ref-swap" title="참고창과 본문 바꾸기"><i class="ic ic-arrow-up-down"></i></button><button class="mini" data-a="close-ref" title="참고창 닫기">✕</button></div>
@@ -5421,24 +5439,35 @@ function renderPageView(paneEl, doc) {
     let no = 0;
     const pagesHtml = parts.map(({ d, r }) => r.pages.map((p, i) => { no++; return `<div class="pv-page" data-doc="${d.id}" style="width:${r.pw}px;height:${r.ph}px;padding:${r.m}px;font-family:${pageFont(L.font)};font-size:${r.fpx}px;line-height:${L.lh};letter-spacing:${pageLs(L)};word-break:${pageWb(L)}">
             ${docs.length > 1 && i === 0 ? `<div class="pv-ep">${esc(d.title || '제목 없음')}</div>` : ''}<div class="pv-text">${p.join('')}</div><div class="pv-no">${docs.length > 1 ? `${esc(d.title || '')} · ` : ''}${no} / ${total}</div></div>`; }).join('')).join('');
-    const rangeLabel = docs.length > 1 ? `${esc(docs[0].title || '')} ~ ${esc(docs[docs.length - 1].title || '')} (${docs.length}화) · ` : '';
     host.dataset.doc = doc.id;
-    host.innerHTML = `<div class="pv-bar"><span>쪽 나눠 보기</span>
-        <select data-pv-range title="쪽 보기로 볼 회차">${PV_RANGES.map(([v, n]) => `<option value="${v}" ${v === range ? 'selected' : ''}>${n}</option>`).join('')}</select>
-        <select data-pv-layout>${pageLayouts().map(l => `<option value="${l.id}" ${l.id === L.id ? 'selected' : ''}>${esc(l.name)}</option>`).join('')}<option value="__new">＋ 내 판형 만들기…</option></select><button class="mini pv-set" data-pv-edit title="조판 설정: 글꼴·크기·줄간격·자간 (${L.w}×${L.h}mm · ${esc(L.font)} ${L.pt}pt · ${Math.round(L.lh * 100)}%)"><i class="ic ic-settings"></i></button>
-        <button class="mini" data-pv-z="-0.1">－</button><span>${Math.round((W.pageZoom || 1) * 100)}%</span><button class="mini" data-pv-z="0.1">＋</button>
-        <b>${rangeLabel}${total}쪽 · ${r0.lines}줄/쪽</b><span style="flex:1"></span><button class="mini" data-a="pages">쪽 보기 끄기</button></div>
-        <div class="pv-pages"><div class="pv-stack" style="zoom:${zoom}">${pagesHtml}</div></div>`;
+    const cnt = docs.reduce((a, d) => { const c = docCount(d); return [a[0] + c.noSpace, a[1] + c.all]; }, [0, 0]);
+    const info = $('[data-pv-info]', paneEl);
+    if (info) { info.textContent = `${docs.length > 1 ? `${docs[0].title || ''} ~ ${docs[docs.length - 1].title || ''} · ` : `${doc.title || ''} · `}${fmt(total)}쪽 · ${fmt(cnt[0])}자`; info.title = `${esc(L.name)} · 한 쪽 ${r0.lines}줄 · 공백 제외 ${fmt(cnt[0])}자 · 공백 포함 ${fmt(cnt[1])}자`; }
+    host.innerHTML = `<div class="pv-pages"><div class="pv-stack" style="zoom:${zoom}">${pagesHtml}</div></div>`;
     $('.pv-pages', host).scrollTop = keep;
 }
-document.addEventListener('change', e => {
-    const t = e.target; if (!t.matches || !t.matches('[data-pv-range]')) return;
-    const i = +t.closest('.epane').dataset.pane;
-    setWL(W => { W.panes[i].pvRange = t.value; });
-    renderEditors();
-    // 범위를 바꾸면 지금 회차가 있는 쪽으로
-    const pe = $(`.epane[data-pane="${i}"]`), cur = WL().panes.find((p, k) => k !== i && !p.pageView && get(p.active)?.kind === 'episode')?.active || WL().panes[i].active;
-    const pg = pe && $(`.pv-page[data-doc="${cur}"]`, pe); if (pg) pg.scrollIntoView({ block: 'start' });
+// 쪽 보기 설정 아이콘: 볼 범위 · 판형 · 조판 설정 · 쪽 보기 끄기
+document.addEventListener('click', e => {
+    const btn = e.target.closest && e.target.closest('[data-pv-menu]'); if (!btn) return;
+    const i = +btn.closest('.epane').dataset.pane, W = WL(), range = W.panes[i].pvRange || '1';
+    const L = pageLayouts().find(l => l.id === W.pageLayout) || PAGE_PRESETS[0];
+    const pop = showPop(btn, `<div class="pv-pop"><div class="grp">볼 원고</div>${PV_RANGES.map(([v, n]) => `<button data-pr="${v}" class="${v === range ? 'on' : ''}">${n}</button>`).join('')}
+        <div class="grp">판형</div>${pageLayouts().map(l => `<button data-pl="${l.id}" class="${l.id === L.id ? 'on' : ''}">${esc(l.name)}<small>${l.w}×${l.h}mm · ${esc(l.font)} ${l.pt}pt</small></button>`).join('')}
+        <button data-pl="__new">＋ 내 판형 만들기</button><hr>
+        <button data-pset><i class="ic ic-type"></i> 조판 설정 (글꼴·크기·줄간격·자간)</button>
+        <button data-poff><i class="ic ic-x"></i> 쪽 보기 끄기</button></div>`);
+    pop.addEventListener('click', async ev => {
+        const b = ev.target.closest('button'); if (!b) return;
+        closePop();
+        if (b.dataset.pr) {
+            setWL(W => { W.panes[i].pvRange = b.dataset.pr; }); renderEditors();
+            const pe = $(`.epane[data-pane="${i}"]`), cur = WL().panes.find((p, k) => k !== i && !p.pageView && get(p.active)?.kind === 'episode')?.active || WL().panes[i].active;
+            const pg = pe && $(`.pv-page[data-doc="${cur}"]`, pe); if (pg) pg.scrollIntoView({ block: 'start' });
+        }
+        if (b.dataset.pl) { let id = b.dataset.pl; if (id === '__new') { const N = await newPageLayout(); if (!N) return; id = N.id; } setWL(W => { W.pageLayout = id; }); renderEditors(); }
+        if (b.dataset.pset != null) { const N = await newPageLayout(L); if (!N) return; setWL(W => { W.pageLayout = N.id; }); renderEditors(); }
+        if (b.dataset.poff != null) { setWL(W => { W.panes[i].pageView = false; }); renderAll(); }
+    });
 });
 let pvTimer = null;
 function schedulePageViews(docId) {
@@ -5575,7 +5604,7 @@ function memoInput(bar, val, onOk, place, onDel) {
     bar.innerHTML = `<span class="pv-at">@</span><input type="text" data-mi value="${esc(val)}" placeholder="나중에 고칠 것" maxlength="80">${onDel ? '<button class="pv-btn" data-mdel title="메모 지우기"><i class="ic ic-trash-2"></i></button>' : ''}<button class="pv-btn primary" data-mok>저장</button>`;
     place && place();
     const inp = $('[data-mi]', bar); inp.focus(); inp.select();
-    const ok = () => { const v = inp.value.trim(); if (v) onOk(v); closePvBar(); };
+    const ok = () => { onOk(inp.value.trim() || inp.placeholder); closePvBar(); }; // 비워 두고 저장하면 '나중에 고칠 것'
     inp.addEventListener('keydown', e => { if (e.isComposing) return; if (e.key === 'Enter') { e.preventDefault(); ok(); } if (e.key === 'Escape') closePvBar(); });
     $('[data-mok]', bar).onclick = ok;
     if (onDel) $('[data-mdel]', bar).onclick = () => { onDel(); closePvBar(); };

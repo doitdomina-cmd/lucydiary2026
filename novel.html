@@ -1928,10 +1928,19 @@ document.addEventListener('focusin', e => {
     const p = e.target.closest && e.target.closest('.pane[data-pane], .epane[data-pane]');
     if (!p) return;
     const i = +p.dataset.pane, W = WL();
-    if (p.classList.contains('epane') && W.activeEditor !== i) { setWL(W => W.activeEditor = i); $$('.epane').forEach(x => x.classList.toggle('active', +x.dataset.pane === i)); renderBoard(); if (WL().synopPanes.includes('__cur')) renderSynops(); }
+    if (p.classList.contains('epane')) activateEditorPane(i);
     if (p.classList.contains('pane') && W.activeSynop !== i) { setWL(W => W.activeSynop = i); $$('.synop-grid .pane').forEach(x => x.classList.toggle('active', +x.dataset.pane === i)); }
 });
 document.addEventListener('focusout', () => setTimeout(flushPendingRemote, 50));
+// 분할 창: 창 안 어디를 눌러도(탭 줄·경로·쪽 보기·원고) 그 창이 지금 쓰는 창이 됨
+function activateEditorPane(i) {
+    if (WL().activeEditor === i) return;
+    setWL(W => W.activeEditor = i);
+    $$('.epane').forEach(x => x.classList.toggle('active', +x.dataset.pane === i));
+    renderBoard(); if (WL().synopPanes.includes('__cur')) renderSynops();
+    if (typeof navSync === 'function') navSync();
+}
+$('#editor-grid').addEventListener('mousedown', e => { const p = e.target.closest('.epane[data-pane]'); if (p) activateEditorPane(+p.dataset.pane); }, true);
 
 /* =====================================================================
    서식 명령
@@ -2494,7 +2503,7 @@ $('#editor-grid').addEventListener('click', async e => {
         });
         renderAll(); return;
     }
-    if (tab && !a) { if (p.active !== tab.dataset.tab) { setWL(W => { W.panes[i].active = tab.dataset.tab; W.activeEditor = i; }); renderAll(); } return; }
+    if (tab && !a) { if (p.active !== tab.dataset.tab) { setWL(W => { W.panes[i].active = tab.dataset.tab; W.activeEditor = i; }); renderAll(); } else activateEditorPane(i); return; }
     if (a === 'single') { setWL(W => { const P = W.panes[i]; P.single = !P.single; if (P.single && P.active) P.tabs = [P.active]; }); renderAll(); return; }
     if (a === 'lock') { const it = get(p.active); if (it) { it.locked = !it.locked; touch(it); renderAll(); } return; }
     if (a === 'close-pane') {

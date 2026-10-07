@@ -687,6 +687,19 @@ kbd { font: 12px/1.4 ui-monospace, monospace; background: var(--panel2); border:
 .pv-note { font-size: 11px; color: var(--muted); padding: 4px 12px; }
 .pv-pages { flex: 1; overflow: auto; min-height: 0; }
 .pv-stack { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 12px 12px 40px; }
+.pv-selbar { position: fixed; z-index: 60; display: flex; align-items: center; gap: 4px; padding: 5px 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 6px 20px rgba(0,0,0,.14); }
+.pv-dot { width: 18px; height: 18px; border-radius: 50%; background: var(--c); border: 2px solid var(--panel); box-shadow: 0 0 0 1px var(--line); }
+.pv-dot:hover { transform: scale(1.12); }
+.pv-btn { font-size: 12px; padding: 3px 8px; border-radius: 6px; color: var(--text); }
+.pv-btn:hover { background: var(--line); }
+.pv-btn.primary { background: var(--accent); color: #fff; }
+.pv-sep { width: 1px; height: 16px; background: var(--line); margin: 0 2px; }
+.pv-at { font-weight: 700; color: var(--accent); padding-left: 4px; }
+.pv-selbar input { border: 0; outline: none; background: transparent; font-size: 13px; width: 170px; color: var(--text); }
+.pv-memo { display: inline-block; font: 700 0.75em/1.3 system-ui, sans-serif; color: #fff; background: var(--accent); border-radius: 4px; padding: 0 3px; margin: 0 1px; cursor: pointer; vertical-align: 0.1em; text-indent: 0; }
+.manuscript [data-memo] { font-size: 0.78em; font-family: 'Pretendard', system-ui, sans-serif; color: var(--accent); background: var(--accent-soft); border-radius: 5px; padding: 1px 5px; margin: 0 2px; cursor: pointer; white-space: nowrap; }
+::highlight(pv-link) { background-color: color-mix(in srgb, var(--accent) 16%, transparent); }
+.pv-text { user-select: text; }
 .pv-page { background: #fffefa; color: #222; box-shadow: 0 2px 10px rgba(0,0,0,.15); position: relative; flex: none; word-break: keep-all; line-break: strict; overflow-wrap: anywhere; overflow: hidden; }
 .pv-no { position: absolute; bottom: 8px; left: 0; right: 0; text-align: center; font: 10px 'Pretendard', 'Noto Sans KR', sans-serif; color: #aaa; }
 /* 시놉시스 보드 (파트 · 블록) */
@@ -1224,9 +1237,11 @@ function sanitizeHtml(html) {
             }
             const style = n.getAttribute('style');
             const fold = (n.tagName === 'P' || n.tagName === 'DIV') ? n.getAttribute('data-fold') : null;
+            const memo = n.tagName === 'SPAN' && n.hasAttribute('data-memo');
             const foldX = fold && n.hasAttribute('data-fold-x');
             for (const a of [...n.attributes]) n.removeAttribute(a.name);
             if (fold && /^[\w-]{1,40}$/.test(fold)) { n.setAttribute('data-fold', fold); if (foldX) n.setAttribute('data-fold-x', ''); }
+            if (memo) n.setAttribute('data-memo', '');
             if (style) {
                 const tmp = document.createElement('span'); tmp.setAttribute('style', style);
                 const keep = ALLOWED_STYLES.map(p => tmp.style.getPropertyValue(p) ? `${p}: ${tmp.style.getPropertyValue(p)}` : '').filter(Boolean);
@@ -1243,7 +1258,7 @@ function textToHtml(text) {
 }
 const ENT = { amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'", nbsp: ' ' };
 // 접은 단락 중 '내보내기에서 빼기'를 켠 단락을 지움 (글자 수·내보내기용)
-const stripExcluded = html => String(html || '').replace(/<(p|div)\b[^>]*\bdata-fold-x\b[^>]*>[\s\S]*?<\/\1>/g, '');
+const stripExcluded = html => String(html || '').replace(/<(p|div)\b[^>]*\bdata-fold-x\b[^>]*>[\s\S]*?<\/\1>/g, '').replace(/<span\b[^>]*\bdata-memo\b[^>]*>[^<]*<\/span>/g, '');
 function htmlToPlain(html) {
     return String(html || '').replace(/<[^>]*>/g, '').replace(/&(amp|lt|gt|quot|#39|nbsp);/g, (_, e) => ENT[e]);
 }
@@ -1740,6 +1755,7 @@ function renderEditors() {
     }
     grid.innerHTML = html;
     applyPaneSplit();
+    $$('.manuscript [data-memo]', grid).forEach(x => x.contentEditable = 'false');
     fillImages(grid);
     $$('.manuscript', grid).forEach(decorateFolds);
     for (let i = 0; i < W.editorN; i++) { const it = get(W.panes[i].active); if (it && it.kind === 'episode') renderFoot(it); }
@@ -3368,15 +3384,16 @@ $('#btn-hl')?.addEventListener('click', openHighlights);
    원고 → 문단 블록 (내보내기·복사 공용)
    블록 = { runs: [{ text, b, i, u, s, color, bg, img, width }], align }
    ===================================================================== */
-function toBlocks(html) {
+// opt.memo: @메모도 넣음(쪽 보기용). 글자마다 원고 안 위치(at)를 붙여 둠
+function toBlocks(html, opt = {}) {
     const t = document.createElement('template'); t.innerHTML = sanitizeHtml(html);
-    const blocks = []; let cur = null;
+    const blocks = []; let cur = null, pos = 0;
     const nb = align => { cur = { runs: [], align: align || '' }; blocks.push(cur); return cur; };
     const isBlock = n => n.nodeType === 1 && (n.tagName === 'P' || n.tagName === 'DIV');
     const walk = (node, st) => {
         const kids = [...node.childNodes];
         kids.forEach((n, i) => {
-            if (n.nodeType === 3) { if (!n.data) return; if (!cur) nb(); cur.runs.push({ ...st, text: n.data.replace(/\n/g, ' ') }); return; }
+            if (n.nodeType === 3) { const at = pos; pos += n.data.length; if (!n.data) return; if (!cur) nb(); cur.runs.push({ ...st, text: n.data.replace(/\n/g, ' '), at }); return; }
             if (n.nodeType !== 1) return;
             if (n.tagName === 'BR') {
                 const trailing = kids.slice(i + 1).every(k => k.nodeType === 3 && !k.data);
@@ -3385,7 +3402,8 @@ function toBlocks(html) {
                 return;
             }
             if (n.tagName === 'IMG') { if (!cur) nb(); cur.runs.push({ ...st, text: '', img: n.getAttribute('data-img'), width: n.style.width }); return; }
-            if (isBlock(n)) { if (n.hasAttribute('data-fold-x')) return; nb(n.style.textAlign); walk(n, st); cur = null; return; }
+            if (isBlock(n)) { if (n.hasAttribute('data-fold-x')) { pos += n.textContent.length; return; } nb(n.style.textAlign); walk(n, st); cur = null; return; }
+            if (n.hasAttribute('data-memo')) { const at = pos, tx = n.textContent; pos += tx.length; if (opt.memo && tx) { if (!cur) nb(); cur.runs.push({ text: '@', memo: tx, at }); } return; }
             const s2 = { ...st }, tg = n.tagName;
             if (tg === 'B' || tg === 'STRONG') s2.b = true;
             if (tg === 'I' || tg === 'EM') s2.i = true;
@@ -5275,7 +5293,22 @@ function paginate(doc, L) {
     box.style.cssText = `position:absolute;left:-9999px;top:0;visibility:hidden;width:${iw}px;font-family:${pageFont(L.font)};font-size:${fpx}px;line-height:${L.lh};word-break:keep-all;line-break:strict;overflow-wrap:anywhere`;
     document.body.appendChild(box);
     const pStyle = `margin:0;text-indent:${para().indentPt}pt;white-space:pre-wrap`;
-    const blocks = applyLineRules(toBlocks(doc.body), lineRules());
+    const blocks = applyLineRules(toBlocks(doc.body, { memo: true }), lineRules());
+    // 문단의 [s, e) 글자를 쪽 보기 HTML로 (글자마다 원고 위치 data-at)
+    const sliceHtml = (b, s, e) => {
+        let c = 0, h = '';
+        const len = blockText(b).length;
+        for (const r of b.runs) {
+            const l = r.text.length, a = Math.max(s, c), z = Math.min(e, c + l);
+            if (r.img) { if ((c >= s && c < e) || (c === e && e === len)) h += '[이미지]'; }
+            else if (z > a) {
+                if (r.memo) h += `<span class="pv-memo" data-at="${r.at}" data-len="${r.memo.length}" data-memo-text="${xe(r.memo)}" title="${xe(r.memo)}">@</span>`;
+                else h += r.at != null ? `<span data-at="${r.at + a - c}">${runHtml({ ...r, text: r.text.slice(a - c, z - c) }, () => '')}</span>` : runHtml({ ...r, text: r.text.slice(a - c, z - c) }, () => '');
+            }
+            c += l;
+        }
+        return h;
+    };
     const pages = []; let cur = [];
     const newPage = () => { pages.push(cur); cur = []; box.innerHTML = ''; };
     const fits = () => box.scrollHeight <= ih;
@@ -5284,22 +5317,23 @@ function paginate(doc, L) {
         const text = blockText(b);
         const isEmpty = !text.trim() && !b.runs.some(r => r.img);
         if (isEmpty && !cur.length) continue; // 쪽 맨 위 빈 줄은 건너뜀
-        const inner = b.runs.map(r => r.img ? '[이미지]' : runHtml(r, () => '')).join('') || '&nbsp;';
+        const inner = sliceHtml(b, 0, text.length) || '&nbsp;';
         const html = `<p style="${pStyle}${b.align && b.align !== 'left' && b.align !== 'start' ? ';text-align:' + b.align : ''}">${inner}</p>`;
         let el = addHtml(html);
         if (fits()) { cur.push(html); continue; }
         el.remove();
         // 쪽에 다 안 들어가면 글자 단위로 잘라 남은 자리를 채움
-        let rest = text, first = true;
-        while (rest) {
-            const mk = (t, f) => `<p style="${pStyle}${f ? '' : ';text-indent:0'}">${esc(t)}</p>`;
-            let lo = 0, hi = rest.length;
-            while (lo < hi) { const mid = Math.ceil((lo + hi) / 2); const e2 = addHtml(mk(rest.slice(0, mid), first)); const ok = fits(); e2.remove(); if (ok) lo = mid; else hi = mid - 1; }
-            if (lo === 0) { if (!cur.length) lo = Math.min(rest.length, 1); else { newPage(); continue; } }
-            const part = mk(rest.slice(0, lo), first);
+        let off = 0, first = true;
+        while (off < text.length) {
+            const mk = (n, f) => `<p style="${pStyle}${f ? '' : ';text-indent:0'}">${sliceHtml(b, off, off + n)}</p>`;
+            const restLen = text.length - off;
+            let lo = 0, hi = restLen;
+            while (lo < hi) { const mid = Math.ceil((lo + hi) / 2); const e2 = addHtml(mk(mid, first)); const ok = fits(); e2.remove(); if (ok) lo = mid; else hi = mid - 1; }
+            if (lo === 0) { if (!cur.length) lo = Math.min(restLen, 1); else { newPage(); continue; } }
+            const part = mk(lo, first);
             addHtml(part); cur.push(part);
-            rest = rest.slice(lo); first = false;
-            if (rest) newPage();
+            off += lo; first = false;
+            if (off < text.length) newPage();
         }
     }
     if (cur.length || !pages.length) pages.push(cur);
@@ -5315,6 +5349,7 @@ function renderPageView(paneEl, doc) {
     const zoom = Math.max(0.2, fit * (W.pageZoom || 1));
     const keep = $('.pv-pages', host)?.scrollTop || 0;
     const r = paginate(doc, L);
+    host.dataset.doc = doc.id;
     host.innerHTML = `<div class="pv-bar"><span>쪽 나눠 보기</span>
         <select data-pv-layout>${pageLayouts().map(l => `<option value="${l.id}" ${l.id === L.id ? 'selected' : ''}>${esc(l.name)}</option>`).join('')}<option value="__new">＋ 내 판형 만들기…</option></select>
         <button class="mini" data-pv-z="-0.1">－</button><span>${Math.round((W.pageZoom || 1) * 100)}%</span><button class="mini" data-pv-z="0.1">＋</button>
@@ -5329,6 +5364,161 @@ function schedulePageViews(docId) {
     clearTimeout(pvTimer);
     pvTimer = setTimeout(() => { $$('.epane').forEach(pe => { const p = WL().panes[+pe.dataset.pane]; if (p && p.pageView && p.active === docId) renderPageView(pe, get(docId)); }); }, 700);
 }
+/* ---- 쪽 보기 ↔ 원고 잇기: 마우스를 올리면 옆 원고가 그 자리로, 고를 곳에 글자색·@메모 ---- */
+// 쪽 보기 속 한 점 → 원고 안 글자 위치
+function pvAt(node, off) {
+    const el = (node.nodeType === 3 ? node.parentElement : node)?.closest('[data-at]');
+    if (!el) return null;
+    if (el.classList.contains('pv-memo')) return +el.dataset.at;
+    const r = document.createRange(); r.setStart(el, 0);
+    try { r.setEnd(node, off); } catch (e) { return +el.dataset.at; }
+    return +el.dataset.at + r.toString().length;
+}
+function pvParaSpan(p) {
+    const xs = $$('[data-at]', p); if (!xs.length) return null;
+    const last = xs[xs.length - 1];
+    return [+xs[0].dataset.at, +last.dataset.at + (last.classList.contains('pv-memo') ? +last.dataset.len : last.textContent.length)];
+}
+// 옆 창에 같은 회차가 원고로 열려 있으면 그 원고
+const pvLiveEd = docId => $$(`.ed-wrap[data-scroll] .manuscript[data-id="${docId}"]`).find(e => e.offsetParent);
+// 원고 안 글자 위치 → 원고 화면의 Range
+function edRangeAt(ed, a, b) {
+    const w = document.createTreeWalker(ed, NodeFilter.SHOW_TEXT, { acceptNode: n => n.parentElement.closest('.foldbar') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+    let c = 0, r = document.createRange(), started = false;
+    for (let n = w.nextNode(); n; n = w.nextNode()) {
+        const l = n.data.length;
+        if (!started && a <= c + l) { r.setStart(n, Math.max(0, a - c)); started = true; }
+        if (started && b <= c + l) { r.setEnd(n, Math.max(0, b - c)); return r; }
+        c += l;
+    }
+    return started ? (r.collapse(true), r) : null;
+}
+let pvHoverP = null, pvHoverRaf = 0;
+function pvLinkClear() { pvHoverP = null; CSS.highlights?.delete('pv-link'); }
+document.addEventListener('mousemove', e => {
+    if (pvHoverRaf) return;
+    const tgt = e.target, y = e.clientY;
+    pvHoverRaf = requestAnimationFrame(() => {
+        pvHoverRaf = 0;
+        const p = tgt.closest && tgt.closest('.pv-text > p');
+        if (!p) { if (pvHoverP && !(tgt.closest && tgt.closest('.pv-pages'))) pvLinkClear(); return; }
+        if (p === pvHoverP || getSelection().toString()) return;
+        pvHoverP = p;
+        const host = p.closest('.page-view'), ed = host && pvLiveEd(host.dataset.doc), span = pvParaSpan(p);
+        if (!ed || !span) return;
+        const r = edRangeAt(ed, span[0], span[1]); if (!r) return;
+        if (window.Highlight) CSS.highlights.set('pv-link', new Highlight(r));
+        const wrap = ed.closest('.ed-wrap'), rr = r.getBoundingClientRect();
+        if (!rr.height) return;
+        // 쪽 보기에서 마우스가 있는 높이에 원고 문단이 오도록
+        const wr = wrap.getBoundingClientRect(), want = Math.min(Math.max(y, wr.top + 40), wr.bottom - 80);
+        wrap.scrollTop += rr.top - want;
+    });
+});
+// 원고 본문(HTML)에서 [a, b) 글자마다 fn(텍스트 노드, 시작, 끝)
+function editBodyRange(doc, a, b, fn) {
+    const t = document.createElement('template'); t.innerHTML = sanitizeHtml(doc.body);
+    const w = document.createTreeWalker(t.content, NodeFilter.SHOW_TEXT);
+    const segs = []; let c = 0;
+    for (let n = w.nextNode(); n; n = w.nextNode()) {
+        const l = n.data.length, s0 = Math.max(a, c), e0 = Math.min(b, c + l);
+        if (e0 > s0 && !n.parentElement?.closest('[data-memo]')) segs.push([n, s0 - c, e0 - c]);
+        c += l;
+    }
+    segs.forEach(([n, s0, e0]) => fn(n, s0, e0, t));
+    return t;
+}
+function commitBody(doc, t) {
+    maybeSnapshot(doc, doc.body);
+    doc.body = t.innerHTML; touch(doc);
+    renderEditors();
+}
+function pvColor(doc, a, b, color) {
+    if (doc.locked) { toast('잠긴 문서예요. 먼저 잠금을 풀어 주세요.'); return; }
+    const t = editBodyRange(doc, a, b, (n, s0, e0) => {
+        if (!color) { for (let el = n.parentElement; el && !/^(P|DIV)$/.test(el.tagName); el = el.parentElement) if (el.style && el.style.color) el.style.color = ''; return; }
+        const mid = s0 > 0 ? n.splitText(s0) : n;
+        if (e0 - s0 < mid.data.length) mid.splitText(e0 - s0);
+        const sp = mid.ownerDocument.createElement('span'); sp.style.color = color;
+        mid.replaceWith(sp); sp.append(mid);
+    });
+    commitBody(doc, t);
+}
+function pvAddMemo(doc, at, text) {
+    if (doc.locked) { toast('잠긴 문서예요. 먼저 잠금을 풀어 주세요.'); return; }
+    const t = document.createElement('template'); t.innerHTML = sanitizeHtml(doc.body);
+    const w = document.createTreeWalker(t.content, NodeFilter.SHOW_TEXT);
+    let c = 0, node = null, off = 0, last = null;
+    for (let n = w.nextNode(); n; n = w.nextNode()) { const l = n.data.length; last = n; if (at <= c + l && !n.parentElement?.closest('[data-memo]')) { node = n; off = at - c; break; } c += l; }
+    const sp = t.content.ownerDocument.createElement('span'); sp.setAttribute('data-memo', ''); sp.textContent = '@' + text.replace(/^@/, '');
+    if (node) { const rest = node.splitText(off); rest.before(sp); }
+    else if (last) last.after(sp); else return;
+    commitBody(doc, t);
+}
+const PV_COLORS = [['#e5484d', '빨강'], ['#3e63dd', '파랑'], ['#30a46c', '초록'], ['#8e4ec6', '보라'], ['#f76b15', '주황']];
+let pvBar = null;
+function closePvBar() { pvBar?.remove(); pvBar = null; }
+function openPvBar(rect, doc, a, b) {
+    closePvBar();
+    pvBar = document.createElement('div'); pvBar.className = 'pv-selbar';
+    pvBar.innerHTML = `${PV_COLORS.map(([c, n]) => `<button class="pv-dot" data-pvc="${c}" title="${n} 글자" style="--c:${c}"></button>`).join('')}
+        <button class="pv-btn" data-pvc="" title="글자색 지우기">색 지우기</button><span class="pv-sep"></span>
+        <button class="pv-btn" data-pvm title="이 자리에 @메모">@ 메모</button>`;
+    document.body.appendChild(pvBar);
+    const place = () => { const w = pvBar.offsetWidth; pvBar.style.left = Math.max(8, Math.min(innerWidth - w - 8, rect.left + rect.width / 2 - w / 2)) + 'px'; pvBar.style.top = Math.max(8, rect.top - pvBar.offsetHeight - 8) + 'px'; };
+    place();
+    pvBar.addEventListener('mousedown', e => { if (!e.target.matches('input')) e.preventDefault(); });
+    pvBar.addEventListener('click', e => {
+        const t = e.target.closest('button'); if (!t) return;
+        if (t.dataset.pvc != null) { pvColor(doc, a, b, t.dataset.pvc); getSelection().removeAllRanges(); closePvBar(); return; }
+        if (t.dataset.pvm != null) memoInput(pvBar, '', v => { pvAddMemo(doc, b, v); getSelection().removeAllRanges(); }, place);
+    });
+}
+// 막대 안에서 @메모 입력 (Enter 저장, Esc 취소)
+function memoInput(bar, val, onOk, place, onDel) {
+    bar.innerHTML = `<span class="pv-at">@</span><input type="text" data-mi value="${esc(val)}" placeholder="나중에 고칠 것" maxlength="80">${onDel ? '<button class="pv-btn" data-mdel title="메모 지우기"><i class="ic ic-trash-2"></i></button>' : ''}<button class="pv-btn primary" data-mok>저장</button>`;
+    place && place();
+    const inp = $('[data-mi]', bar); inp.focus(); inp.select();
+    const ok = () => { const v = inp.value.trim(); if (v) onOk(v); closePvBar(); };
+    inp.addEventListener('keydown', e => { if (e.isComposing) return; if (e.key === 'Enter') { e.preventDefault(); ok(); } if (e.key === 'Escape') closePvBar(); });
+    $('[data-mok]', bar).onclick = ok;
+    if (onDel) $('[data-mdel]', bar).onclick = () => { onDel(); closePvBar(); };
+}
+document.addEventListener('mouseup', e => {
+    if (pvBar && pvBar.contains(e.target)) return;
+    const pages = e.target.closest && e.target.closest('.pv-pages');
+    setTimeout(() => {
+        const sel = getSelection();
+        if (!pages || !sel.rangeCount || sel.isCollapsed) { if (!(pvBar && pvBar.contains(document.activeElement))) closePvBar(); return; }
+        const r = sel.getRangeAt(0); if (!pages.contains(r.commonAncestorContainer)) return;
+        const host = pages.closest('.page-view'), doc = host && get(host.dataset.doc); if (!doc) return;
+        let a = pvAt(r.startContainer, r.startOffset), b = pvAt(r.endContainer, r.endOffset);
+        if (a == null) { const x = $('[data-at]', r.cloneContents()); a = x ? +x.dataset.at : null; }
+        if (a == null || b == null || b <= a) { closePvBar(); return; }
+        openPvBar(r.getBoundingClientRect(), doc, a, b);
+    }, 0);
+});
+// @메모 누르면 고치기·지우기 (쪽 보기·원고 모두)
+document.addEventListener('click', e => {
+    const m = e.target.closest && e.target.closest('.pv-memo, .manuscript [data-memo]'); if (!m) return;
+    const host = m.closest('.page-view'), ed = m.closest('.manuscript');
+    const doc = get(host ? host.dataset.doc : ed?.dataset.id); if (!doc) return;
+    let at;
+    if (host) at = +m.dataset.at;
+    else { const r = document.createRange(); r.setStart(ed, 0); r.setEndBefore(m); const tmp = document.createElement('div'); tmp.append(r.cloneContents()); tmp.querySelectorAll('.foldbar').forEach(x => x.remove()); at = tmp.textContent.length; }
+    const old = host ? m.dataset.memoText : m.textContent;
+    e.preventDefault();
+    closePvBar();
+    pvBar = document.createElement('div'); pvBar.className = 'pv-selbar'; document.body.appendChild(pvBar);
+    const rect = m.getBoundingClientRect();
+    const place = () => { const w = pvBar.offsetWidth; pvBar.style.left = Math.max(8, Math.min(innerWidth - w - 8, rect.left - w / 2)) + 'px'; pvBar.style.top = Math.max(8, rect.top - pvBar.offsetHeight - 8) + 'px'; };
+    const edit = fn => {
+        const t = document.createElement('template'); t.innerHTML = sanitizeHtml(doc.body);
+        const w = document.createTreeWalker(t.content, NodeFilter.SHOW_TEXT); let c = 0;
+        for (let n = w.nextNode(); n; n = w.nextNode()) { const sp = n.parentElement?.closest('[data-memo]'); if (sp && c === at) { fn(sp); commitBody(doc, t); return; } c += n.data.length; }
+    };
+    memoInput(pvBar, old.replace(/^@/, ''), v => edit(sp => { sp.textContent = '@' + v; }), place, () => edit(sp => sp.remove()));
+});
 function newPageLayout() {
     const bg = document.createElement('div'); bg.className = 'modal-bg';
     bg.innerHTML = `<div class="modal"><h3>내 판형 만들기</h3>

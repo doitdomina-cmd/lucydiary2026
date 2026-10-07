@@ -3195,7 +3195,7 @@ function openHighlights() {
                 const es = list.filter(e => e.hex === c);
                 return `<div class="hl-group"><span class="hl-dot" style="background:${c};width:14px;height:14px"></span>${es.length}개</div>`
                     + es.map(e => { const k = hlKey(e.doc.id, e.hex, e.text), m = hlMemo(k); return `<div class="hl-entry"><button class="hl-item" data-doc="${e.doc.id}" data-i="${e.idx}"><small>${esc([...pathOf(e.doc), e.doc.title].join(' › '))}</small><span style="background:${c}">${esc(e.text.length > 120 ? e.text.slice(0, 120) + '…' : e.text)}</span></button>
-                        <div class="hl-memo">${editing === k ? `<input data-memo-in="${esc(k)}" value="${esc(m)}" placeholder="한 줄 메모 (예: 여기서 처음 등장, 왼손잡이라고 씀)">` : m ? `<button data-memo="${esc(k)}" title="메모 고치기">📝 ${esc(m)}</button>` : `<button data-memo="${esc(k)}" class="add">＋ 메모</button>`}</div></div>`; }).join('');
+                        <div class="hl-memo">${editing === k ? `<input data-memo-in="${esc(k)}" value="${esc(m)}" placeholder="한 줄 메모">` : m ? `<button data-memo="${esc(k)}" title="메모 고치기">📝 ${esc(m)}</button>` : `<button data-memo="${esc(k)}" class="add">＋ 메모</button>`}</div></div>`; }).join('');
             }).join('') : '<p style="color:var(--muted);font-size:13px;line-height:1.7;padding:16px 0">아직 칠한 형광펜이 없어요.<br>원고에서 문장을 고른 뒤 위에 뜨는 색 동그라미를 눌러 보세요.</p>'}</div></div>`;
     };
     render();
@@ -4441,9 +4441,9 @@ function renderChrono() {
     const head = `<div class="ch-pubsum">${P.pubI >= 0 ? `연재 <b>${P.pubI + 1}편</b> (~${esc(P.docs[P.pubI].title)}) · 쌓아 둔 원고 <b>${P.stock}편</b>` : '위의 「연재된 곳」에서 연재처에 올린 마지막 회차를 고르면, 이미 연재된 사건과 쌓아 둔 원고가 보여요.'}${P.writing ? ` · 쓰는 중 <b>${esc(get(P.writing)?.title || '')}</b>` : ''}</div>`;
     const after = (ev, i) => (i === lastPub ? '<div class="ch-line pub"><span>— 여기까지 연재됨 —</span></div>' : '') + (ev.type !== 'marker' && isWr(ev) ? '<div class="ch-line writing"><span>✍ 쓰는 중</span></div>' : '');
     return head + `<div class="chrono">${list.map((ev, i) => (ev.type === 'marker'
-        ? `<div class="ch-marker" data-ev="${ev.id}"><input data-pid="${ev.id}" data-pf="title" value="${esc(ev.title)}" placeholder="구간 이름 (예: 1부 · 회귀 전)"><span class="ch-tools"><button class="mini" data-up="${ev.id}">↑</button><button class="mini" data-down="${ev.id}">↓</button><button class="mini" data-del="${ev.id}">✕</button></span></div>`
+        ? `<div class="ch-marker" data-ev="${ev.id}"><input data-pid="${ev.id}" data-pf="title" value="${esc(ev.title)}" placeholder="구간 이름"><span class="ch-tools"><button class="mini" data-up="${ev.id}">↑</button><button class="mini" data-down="${ev.id}">↓</button><button class="mini" data-del="${ev.id}">✕</button></span></div>`
         : `<div class="ch-row" data-ev="${ev.id}">
-            <div class="ch-time"><input data-pid="${ev.id}" data-pf="time" value="${esc(ev.time || '')}" placeholder="언제? (예: 12년 전)"></div>
+            <div class="ch-time"><input data-pid="${ev.id}" data-pf="time" value="${esc(ev.time || '')}" placeholder="언제?"></div>
             <div class="ch-dot ${ev.status === 'fixed' ? 'fixed' : ''}"></div>
             <div class="ch-card ${ev.status === 'fixed' ? 'fixed' : ''} ${isPub(ev) ? 'pub' : ''} ${isWr(ev) ? 'writing' : ''}">
                 <div class="ch-card-head">${isPub(ev) ? '<span class="ch-pubtag" title="이미 연재된 이야기"><i class="ic ic-lock"></i> 연재됨</span>' : ''}${isWr(ev) ? '<span class="ch-wrtag">✍ 쓰는 중</span>' : ''}<button class="ch-status" data-status="${ev.id}" title="눌러서 바꾸기">${ev.status === 'fixed' ? '확정' : '초안'}</button>
@@ -4494,7 +4494,7 @@ function fsEndHtml(fs, which) {
     const d = get(e.docId);
     return `<button class="fs-quote" data-jump="${e.docId}|${esc(e.text)}"><small>${which === 'plant' ? '심은 곳' : '거둔 곳'} · <i class="ic ic-file-text"></i> ${esc(d ? d.title : '지운 회차')}</small>
         <span style="background:${esc(e.hex || '#fff3a3')}">${esc(e.text.length > 90 ? e.text.slice(0, 90) + '…' : e.text)}</span>${hlMemo(hlKey(e.docId, e.hex || '', e.text)) ? `<em class="fs-memo">📝 ${esc(hlMemo(hlKey(e.docId, e.hex || '', e.text)))}</em>` : ''}</button>
-        <textarea data-pid="${fs.id}" data-pf="${which}Note" placeholder="메모 (예: 손 = 역류 흔적, 5화 만옥 대사와 연결)" rows="1">${esc(fs[which + 'Note'] || '')}</textarea>`;
+        <textarea data-pid="${fs.id}" data-pf="${which}Note" placeholder="메모" rows="1">${esc(fs[which + 'Note'] || '')}</textarea>`;
 }
 function renderForeshadow() {
     const list = foreshadows();
@@ -5535,7 +5535,7 @@ function planMd(pl) {
 /* 회차 개요: 원고 오른쪽에 붙는 칸. 본문에는 안 들어감 (= 타임라인 카드·시놉 창 '지금 회차 시놉시스'와 같은 내용) */
 function outlineHtml(it) {
     return `<aside class="outline"><div class="ol-head"><i class="ic ic-notebook-text"></i> <b>${esc(it.title || '이 회차')}</b> 트릿<span style="flex:1"></span><button class="mini" data-a="outline" title="트릿 칸 닫기">✕</button></div>
-        <textarea data-id="${it.id}" data-field="summary" placeholder="이 회차에서 쓸 내용을 적어 두세요.&#10;&#10;예)&#10;- 접수처에서 동명이인 사고&#10;- 대진표에 하필 S급 3위&#10;- 절단: 백하린 등장">${esc(it.summary || '')}</textarea>
+        <textarea data-id="${it.id}" data-field="summary" placeholder="이 회차에서 쓸 내용을 적어 두세요.">${esc(it.summary || '')}</textarea>
         <div class="ol-note">본문에는 안 들어가요 · 타임라인 카드와 같은 내용</div></aside>`;
 }
 

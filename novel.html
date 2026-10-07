@@ -126,6 +126,7 @@ main { height: calc(100% - 82px); display: flex; }
 .modal .exb-row input[type=checkbox] { width: auto; margin: 0; accent-color: var(--accent); }
 .modal .exb-row input[type=number] { width: 52px; margin: 0; padding: 2px 6px; text-align: right; }
 .ex-preview { max-height: 150px; overflow-y: auto; white-space: pre-wrap; font: 12px/1.7 inherit; font-family: inherit; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 0; color: var(--text); }
+.pl-name { font-size: 13px; margin-right: 6px; }
 .pub-pick { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--muted); margin-right: 6px; }
 .pub-pick select { font-size: 11px; padding: 1px 4px; max-width: 120px; }
 .ch-pubsum { font-size: 12px; color: var(--muted); padding: 2px 4px 10px; } .ch-pubsum b { color: var(--text); }
@@ -1675,7 +1676,7 @@ function renderEditors() {
         const ref = get(p.ref);
         const head = p.single
             ? `<select data-role="ep-pick" style="flex:1;min-width:0">${it ? '' : '<option value="">— 문서 선택 —</option>'}${docOptions(it?.id)}</select>`
-            : `<div class="tabs">${p.tabs.map(id => { const d = get(id); return d ? `<div class="tab ${id === p.active ? 'on' : ''}" data-tab="${id}" title="${esc(d.title)}">${d.locked ? '<i class="ic ic-lock"></i>' : d.kind === 'plan' ? '<i class="ic ic-book-open"></i>' : d.kind === 'folder' ? '<i class="ic ic-folder"></i>' : d.kind === 'sbview' ? '<i class="ic ic-layout-dashboard"></i>' : d.kind === 'plview' ? '<i class="ic ic-chart-gantt"></i>' : d.kind === 'msel' ? '<i class="ic ic-layout-list"></i>' : ''}<span>${esc(d.title || '제목 없음')}</span><button class="x" data-a="close-tab" title="탭 닫기">✕</button></div>` : ''; }).join('')}</div>`;
+            : `<div class="tabs">${p.tabs.map(id => { const d = get(id); return d ? `<div class="tab ${id === p.active ? 'on' : ''}" data-tab="${id}" title="${esc(d.title)}">${d.locked ? '<i class="ic ic-lock"></i>' : d.kind === 'plan' ? '<i class="ic ic-book-open"></i>' : d.kind === 'folder' ? '<i class="ic ic-folder"></i>' : d.kind === 'sbview' ? '<i class="ic ic-layout-dashboard"></i>' : d.kind === 'plview' ? `<i class="ic ic-${d.tab === 'chrono' ? 'history' : d.tab === 'foreshadow' ? 'flag' : 'chart-gantt'}"></i>` : d.kind === 'msel' ? '<i class="ic ic-layout-list"></i>' : ''}<span>${esc(d.title || '제목 없음')}</span><button class="x" data-a="close-tab" title="탭 닫기">✕</button></div>` : ''; }).join('')}</div>`;
         html += `<div class="epane ${i === W.activeEditor ? 'active' : ''}" data-pane="${i}">
             <div class="pane-head">${head}
                 <button class="mini ${p.single ? 'on' : ''}" data-a="single" title="${p.single ? '탭 모드로 전환' : '한 회차만 보기로 전환'}">${p.single ? '<i class="ic ic-square"></i>' : '<i class="ic ic-layers"></i>'}</button>
@@ -1687,7 +1688,7 @@ function renderEditors() {
             ${it && it.kind === 'plan' ? `<div class="plan-view" data-plan-id="${it.id}">${planHtml(it)}</div>` : ''}
             ${it && it.kind === 'folder' ? `<div class="fb-view" data-folder="${it.id}">${folderBoardHtml(it)}</div>` : ''}
             ${it && it.kind === 'sbview' ? `<div class="sbv-view" data-sbv="${it.id}">${sbViewHtml(it)}</div>` : ''}
-            ${it && it.kind === 'plview' ? plannerPaneHtml() : ''}
+            ${it && it.kind === 'plview' ? plannerPaneHtml(it) : ''}
             ${it && it.kind === 'msel' ? mselPaneHtml(it) : ''}
             ${it && it.kind === 'episode' ? `<div class="crumb">${esc([get(curWorkId())?.title, ...pathOf(it), it.title].filter(Boolean).join(' › '))}${it.locked ? '<span class="lock-badge">· 잠김</span>' : ''}</div>
                 <div class="ed-main"><div class="ed-col">
@@ -4296,13 +4297,16 @@ function openPlanner(tab) {
 function closePlanner() { $('.planner:not(.planner-pane)')?.remove(); renderAll(); }
 function renderPlanner() { $$('.planner').forEach(renderPlannerIn); }
 // 원고 창 탭 안의 타임라인 (바인더 시놉시스 › 타임라인)
-function plannerPaneHtml() {
-    return `<div class="planner planner-pane"><div class="planner-head"><div class="seg pl-tabs"><button data-tab="structure">타임라인</button><button data-tab="chrono">연대기</button><button data-tab="foreshadow">복선</button></div>
+// 바인더의 타임라인 · 연대기 · 복선은 각각 자기 화면만 (탭 없이)
+const PL_TABS = { structure: '타임라인', chrono: '연대기', foreshadow: '복선' };
+function plannerPaneHtml(it) {
+    const tab = (it && it.tab) || 'structure';
+    return `<div class="planner planner-pane" data-fixed-tab="${tab}"><div class="planner-head"><b class="pl-name">${PL_TABS[tab]}</b>
         <span class="pl-tools"></span><span style="flex:1"></span><button class="mini" data-pl-full title="전체 화면으로 보기"><i class="ic ic-maximize-2"></i></button></div><div class="planner-body"></div></div>`;
 }
 function bindPlannerPanes(root) {
     $$('.planner-pane', root).forEach(pl => {
-        pl.addEventListener('click', e => { if (e.target.closest('[data-pl-full]')) { openPlanner(); return; } plannerClick(e); });
+        pl.addEventListener('click', e => { if (e.target.closest('[data-pl-full]')) { openPlanner(pl.dataset.fixedTab); return; } plannerClick(e); });
         pl.addEventListener('input', plannerInput);
         pl.addEventListener('change', plannerChange);
         bindCardDrag(pl);
@@ -4311,11 +4315,12 @@ function bindPlannerPanes(root) {
 }
 function renderPlannerIn(pl) {
     const body = $('.planner-body', pl), keep = body.scrollTop;
-    $$('.pl-tabs button', pl).forEach(b => b.classList.toggle('on', b.dataset.tab === plannerTab));
+    const tab = pl.dataset.fixedTab || plannerTab;
+    $$('.pl-tabs button', pl).forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
     const tools = $('.pl-tools', pl);
-    if (plannerTab === 'structure') { tools.innerHTML = renderStructureTools(); body.innerHTML = renderStructure(); }
-    if (plannerTab === 'chrono') { tools.innerHTML = `${pubSelectHtml()}<button class="mini" data-c="add-event">＋ 사건</button><button class="mini" data-c="add-marker">＋ 구간 이름</button><button class="mini" data-c="import">＋ 회차 불러오기</button>`; body.innerHTML = renderChrono(); }
-    if (plannerTab === 'foreshadow') { tools.innerHTML = ''; body.innerHTML = renderForeshadow(); }
+    if (tab === 'structure') { tools.innerHTML = renderStructureTools(); body.innerHTML = renderStructure(); }
+    if (tab === 'chrono') { tools.innerHTML = `${pubSelectHtml()}<button class="mini" data-c="add-event">＋ 사건</button><button class="mini" data-c="add-marker">＋ 구간 이름</button><button class="mini" data-c="import">＋ 회차 불러오기</button>`; body.innerHTML = renderChrono(); }
+    if (tab === 'foreshadow') { tools.innerHTML = ''; body.innerHTML = renderForeshadow(); }
     $$('textarea', body).forEach(autoGrow);
     body.scrollTop = keep;
 }
@@ -7065,10 +7070,12 @@ function sbTreeRows(open) {
     return group('sb_char', '캐릭터 설정', SB_CHAR_TABS, 'file-pen-line') + group('sb_note', '작품 설정', SB_NOTE_TABS, 'file-text');
 }
 function sbSynopRows(open) {
-    const wid = curWorkId(), id = `plv_${wid}`;
-    let tl = items[id];
-    if (!tl || tl.deleted) tl = create('plview', { id, workId: wid, title: '타임라인' });
-    return sbRow(sbItem('plot', '시놉시스'), open, 4, 'layout-list') + sbRow(tl, open, 4, 'chart-gantt');
+    const wid = curWorkId();
+    const pv = (id, title, tab) => { let it = items[id]; if (!it || it.deleted) it = create('plview', { id, workId: wid, title, tab }); return it; };
+    return sbRow(sbItem('plot', '시놉시스'), open, 4, 'layout-list')
+        + sbRow(pv(`plv_${wid}`, '타임라인', 'structure'), open, 4, 'chart-gantt')
+        + sbRow(pv(`plvc_${wid}`, '연대기', 'chrono'), open, 4, 'history')
+        + sbRow(pv(`plvf_${wid}`, '복선', 'foreshadow'), open, 4, 'flag');
 }
 function sbSafe(html) { const t = document.createElement('template'); t.innerHTML = sanitizeHtml(String(html || '')); return t.innerHTML; }
 function sbViewHtml(it) {

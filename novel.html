@@ -1114,6 +1114,7 @@ nav.mtabs { display: none; }
         <span class="sep"></span>
         <button class="sb-sw" data-sbc="bg-red-50" style="background:#d9a9a4" title="색"></button><button class="sb-sw" data-sbc="bg-blue-50" style="background:#a3bcd1" title="색"></button><button class="sb-sw" data-sbc="bg-green-50" style="background:#a8c3ab" title="색"></button><button class="sb-sw" data-sbc="bg-orange-50" style="background:#d3b48c" title="색"></button><button class="sb-sw" data-sbc="bg-pink-50" style="background:#d6b0bd" title="색"></button><button class="sb-sw" data-sbc="bg-purple-50" style="background:#b7abc9" title="색"></button><button class="sb-sw sb-sw-x" data-sbc="" title="색 빼기"><i class="ic ic-x"></i></button>
         <span class="sep"></span></span>
+ <button class="tb small" id="btn-revise" title="퇴고 보기: 왼쪽 원고 · 오른쪽 쪽 보기 (다시 누르면 원래대로)"><i class="ic ic-file-pen-line"></i> 퇴고</button>
  <button class="tb small keep-sel" id="btn-spell" title="맞춤법 점검 (오른쪽 옆 창)"><i class="ic ic-spell-check"></i> 맞춤법</button>
     <button class="tb small keep-sel" id="btn-syn" title="원고에서 고른 말의 비슷한 표현 · 고른 게 없으면 반복 표현 옆 창"><i class="ic ic-repeat"></i> 비슷한 표현</button>
     <button class="tb small" id="btn-hl" title="작품 전체의 형광펜 목록"><i class="ic ic-highlighter"></i> 형광펜</button>
@@ -1756,6 +1757,7 @@ function renderEditors() {
     grid.innerHTML = html;
     applyPaneSplit();
     $$('.manuscript [data-memo]', grid).forEach(x => x.contentEditable = 'false');
+    $('#btn-revise')?.classList.toggle('on', reviseMode());
     fillImages(grid);
     $$('.manuscript', grid).forEach(decorateFolds);
     for (let i = 0; i < W.editorN; i++) { const it = get(W.panes[i].active); if (it && it.kind === 'episode') renderFoot(it); }
@@ -4420,6 +4422,25 @@ $('#btn-folds').addEventListener('click', openFoldList);
 // 원고에서 고른 글자가 풀리지 않게 (맞춤법·비슷한 표현 버튼)
 $$('.keep-sel').forEach(b => b.addEventListener('mousedown', e => e.preventDefault()));
 $('#btn-spell').addEventListener('click', () => openSpellPanel());
+// 퇴고 보기: 지금 회차를 왼쪽 원고 + 오른쪽 쪽 보기로. 이미 퇴고 보기면 한 창으로 돌아감
+function reviseMode() {
+    const W = WL();
+    return W.editorN === 2 && W.panes[0].active && W.panes[0].active === W.panes[1].active && !W.panes[0].pageView && W.panes[1].pageView;
+}
+function toggleRevise() {
+    const W = WL();
+    if (reviseMode()) { setWL(W => { W.editorN = 1; W.activeEditor = 0; }); renderAll(); return; }
+    const id = W.panes[W.activeEditor]?.active;
+    if (!id || get(id)?.kind !== 'episode') { toast('퇴고할 회차를 먼저 열어 주세요.'); return; }
+    setWL(W => {
+        W.editorN = 2; W.activeEditor = 0;
+        const add = p => { if (p.single) p.tabs = [id]; else if (!p.tabs.includes(id)) p.tabs.push(id); p.active = id; };
+        add(W.panes[0]); add(W.panes[1]);
+        W.panes[0].pageView = false; W.panes[1].pageView = true;
+    });
+    renderAll();
+}
+$('#btn-revise').addEventListener('click', toggleRevise);
 $('#btn-syn').addEventListener('click', () => {
     const sel = getSelection(), n = sel.rangeCount && sel.anchorNode;
     const el = n && (n.nodeType === 1 ? n : n.parentElement);

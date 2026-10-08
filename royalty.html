@@ -1484,6 +1484,7 @@
                                 <button onclick="setWebtoonViewFilter('published')" id="wtvf-published" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all">출간작만 보기</button>
                                 <button onclick="setWebtoonViewFilter('upcoming')" id="wtvf-upcoming" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all">출간 예정 보기</button>
                                 <button onclick="setWebtoonViewFilter('pen')" id="wtvf-pen" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all">필명 별로 보기</button>
+                                <button onclick="setWebtoonViewFilter('broken')" id="wtvf-broken" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all">계약 파기</button>
                                 <button onclick="openWebtoonCardSettings()" class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all" title="카드 설정"><i class="fa-solid fa-sliders"></i></button>
                             </div>
                         </div>
@@ -2257,7 +2258,11 @@
                     <p class="text-[11px] text-slate-400 mt-1">※ 주민번호·계좌번호 같은 개인정보는 일부러 가져오지 않습니다. PDF 원본은 구글드라이브 <b>백업/정산 파일/계약서</b> 폴더에 <b>웹툰_작품제목.pdf</b>로 보관됩니다.</p>
                 </div>
             </div>
-            <div class="flex gap-3 pt-4 mt-2 border-t border-slate-100">
+            <div class="flex gap-3 pt-4 mt-2 border-t border-slate-100 items-center">
+                <label class="flex items-center gap-2 px-3 py-3 rounded-xl bg-slate-50 hover:bg-slate-100 cursor-pointer shrink-0" title="체크하면 웹툰 관리 목록에서 빠지고 '계약 파기' 목록에만 보여요. 받은 MG 등 정산 금액은 그대로 수입에 남아요.">
+                    <input type="checkbox" id="wtm-contract-broken" onchange="toggleWebtoonContractBroken(this)" class="w-4 h-4 accent-slate-500">
+                    <span class="text-sm font-bold text-slate-500">계약 파기</span>
+                </label>
                 <button onclick="closeWebtoonManageModal()" class="flex-1 py-3 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200">취소</button>
                 <button onclick="saveWebtoonManageModal()" class="flex-1 py-3 rounded-xl font-bold text-white shadow-lg" style="background:var(--primary)">저장</button>
             </div>
@@ -7254,6 +7259,7 @@
             const items = [];
             masterWorks.forEach(w => {
                 if (!includeWebtoon && w.genre.includes('웹툰')) return;
+                if (w.contractBroken) return;   // 계약 파기한 작품은 고를 일이 없으니 목록에서 뺀다
                 const mainPast = !w.isPending && w.publishDate && w.publishDate < today;
                 const mainDone = !!w.workDone;   // 수동으로 '작업 완료' 표시 — 출간일 전이어도 숨김
                 if (includePast || (!mainDone && !mainPast)) {
@@ -7633,7 +7639,7 @@
                     html += `</tbody></table></div></div><div class="sheet-footer-outer"><div class="sheet-footer-inner"><table class="sheet-table"><tbody><tr class="bg-slate-100/50"><td class="sticky-col text-center font-bold text-slate-600 text-sm">총합</td><td class="text-center font-bold text-[0.85rem] grand-total-cell">${currencySymbol}${formatCurrency(grandTotal)}</td><td class="text-right pr-2 font-bold grand-total-cell">${currencySymbol}${formatCurrency(grandSales)}</td>` + years.map(y => `<td class="text-right pr-2 font-bold grand-total-cell">${currencySymbol}${formatCurrency(yearTotals[y])}</td>`).join('') + `</tr></tbody></table></div></div>`;
                     section.innerHTML += html; container.appendChild(section);
                 } else {
-                    const genre = currentGenreTab, gWorks = sortedWorks(masterWorks.filter(w => w.genre === genre && w.title.toLowerCase().includes(searchTerm)));
+                    const genre = currentGenreTab, gWorks = sortedWorks(masterWorks.filter(w => w.genre === genre && !w.contractBroken && w.title.toLowerCase().includes(searchTerm)));
                     const section = document.createElement('div'); section.innerHTML = `<h4 class="text-sm font-bold text-slate-500 mb-4 pl-2 border-l-4" style="border-color:var(--primary)">${genre} 연도별 상세 (전체 기간)</h4>`;
                     // 웹툰 탭에는 추정 매출 칸을 넣지 않음
                     const showSalesCol = !(currentGenreTab && currentGenreTab.includes('웹툰'));
@@ -7652,8 +7658,15 @@
                         const salesCell = showSalesCol ? `<td class="text-right pr-2 text-slate-500 text-sm" style="background:#fafafa;">${currencySymbol}${formatCurrency(wSales)}</td>` : '';
                         html += `<tr><td class="sticky-col pl-6" style="min-width:156px;overflow:hidden;"><div class="font-bold text-slate-700 text-sm truncate w-full mb-1" title="${w.title}">${w.title}</div><div class="text-[11px] text-slate-400 flex items-center"><span class="sheet-pub-name">${(currentGenreTab === '웹툰' ? (w.studio || '-') : w.publisher)}${rateTxt} | </span>${dateDisplay}${advHtml}</div></td><td class="text-center font-bold text-[0.85rem] grand-total-cell" style="background:#f1f5f9; border-color:#e2e8f0;">${currencySymbol}${formatCurrency(wCumulative)}</td>${salesCell}` + years.map(y => `<td class="text-right pr-2 text-slate-600 text-sm">${currencySymbol}${formatCurrency(wYearly[y])}</td>`).join('') + `</tr>`;
                     });
+                    // 계약 파기 작품은 줄로는 안 보이지만 총합에는 들어간다
+                    masterWorks.filter(w => w.genre === genre && w.contractBroken).forEach(w => {
+                        let wCum = 0;
+                        years.forEach(y => { for (let m = 1; m <= 12; m++) { const val = (monthlyData[`${y}-${String(m).padStart(2,'0')}`] || {})[w.id] || 0; totalYearly[y] += val; wCum += val; } });
+                        totalCumulative += wCum; totalSalesAll += calculateGrossSales(wCum, w.rate);
+                    });
                     const salesFootTotal = showSalesCol ? `<td class="text-right pr-2 font-bold grand-total-cell">${currencySymbol}${formatCurrency(totalSalesAll)}</td>` : '';
                     html += `</tbody></table></div></div><div class="sheet-footer-outer"><div class="sheet-footer-inner"><table class="sheet-table"><tbody><tr class="bg-slate-100/50"><td class="sticky-col text-center font-bold text-slate-600 text-sm" style="width:156px;min-width:156px;">총합</td><td class="text-center font-bold grand-total-cell">${currencySymbol}${formatCurrency(totalCumulative)}</td>${salesFootTotal}` + years.map(y => `<td class="text-right pr-2 font-bold grand-total-cell">${currencySymbol}${formatCurrency(totalYearly[y])}</td>`).join('') + `</tr></tbody></table></div></div>`;
+                    html += brokenWorksNoteHTML(genre, null);
                     section.innerHTML += html; container.appendChild(section);
                 }
             } else {
@@ -7673,7 +7686,7 @@
                     html += `</tbody></table></div></div><div class="sheet-footer-outer"><div class="sheet-footer-inner"><table class="sheet-table"><tbody><tr class="bg-slate-100/50"><td class="sticky-col text-center font-bold text-slate-600 text-sm">월별 총합</td>` + monthlyTotals.map(val => `<td class="text-right pr-2 font-bold grand-total-cell">${currencySymbol}${formatCurrency(val)}</td>`).join('') + `<td class="text-right pr-4 font-bold grand-total-cell" style="min-width:135px;">${currencySymbol}${formatCurrency(grandTotal)}</td></tr></tbody></table></div></div>`;
                     section.innerHTML += html; container.appendChild(section);
                 } else {
-                    const gWorks = sortedWorks(masterWorks.filter(w => w.genre === currentGenreTab && w.title.toLowerCase().includes(searchTerm)));
+                    const gWorks = sortedWorks(masterWorks.filter(w => w.genre === currentGenreTab && !w.contractBroken && w.title.toLowerCase().includes(searchTerm)));
                     const section = document.createElement('div'); section.innerHTML = `<h4 class="text-sm font-bold text-slate-500 mb-4 pl-2 border-l-4" style="border-color:var(--primary)">${currentGenreTab} 상세 입력 <span class="text-slate-400 font-normal">(${gWorks.length})</span></h4>`;
                     let html = `<div class="sheet-wrapper"><div class="spreadsheet-container"><table class="sheet-table"><thead><tr>${getStickyHeader()}` + months.map(m => `<th class="text-center">${parseInt(m.split('-')[1])}월</th>`).join('') + `<th class="genre-total-row text-center" style="min-width:135px;">합계</th></tr></thead><tbody>`;
                     gWorks.forEach(w => {
@@ -7692,6 +7705,7 @@
                         html += `<td id="work-total-${w.id}" class="genre-total-row pr-4" style="min-width:135px;">0</td></tr>`;
                     });
                     html += `</tbody></table></div></div><div class="sheet-footer-outer"><div class="sheet-footer-inner"><table class="sheet-table"><tbody><tr class="bg-slate-100/50"><td class="sticky-col text-center font-bold text-slate-600 text-sm">월별 총합</td>` + months.map(m => `<td id="genre-month-total-${currentGenreTab}-${m}" class="text-right pr-2 font-bold grand-total-cell">0</td>`).join('') + `<td id="genre-total-all-${currentGenreTab}" class="text-right pr-4 font-bold grand-total-cell" style="min-width:135px;">0</td></tr></tbody></table></div></div>`;
+                    html += brokenWorksNoteHTML(currentGenreTab, months);
                     section.innerHTML += html; container.appendChild(section);
                     setTimeout(updateSheetTotals, 0);
                 }
@@ -7732,6 +7746,21 @@
             });
         }
         window.addEventListener('resize', () => requestAnimationFrame(syncSheetFooters));
+        // 월별 정산 표 아래 안내: 줄에서 빠진 계약 파기 작품 금액이 총합에 들어가 있다는 것
+        // months를 주면 그 달들만, 안 주면 전체 기간 기준.
+        function brokenWorksNoteHTML(genre, months) {
+            const broken = masterWorks.filter(w => w.genre === genre && w.contractBroken);
+            if (!broken.length) return '';
+            let sum = 0, count = 0;
+            broken.forEach(w => {
+                let ws = 0;
+                Object.entries(monthlyData).forEach(([ym, d]) => { if (!months || months.includes(ym)) ws += Number(d[w.id]) || 0; });
+                if (ws) { sum += ws; count++; }
+            });
+            if (!count) return '';
+            const text = `※ 총합에는 목록에 안 보이는 계약 파기 작품 ${count}개 금액 ₩ ${formatCurrency(sum)}이 포함돼 있어요.`;
+            return `<p class="text-[11px] text-slate-400 mt-2 pl-2">${text}</p>`;
+        }
         function updateSheetTotals() {
             if (currentGenreTab === '종합' || currentYear === 'total') return;
             const months = Array.from({length: 12}, (_, i) => `${currentYear}-${String(i+1).padStart(2, '0')}`);
@@ -7997,11 +8026,11 @@
             renderWebtoonManage();
         }
         function updateWebtoonViewTabsUI() {
-            const modes = { all: 'wtvf-all', published: 'wtvf-published', upcoming: 'wtvf-upcoming', pen: 'wtvf-pen' };
+            const modes = { all: 'wtvf-all', published: 'wtvf-published', upcoming: 'wtvf-upcoming', pen: 'wtvf-pen', broken: 'wtvf-broken' };
             Object.keys(modes).forEach(m => {
                 const btn = document.getElementById(modes[m]);
                 if (!btn) return;
-                if (m === webtoonViewFilter) { btn.style.background = 'var(--primary)'; btn.style.color = '#fff'; btn.classList.add('shadow-sm'); }
+                if (m === webtoonViewFilter) { btn.style.background = m === 'broken' ? '#94a3b8' : 'var(--primary)'; btn.style.color = '#fff'; btn.classList.add('shadow-sm'); }
                 else { btn.style.background = '#f1f5f9'; btn.style.color = '#64748b'; btn.classList.remove('shadow-sm'); }
             });
         }
@@ -8112,9 +8141,19 @@
             const container = document.getElementById('webtoon-manage-list');
             if (!container) return;
             updateWebtoonViewTabsUI();
-            const allWebtoonWorks = masterWorks.filter(w => w.genre && w.genre.includes('웹툰'));
+            // 계약 파기한 작품은 '계약 파기' 보기에서만 보인다 (전체 보기·필명 별로 보기 등에서는 빠짐)
+            const brokenWorks = masterWorks.filter(w => w.genre && w.genre.includes('웹툰') && w.contractBroken);
+            const allWebtoonWorks = masterWorks.filter(w => w.genre && w.genre.includes('웹툰') && !w.contractBroken);
             const totalBadge = document.getElementById('webtoon-total-count');
             if (totalBadge) totalBadge.textContent = allWebtoonWorks.length;
+            const brokenBtn = document.getElementById('wtvf-broken');
+            if (brokenBtn) brokenBtn.textContent = brokenWorks.length ? `계약 파기 (${brokenWorks.length})` : '계약 파기';
+            if (webtoonViewFilter === 'broken') {
+                container.innerHTML = brokenWorks.length === 0
+                    ? `<div class="text-center py-20 text-slate-400">계약 파기한 웹툰이 없습니다.</div>`
+                    : `<div class="grid gap-4" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">${sortWebtoonWorks(brokenWorks).map(w => `<div style="filter:grayscale(1); opacity:.75;">${webtoonCardHTML(w)}</div>`).join('')}</div>`;
+                return;
+            }
 
             if (allWebtoonWorks.length === 0) {
                 container.innerHTML = `<div class="text-center py-20 text-slate-400">‘작품 등록’에 등록된 웹툰 작품이 없습니다.</div>`;
@@ -8483,6 +8522,7 @@
             document.getElementById('wtm-cashsheet-done').checked = !!info.cashsheetDone;
             document.getElementById('wtm-ep1conti-done').checked = !!info.ep1ContiDone;
             document.getElementById('wtm-mg-paid-done').checked = !!info.mgPaidDone;
+            document.getElementById('wtm-contract-broken').checked = !!w.contractBroken;
             loadAdvDraft('wtm', w);
             document.getElementById('wtm-illustrator').value = info.illustrator || '';
             document.getElementById('wtm-website').value = info.website || '';
@@ -8502,6 +8542,28 @@
             if (!dateInput || !monthInput) return;
             if (checked) { dateInput.classList.add('hidden'); monthInput.classList.remove('hidden'); }
             else { dateInput.classList.remove('hidden'); monthInput.classList.add('hidden'); monthInput.value = ''; }
+        }
+        // 계약 파기: 작품은 지우지 않고 표시만 한다 — 받은 MG 등 정산 금액은 수입에 그대로 남고,
+        // 웹툰 관리 목록·작품 선택 목록·월별 정산 표에서는 빠진다. 제목 뒤에 ' (계파)'를 붙여서
+        // 나중에 같은 제목으로 다시 등록해도 다른 작품으로 따로 관리된다.
+        const CONTRACT_BROKEN_SUFFIX = ' (계파)';
+        function toggleWebtoonContractBroken(cb) {
+            const w = masterWorks.find(x => x.id === currentWebtoonManageWorkId);
+            if (!w) { cb.checked = false; return; }
+            if (cb.checked) {
+                if (!confirm(`'${w.title}' 계약을 파기하시겠습니까?\n\n· 웹툰 관리 목록에서 빠지고 '계약 파기' 목록에만 보여요.\n· 받은 MG 등 정산 금액은 수입에 그대로 남아요.\n· 제목 뒤에 (계파)가 붙어요.`)) { cb.checked = false; return; }
+                w.contractBroken = true;
+                w.contractBrokenDate = getYYYYMMDD(new Date());
+                if (!w.title.endsWith(CONTRACT_BROKEN_SUFFIX)) w.title += CONTRACT_BROKEN_SUFFIX;
+            } else {
+                if (!confirm(`'${w.title}' 계약 파기를 취소할까요?\n원래대로 웹툰 관리 목록에 다시 보여요.`)) { cb.checked = true; return; }
+                w.contractBroken = false;
+                delete w.contractBrokenDate;
+                if (w.title.endsWith(CONTRACT_BROKEN_SUFFIX)) w.title = w.title.slice(0, -CONTRACT_BROKEN_SUFFIX.length);
+            }
+            document.getElementById('wtm-modal-title').innerText = w.title;
+            save();
+            renderWebtoonManage();
         }
         function closeWebtoonManageModal() {
             document.getElementById('webtoon-manage-modal').classList.remove('open');
@@ -11921,13 +11983,13 @@
             const prevMonth2Date = new Date(targetMonthDate.getFullYear(), targetMonthDate.getMonth() - 2, 1);
             const prevMonth2Key = `${prevMonth2Date.getFullYear()}-${String(prevMonth2Date.getMonth() + 1).padStart(2,'0')}`;
             Object.entries(monthlyData).forEach(([mKey, data]) => { const parts = mKey.split('-'); if (parts.length !== 2) return; const y = parseInt(parts[0]), m = parseInt(parts[1]); Object.entries(data).forEach(([wId, val]) => { const w = masterWorks.find(x => x.id === wId); if (w) { const sales = calculateGrossSales(val, w.rate); totalProfit += val; totalSales += sales; genreStats[w.genre] = (genreStats[w.genre] || 0) + val; workStats[wId] = (workStats[wId] || 0) + (Number(val)||0); if (!workStatsByYear[y]) workStatsByYear[y] = {}; workStatsByYear[y][wId] = (workStatsByYear[y][wId] || 0) + (Number(val)||0); if (yearTotals[y]) yearTotals[y][w.genre] = (yearTotals[y][w.genre] || 0) + val; if (y === targetDashYear) { monthlyStats[m-1][w.genre] = (monthlyStats[m-1][w.genre] || 0) + val; yearProfit += val; yearSales += sales; } if (y === prevDashYear) { prevYearProfit += val; } if (mKey === targetDashMonthKey) { thisMonthProfit += val; thisMonthSales += sales; } if (mKey === prevMonthKey) { prevMonthProfit += val; } if (mKey === prevMonth2Key) { prevMonth2Profit += val; } } }); });
-            document.getElementById('stat-total').innerText = `₩ ${formatCurrency(totalProfit)}`; const _sts=document.getElementById('stat-total-sales'); if(_sts) _sts.innerText = `₩ ${formatCurrency(totalSales)}`; document.getElementById('stat-year-profit').innerText = `₩ ${formatCurrency(yearProfit)}`; const _sys=document.getElementById('stat-year-sales'); if(_sys) _sys.innerText = `₩ ${formatCurrency(yearSales)}`; document.getElementById('dashboard-year-label').innerText = targetDashYear; document.getElementById('dashboard-month-label').innerText = dashMonthOffset === 0 ? "이번 달" : `${targetMonthDate.getFullYear()}년 ${targetMonthDate.getMonth() + 1}월`; document.getElementById('stat-month-profit').innerText = `₩ ${formatCurrency(thisMonthProfit)}`; const _sms=document.getElementById('stat-month-sales'); if(_sms) _sms.innerText = `₩ ${formatCurrency(thisMonthSales)}`; document.getElementById('stat-works-count').innerText = masterWorks.length; const _nonWt=masterWorks.filter(w=>!(w.genre&&w.genre.includes('웹툰')));
+            document.getElementById('stat-total').innerText = `₩ ${formatCurrency(totalProfit)}`; const _sts=document.getElementById('stat-total-sales'); if(_sts) _sts.innerText = `₩ ${formatCurrency(totalSales)}`; document.getElementById('stat-year-profit').innerText = `₩ ${formatCurrency(yearProfit)}`; const _sys=document.getElementById('stat-year-sales'); if(_sys) _sys.innerText = `₩ ${formatCurrency(yearSales)}`; document.getElementById('dashboard-year-label').innerText = targetDashYear; document.getElementById('dashboard-month-label').innerText = dashMonthOffset === 0 ? "이번 달" : `${targetMonthDate.getFullYear()}년 ${targetMonthDate.getMonth() + 1}월`; document.getElementById('stat-month-profit').innerText = `₩ ${formatCurrency(thisMonthProfit)}`; const _sms=document.getElementById('stat-month-sales'); if(_sms) _sms.innerText = `₩ ${formatCurrency(thisMonthSales)}`; const _liveWorks = masterWorks.filter(w => !w.contractBroken); /* 계약 파기 작품은 작품 수에서 뺀다 */ document.getElementById('stat-works-count').innerText = _liveWorks.length; const _nonWt=_liveWorks.filter(w=>!(w.genre&&w.genre.includes('웹툰')));
             const _totalVols=_nonWt.reduce((s,w)=>s+(parseInt(w.volumes)||1)+(w.extras||[]).length,0);
             const _pubNonWt=_nonWt.filter(w=>!w.isPending);
             const _pubVols=_pubNonWt.reduce((s,w)=>s+(parseInt(w.volumes)||1)+(w.extras||[]).length,0);
-            const _pubAll=masterWorks.filter(w=>!w.isPending).length;
+            const _pubAll=_liveWorks.filter(w=>!w.isPending).length;
             const _volEl=document.getElementById('stat-works-volumes');
-            const _unpubAll=masterWorks.length-_pubAll; const _unpubVols=_totalVols-_pubVols; const _pendingPart=_unpubAll>0?` / 출간 예정 ${_unpubAll}종 ${_unpubVols}권`:''; const _subText=`(출간 ${_pubAll}종 ${_pubVols}권${_pendingPart})`; if(_volEl) _volEl.innerHTML=`${_totalVols}권<span style="display:block;color:#94a3b8;font-weight:500;font-size:11px;text-align:right;margin-top:1px;white-space:normal;line-height:1.3">${_subText}</span>`;
+            const _unpubAll=_liveWorks.length-_pubAll; const _unpubVols=_totalVols-_pubVols; const _pendingPart=_unpubAll>0?` / 출간 예정 ${_unpubAll}종 ${_unpubVols}권`:''; const _subText=`(출간 ${_pubAll}종 ${_pubVols}권${_pendingPart})`; if(_volEl) _volEl.innerHTML=`${_totalVols}권<span style="display:block;color:#94a3b8;font-weight:500;font-size:11px;text-align:right;margin-top:1px;white-space:normal;line-height:1.3">${_subText}</span>`;
             // prev year/month + 연 평균
             const _pyl = document.getElementById('stat-prev-year-label'); if (_pyl) _pyl.innerText = prevDashYear;
             const _pyp = document.getElementById('stat-prev-year-profit'); if (_pyp) _pyp.innerText = `₩ ${formatCurrency(prevYearProfit)}`;
@@ -11947,11 +12009,11 @@
             if(document.getElementById('stat-month-pretax')) document.getElementById('stat-month-pretax').innerText = `세전 ₩ ${formatCurrency(Math.round(thisMonthProfit / 0.967))}`;
             if(document.getElementById('stat-avg-year-pretax')) document.getElementById('stat-avg-year-pretax').innerText = `세전 ₩ ${formatCurrency(Math.round(avgYearProfit / 0.967))}`;
             if(document.getElementById('stat-prev-year-pretax')) document.getElementById('stat-prev-year-pretax').innerText = `세전 ₩ ${formatCurrency(Math.round(prevYearProfit / 0.967))}`;
-            const genreCounts = {}; genreList.forEach(g => genreCounts[g.name] = 0); masterWorks.forEach(w => { if (genreCounts[w.genre] !== undefined) genreCounts[w.genre]++; });
+            const genreCounts = {}; genreList.forEach(g => genreCounts[g.name] = 0); _liveWorks.forEach(w => { if (genreCounts[w.genre] !== undefined) genreCounts[w.genre]++; });
             const genreCountList = document.getElementById('genre-count-list'); if (genreCountList) genreCountList.innerHTML = genreList.map(g => {
                 const count = genreCounts[g.name] || 0; if (count === 0) return '';
                 const isWebtoon = g.name.includes('웹툰');
-                const works = masterWorks.filter(w => w.genre === g.name);
+                const works = _liveWorks.filter(w => w.genre === g.name);
                 const publishedWorks = works.filter(w => !w.isPending);
                 const pubCount = publishedWorks.length;
 

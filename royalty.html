@@ -14202,7 +14202,8 @@
                         group: sType === 'edit' ? 'edit' : (sType === 'write' ? 'spanWrite' : 'spanRest'),
                         spanId: s.id, color: s.color || '#f0e0a8',
                         title: (s.title && s.title !== '(제목 없음)') ? s.title : '',
-                        workName: s.workId ? (resolveWorkItem(s.workId).displayTitle || '') : '',
+                        workName: s.workId ? ((resolveWorkItem(s.workId).displayTitle || '') + (getSpanSeqInfo(s.id) ? ` ${getSpanSeqInfo(s.id).n}` : '')) : '',
+                        cumChars: (getSpanSeqInfo(s.id) || {}).n > 1 ? getSpanSeqInfo(s.id).cumChars : 0,
                         spanType: sType, noChars: st.noChars,
                         startIdx: Math.max(0, tlDayIndex(s.startDate, y)),
                         endIdx: Math.min(daysInYear - 1, tlDayIndex(s.endDate, y)),
@@ -14329,11 +14330,11 @@
                 const isSpan = it.kind === 'span';
                 const conf = SPAN_TYPES[it.spanType || 'write'];
                 const icon = (isSpan || it.isEditCard) ? conf.icon + ' ' : '';
-                const workTag = (isSpan && it.workName) ? ` · ${it.workName}` : '';
+                const workTag = (isSpan && it.workName) ? `${it.title ? ' · ' : ''}${it.workName}` : '';
                 const l1 = `${icon}${it.title}${workTag}${it.part ? ` ${it.part}` : ''}`;
                 // 자리가 좁으면 짧은 제목으로 — 연결 작품 이름(workTag)만 빼고, 내가 적은 제목(it.title)은 그대로 유지한다
                 // (예전엔 여기서 무조건 "집필" 같은 종류 이름으로 바꿔버려서, 제목을 적어놔도 좁은 칸에서는 안 보였음)
-                const l1short = (isSpan || it.isEditCard) ? `${conf.icon} ${it.title}` : it.title;
+                const l1short = (isSpan || it.isEditCard) ? `${conf.icon} ${it.title || it.workName || ''}` : it.title;
 
                 // 집필은 세 줄(제목 / 일수 / 글자수), 교정·휴식·기타는 두 줄(제목 / 일수)
                 const total = it.spanDays || it.days;
@@ -14345,7 +14346,7 @@
                 const l2 = hasWork ? `${total}일 / 집필 ${workD}일` : `${total}일`;
                 // 자리가 좁으면 "14/10일" 처럼 더 줄인 형태로
                 const l2short = hasWork ? `${total}/${workD}일` : `${total}일`;
-                return [l1, l2, `${it.chars.toLocaleString()}자`, l1short, l2short];
+                return [l1, l2, `${it.chars.toLocaleString()}자${it.cumChars ? ` (누적 ${it.cumChars.toLocaleString()}자)` : ''}`, l1short, l2short];
             };
             const measLine = (txt, size, weight, sp) => {
                 measCtx.font = `${weight} ${size}px ${TL_FONT}`;
@@ -15647,6 +15648,21 @@
             const [y1,m1,d1] = a.split('-').map(Number), [y2,m2,d2] = b.split('-').map(Number);
             return Math.round((new Date(y2,m2-1,d2) - new Date(y1,m1-1,d1)) / 86400000);
         }
+        // 같은 작품에 연결된 '집필' 기간 일정이 여러 개면 시작일 순서로 번호(1, 2…)와 누적 예상 글자수를 매긴다
+        // (예: 권태의 종말 1 · 66,000자 → 권태의 종말 2 · 40,000자 (누적 106,000자))
+        function getSpanSeqInfo(spanId) {
+            const span = writeSpans.find(x => x.id === spanId);
+            if (!span || !span.workId || (span.type || 'write') !== 'write') return null;
+            const list = writeSpans
+                .filter(x => x.workId === span.workId && (x.type || 'write') === 'write')
+                .sort((a, b) => a.startDate.localeCompare(b.startDate) || String(a.id).localeCompare(String(b.id)));
+            if (list.length < 2) return null;
+            const idx = list.findIndex(x => x.id === span.id);
+            if (idx < 0) return null;
+            let cumChars = 0;
+            for (let i = 0; i <= idx; i++) cumChars += calcSpanStats(list[i]).totalChars;
+            return { n: idx + 1, count: list.length, cumChars };
+        }
         // 기간 일정의 '그 날' 하루 집필량 — 구간별 하루 글자수(dailyRanges: [{start,end,chars}])에 걸리는 날은 그 값,
         // 아니면 기본 하루 집필량(dailyChars). 예: 평소 8천자, 11/20~11/30만 1만자
         function spanDailyRanges(span) {
@@ -16429,15 +16445,17 @@
                 const st = calcSpanStats(s);
                 const sType = SPAN_TYPES[s.type || 'write'];
                 // 연결한 작품이 있으면 카드에 작품 이름도 같이 보여준다
-                const spanWork = s.workId ? (resolveWorkItem(s.workId).displayTitle || '') : '';
+                const seq = getSpanSeqInfo(s.id);
+                const spanWork = s.workId ? ((resolveWorkItem(s.workId).displayTitle || '') + (seq ? ` ${seq.n}` : '')) : '';
                 const spanTitle = (s.title && s.title !== '(제목 없음)') ? s.title : '';
-                const headText = `${sType.icon} ${spanTitle}${spanWork ? ` · ${spanWork}` : ''}`;
+                const headText = `${sType.icon} ${spanTitle}${spanTitle && spanWork ? ' · ' : ''}${spanWork}`;
+                const cumText = (seq && seq.n > 1) ? ` (누적 ${seq.cumChars.toLocaleString()}자)` : '';
                 const daysTxt = (sType.rest && st.workDays !== st.totalDays)
                     ? `${st.totalDays}일 / ${sType.chars ? '집필' : '작업'} ${st.workDays}일`
                     : `${st.totalDays}일`;
                 const label = st.noChars
                     ? `${headText} · ${daysTxt}`
-                    : `${headText} · ${daysTxt} · ${st.totalChars.toLocaleString()}자`;
+                    : `${headText} · ${daysTxt} · ${st.totalChars.toLocaleString()}자${cumText}`;
                 // 이 달력 화면 안에 실제 시작일/종료일이 들어와 있는지 (밖이면 잘린 모양으로 표시)
                 const startsInView = s.startDate >= firstDate;
                 const endsInView = s.endDate <= lastDate;
@@ -16472,7 +16490,7 @@
                         box-shadow:0 1px 2px rgba(0,0,0,0.06);`;
                     bar.title = label + (s.memo ? `\n${s.memo}` : '');
                     // 첫 조각에만 전체 정보를 쓰고, 이어지는 조각은 제목만 간단히
-                    const segText = isFirstSeg ? `${startsInView ? '' : '◀ '}${label}` : `↪ ${sType.icon} ${spanTitle}`;
+                    const segText = isFirstSeg ? `${startsInView ? '' : '◀ '}${label}` : `↪ ${sType.icon} ${spanTitle || spanWork}`;
                     bar.innerHTML = `<span style="padding:0 10px 0 16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${segText}</span>`;
                     // 막대 몸통을 잡고 끌면 일정 전체가 통째로 옮겨진다 (그냥 클릭하면 편집 창)
                     bar.onmousedown = (e) => startSpanMove(e, s.id);

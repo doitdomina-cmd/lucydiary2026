@@ -1341,6 +1341,14 @@ body.theme-life .ld-tab{white-space:nowrap}
 body.theme-life .pb[style*="var(--green)"]{background:#A9C2A6 !important}
 @media(max-width:768px){body.theme-life .ld-tabs{display:flex !important;width:100%}body.theme-life .ld-tab{flex:1;min-width:0;padding:7px 4px !important;font-size:12.5px !important}
 .ld-hero{min-height:0;border-radius:20px}.ld-hero-in{padding:18px 18px 8px}.ld-hero-net{font-size:28px}.ld-hero-acts{padding:0 18px 18px}.ld-row{grid-template-columns:minmax(0,1fr) 50px auto}}
+
+/* 가계부 캘린더·자산 (코지) */
+.ld-hero-sm{min-height:170px}
+.ld-hero-sm .ld-hero-net{font-size:30px}
+body.theme-life .ld-asset-stats{display:none}
+body.theme-life .cal-cell [style*="background:var(--green);padding:1px 6px"]{background:#EDF3ED !important;color:#5E7D5B !important}
+body.theme-life .cal-cell [style*="background:var(--red);padding:1px 6px"]{background:#FFF0E9 !important;color:#C9603F !important}
+body.theme-life .cal-cell:hover{background:#FFFAF7 !important}
 </style>
 </head>
 <body>
@@ -1571,6 +1579,11 @@ function chunkData(data) {
   Object.keys(data).forEach(k => {
     if (!FIELDS.includes(k) && k !== 'customFontData') rest[k] = data[k];
   });
+  // 배너 사진도 아직 이 기기에만 있는(base64) 것은 클라우드 전송분에서 뺌
+  const noData = o => (o && typeof o.photo === 'string' && o.photo.indexOf('data:') === 0) ? Object.assign({}, o, { photo: null }) : o;
+  if (rest.todayBanner) rest.todayBanner = noData(rest.todayBanner);
+  if (rest.ledgerBanner) rest.ledgerBanner = noData(rest.ledgerBanner);
+  if (rest.banners) { const bb = {}; Object.keys(rest.banners).forEach(k => { bb[k] = noData(rest.banners[k]); }); rest.banners = bb; }
   if (Object.keys(rest).length > 0) chunks['_misc'] = rest;
   return chunks;
 }
@@ -2640,6 +2653,7 @@ function czObj(kind,id){
   if(kind==='project') return (S.projects||[]).find(function(p){return p.id===id;});
   if(kind==='today'){ if(!S.todayBanner||typeof S.todayBanner!=='object')S.todayBanner={id:'today'}; return S.todayBanner; }
   if(kind==='ledger'){ if(!S.ledgerBanner||typeof S.ledgerBanner!=='object')S.ledgerBanner={id:'ledger'}; return S.ledgerBanner; }
+  if(kind==='ledgerCal'||kind==='ledgerAssets'){ if(!S.banners||typeof S.banners!=='object')S.banners={}; if(!S.banners[kind])S.banners[kind]={id:kind}; return S.banners[kind]; }
   return null;
 }
 var _czTarget=null;
@@ -9107,6 +9121,17 @@ function hideLedgerTip(){
   if(tip)tip.style.display='none';
 }
 
+// 가계부 탭 위 사진 배너 (코지 테마): kind=사진 저장 키, def=기본 사진
+function ldBanner(kind,def,cap,big,pills,acts,nav){
+  const b=czObj(kind,kind),url=b.photo||def;
+  let h='<div class="ld-hero ld-hero-sm" style="background-image:url(\''+esc(url).replace(/'/g,'%27')+'\')"><div class="ld-hero-in">';
+  if(nav) h+='<div class="ld-hero-top"><button class="ld-hb" onclick="ledgerPrevMonth()" title="이전 달">‹</button><span class="ld-hero-m">'+nav+'</span><button class="ld-hb" onclick="ledgerNextMonth()" title="다음 달">›</button></div>';
+  h+='<div class="ld-hero-cap">'+cap+'</div><div class="ld-hero-net">'+big+'</div>';
+  if(pills&&pills.length) h+='<div class="ld-hero-stats">'+pills.map(function(x){return '<span>'+x+'</span>';}).join('')+'</div>';
+  h+='</div>'+(acts?'<div class="ld-hero-acts">'+acts+'</div>':'');
+  h+='<span class="cz-ph-btns"><button type="button" class="cz-ph-btn" onclick="czPickPhoto(\''+kind+'\',\''+kind+'\')" title="사진 바꾸기">📷</button>'+(b.photo?'<button type="button" class="cz-ph-btn" onclick="czResetPhoto(\''+kind+'\',\''+kind+'\')" title="기본 사진으로">↺</button>':'')+'</span></div>';
+  return h;
+}
 function renderLedgerCalendar(){
   const MN=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
   const ts=todStr();
@@ -9152,6 +9177,11 @@ function renderLedgerCalendar(){
   const fixedTotal=(LD.fixedItems||[]).reduce(function(s,fi){return s+(fi.amount&&fi.amount!=='req_input'?Number(fi.amount)||0:0);},0);
 
   let html='';
+  if(document.body.classList.contains('theme-life')){
+    html+=ldBanner('ledgerCal','dream/dream-1.jpg','MONEY CALENDAR · 이번 달 흐름',(calInc-calExp<0?'-':'')+fmtMoney(Math.abs(calInc-calExp)),
+      ['수입 <b>+'+fmtMoney(calInc)+'</b>','지출 <b>-'+fmtMoney(calExp)+'</b>'].concat(fixedTotal>0?['고정 지출 <b>-'+fmtMoney(fixedTotal)+'</b>']:[]),
+      '<button onclick="openLedgerTxForm(\'\')">＋ 내역 추가</button>',ledgerYear+'년 '+MN[ledgerMonth]);
+  } else {
   html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">';
   html+='<div style="display:flex;align-items:center;gap:8px">';
   html+='<button class="btn bg bsm" onclick="ledgerPrevMonth()">‹</button>';
@@ -9161,6 +9191,7 @@ function renderLedgerCalendar(){
   html+='<span style="font-size:0.82em;color:var(--red)">-'+fmtMoney(calExp)+'</span>';
   html+='</div>';
   html+='<button class="btn bp bsm" onclick="openLedgerTxForm(\'\')">+ 내역 추가</button></div>';
+  }
 
   html+='<div class="card" style="padding:12px;margin-bottom:16px">';
   html+='<div class="mcal-wrap"><div>';
@@ -9303,7 +9334,12 @@ function renderLedgerAssets(){
   const totalLiab=assets.filter(a=>a.type==='liability').reduce((s,a)=>s+a.amount,0);
   const netWorth=totalAsset-totalLiab;
 
-  let html='<div class="g3" style="margin-bottom:16px">';
+  let html='';
+  if(document.body.classList.contains('theme-life')){
+    html+=ldBanner('ledgerAssets','dream/dream-4.jpg','MY ASSETS · 나의 순자산',(netWorth<0?'-':'')+fmtMoney(Math.abs(netWorth)),
+      ['총 자산 <b>'+fmtMoney(totalAsset)+'</b>','총 부채 <b>'+fmtMoney(totalLiab)+'</b>'],'<button onclick="openLedgerAssetForm()">＋ 자산 추가</button>','');
+  }
+  html+='<div class="g3 ld-asset-stats" style="margin-bottom:16px">';
   html+='<div class="stat"><div class="sl">총 자산</div><div class="sv" style="color:var(--green);font-size:1.2em">'+fmtMoney(totalAsset)+'</div></div>';
   html+='<div class="stat"><div class="sl">총 부채</div><div class="sv" style="color:var(--red);font-size:1.2em">'+fmtMoney(totalLiab)+'</div></div>';
   html+='<div class="stat"><div class="sl">순자산</div><div class="sv" style="font-size:1.2em;color:'+(netWorth>=0?'var(--accent)':'var(--red)')+'">'+fmtMoney(netWorth)+'</div></div>';

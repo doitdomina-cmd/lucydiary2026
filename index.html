@@ -1878,6 +1878,27 @@ body.cozy .sb-sec{display:flex;flex-direction:column;gap:3px}
 body.cozy .nav{border-radius:9px !important;padding:4px 10px !important;margin:0 !important;width:100%}
 body.cozy .nav:hover{background:color-mix(in srgb,var(--text) 4%,transparent) !important}
 body.cozy .nav.on,body.cozy .nav.on:hover{background:color-mix(in srgb,var(--cz-acc) 10%,transparent) !important}
+
+/* 드림 위시: Be / Have / Do */
+.dma-filter{display:flex;gap:7px;flex-wrap:wrap;margin:-2px 0 16px}
+.dma-filter button{border:1px solid var(--border);background:var(--surface);color:var(--t2);border-radius:99px;padding:7px 13px;font-size:12.5px;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:5px}
+.dma-filter button span{color:var(--t3);font-size:11.5px}
+.dma-filter button b{font-weight:600;color:var(--t3);font-size:11.5px}
+.dma-filter button.on{background:var(--cz-acc);border-color:var(--cz-acc);color:#fff}
+.dma-filter button.on span,.dma-filter button.on b{color:rgba(255,255,255,.85)}
+.dma-kind{position:absolute;left:10px;bottom:10px;border-radius:99px;padding:3px 9px;font-size:10.5px;letter-spacing:1px;color:#fff;box-shadow:0 2px 6px rgba(0,0,0,.12)}
+.dma-kind.k-be{background:#C98A8F}
+.dma-kind.k-have{background:#B79A6E}
+.dma-kind.k-do{background:#7FA394}
+.wf-kind{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0 4px}
+.wf-kind button{border:1.5px solid #EEE5E1;background:#FFFCFA;border-radius:14px;padding:10px 6px;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:2px;color:#6E6468}
+.wf-kind button b{font-size:13px;letter-spacing:1.5px}
+.wf-kind button span{font-size:11.5px;color:#A39A9E}
+.wf-kind button.on.k-be{border-color:#C98A8F;background:#FBF0F1;color:#9A5E64}
+.wf-kind button.on.k-have{border-color:#B79A6E;background:#F8F2E8;color:#7F6640}
+.wf-kind button.on.k-do{border-color:#7FA394;background:#EEF5F1;color:#4F7466}
+body.cozy .app .dma-kind,body.cozy .app .wf-kind button b{font-weight:600 !important}
+@media(max-width:768px){.dma-filter button span{display:none}}
 </style>
 </head>
 <body>
@@ -2625,6 +2646,12 @@ function wishDday(w){
   if(!w.dday)return '';
   var dl=dLeft(w.dday);return dl>0?'D-'+dl:dl===0?'D-DAY':'D+'+Math.abs(dl);
 }
+var WISH_KINDS=[{id:'be',en:'BE',ko:'되고 싶은 나',ph:'예: 원픽 작가, 별 2천 작가'},{id:'have',en:'HAVE',ko:'갖고 싶은 것',ph:'예: 바다 보이는 작업실'},{id:'do',en:'DO',ko:'해보고 싶은 것',ph:'예: 가족과 유럽 여행'}];
+var dreamWishFilter='all';
+function wishKind(w){return (w&&w.kind)||'have';}
+function wishKindInfo(k){return WISH_KINDS.find(function(x){return x.id===k;})||WISH_KINDS[1];}
+function setWishFilter(k){dreamWishFilter=k;render();}
+function setWishKind(k){if(!_wishDraft)return;_wishDraft.kind=k;document.querySelectorAll('.wf-kind button').forEach(function(b){b.classList.toggle('on',b.dataset.k===k);});var n=document.getElementById('wf-name');if(n)n.placeholder=wishKindInfo(k).ph;}
 function renderDreamArea(){
   if(!dreamAreaId){try{dreamAreaId=localStorage.getItem('lucy_dream_area');}catch(e){}}
   var D=dreamData(),i=DREAM_AREAS.findIndex(function(a){return a.id===dreamAreaId;});
@@ -2635,24 +2662,29 @@ function renderDreamArea(){
     if(p.dday&&q.dday)return p.dday.localeCompare(q.dday);
     if(p.dday!==q.dday)return p.dday?-1:1;return 0;
   });
-  var dn=W.filter(function(w){return w.done;}).length;
+  var dn=W.filter(function(w){return w.done;}).length,allW=W;
+  var kc={be:0,have:0,do:0};allW.forEach(function(w){kc[wishKind(w)]++;});
+  if(dreamWishFilter!=='all')W=W.filter(function(w){return wishKind(w)===dreamWishFilter;});
   var h='<div class="dm dma">';
-  h+='<button type="button" class="dma-back" onclick="go(\'dream\')">‹ 드림보드</button>';
+  h+='<button type="button" class="dma-back" onclick="go(\'dream\')">‹ Dream Board</button>';
   h+='<div class="dma-cover" style="background-image:url(\''+esc(cover).replace(/'/g,'%27')+'\')"><div class="dma-cover-in">'
     +'<div class="dm-kick dma-kick">0'+(i+1)+' · '+esc(x.en||a.en)+'</div><h1>'+esc(x.title||a.title)+'</h1><p>'+esc(x.dream)+'</p></div>'
     +'<span class="cz-ph-btns"><button type="button" class="cz-ph-btn" onclick="editDreamAreaText()" title="이름·꿈 문구 고치기">'+CZI.pen+'</button><button type="button" class="cz-ph-btn" onclick="czPickPhoto(\'dreamArea\',\''+a.id+'\')" title="커버 사진 바꾸기">'+CZI.cam+'</button>'
     +(x.photo?'<button type="button" class="cz-ph-btn" onclick="czResetPhoto(\'dreamArea\',\''+a.id+'\')" title="기본 사진으로">'+CZI.reset+'</button>':'')+'</span></div>';
-  h+='<div class="dma-bar"><div><div class="dm-eye">MY WISH LIST</div><h2>갖고 싶은 것 · 하고 싶은 것</h2></div><span class="dma-cnt">'+(W.length?'이룸 '+dn+' / '+W.length:'')+'</span></div>';
+  h+='<div class="dma-bar"><div><div class="dm-eye">MY WISH LIST</div><h2>Be · Have · Do</h2></div><span class="dma-cnt">'+(allW.length?'이룸 '+dn+' / '+allW.length:'')+'</span></div>';
+  h+='<div class="dma-filter"><button type="button" class="'+(dreamWishFilter==='all'?'on':'')+'" onclick="setWishFilter(\'all\')">전체 <b>'+allW.length+'</b></button>'+
+    WISH_KINDS.map(function(k){return '<button type="button" class="k-'+k.id+(dreamWishFilter===k.id?' on':'')+'" onclick="setWishFilter(\''+k.id+'\')">'+k.en+' <span>'+k.ko+'</span> <b>'+kc[k.id]+'</b></button>';}).join('')+'</div>';
   h+='<div class="dma-grid">';
   W.forEach(function(w){
     var dd=wishDday(w);
     h+='<button type="button" class="dma-card'+(w.done?' done':'')+'" onclick="openWishForm(\''+w.id+'\')">'
       +'<div class="dma-ph" style="'+(w.photo?'background-image:url(\''+esc(w.photo).replace(/'/g,'%27')+'\')':'')+'">'+(w.photo?'':'<span class="dma-ph-empty">♡</span>')
-      +(dd?'<span class="dma-dd">'+dd+'</span>':'')+(w.done?'<span class="dma-done">이뤘어요 ✓</span>':'')+'</div>'
+      +(dd?'<span class="dma-dd">'+dd+'</span>':'')+(w.done?'<span class="dma-done">이뤘어요 ✓</span>':'')+'<span class="dma-kind k-'+wishKind(w)+'">'+wishKindInfo(wishKind(w)).en+'</span></div>'
       +'<div class="dma-body"><h3>'+esc(w.text)+'</h3>'+(w.desc?'<p>'+esc(w.desc)+'</p>':'')
       +(w.dday?'<div class="dma-date">'+esc(w.dday.replace(/-/g,'. '))+'</div>':'')+'</div></button>';
   });
-  h+='<button type="button" class="dma-card dma-add" onclick="openWishForm(\'\')"><span>＋</span>갖고 싶은 것 추가</button>';
+  var addK=dreamWishFilter!=='all'?wishKindInfo(dreamWishFilter):null;
+  h+='<button type="button" class="dma-card dma-add" onclick="openWishForm(\'\')"><span>＋</span>'+(addK?addK.ko+' 추가':'꿈 추가하기')+'</button>';
   h+='</div></div>';
   return h;
 }
@@ -2660,14 +2692,16 @@ var _wishDraft=null;
 function openWishForm(wid){
   var x=dreamData().areas[dreamAreaId];if(!x)return;
   var w=wid?(x.wants||[]).find(function(y){return y.id===wid;}):null;
-  _wishDraft=w?JSON.parse(JSON.stringify(w)):{id:gid(),text:'',desc:'',dday:'',done:false,photo:null,_new:true};
+  _wishDraft=w?JSON.parse(JSON.stringify(w)):{id:gid(),kind:(dreamWishFilter!=='all'?dreamWishFilter:'be'),text:'',desc:'',dday:'',done:false,photo:null,_new:true};
+  var curK=wishKind(_wishDraft);
   dreamDlg('<div class="dmd-photo wf-photo" id="wf-photo"><button type="button" class="dmd-x" onclick="closeDreamDlg()" title="닫기">✕</button>'
     +'<div class="wf-photo-empty" id="wf-photo-empty">♡ 사진을 넣어 보세요</div>'
     +'<div class="dmd-pbtns"><button type="button" onclick="document.getElementById(\'wf-file\').click()">사진 고르기</button><button type="button" onclick="wishPhotoClear()">사진 빼기</button></div></div>'
     +'<input type="file" id="wf-file" accept="image/jpeg,image/png,image/webp" hidden onchange="wishPhotoPick(this)">'
     +'<div class="dmd-b"><p class="dm-eye">'+(w?'MY WISH':'NEW WISH')+'</p>'
-    +'<label class="dmd-lbl" for="wf-name">이름</label><input class="dmd-f" id="wf-name" maxlength="80" placeholder="예: 바다 보이는 작업실" value="'+esc(_wishDraft.text)+'">'
-    +'<label class="dmd-lbl" for="wf-desc">설명</label><textarea class="dmd-f" id="wf-desc" maxlength="400" placeholder="왜 갖고 싶은지, 어떤 모습인지 적어 보세요">'+esc(_wishDraft.desc||'')+'</textarea>'
+    +'<div class="wf-kind">'+WISH_KINDS.map(function(k){return '<button type="button" data-k="'+k.id+'" class="k-'+k.id+(curK===k.id?' on':'')+'" onclick="setWishKind(\''+k.id+'\')"><b>'+k.en+'</b><span>'+k.ko+'</span></button>';}).join('')+'</div>'
+    +'<label class="dmd-lbl" for="wf-name">이름</label><input class="dmd-f" id="wf-name" maxlength="80" placeholder="'+wishKindInfo(curK).ph+'" value="'+esc(_wishDraft.text)+'">'
+    +'<label class="dmd-lbl" for="wf-desc">설명</label><textarea class="dmd-f" id="wf-desc" maxlength="400" placeholder="왜 이루고 싶은지, 어떤 모습인지 적어 보세요">'+esc(_wishDraft.desc||'')+'</textarea>'
     +'<label class="dmd-lbl" for="wf-dday">디데이 <small>이루고 싶은 날</small></label><input class="dmd-f" id="wf-dday" type="date" value="'+esc(_wishDraft.dday||'')+'">'
     +(w?'<label class="wf-done"><input type="checkbox" id="wf-done" '+(w.done?'checked':'')+'> 이뤘어요</label>':'')
     +'<div class="dmd-acts">'+(w?'<button type="button" class="dmd-btn sub wf-del" onclick="deleteWish()">삭제</button>':'')+'<button type="button" class="dmd-btn sub" onclick="closeDreamDlg()">취소</button><button type="button" class="dmd-btn" onclick="saveWish()">저장하기</button></div></div>');
@@ -2689,7 +2723,7 @@ function saveWish(){
   var name=(document.getElementById('wf-name').value||'').trim();
   if(!name){document.getElementById('wf-name').focus();return;}
   var w=_wishDraft,isNew=w._new,newPhoto=w._newPhoto;delete w._new;delete w._newPhoto;
-  w.text=name;w.desc=(document.getElementById('wf-desc').value||'').trim();w.dday=document.getElementById('wf-dday').value||'';
+  w.kind=wishKind(w);w.text=name;w.desc=(document.getElementById('wf-desc').value||'').trim();w.dday=document.getElementById('wf-dday').value||'';
   var dc=document.getElementById('wf-done');if(dc){if(dc.checked&&!w.done)w.doneAt=todStr();w.done=dc.checked;if(!w.done)delete w.doneAt;}
   var old=isNew?null:(x.wants||[]).find(function(y){return y.id===w.id;});
   if(newPhoto&&old&&old.photoPath){try{storage.ref().child(old.photoPath).delete().catch(function(){});}catch(_){}w.photoPath=undefined;}

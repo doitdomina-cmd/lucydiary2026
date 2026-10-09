@@ -5020,7 +5020,7 @@ function openAreaModal(id){
     '<div class="fg"><label class="fl">이름</label><input class="inp" id="ar-n" value="'+(a?esc(a.name):'')+'" placeholder="예: 창작, 건강..."></div>'+
     '<div class="fg"><label class="fl">🎯 디데이 <span style="font-size:0.8em;color:var(--t3);font-weight:400">(상위 목표 날짜 자동 · 수정 가능)</span></label><input type="date" class="inp" id="ar-dday" value="'+ddayDefault+'"></div>'+
     '<div class="fg"><label class="fl">♡ 어떤 꿈 카드의 목표인가요? <span style="font-size:0.8em;color:var(--t3);font-weight:400">(드림보드와 연결)</span></label>'+
-      '<select class="sel" id="ar-wish"><option value="">연결 안 함</option>'+DREAM_AREAS.map(function(d){var x=dreamData().areas[d.id];var ws=(x&&x.wants)||[];if(!ws.length)return '';return '<optgroup label="'+esc(dreamAreaTitle(d.id))+'">'+ws.map(function(w){var r=d.id+'~'+w.id;return '<option value="'+r+'"'+(a&&a.wishRef===r?' selected':'')+'>'+wishKindInfo(wishKind(w)).en+' · '+esc(w.text)+'</option>';}).join('')+'</optgroup>';}).join('')+'</select></div>'+
+      '<select class="sel" id="ar-wish"><option value="">연결 안 함</option>'+DREAM_AREAS.map(function(d){var x=dreamData().areas[d.id];var ws=(x&&x.wants)||[];return '<optgroup label="'+esc(dreamAreaTitle(d.id))+'"><option value="area:'+d.id+'"'+(a&&!a.wishRef&&a.dreamArea===d.id?' selected':'')+'>✿ '+esc(dreamAreaTitle(d.id))+' (꿈 카드 전체)</option>'+ws.map(function(w){var r=d.id+'~'+w.id;return '<option value="'+r+'"'+(a&&a.wishRef===r?' selected':'')+'>'+wishKindInfo(wishKind(w)).en+' · '+esc(w.text)+'</option>';}).join('')+'</optgroup>';}).join('')+'</select></div>'+
     '<div class="fg"><label class="fl">색상</label><div class="cops">'+areaColorHtml+'</div></div>'+
     projHtml,
     '<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="saveArea(\''+( id||'')+'\')">저장</button>');
@@ -5088,7 +5088,7 @@ function pickAreaC(el,c){selAreaC=c;document.querySelectorAll('.cop').forEach(e=
 function saveArea(eid){
   const emoji=document.getElementById('ar-e').value||'📌',name=document.getElementById('ar-n').value.trim();
   const dday=document.getElementById('ar-dday').value||'';
-  const wSel=document.getElementById('ar-wish'),wishRef=wSel?wSel.value:'',dreamArea=wishRef?wishRef.split('~')[0]:'';
+  const wSel=document.getElementById('ar-wish'),wv=wSel?wSel.value:'',isAr=wv.indexOf('area:')===0,wishRef=isAr?'':wv,dreamArea=isAr?wv.slice(5):(wv?wv.split('~')[0]:'');
   if(!name)return;
   if(eid){S.lifeAreas=(S.lifeAreas||[]).map(a=>a.id===eid?Object.assign({},a,{emoji,name,color:selAreaC,dday,dreamArea,wishRef}):a);}
   else{if(!S.lifeAreas)S.lifeAreas=[];S.lifeAreas.push({id:gid(),name,emoji,color:selAreaC,dday,dreamArea,wishRef});}

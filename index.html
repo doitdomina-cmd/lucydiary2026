@@ -1277,6 +1277,26 @@ body.theme-life .app .dm-kick,
 body.theme-life .app .sl,
 body.theme-life .app .dm-int-cap{font-weight:600 !important}
 body.theme-life .app .btn.bp{font-weight:600 !important}
+
+/* 코지 사진: Lucy's life 테마에서만 보임 */
+.cz-ph,.cz-today{display:none}
+body.theme-life .cz-ph{display:block;position:relative;background:#EFECE7 center/cover no-repeat;flex-shrink:0}
+body.theme-life .cz-ph:after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.02),rgba(0,0,0,0) 50%,rgba(0,0,0,.06))}
+body.theme-life .la-card .cz-ph{height:120px;margin:-22px -24px 16px}
+body.theme-life .pj-card .cz-ph{height:112px}
+.cz-ph-btns{position:absolute;right:10px;bottom:10px;z-index:2;display:flex;gap:5px;opacity:0;transition:opacity .15s}
+.cz-ph:hover .cz-ph-btns,.cz-today:hover .cz-ph-btns{opacity:1}
+@media(hover:none){.cz-ph-btns{opacity:.9}}
+.cz-ph-btn{border:0;background:rgba(255,255,255,.88);border-radius:99px;width:30px;height:30px;display:grid;place-items:center;cursor:pointer;font-size:13px;color:#6d6359;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+body.theme-life .cz-today{display:flex;align-items:flex-end;position:relative;height:170px;border-radius:22px;overflow:hidden;margin-bottom:4px;background:#EFECE7 center/cover no-repeat;box-shadow:0 4px 18px rgba(43,27,19,.05)}
+body.theme-life .cz-today:before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,rgba(40,28,20,.55) 0%,rgba(40,28,20,.25) 45%,rgba(40,28,20,0) 75%)}
+.cz-today-in{position:relative;z-index:1;padding:22px 26px;color:#fff;max-width:640px}
+.cz-today-date{font-size:11.5px;letter-spacing:1.6px;opacity:.9}
+.cz-today-hi{font-size:26px;letter-spacing:-1px;margin:2px 0 4px}
+.cz-today-int{font-size:13.5px;opacity:.92;word-break:keep-all}
+body.theme-life .app .cz-today-hi{font-weight:800 !important}
+body.theme-life .app .cz-today-date{font-weight:600 !important}
+@media(max-width:768px){body.theme-life .cz-today{height:140px;border-radius:18px}.cz-today-in{padding:16px 18px}.cz-today-hi{font-size:21px}}
 </style>
 </head>
 <body>
@@ -1491,6 +1511,11 @@ function chunkData(data) {
     });
     chunks.diaryEntries = slim;
   }
+  // 라이프·프로젝트 카드 사진도 아직 이 기기에만 있는(base64) 것은 클라우드 전송분에서 뺌
+  ['lifeAreas','projects'].forEach(k => {
+    if (Array.isArray(chunks[k]) && chunks[k].some(x => x && typeof x.photo === 'string' && x.photo.indexOf('data:') === 0))
+      chunks[k] = chunks[k].map(x => (x && typeof x.photo === 'string' && x.photo.indexOf('data:') === 0) ? Object.assign({}, x, { photo: null }) : x);
+  });
   // 드림보드 사진 중 아직 이 기기에만 있는(base64) 것은 클라우드 전송분에서 뺌 (올리기가 끝나면 주소로 바뀜)
   if (chunks.dream && chunks.dream.areas) {
     const dc = JSON.parse(JSON.stringify(chunks.dream));
@@ -2546,9 +2571,71 @@ function renderTodayLegacy(){
 
 // ═══════════ TODAY (기존 기능 그대로 + 카드 스타일만 깔끔하게) ═══════════
 function renderToday(){
-  return '<div class="today-life"><div class="tl-legacy">'+renderTodayLegacy()+'</div></div>';
+  return '<div class="today-life">'+czTodayBanner()+'<div class="tl-legacy">'+renderTodayLegacy()+'</div></div>';
 }
 
+
+// ═══════════ 코지 사진 (Lucy's life 테마): Today 배너 · 라이프/프로젝트 카드 사진 ═══════════
+// 기본 사진은 드림보드 사진 6장 중 이름에 맞는 것, 카드마다 📷로 내 사진으로 바꿀 수 있음
+var CZ_KEYS=[[/창작|작품|웹툰|웹소설|소설|글|작가|집필|커리어|일|업무|데뷔|연재/,1],[/돈|재정|저축|경제|수입|투자|재테크|자산|가계/,2],[/건강|운동|다이어트|몸|헬스|필라테스|요가|뷰티|아름/,3],[/집|생활|인테리어|이사|정리|살림/,4],[/공부|취미|성장|독서|책|그림|마인드|자기|배움|학습|영어/,5],[/관계|사랑|여행|가족|친구|연애|결혼|경험|추억/,6]];
+function czPick(name,seed){
+  var t=String(name||'');
+  for(var i=0;i<CZ_KEYS.length;i++) if(CZ_KEYS[i][0].test(t)) return 'dream/dream-'+CZ_KEYS[i][1]+'.jpg';
+  var h=0,k=String(seed||t);for(var j=0;j<k.length;j++)h=(h*31+k.charCodeAt(j))>>>0;
+  return 'dream/dream-'+(h%6+1)+'.jpg';
+}
+function czAreaPhoto(a){return (a&&a.photo)||czPick(a&&a.name,a&&a.id);}
+function czProjectPhoto(p,area){return (p&&p.photo)||(area&&area.photo)||czPick((p&&p.name||'')+' '+(area&&area.name||''),p&&p.id);}
+function czPhotoHtml(kind,obj,url){
+  return '<div class="cz-ph" style="background-image:url(\''+esc(url).replace(/'/g,'%27')+'\')">'
+    +'<span class="cz-ph-btns"><button type="button" class="cz-ph-btn" onclick="event.stopPropagation();czPickPhoto(\''+kind+'\',\''+obj.id+'\')" title="사진 바꾸기">📷</button>'
+    +(obj.photo?'<button type="button" class="cz-ph-btn" onclick="event.stopPropagation();czResetPhoto(\''+kind+'\',\''+obj.id+'\')" title="기본 사진으로">↺</button>':'')+'</span></div>';
+}
+function czObj(kind,id){
+  if(kind==='area') return (S.lifeAreas||[]).find(function(a){return a.id===id;});
+  if(kind==='project') return (S.projects||[]).find(function(p){return p.id===id;});
+  if(kind==='today'){ if(!S.todayBanner||typeof S.todayBanner!=='object')S.todayBanner={id:'today'}; return S.todayBanner; }
+  return null;
+}
+var _czTarget=null;
+function czPickPhoto(kind,id){
+  _czTarget={kind:kind,id:id};
+  var inp=document.getElementById('cz-file');
+  if(!inp){inp=document.createElement('input');inp.type='file';inp.id='cz-file';inp.accept='image/jpeg,image/png,image/webp';inp.hidden=true;inp.onchange=czPhotoChosen;document.body.appendChild(inp);}
+  inp.value='';inp.click();
+}
+async function czPhotoChosen(e){
+  var f=e.target.files&&e.target.files[0];e.target.value='';var t=_czTarget;if(!f||!t)return;
+  try{
+    var d=await compressDreamPhoto(f),o=czObj(t.kind,t.id);if(!o)return;
+    var oldPath=o.photoPath;o.photo=d;o.photoPath=undefined;save();render();
+    if(oldPath){try{storage.ref().child(oldPath).delete().catch(function(){});}catch(_){}}
+    if(currentUser){
+      var blob=dataUrlToBlob(d),ext=blob.type==='image/jpeg'?'jpg':'webp',path='users/'+currentUser.uid+'/cozy/'+t.kind+'-'+t.id+'-'+Date.now()+'.'+ext;
+      var ref=storage.ref().child(path);
+      await ref.put(blob,{contentType:blob.type||'image/webp',cacheControl:'public,max-age=31536000'});
+      var url=await ref.getDownloadURL(),cur=czObj(t.kind,t.id);
+      if(!cur||cur.photo!==d){try{ref.delete();}catch(_){}return;}
+      cur.photo=url;cur.photoPath=path;save();render();
+    }
+  }catch(err){console.warn('사진 바꾸기 실패',err);alert((err&&err.message)||'사진을 바꾸지 못했어요.');}
+}
+function czResetPhoto(kind,id){
+  var o=czObj(kind,id);if(!o)return;
+  if(o.photoPath){try{storage.ref().child(o.photoPath).delete().catch(function(){});}catch(_){}}
+  o.photo=null;o.photoPath=undefined;save();render();
+}
+function czTodayBanner(){
+  var D=dreamData(),b=czObj('today'),now=new Date(),h=now.getHours();
+  var hello=h<5?'고요한 밤이에요':h<11?'좋은 아침이에요':h<17?'좋은 오후예요':h<21?'편안한 저녁이에요':'오늘도 수고했어요';
+  var url=b.photo||('dream/dream-'+((Math.floor(now.getTime()/86400000))%6+1)+'.jpg'); // 기본은 날마다 바뀜
+  var days=['일','월','화','수','목','금','토'];
+  return '<div class="cz-today" style="background-image:url(\''+esc(url).replace(/'/g,'%27')+'\')">'
+    +'<div class="cz-today-in"><div class="cz-today-date">'+(now.getMonth()+1)+'월 '+now.getDate()+'일 '+days[now.getDay()]+'요일</div>'
+    +'<div class="cz-today-hi">'+hello+'</div><div class="cz-today-int">'+esc(D.intention)+'</div></div>'
+    +'<span class="cz-ph-btns"><button type="button" class="cz-ph-btn" onclick="czPickPhoto(\'today\',\'today\')" title="배너 사진 바꾸기">📷</button>'
+    +(b.photo?'<button type="button" class="cz-ph-btn" onclick="czResetPhoto(\'today\',\'today\')" title="기본 사진으로 (날마다 바뀜)">↺</button>':'')+'</span></div>';
+}
 // ═══════════ DRAG & DROP ═══════════
 // ═══════════ CSS 추가 ═══════════
 (function(){
@@ -3326,6 +3413,7 @@ function renderLife(){
   areas.forEach(function(a){
     const projs=S.projects.filter(p=>p.lifeAreaId===a.id);
     html+='<div class="la-card" draggable="true" data-aid="'+a.id+'" data-color="'+a.color+'" onclick="laCardClick(event,this.dataset.aid)" style="border-color:'+a.color+'30;--card-accent:'+a.color+'">';
+    html+=czPhotoHtml('area',a,czAreaPhoto(a));
     html+='<div style="display:flex;align-items:center;margin-bottom:12px;min-width:0;padding-right:34px">';
     html+='<div style="display:flex;align-items:center;gap:6px;min-width:0;flex:1"><div class="la-title-text" style="font-size:1.0714em;font-weight:600;color:var(--text);min-width:0">'+esc(a.name)+'</div>'+
       (a.dday?(function(){var dl=dLeft(a.dday);var lab=dl>0?'D-'+dl:dl===0?'D-DAY':'D+'+Math.abs(dl);return '<span style="font-size:0.68em;padding:2px 7px;border-radius:99px;background:'+a.color+'18;color:'+a.color+';font-weight:600;font-family:var(--mono)">'+lab+'</span>';})():'')+
@@ -3539,6 +3627,7 @@ function renderProjects(){
       if(pjDday!==null) metaBits.push(pjDdayLabel);
       var col=p.color||'#F5C490';
       html+='<div class="pj-card" onclick="go(\'projects\',\''+p.id+'\')" style="--card-accent:'+col+'">'+
+          czPhotoHtml('project',p,czProjectPhoto(p,area))+
           '<div class="pj-bar" style="background:'+col+'"></div>'+
           '<div class="pj-body">'+
             '<div style="display:flex;align-items:flex-start;min-width:0;padding-right:22px">'+

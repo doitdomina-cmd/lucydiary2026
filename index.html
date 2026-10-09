@@ -2131,6 +2131,42 @@ body.cozy .app .cz-stat b{font-weight:600 !important}
 .cz-stat-g{min-width:150px;max-width:220px}
 .cz-stat-g em{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 @media(max-width:768px){.cz-stats{flex-wrap:wrap}.cz-stat-g{flex:1 0 100%;max-width:none}}
+
+/* 코지 로드맵: 세로 여정 */
+.rj{position:relative;display:flex;flex-direction:column;gap:14px;padding:4px 0 10px}
+.rj::before{content:'';position:absolute;left:103px;top:18px;bottom:30px;border-left:2px dashed var(--cz-line)}
+.rj-item{display:grid;grid-template-columns:84px 40px minmax(0,1fr);align-items:start;position:relative}
+.rj-item.dragging{opacity:.4}
+.rj-item.drag-over .rj-card{box-shadow:0 0 0 2px var(--cz-mid) !important}
+.rj-year{font-family:'Instrument Serif',Georgia,serif;font-size:30px;line-height:1;color:var(--text);text-align:right;padding-top:14px;letter-spacing:-.3px}
+.rj-year em{display:block;font-size:13px;color:var(--cz-deep);margin-top:2px}
+.rj-item.past .rj-year{color:var(--t3)}
+.rj-mark{display:flex;justify-content:center;padding-top:16px;position:relative;z-index:1}
+.rj-mark span{width:22px;height:22px;border-radius:50%;background:var(--surface);border:2px solid var(--cz-mid);display:grid;place-items:center;font-size:11px;color:#fff;box-shadow:0 0 0 4px var(--bg)}
+.rj-item.past .rj-mark span{background:var(--cz-mid)}
+.rj-item.now .rj-mark span{background:var(--cz-acc);border-color:var(--cz-acc);width:26px;height:26px;font-size:13px}
+.rj-card{position:relative;display:block;width:100%;text-align:left;font-family:inherit;background:var(--surface);border:0;border-radius:22px;padding:18px 20px;box-shadow:0 3px 14px rgba(120,80,60,.07);cursor:grab;transition:transform .2s,box-shadow .2s}
+.rj-card:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(120,80,60,.11)}
+.rj-item.now .rj-card{background:var(--cz-soft)}
+.rj-card h3{margin:0;font-size:16px;letter-spacing:-.3px;color:var(--text);padding-right:56px}
+.rj-sub{font-size:12.5px;color:var(--cz-deep);margin-top:4px}
+.rj-card p{margin:8px 0 0;font-size:13px;line-height:1.6;color:var(--t2);white-space:pre-line}
+.rj-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.rj-tag{font-size:11.5px;padding:3px 10px;border-radius:99px;background:var(--cz-paper);border:1px solid var(--cz-line);color:var(--t2)}
+.rj-btns{position:absolute;top:10px;right:10px;display:flex;gap:2px;opacity:0;transition:opacity .15s}
+.rj-card:hover .rj-btns{opacity:1}
+.rj-btns button{width:28px;height:28px;border-radius:50%;border:0;background:transparent;color:var(--t3);cursor:pointer;display:grid;place-items:center;font-size:16px}
+.rj-btns button:hover{background:var(--s2)}
+.rj-item.small .rj-year{font-size:20px;padding-top:10px}
+.rj-item.small .rj-mark{padding-top:10px}
+.rj-item.small .rj-mark span{width:14px;height:14px;font-size:0}
+.rj-item.small .rj-card{background:transparent;box-shadow:none;border:1.5px dashed var(--cz-line);padding:12px 16px}
+.rj-item.small .rj-card h3{font-size:14px}
+.rj-add .rj-mark span{border-style:dashed;color:var(--cz-muted);font-size:14px;background:var(--surface)}
+.rj-add .rj-card{background:transparent;box-shadow:none;border:1.5px dashed var(--cz-line);color:var(--cz-muted);font-size:13px;cursor:pointer;text-align:center;padding:14px}
+body.cozy .app .rj-card h3{font-weight:600 !important}
+@media(hover:none){.rj-btns{opacity:.7}}
+@media(max-width:768px){.rj::before{left:67px}.rj-item{grid-template-columns:52px 32px minmax(0,1fr)}.rj-year{font-size:22px}.rj-item.small .rj-year{font-size:16px}.rj-card{padding:15px 16px}}
 </style>
 </head>
 <body>
@@ -4931,6 +4967,26 @@ function renderTimeline(){
     return html;
   }
 
+  if(isLife){
+    var nowY=new Date().getFullYear();
+    html+='<div class="rj">'+entries.map(function(e,i){
+      var tags=(e.tags||[]).map(function(t){return '<span class="rj-tag">'+esc(t)+'</span>';}).join('');
+      var y=parseInt(e.year,10),state=isNaN(y)?'':y<nowY?'past':y===nowY?'now':'future';
+      var small=e.size==='small';
+      return '<div class="rj-item'+(small?' small':'')+' '+state+'" draggable="true" data-id="'+e.id+'" ondragstart="tlDragStart(event)" ondragend="tlDragEnd(event)" ondragover="tlDragOver(event)" ondragleave="tlDragLeave(event)" ondrop="tlDrop(event)">'+
+        '<div class="rj-year">'+esc(e.year||'')+(state==='now'?'<em>now</em>':'')+'</div>'+
+        '<div class="rj-mark"><span>'+(state==='past'?'✓':state==='now'?'✿':'')+'</span></div>'+
+        '<div class="rj-card" onclick="openTlModal(\''+e.id+'\')"'+(e.bgColor&&!small?' style="background:'+esc(e.bgColor)+'"':'')+'>'+
+          '<div class="rj-btns"><button type="button" onclick="event.stopPropagation();openTlModal(\''+e.id+'\')" title="수정">'+CZI.pen+'</button><button type="button" onclick="event.stopPropagation();delTlEntry(\''+e.id+'\')" title="삭제">×</button></div>'+
+          (e.title?'<h3>'+esc(e.title)+'</h3>':'')+
+          (e.subtitle?'<div class="rj-sub">'+esc(e.subtitle)+'</div>':'')+
+          (e.desc?'<p>'+esc(e.desc)+'</p>':'')+
+          (tags?'<div class="rj-tags">'+tags+'</div>':'')+
+        '</div></div>';
+    }).join('')+
+    '<div class="rj-item rj-add"><div class="rj-year"></div><div class="rj-mark"><span>+</span></div><button type="button" class="rj-card" onclick="openTlModal()">새 시점 추가하기</button></div></div>';
+    return html;
+  }
   var scrollStyle='--tl-fs-big:'+fsBig+';--tl-fs-small:'+fsSmall+';--tl-line-big:'+lnBig+'px;--tl-line-small:'+lnSmall+'px'+(txtColor?';--tl-text-color:'+esc(txtColor):'');
   html+='<div class="tl3-scroll" style="'+scrollStyle+'"><div class="tl3-row">'+
     '<div class="tl3-line"></div>'+

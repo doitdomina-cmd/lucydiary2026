@@ -2115,6 +2115,19 @@ body.cozy .td-cz-wrap .stat{border:0 !important;border-radius:24px !important;bo
 .tdl-row:hover .tdl-dot{border-color:var(--cz-acc) !important}
 body.cozy .cz-today{height:auto !important;min-height:170px}
 @media(max-width:768px){body.cozy .cz-today{min-height:150px}body.cozy .cz-today-in{padding:18px 18px 16px}.cz-season{display:block;margin:4px 0 0;padding:0;border:0}.cz-today-next,.cz-today-be{margin-top:8px}}
+
+.cz-stats{display:flex;gap:8px}
+.cz-stats-d{position:absolute;right:22px;bottom:20px;z-index:2}
+.cz-stats-m{display:none}
+@media(max-width:768px){.cz-stats-d{display:none}.cz-stats-m{display:block}}
+.cz-stat{display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:118px;border:0;background:rgba(255,255,255,.22);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:16px;padding:10px 13px;color:#fff;cursor:pointer;font-family:inherit;text-align:left}
+.cz-stat span{font-size:11px;opacity:.9}
+.cz-stat b{font-size:20px;line-height:1.1;font-variant-numeric:tabular-nums}
+.cz-stat i{display:block;width:100%;height:4px;border-radius:99px;background:rgba(255,255,255,.3);overflow:hidden}
+.cz-stat u{display:block;height:100%;background:#fff;border-radius:99px}
+.cz-stat em{font-style:normal;font-size:10.5px;opacity:.85}
+body.cozy .app .cz-stat b{font-weight:600 !important}
+@media(max-width:768px){.cz-stats{position:static;margin-top:12px}.cz-stat{flex:1;min-width:0;padding:8px 11px}.cz-stat b{font-size:17px}}
 </style>
 </head>
 <body>
@@ -3637,7 +3650,6 @@ function tdCozyLayout(t,TCB,tdVis){
   g+=slot('week',tdWeekCard());
   g+=slot('upcoming',tdUpcomingCard());
   g+=slot('monthlyGoal',TCB.monthlyGoal);
-  g+=slot('stats',TCB.stats,2);
   if(!night) g+=slot('diary',TCB.diary,2);
   g+=slot('lookback',TCB.lookback,2);
   if(tdVis.suppToday===true) g+=slot('suppToday',TCB.suppToday);
@@ -3801,6 +3813,14 @@ function czTodayBe(now){
   var it=list[Math.floor(now.getTime()/86400000)%list.length],dd=wishDday(it.w);
   return '<button type="button" class="cz-today-be" onclick="openDreamArea(\''+it.area+'\')"><em>BE</em>'+esc(it.w.text)+(dd?'<span>'+dd+'</span>':'')+'</button>';
 }
+function czTodayStats(){
+  try{
+    var ds=todStr(),rs=routinesForDate(ds),ck=S.checks[ds]||{},dn=rs.filter(function(r){return ck[r.id];}).length,rp=rs.length?Math.round(dn/rs.length*100):0;
+    var sv=S.savings||{},sp=sv.goal?Math.min(100,Math.round((sv.current||0)/sv.goal*100)):0;
+    var chip=function(lab,pc,sub,on){return '<button type="button" class="cz-stat" onclick="'+on+'"><span>'+lab+'</span><b>'+pc+'%</b><i><u style="width:'+pc+'%"></u></i><em>'+sub+'</em></button>';};
+    return '<div class="cz-stats">'+chip('루틴 달성',rp,dn+' / '+rs.length,"go('routine')")+(sv.goal?chip('저축 달성',sp,money(sv.current||0),"go('savings')"):'')+'</div>';
+  }catch(e){return '';}
+}
 function czSeason(now){
   var m=now.getMonth()+1,h=now.getHours();
   var se=m>=3&&m<=5?['봄','✿']:m>=6&&m<=8?['여름','☀︎']:m>=9&&m<=11?['가을','❦']:['겨울','❄︎'];
@@ -3815,7 +3835,7 @@ function czTodayBanner(){
   var days=['일','월','화','수','목','금','토'];
   return '<div class="cz-today" style="background-image:url(\''+esc(url).replace(/'/g,'%27')+'\')">'
     +'<div class="cz-today-in"><div class="cz-today-date">'+(now.getMonth()+1)+'월 '+now.getDate()+'일 '+days[now.getDay()]+'요일<span class="cz-season">'+czSeason(now)+'</span></div>'
-    +'<div class="cz-today-hi">'+hello+'</div><div class="cz-today-int">'+esc(D.intention)+'</div>'+czTodayNext(now)+czTodayBe(now)+'</div>'
+    +'<div class="cz-today-hi">'+hello+'</div><div class="cz-today-int">'+esc(D.intention)+'</div>'+czTodayNext(now)+czTodayBe(now)+'<div class="cz-stats-m">'+czTodayStats()+'</div></div><div class="cz-stats-d">'+czTodayStats()+'</div>'
     +'<span class="cz-ph-btns"><button type="button" class="cz-ph-btn" onclick="czPickPhoto(\'today\',\'today\')" title="배너 사진 바꾸기">'+CZI.cam+'</button>'
     +(b.photo?'<button type="button" class="cz-ph-btn" onclick="czResetPhoto(\'today\',\'today\')" title="기본 사진으로 (날마다 바뀜)">'+CZI.reset+'</button>':'')+'</span></div>';
 }

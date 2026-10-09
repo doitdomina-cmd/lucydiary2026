@@ -1832,6 +1832,17 @@ body.cozy .mint-page .mc-grid>div.dc-photo{background-color:transparent !importa
 body.cozy .mint-page .mc-dday{width:var(--mcal-daysz);height:var(--mcal-daysz);border-radius:50%;display:inline-flex;align-items:center;justify-content:center}
 body.cozy .mc-card .mcal-wrap>div:first-child{border-bottom:0 !important}
 body.cozy .mint-page .mc-ev.mc-td{background:#EEF6F2}
+
+/* 사진 위치 옮기기 */
+.cz-moving{cursor:grab !important;touch-action:none;outline:2.5px dashed rgba(255,255,255,.9);outline-offset:-6px}
+.cz-moving:active{cursor:grabbing !important}
+.cz-moving>*:not(.cz-mv-bar){pointer-events:none !important;opacity:.35;transition:opacity .2s}
+.cz-moving .cz-ph-btns{display:none !important}
+.cz-mv-bar{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:5;display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.95);border-radius:99px;padding:5px 5px 5px 14px;box-shadow:0 4px 16px rgba(0,0,0,.18);font-size:12px;color:#4A3F42;white-space:nowrap;max-width:calc(100% - 20px)}
+.cz-mv-bar span{overflow:hidden;text-overflow:ellipsis}
+.cz-mv-bar button{border:0;border-radius:99px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:inherit;background:#F1ECEA;color:#5E5458}
+.cz-mv-bar .cz-mv-done{background:var(--cz-acc,#E07656);color:#fff}
+@media(max-width:768px){.cz-mv-bar span{display:none}.cz-mv-bar{padding:5px}}
 </style>
 </head>
 <body>
@@ -3267,7 +3278,7 @@ async function czPhotoChosen(e){
   var f=e.target.files&&e.target.files[0];e.target.value='';var t=_czTarget;if(!f||!t)return;
   try{
     var d=await compressDreamPhoto(f),o=czObj(t.kind,t.id);if(!o)return;
-    var oldPath=o.photoPath;o.photo=d;o.photoPath=undefined;save();render();
+    var oldPath=o.photoPath;o.photo=d;o.photoPath=undefined;delete o.posX;delete o.posY;save();render();
     if(oldPath){try{storage.ref().child(oldPath).delete().catch(function(){});}catch(_){}}
     await czUpload(t.kind,t.id);
   }catch(err){console.warn('사진 바꾸기 실패',err);alert((err&&err.message)||'사진을 바꾸지 못했어요.');}
@@ -3288,8 +3299,52 @@ async function czUpload(kind,id){
 function czResetPhoto(kind,id){
   var o=czObj(kind,id);if(!o)return;
   if(o.photoPath){try{storage.ref().child(o.photoPath).delete().catch(function(){});}catch(_){}}
-  o.photo=null;o.photoPath=undefined;save();render();
+  o.photo=null;o.photoPath=undefined;delete o.posX;delete o.posY;save();render();
 }
+// ═══════════ 코지 사진 위치 조정 (드래그) ═══════════
+// 사진마다 posX/posY(0~100%)를 저장해서 background-position으로 씀
+function czParseTarget(btns){
+  var b=btns&&btns.querySelector('[onclick*="czPickPhoto"]');if(!b)return null;
+  var m=/czPickPhoto\('([^']*)','([^']*)'\)/.exec(b.getAttribute('onclick')||'');
+  return m?{kind:m[1],id:m[2]}:null;
+}
+function czApplyPos(){
+  document.querySelectorAll('.cz-ph-btns').forEach(function(btns){
+    var t=czParseTarget(btns),el=btns.parentElement;if(!t||!el)return;
+    var o=czObj(t.kind,t.id);
+    if(o&&(o.posX!=null||o.posY!=null))el.style.backgroundPosition=(o.posX!=null?o.posX:50)+'% '+(o.posY!=null?o.posY:50)+'%';
+    if(o&&o.photo&&!btns.querySelector('.cz-mv')){
+      var mv=document.createElement('button');mv.type='button';mv.className='cz-ph-btn cz-mv';mv.title='사진 위치 옮기기';
+      mv.innerHTML='<svg class="czi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18M12 3l-2.5 2.5M12 3l2.5 2.5M12 21l-2.5-2.5M12 21l2.5-2.5M3 12l2.5-2.5M3 12l2.5 2.5M21 12l-2.5-2.5M21 12l-2.5 2.5"/></svg>';
+      mv.onclick=function(ev){ev.stopPropagation();ev.preventDefault();czStartMove(el,t);};
+      btns.insertBefore(mv,btns.children[1]||null);
+    }
+  });
+}
+function czStartMove(el,t){
+  var o=czObj(t.kind,t.id);if(!o)return;
+  if(el.classList.contains('cz-moving'))return;
+  var x=o.posX!=null?o.posX:50,y=o.posY!=null?o.posY:50,drag=null;
+  el.classList.add('cz-moving');
+  var bar=document.createElement('div');bar.className='cz-mv-bar';
+  bar.innerHTML='<span>사진을 끌어서 위치를 맞춰요</span><button type="button" class="cz-mv-reset">가운데</button><button type="button" class="cz-mv-done">완료</button>';
+  el.appendChild(bar);
+  function apply(){el.style.backgroundPosition=x+'% '+y+'%';}
+  function down(e){if(e.target.closest('.cz-mv-bar'))return;e.preventDefault();e.stopPropagation();drag={sx:e.clientX,sy:e.clientY,x:x,y:y};try{el.setPointerCapture(e.pointerId);}catch(_){}}
+  function move(e){if(!drag)return;e.preventDefault();var r=el.getBoundingClientRect();
+    x=Math.max(0,Math.min(100,drag.x-(e.clientX-drag.sx)/Math.max(1,r.width)*160));
+    y=Math.max(0,Math.min(100,drag.y-(e.clientY-drag.sy)/Math.max(1,r.height)*160));apply();}
+  function up(){drag=null;}
+  function stopClick(e){if(!e.target.closest('.cz-mv-bar')){e.stopPropagation();e.preventDefault();}}
+  function done(e){if(e){e.stopPropagation();e.preventDefault();}
+    el.removeEventListener('pointerdown',down,true);el.removeEventListener('pointermove',move,true);el.removeEventListener('pointerup',up,true);el.removeEventListener('pointercancel',up,true);el.removeEventListener('click',stopClick,true);
+    el.classList.remove('cz-moving');bar.remove();
+    var cur=czObj(t.kind,t.id);if(cur){cur.posX=Math.round(x);cur.posY=Math.round(y);save();render();}}
+  el.addEventListener('pointerdown',down,true);el.addEventListener('pointermove',move,true);el.addEventListener('pointerup',up,true);el.addEventListener('pointercancel',up,true);el.addEventListener('click',stopClick,true);
+  bar.querySelector('.cz-mv-done').onclick=done;
+  bar.querySelector('.cz-mv-reset').onclick=function(e){e.stopPropagation();x=50;y=50;apply();};
+}
+(function(){var _r=render;render=function(){var v=_r.apply(this,arguments);try{czApplyPos();}catch(e){}return v;};})();
 function czTodayBanner(){
   var D=dreamData(),b=czObj('today'),now=new Date(),h=now.getHours();
   var hello=h<5?'고요한 밤이에요':h<11?'좋은 아침이에요':h<17?'좋은 오후예요':h<21?'편안한 저녁이에요':'오늘도 수고했어요';

@@ -2320,6 +2320,8 @@ body.cozy .td-cz-wrap [data-card="diary"] textarea{background-color:transparent 
 /* 목표 코치 */
 .gt-row{display:flex;align-items:flex-start;gap:11px;width:100%;text-align:left;border:0;background:transparent;padding:10px 4px;border-bottom:1px dashed var(--cz-line);cursor:pointer;font-family:inherit}
 .gt-row:last-child{border-bottom:0}
+div.gt-row{cursor:default}
+.lda .gt,.ld-tips .gt{margin:0 !important}
 .gt-ic{width:30px;height:30px;border-radius:50%;background:var(--cz-soft);color:var(--cz-deep);display:grid;place-items:center;font-size:14px;flex-shrink:0}
 .gt-b{flex:1;min-width:0}
 .gt-b b{display:block;font-size:13.5px;color:var(--text);line-height:1.5;font-weight:500}
@@ -10782,6 +10784,7 @@ function renderLedgerDashboard(){
       });
       return h+'</div>';
     };
+    html+=ldMoneyTipsCard({ym:ym,prevYm:prevYm,curInc:curInc,curExp:curExp,prevExp:prevExp,catMap:catMap,totalBudget:totalBudget,totalSpent:totalSpent});
     html+='<div class="g2" style="margin-bottom:16px">';
     html+=sumCard('이번 달 수입',curInc,'#7E9B7B',Object.entries(incCatMap).sort((a,b)=>b[1].total-a[1].total),'+');
     html+=sumCard('이번 달 지출',curExp,'#E07656',Object.entries(expCatMapDetail).sort((a,b)=>b[1].total-a[1].total),'-');
@@ -11191,6 +11194,8 @@ function ldGoalCalc(){
 function ldAssetInsights(assets,totalAsset,totalLiab,net){
   ldNwSnapshot(net);
   var h='<div class="lda">';
+  var at=goalTips().filter(function(x){return x.go.indexOf('ledger')>=0;});
+  h+=ldAssetTips(assets,totalAsset,totalLiab,net,at);
   // 목표
   var gc=ldGoalCalc();
   if(gc){
@@ -11242,6 +11247,48 @@ function ldAssetInsights(assets,totalAsset,totalLiab,net){
   }
   return h+'</div>';
 }
+function ldTipsHtml(title,tips){
+  if(!tips.length)return '';
+  return '<div class="card gt"><div class="tdr-h"><div class="tdk"><em>for you</em>'+title+'</div></div>'+tips.map(function(x){return '<div class="gt-row"><span class="gt-ic">'+x.ic+'</span><span class="gt-b"><b>'+x.tx+'</b>'+(x.sub?'<small>'+x.sub+'</small>':'')+'</span></div>';}).join('')+'</div>';
+}
+function ldAssetTips(assets,tA,tL,net,base){
+  var tips=(base||[]).slice(),gc=ldGoalCalc();
+  var cash=assets.filter(function(a){return a.type==='asset'&&/예적금|현금|입출금|통장|예금|적금/.test(a.category+a.name);}).reduce(function(s,a){return s+a.amount;},0);
+  if(tA>0&&cash/tA>0.6&&tA>=10000000) tips.push({ic:'◔',tx:'자산의 '+Math.round(cash/tA*100)+'%가 예적금·현금이에요',sub:'목표가 멀다면 일부를 투자·연금 계좌로 나눠 두는 것도 생각해 보세요'});
+  var hiDebt=assets.filter(function(a){return a.type==='liability'&&(a.interestRate||0)>=5;}).sort(function(a,b){return b.interestRate-a.interestRate;})[0];
+  if(hiDebt) tips.push({ic:'↘',tx:esc(hiDebt.name)+' 금리 '+hiDebt.interestRate+'% · 가장 먼저 갚으면 이자가 가장 많이 줄어요',sub:'남은 금액 '+fmtMoney(hiDebt.amount)});
+  if(tA>0&&tL/tA>0.5) tips.push({ic:'!',tx:'부채가 자산의 '+Math.round(tL/tA*100)+'%예요',sub:'상환액을 정해 두면 완납 시점을 아래에서 계산해 줘요'});
+  var noDay=assets.filter(function(a){return a.type==='liability'&&a.amount>0&&!a.monthly;})[0];
+  if(noDay) tips.push({ic:'✎',tx:esc(noDay.name)+'에 매달 상환액을 넣어 보세요',sub:'완납 예상일과 알림이 생겨요'});
+  if(!gc&&assets.length) tips.push({ic:'⌂',tx:'자산 목표를 정하면 매달 얼마씩 모아야 할지 계산해 드려요',sub:'예: 내 집 마련 · 자산 5억'});
+  if(gc&&gc.rem<=0) tips.push({ic:'✿',tx:esc(gc.g.name||'자산 목표')+' 달성! 다음 목표를 정해 볼까요?',sub:''});
+  return '<div style="grid-column:1/-1">'+ldTipsHtml('자산 코치',tips.slice(0,4))+'</div>';
+}
+function ldMoneyTipsCard(c){
+  var tips=[],t=todStr(),isCur=c.ym===t.slice(0,7);
+  var now=new Date(),day=now.getDate(),dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+  if(isCur&&c.totalBudget>0){
+    var usePct=Math.round(c.totalSpent/c.totalBudget*100),timePct=Math.round(day/dim*100);
+    if(c.totalSpent>c.totalBudget) tips.push({ic:'!',tx:'이번 달 예산을 '+fmtMoney(c.totalSpent-c.totalBudget)+' 넘었어요',sub:'남은 '+(dim-day)+'일은 꼭 필요한 지출만 해요'});
+    else if(usePct>timePct+10) tips.push({ic:'◔',tx:'예산 '+usePct+'% 사용 · 한 달의 '+timePct+'%가 지났어요',sub:'남은 '+(dim-day)+'일 동안 하루 '+fmtMoney(Math.floor((c.totalBudget-c.totalSpent)/Math.max(1,dim-day+1)))+'씩 쓰면 예산 안이에요'});
+    else tips.push({ic:'✿',tx:'예산 페이스 좋아요 · '+usePct+'% 사용',sub:'하루 '+fmtMoney(Math.floor((c.totalBudget-c.totalSpent)/Math.max(1,dim-day+1)))+'까지 써도 괜찮아요'});
+  }
+  // 카테고리 증가
+  var prevCat={};(LD.transactions||[]).forEach(function(tx){if(tx.type==='expense'&&tx.date.slice(0,7)===c.prevYm)prevCat[tx.majorCategory]=(prevCat[tx.majorCategory]||0)+tx.amount;});
+  var up=Object.keys(c.catMap).map(function(k){return [k,(c.catMap[k]||0)-(prevCat[k]||0),prevCat[k]||0];}).filter(function(x){return x[1]>=50000&&x[2]>0;}).sort(function(a,b){return b[1]-a[1];})[0];
+  if(up) tips.push({ic:'↗',tx:esc(up[0])+' 지출이 지난달보다 '+fmtMoney(up[1])+' 늘었어요',sub:'지난달 '+fmtMoney(up[2])+' → 이번 달 '+fmtMoney(c.catMap[up[0]])});
+  // 저축률
+  if(c.curInc>0){var rate=Math.round((c.curInc-c.curExp)/c.curInc*100);
+    tips.push(rate>=30?{ic:'♢',tx:'이번 달 저축 여력 '+rate+'% · '+fmtMoney(c.curInc-c.curExp),sub:'남은 돈을 목표 통장으로 옮겨 두면 자산 목표에 바로 반영돼요'}:rate>=0?{ic:'♢',tx:'이번 달 남은 돈은 수입의 '+rate+'%예요',sub:'수입의 30%를 먼저 떼어 두는 걸 목표로 해 봐요'}:{ic:'!',tx:'이번 달 지출이 수입보다 '+fmtMoney(c.curExp-c.curInc)+' 많아요',sub:'고정 지출부터 한 번 점검해 봐요'});}
+  // 고정비 비중
+  var fx=(LD.fixedItems||[]).reduce(function(a,f){return a+(f.amount&&f.amount!=='req_input'?Number(f.amount)||0:0);},0);
+  if(fx>0&&c.curInc>0&&fx/c.curInc>0.4) tips.push({ic:'⌁',tx:'고정 지출이 수입의 '+Math.round(fx/c.curInc*100)+'%예요',sub:'구독·통신비처럼 줄일 수 있는 게 있는지 봐요'});
+  // 목표 연결
+  var gc=ldGoalCalc();
+  if(gc&&gc.need&&c.curInc>0&&isCur){var left=c.curInc-c.curExp;tips.push(left>=gc.need?{ic:'⌂',tx:esc(gc.g.name||'자산 목표')+' 이번 달 필요 금액 '+fmtMoney(gc.need)+' 충분해요',sub:'남은 돈 '+fmtMoney(left)}:{ic:'⌂',tx:esc(gc.g.name||'자산 목표')+'까지 이번 달 '+fmtMoney(gc.need-Math.max(0,left))+' 부족해요',sub:'매달 '+fmtMoney(gc.need)+' 필요 · 이번 달 남은 돈 '+fmtMoney(Math.max(0,left))});}
+  return '<div style="margin-bottom:16px">'+ldTipsHtml('가계부 코치',tips.slice(0,4))+'</div>';
+}
+
 function openAssetGoal(){
   var g=LD.assetGoal||{};
   openMo('자산 목표',

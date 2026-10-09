@@ -1980,7 +1980,7 @@ function renderChars(force) {
     if (!force && col._k === key) return;
     col._k = key;
     $('#chx-tabs').innerHTML = SB_CHAR_TABS.map(([t, l]) => { const nm = b?.charProfiles?.[t]?.name; return `<button data-chx="${t}" class="${t === tab ? 'on' : ''}" title="${esc(sbLabel(t, l))}">${esc(nm || sbLabel(t, l))}</button>`; }).join('');
-    if (!b) { $('#chx-body').innerHTML = `<div class="chx-empty">${typeof synopWin === 'function' && synopWin() ? '내 시놉 보드에서 이 작품의 시놉시스를 찾으면<br>캐릭터 설정이 여기에 나와요.' : '내 시놉 보드를 불러오면<br>캐릭터 설정이 여기에 나와요.'}</div>`; return; }
+    if (!b) { $('#chx-body').innerHTML = `<div class="chx-empty">${typeof synopWin === 'function' && synopWin() ? '내 시놉 보드에 이 작품의 시놉시스가 없어요.<br><button class="btn primary" data-sb-create style="margin-top:10px">＋ 시놉 보드에 새로 만들기</button>' : '내 시놉 보드를 불러오면<br>캐릭터 설정이 여기에 나와요.'}</div>`; return; }
     const y = b.memoPhotoPos?.[tab]?.y ?? 50;
     const fields = SB_PROFILE.filter(([k]) => k !== 'name' && k !== 'age' && String(pf[k] || '').trim());
     $('#chx-body').innerHTML = `<div class="chx-top"><span class="chx-photo">${photo ? `<img src="${esc(photo)}" alt="" style="object-position:50% ${y}%">` : '<i class="ic ic-image"></i>'}</span>
@@ -2877,7 +2877,7 @@ $('#file-restore').addEventListener('change', async e => {
 async function newWork() {
     const r = await newWorkModal(); if (!r) { renderHeader(); return; }
     const t = r.title;
-    const w = create('work', { title: t || '새 작품', order: Date.now() });
+    const w = create('work', { title: t || '새 작품', order: Date.now(), needSynop: true }); // 시놉 보드에도 같은 이름으로 만들기
     const f1 = create('folder', { workId: w.id, title: '1부', order: 1 });
     const e1 = create('episode', { workId: w.id, parentId: f1.id, title: '1화', order: 1, goal: 5000 });
     const s1 = create('synop', { workId: w.id, title: '전체 시놉시스', order: 1, cards: [newCard('로그라인')] });
@@ -7652,6 +7652,26 @@ setInterval(() => {
     synopPicking = false; lockSynopList(); // 골랐으면 다시 목록 숨김
 }, 2000);
 
+// 작업실에서 새 작품을 만들면 내 시놉 보드에도 같은 이름의 시놉시스를 만들어 짝지음
+const SB_GENRE = { 'BL 장편': 'BL', '현로 장편': '현로', '현로 초단': '현로초단', 'BL 초단': 'BL초단' };
+function createSynopFor(wid, quiet) {
+    const w = synopWin(), work = get(wid); if (!w || !work || typeof w.createNewBoard !== 'function') return false;
+    const genre = SB_GENRE[ensurePlan(wid).genre] || '';
+    try { w.createNewBoard({ title: work.title || '새 작품', genre }); } catch (e) { console.warn(e); return false; }
+    const map = pref.synopMap || (pref.synopMap = {});
+    map[wid] = w.currentWorkspaceId; synopAutoId = w.currentWorkspaceId; savePref();
+    if (work.needSynop) { delete work.needSynop; touch(work); }
+    renderTree(); renderSbViews(); renderChars(true);
+    if (!quiet) toast(`내 시놉 보드에도 ‘${work.title || '새 작품'}’ 시놉시스를 만들었어요.`);
+    return true;
+}
+setInterval(() => {
+    const wid = curWorkId(), work = get(wid);
+    if (!work || !work.needSynop || !synopWin()) return;
+    if (sbBoard()) { delete work.needSynop; touch(work); return; } // 이미 같은 이름이 있으면 그걸 씀
+    createSynopFor(wid);
+}, 2000);
+document.addEventListener('click', e => { if (e.target.closest && e.target.closest('[data-sb-create]')) createSynopFor(curWorkId()); });
 $('#btn-synop-pick').addEventListener('click', () => { synopPicking = !synopPicking; lockSynopList(); });
 $('#btn-synop-wide').addEventListener('click', () => { pref.synopWide = !pref.synopWide; savePref(); applySynopMode(); applyWidths(); });
 
@@ -7711,7 +7731,7 @@ function sbSafe(html) { const t = document.createElement('template'); t.innerHTM
 function sbViewHtml(it) {
     if (sbBoard()) return `<div class="sbv-host" data-sbv-host="${it.id}"></div>`;
     const msg = IN_PREVIEW || !location.protocol.startsWith('http') ? '내 시놉 보드는 GitHub 주소에서 열었을 때 보여요.'
-        : synopWin() ? `내 시놉 보드에서 ‘${esc(get(curWorkId())?.title || '')}’와 이름이 같은 시놉시스를 못 찾았어요.<br>시놉 칸 위의 ‘시놉 바꾸기’를 눌러 이 작품의 시놉시스를 한 번 골라 주세요.` : '내 시놉 보드를 불러오는 중이에요…';
+        : synopWin() ? `내 시놉 보드에서 ‘${esc(get(curWorkId())?.title || '')}’와 이름이 같은 시놉시스를 못 찾았어요.<br><button class="btn primary" data-sb-create style="margin:10px 0">＋ 시놉 보드에 새로 만들기</button><br>이미 있는 시놉시스와 짝지으려면 시놉 칸 위의 ‘시놉 바꾸기’를 눌러 골라 주세요.` : '내 시놉 보드를 불러오는 중이에요…';
     return `<div class="pane-empty">${msg}</div>`;
 }
 const sbKey = () => { const b = sbBoard(); return b ? 'b:' + b.id : synopWin() ? 'nob' : 'wait'; };

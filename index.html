@@ -2004,6 +2004,22 @@ body.cozy .app .dm-head h1.dm-serif,body.cozy .app .dm-head h1.dm-serif *{font-f
 body.cozy .app .dm-head .dm-eye{font-weight:500 !important;letter-spacing:3px;font-size:11px;color:var(--t3)}
 @media(max-width:768px){.dm-head h1.dm-serif{font-size:42px}}
 body.cozy .app .dm-head .dm-eye-love{font-family:'Instrument Serif',Georgia,serif !important;font-style:italic;font-weight:400 !important;letter-spacing:.2px !important;font-size:16px !important;text-transform:none;color:var(--t3);margin-bottom:2px}
+
+/* 오늘: 다음 루틴 칩 + 모바일 순서 */
+.cz-today-next{display:inline-flex;align-items:center;gap:7px;margin:10px 6px 0 0;border:0;background:rgba(255,255,255,.9);color:#4A3F42;border-radius:99px;padding:4px 12px 4px 4px;font-size:12.5px;cursor:pointer;font-family:inherit;max-width:100%}
+.cz-today-next em{font-style:normal;background:var(--cz-acc);color:#fff;border-radius:99px;padding:2px 8px;font-size:10px;letter-spacing:1px}
+.cz-today-next span{color:var(--t3);font-size:11.5px}
+@media(max-width:768px){
+  body.cozy .today-wrap{display:flex !important;flex-direction:column}
+  body.cozy .today-wrap>.td-grid{order:1;width:100%;min-width:0}
+  body.cozy .today-wrap>.td-rt-col{width:100%;min-width:0}
+  body.cozy .today-wrap>.td-rt-col{order:2}
+  body.cozy .td-grid>.pj-slot[data-card="todo"]{order:1}
+  body.cozy .td-grid>.pj-slot[data-card="stats"]{order:2}
+  body.cozy .td-grid>.pj-slot[data-card="deadlines"]{order:3}
+  body.cozy .td-grid>.pj-slot[data-card="monthlyGoal"]{order:4}
+  body.cozy .td-grid>.pj-slot{order:5}
+}
 </style>
 </head>
 <body>
@@ -3437,9 +3453,9 @@ function renderTodayLegacy(){
 
   return goalBar+
     '<div class="today-wrap">'+
-    '<div style="display:flex;flex-direction:column;gap:14px">'+routineCard(viewDate)+
+    '<div class="td-rt-col" style="display:flex;flex-direction:column;gap:14px">'+routineCard(viewDate)+
     '</div>'+
-    '<div class="pj-layout'+(isTdEdit?' pj-editing':'')+'">'+rightGrid+'</div></div>';
+    '<div class="pj-layout td-grid'+(isTdEdit?' pj-editing':'')+'">'+rightGrid+'</div></div>';
 }
 
 
@@ -3583,6 +3599,17 @@ function czRotatePhoto(kind,id){
   });
 }
 (function(){var _r=render;render=function(){var v=_r.apply(this,arguments);try{czApplyPos();}catch(e){}return v;};})();
+// 오늘 배너: 지금/다음 루틴 한 줄
+function czTodayNext(now){
+  try{
+    var ds=todStr(),nowT=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0'),ck=S.checks[ds]||{};
+    var rs=routinesForDate(ds).filter(function(r){return r.time;}).sort(function(a,b){return a.time.localeCompare(b.time);});
+    if(!rs.length)return '';
+    var done=rs.filter(function(r){return ck[r.id];}).length;
+    var nx=rs.find(function(r){return r.time>nowT&&!ck[r.id];});
+    return '<button type="button" class="cz-today-next" onclick="var e=document.querySelector(\'.td-rt-col\');if(e)e.scrollIntoView({behavior:\'smooth\',block:\'start\'})"><em>'+(nx?'NEXT':'DONE')+'</em>'+(nx?esc(nx.time)+' · '+esc(nx.task):'오늘 루틴 끝!')+'<span>'+done+' / '+rs.length+'</span></button>';
+  }catch(e){return '';}
+}
 // 오늘 배너: 날마다 바뀌는 '되고 싶은 나' 한 줄
 function czTodayBe(now){
   var D=dreamData(),list=[];
@@ -3598,7 +3625,7 @@ function czTodayBanner(){
   var days=['일','월','화','수','목','금','토'];
   return '<div class="cz-today" style="background-image:url(\''+esc(url).replace(/'/g,'%27')+'\')">'
     +'<div class="cz-today-in"><div class="cz-today-date">'+(now.getMonth()+1)+'월 '+now.getDate()+'일 '+days[now.getDay()]+'요일</div>'
-    +'<div class="cz-today-hi">'+hello+'</div><div class="cz-today-int">'+esc(D.intention)+'</div>'+czTodayBe(now)+'</div>'
+    +'<div class="cz-today-hi">'+hello+'</div><div class="cz-today-int">'+esc(D.intention)+'</div>'+czTodayNext(now)+czTodayBe(now)+'</div>'
     +'<span class="cz-ph-btns"><button type="button" class="cz-ph-btn" onclick="czPickPhoto(\'today\',\'today\')" title="배너 사진 바꾸기">'+CZI.cam+'</button>'
     +(b.photo?'<button type="button" class="cz-ph-btn" onclick="czResetPhoto(\'today\',\'today\')" title="기본 사진으로 (날마다 바뀜)">'+CZI.reset+'</button>':'')+'</span></div>';
 }

@@ -1865,6 +1865,13 @@ body.cozy .nav-ic,body.cozy .nav-ic svg.nav-line{width:16px !important;height:16
 body.cozy .sb{overflow-y:auto}
 body.cozy .sb>*{flex-shrink:0}
 body.cozy .sb-pj-wrap{flex:1 0 140px !important;min-height:140px}
+body.cozy .sb-year{margin:8px 0 14px 4px !important}
+body.cozy .sb-year span{margin-top:0 !important}
+
+/* 로고 글씨체 설정이 코지 스타일에서도 먹게 */
+body.cozy .logo{font-family:var(--logo-font) !important}
+body.cozy.logo-mont .logo{font-style:italic !important;font-weight:800 !important;letter-spacing:-.3px !important;font-size:1.35em !important}
+body.cozy.logo-script .logo{font-size:1.75em !important;letter-spacing:0 !important}
 </style>
 </head>
 <body>
@@ -2470,7 +2477,7 @@ function dreamData(){
   return D;
 }
 function dreamPhotoUrl(a,i){var x=dreamData().areas[a.id];return (x&&x.photo)||('dream/dream-'+(i+1)+'.jpg');}
-function updateDreamYear(){var el=document.getElementById('sb-year');if(el)el.innerHTML='<b>'+dmEsc(dreamData().year)+'</b><span>A YEAR OF MY OWN</span>';}
+function updateDreamYear(){var el=document.getElementById('sb-year');if(el)el.innerHTML='<span>A YEAR OF MY OWN</span>';}
 function renderDream(){
   var D=dreamData();
   var cards=DREAM_AREAS.map(function(a,i){
@@ -9101,8 +9108,9 @@ function renderSettings(){
   fontHtml+='</div>';
 
   // 로고 글씨체 선택
-  var curLogo=S.logoFont||'montserrat';
+  var curLogo=S.logoFont||(S.cozyOff?'montserrat':'serif');
   var logoFonts=[
+    {id:'serif',name:'코지 세리프 (기본)',ff:"Georgia,'Noto Serif KR',serif",italic:false,size:'1.5em'},
     {id:'montserrat',name:'Montserrat',ff:"'Montserrat',sans-serif",italic:true,size:'1.3em'},
     {id:'dancing',name:'Dancing Script',ff:"'Dancing Script',cursive",italic:false,size:'1.7em'},
     {id:'sacramento',name:'Sacramento',ff:"'Sacramento',cursive",italic:false,size:'1.8em'},
@@ -9450,18 +9458,22 @@ function applyTheme(t){
 
   // 로고 글씨체 적용
   var logoFontMap={
+    serif:"Georgia,'Noto Serif KR',serif",
     montserrat:"'Montserrat','Pretendard',sans-serif",
     dancing:"'Dancing Script',cursive",
     sacramento:"'Sacramento',cursive",
     allura:"'Allura',cursive",
     kaushan:"'Kaushan Script',cursive"
   };
-  root.setProperty('--logo-font', logoFontMap[S.logoFont||'montserrat']||logoFontMap.montserrat);
+  var _lfId=S.logoFont||(S.cozyOff?'montserrat':'serif');
+  root.setProperty('--logo-font', logoFontMap[_lfId]||logoFontMap.montserrat);
+  document.body.classList.toggle('logo-script',_lfId!=='serif'&&_lfId!=='montserrat');
+  document.body.classList.toggle('logo-mont',_lfId==='montserrat');
   // 로고 italic/size 보정 (필기체는 italic 해제). 헤더 높이 고정이라 크기 늘어도 안 넘침
   (function(){
     var lg=document.querySelector('.logo');
     if(lg){
-      var sc=(S.logoFont&&S.logoFont!=='montserrat');
+      var sc=(_lfId!=='montserrat');
       lg.style.fontStyle=sc?'normal':'italic';
       lg.style.fontSize=sc?'1.75em':'1.4em';
     }

@@ -2522,7 +2522,8 @@ function renderTodayLegacy(){
   tl.forEach(function(slot){
     var h=TCB[slot.id];
     if(!h&&!isTdEdit)return;
-    var hid=tdVis[slot.id]===false;
+    // 영양제 체크 카드는 기본으로 숨김 (Today 편집 모드에서 👁로 다시 켤 수 있음)
+    var hid=slot.id==='suppToday'?tdVis[slot.id]!==true:tdVis[slot.id]===false;
     if(hid&&!isTdEdit)return;
     var dim=hid?'opacity:0.35;':'';
     rightGrid+='<div class="pj-slot" data-card="'+slot.id+'" style="grid-column:span '+slot.cols+';'+dim+'"'+(isTdEdit?' draggable="true" ondragstart="tdSlotDragStart(event)" ondragend="pjSlotDragEnd(event)" ondragover="pjSlotDragOver(event)" ondragleave="pjSlotDragLeave(event)" ondrop="tdSlotDrop(event)"':'')+'>'+
@@ -4105,7 +4106,7 @@ function togTdSlotSize(cardId){
   if(!S.todayLayout)S.todayLayout=JSON.parse(JSON.stringify(defTL));
   var s=S.todayLayout.find(x=>x.id===cardId);if(s)s.cols=s.cols===2?1:2;save();render();
 }
-function togTdSlotVis(cardId){if(!S.todayCardVis)S.todayCardVis={};S.todayCardVis[cardId]=S.todayCardVis[cardId]===false?true:false;save();render();}
+function togTdSlotVis(cardId){if(!S.todayCardVis)S.todayCardVis={};var v=S.todayCardVis[cardId];var shown=cardId==='suppToday'?v===true:v!==false;S.todayCardVis[cardId]=!shown;save();render();}
 var _tdDragCard=null;
 function tdSlotDragStart(e){_tdDragCard=e.currentTarget.dataset.card;e.currentTarget.classList.add('dragging');e.dataTransfer.effectAllowed='move';}
 function tdSlotDrop(e){

@@ -2128,6 +2128,9 @@ body.cozy .cz-today{height:auto !important;min-height:170px}
 .cz-stat em{font-style:normal;font-size:10.5px;opacity:.85}
 body.cozy .app .cz-stat b{font-weight:600 !important}
 @media(max-width:768px){.cz-stats{position:static;margin-top:12px}.cz-stat{flex:1;min-width:0;padding:8px 11px}.cz-stat b{font-size:17px}}
+.cz-stat-g{min-width:150px;max-width:220px}
+.cz-stat-g em{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+@media(max-width:768px){.cz-stats{flex-wrap:wrap}.cz-stat-g{flex:1 0 100%;max-width:none}}
 </style>
 </head>
 <body>
@@ -3649,7 +3652,6 @@ function tdCozyLayout(t,TCB,tdVis){
   g+=slot('rt',tdRoutineCard(viewDate));
   g+=slot('week',tdWeekCard());
   g+=slot('upcoming',tdUpcomingCard());
-  g+=slot('monthlyGoal',TCB.monthlyGoal);
   if(!night) g+=slot('diary',TCB.diary,2);
   g+=slot('lookback',TCB.lookback,2);
   if(tdVis.suppToday===true) g+=slot('suppToday',TCB.suppToday);
@@ -3818,7 +3820,9 @@ function czTodayStats(){
     var ds=todStr(),rs=routinesForDate(ds),ck=S.checks[ds]||{},dn=rs.filter(function(r){return ck[r.id];}).length,rp=rs.length?Math.round(dn/rs.length*100):0;
     var sv=S.savings||{},sp=sv.goal?Math.min(100,Math.round((sv.current||0)/sv.goal*100)):0;
     var chip=function(lab,pc,sub,on){return '<button type="button" class="cz-stat" onclick="'+on+'"><span>'+lab+'</span><b>'+pc+'%</b><i><u style="width:'+pc+'%"></u></i><em>'+sub+'</em></button>';};
-    return '<div class="cz-stats">'+chip('루틴 달성',rp,dn+' / '+rs.length,"go('routine')")+(sv.goal?chip('저축 달성',sp,money(sv.current||0),"go('savings')"):'')+'</div>';
+    var now2=new Date(),ym=ds.slice(0,7),gl=(S.monthlyGoals&&S.monthlyGoals[ym])||[],gd=gl.filter(function(g){return g.done;}).length,nx=gl.find(function(g){return !g.done;});
+    var goalChip='<button type="button" class="cz-stat cz-stat-g" onclick="calY='+now2.getFullYear()+';calM='+now2.getMonth()+';go(\'calendar\')"><span>'+(now2.getMonth()+1)+'월 목표</span><b>'+(gl.length?gd+' / '+gl.length:'+')+'</b><em>'+(gl.length?(nx?'다음 · '+esc(nx.text):'✿ 이번 달 목표 완료!'):'목표 추가하기')+'</em></button>';
+    return '<div class="cz-stats">'+goalChip+chip('루틴 달성',rp,dn+' / '+rs.length,"go('routine')")+(sv.goal?chip('저축 달성',sp,money(sv.current||0),"go('savings')"):'')+'</div>';
   }catch(e){return '';}
 }
 function czSeason(now){

@@ -1547,7 +1547,8 @@ body.theme-life .sb-sec{margin-bottom:14px}
 body.theme-life .sb-lbl{font-size:11px;letter-spacing:.5px;color:#B3A9AD;padding:0 12px;margin:0 0 6px}
 body.theme-life .nav{padding:9px 12px;gap:11px;font-size:14.5px;color:#6E6468;letter-spacing:-.2px}
 body.theme-life .nav-ic{width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;color:#B9A49B}
-body.theme-life .nav-ic svg{width:18px;height:18px;display:block}
+body.theme-life .nav-ic svg.nav-line{width:18px;height:18px;display:block}
+.nav-ic svg.nav-line{width:17px;height:17px;display:block}
 body.theme-life .nav:hover .nav-ic{color:#C9785E}
 body.theme-life .nav.on .nav-ic{color:#E07656}
 body.theme-life .app .nav.on{font-weight:700 !important}
@@ -8690,14 +8691,16 @@ function renderSettings(){
   var curMk=S.navMarker||'dot';
   var sampleColors=['#F5C842','#61C0BF','#B2B0E8'];
   function mkSample(type){
+    if(type==='line'||type==='lineColor') return ['today','calendar','diary'].map(function(k,i){return '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="'+(type==='lineColor'?sampleColors[i]:'var(--t2)')+'" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+NAV_LINE[k]+'</svg>';}).join('<span style="display:inline-block;width:5px"></span>');
+    if(type==='star'||type==='flower') return sampleColors.map(function(c){return '<svg width="13" height="13" viewBox="0 0 24 24" fill="'+(type==='flower'?'var(--accent)':c)+'">'+(type==='star'?'<path d="M12 1.5l2.1 6.8 7.15.05-5.78 4.28 2.2 6.77L12 15.05 6.33 19.4l2.2-6.77-5.78-4.28 7.15-.05z"/>':NAV_SHAPES.flower)+'</svg>';}).join('<span style="display:inline-block;width:5px"></span>');
     return sampleColors.map(function(c){
       if(type==='dot')return '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+c+'"></span>';
       var hc=(type==='heartTheme')?'var(--accent)':c;
       return '<svg width="13" height="13" viewBox="0 0 24 24" fill="'+hc+'"><path d="M12 21s-7.5-4.7-10-9.3C.4 8.5 1.5 5 4.7 4.2c2-.5 3.8.4 4.8 1.9l.5.8.5-.8c1-1.5 2.8-2.4 4.8-1.9C22.5 5 23.6 8.5 22 11.7 19.5 16.3 12 21 12 21z"/></svg>';
     }).join('<span style="display:inline-block;width:5px"></span>');
   }
-  var mkOpts=[{id:'dot',name:'동그라미'},{id:'heartColor',name:'하트 (색상별)'},{id:'heartTheme',name:'하트 (테마색)'}];
-  var markerHtml='<div style="display:flex;flex-direction:column;gap:8px">';
+  var mkOpts=[{id:'line',name:'선 아이콘'},{id:'lineColor',name:'선 아이콘 (색상별)'},{id:'heartColor',name:'하트 (색상별)'},{id:'heartTheme',name:'하트 (테마색)'},{id:'star',name:'별 (색상별)'},{id:'flower',name:'꽃 (테마색)'},{id:'dot',name:'동그라미'}];
+  var markerHtml='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px">';
   mkOpts.forEach(function(o){
     var isCur=curMk===o.id;
     markerHtml+='<div onclick="setNavMarker(\''+o.id+'\')" style="display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;border:1.5px solid '+(isCur?'var(--accent)':'var(--border)')+';border-radius:8px;padding:11px 14px;background:'+(isCur?'var(--al)':'var(--surface)')+';transition:all .2s">'+
@@ -8890,6 +8893,22 @@ function setCustomThemeVars(hex){
 }
 
 // 사이드바 메뉴 마커 (동그라미 / 색하트 / 테마하트)
+// 메뉴 선 아이콘
+var NAV_SHAPES={flower:'<circle cx="12" cy="6" r="4.3"/><circle cx="18" cy="11" r="4.3"/><circle cx="15.6" cy="18" r="4.3"/><circle cx="8.4" cy="18" r="4.3"/><circle cx="6" cy="11" r="4.3"/><circle cx="12" cy="12.5" r="2.6" fill="#fff"/>'};
+var NAV_LINE={dream:'<path d="M12 20s-7-4.4-8.6-8.6C2.2 8.2 4 5 7.2 5c2 0 3.3 1.1 4.8 2.9C13.5 6.1 14.8 5 16.8 5 20 5 21.8 8.2 20.6 11.4 19 15.6 12 20 12 20z"/>',
+      today:'<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
+      timeline:'<path d="M4 18c3 0 3-6 6-6s3 4 6 4 3-8 4-10"/><circle cx="4" cy="18" r="1.4"/><circle cx="20" cy="6" r="1.4"/>',
+      calendar:'<rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+      todocal:'<rect x="4" y="4" width="16" height="16" rx="4"/><path d="m8.5 12 2.5 2.5 4.5-5"/>',
+      diary:'<path d="M5 4.5h11a3 3 0 0 1 3 3v12H8a3 3 0 0 1-3-3z"/><path d="M5 16.5a3 3 0 0 1 3-3h11M9 8.5h6"/>',
+      life:'<path d="M12 21c-4-3-6-6-6-9.5a6 6 0 0 1 12 0C18 15 16 18 12 21z"/><path d="M12 21V11"/>',
+      projects:'<rect x="3.5" y="6.5" width="17" height="13" rx="3"/><path d="M9 6.5V5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5v1.5M3.5 12h17"/>',
+      ledger:'<rect x="3.5" y="6" width="17" height="13" rx="3"/><path d="M3.5 10h17M15.5 14.5h2"/>',
+      deadlines:'<circle cx="12" cy="13" r="7.5"/><path d="M12 9v4l2.5 2M9.5 2.5h5"/>',
+      health:'<path d="M3 12h4l2-4 3 8 2-4h7"/>',
+      savings:'<path d="M5 11a7 6 0 0 1 13 0v1.5l2 1v3h-2.2A7 6 0 0 1 15 19v1.5h-2.5V19h-3v1.5H7v-2A6.5 6 0 0 1 5 11z"/><path d="M10 7.5h4"/>',
+      routine:'<path d="M4.5 12a7.5 7.5 0 0 1 13-5.1M19.5 12a7.5 7.5 0 0 1-13 5.1M17.5 3.5v3.4h-3.4M6.5 20.5v-3.4h3.4"/>',
+      insights:'<path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/>'};
 function applyNavMarkers(){
   var mode=S.navMarker||'dot';
   // 테마별 지정 색 (설정 스와치의 진한 색과 동일)
@@ -8910,29 +8929,22 @@ function applyNavMarkers(){
   var isSailor=(th==='sailornavy'||th==='sailorpink');
   var starPath='<path d="M12 1.5l2.1 6.8 7.15.05-5.78 4.28 2.2 6.77L12 15.05 6.33 19.4l2.2-6.77-5.78-4.28 7.15-.05z"/>';
   var heartPath='<path d="M12 21s-7.5-4.7-10-9.3C.4 8.5 1.5 5 4.7 4.2c2-.5 3.8.4 4.8 1.9l.5.8.5-.8c1-1.5 2.8-2.4 4.8-1.9C22.5 5 23.6 8.5 22 11.7 19.5 16.3 12 21 12 21z"/>';
-  if(document.body.classList.contains('theme-life')){
-    var NI={dream:'<path d="M12 20s-7-4.4-8.6-8.6C2.2 8.2 4 5 7.2 5c2 0 3.3 1.1 4.8 2.9C13.5 6.1 14.8 5 16.8 5 20 5 21.8 8.2 20.6 11.4 19 15.6 12 20 12 20z"/>',
-      today:'<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
-      timeline:'<path d="M4 18c3 0 3-6 6-6s3 4 6 4 3-8 4-10"/><circle cx="4" cy="18" r="1.4"/><circle cx="20" cy="6" r="1.4"/>',
-      calendar:'<rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
-      todocal:'<rect x="4" y="4" width="16" height="16" rx="4"/><path d="m8.5 12 2.5 2.5 4.5-5"/>',
-      diary:'<path d="M5 4.5h11a3 3 0 0 1 3 3v12H8a3 3 0 0 1-3-3z"/><path d="M5 16.5a3 3 0 0 1 3-3h11M9 8.5h6"/>',
-      life:'<path d="M12 21c-4-3-6-6-6-9.5a6 6 0 0 1 12 0C18 15 16 18 12 21z"/><path d="M12 21V11"/>',
-      projects:'<rect x="3.5" y="6.5" width="17" height="13" rx="3"/><path d="M9 6.5V5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5v1.5M3.5 12h17"/>',
-      ledger:'<rect x="3.5" y="6" width="17" height="13" rx="3"/><path d="M3.5 10h17M15.5 14.5h2"/>',
-      deadlines:'<circle cx="12" cy="13" r="7.5"/><path d="M12 9v4l2.5 2M9.5 2.5h5"/>',
-      health:'<path d="M3 12h4l2-4 3 8 2-4h7"/>',
-      savings:'<path d="M5 11a7 6 0 0 1 13 0v1.5l2 1v3h-2.2A7 6 0 0 1 15 19v1.5h-2.5V19h-3v1.5H7v-2A6.5 6 0 0 1 5 11z"/><path d="M10 7.5h4"/>',
-      routine:'<path d="M4.5 12a7.5 7.5 0 0 1 13-5.1M19.5 12a7.5 7.5 0 0 1-13 5.1M17.5 3.5v3.4h-3.4M6.5 20.5v-3.4h3.4"/>',
-      insights:'<path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/>'};
+  if(document.body.classList.contains('theme-life')&&!S.navLineOnce){S.navLineOnce=true;S.navMarker='line';mode='line';}
+  var NI=NAV_LINE;
+  if(mode==='line'||mode==='lineColor'){
     document.querySelectorAll('.nav-ic[data-color]').forEach(function(ic){
       var k=(ic.parentNode.id||'').replace('nav-','');
-      ic.innerHTML=NI[k]?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+NI[k]+'</svg>':'';
+      ic.innerHTML=NI[k]?'<svg class="nav-line" viewBox="0 0 24 24" fill="none" stroke="'+(mode==='lineColor'?ic.dataset.color:'currentColor')+'" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+NI[k]+'</svg>':'';
     });
     return;
   }
   document.querySelectorAll('.nav-ic[data-color]').forEach(function(ic){
     var color=ic.dataset.color;
+    if(mode==='star'||mode==='flower'){
+      var fc=(mode==='flower')?accent:color;
+      ic.innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="'+(isSailor?'#C9A227':fc)+'" style="display:block">'+(mode==='star'?starPath:NAV_SHAPES.flower)+'</svg>';
+      return;
+    }
     if(mode==='dot'){
       if(isSailor){
         ic.innerHTML='<svg width="10" height="10" viewBox="0 0 24 24" fill="'+color+'" style="display:block">'+starPath+'</svg>';

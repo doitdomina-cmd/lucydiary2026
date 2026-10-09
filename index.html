@@ -2359,6 +2359,28 @@ body.cozy .app .lds .lds-t{font-weight:400 !important}
 body.cozy .app .czs .czs-t{font-weight:400 !important}
 .czs .card-style-option,.czs .font-opt,.czs button[onclick^="setFont("],.czs button[onclick^="setLogoFont"],.czs button[onclick^="setMarker"]{border-radius:16px !important}
 .czs .btn.bg.bsm{border-radius:99px !important;background:var(--cz-paper) !important}
+
+/* 로드맵: 시점 옆 작은 카드 */
+.rj-row{display:flex;flex-wrap:wrap;gap:12px;align-items:stretch;min-width:0}
+.rj-row>.rj-card{flex:0 1 380px;width:auto;min-width:0}
+.rj-kid{position:relative;flex:0 0 200px;min-width:0;background:var(--cz-paper);border-radius:18px;padding:14px 16px;cursor:pointer;display:flex;flex-direction:column;gap:4px;transition:transform .2s,box-shadow .2s;box-shadow:0 2px 10px rgba(120,80,60,.05)}
+.rj-kid::before{content:'';position:absolute;left:-12px;top:26px;width:12px;border-top:2px dashed var(--cz-line)}
+.rj-kid:not(.rj-kid-add){align-self:flex-start}
+.rj-kid:hover{transform:translateY(-2px);box-shadow:0 8px 18px rgba(120,80,60,.1)}
+.rj-kid:hover .rj-btns{opacity:1}
+.rj-kid .rj-btns{top:6px;right:6px}
+.rj-kid-y{font-family:'Instrument Serif',Georgia,serif;font-size:14px;font-style:italic;color:var(--cz-muted)}
+.rj-kid b{font-size:14px;color:var(--text);font-weight:500;padding-right:22px;word-break:keep-all}
+.rj-kid small{font-size:12px;color:var(--cz-deep)}
+.rj-kid p{margin:2px 0 0;font-size:12px;line-height:1.55;color:var(--t2);white-space:pre-line}
+body.cozy .app .rj-kid b{font-weight:500 !important}
+.rj-kid-add{flex:0 0 72px;border:1.5px dashed var(--cz-line);background:transparent;box-shadow:none;align-items:center;justify-content:center;color:var(--cz-muted);font-family:inherit;font-size:12px;opacity:.55}
+.rj-kid-add .czi{width:16px;height:16px}
+.rj-item:hover .rj-kid-add,.rj-kid-add:focus{opacity:1}
+.rj-kid-add:hover{color:var(--cz-deep);border-color:var(--cz-mid)}
+.rj-kid-add::before{display:none}
+@media(max-width:768px){.rj-row{flex-direction:column;gap:8px}.rj-row>.rj-card{flex:none;width:100%}.rj-kid{flex:none;margin-left:16px}.rj-kid::before{left:-12px;top:-8px;bottom:50%;width:10px;height:auto;border-top:0;border-left:2px dashed var(--cz-line);border-bottom:2px dashed var(--cz-line);border-bottom-left-radius:8px}.rj-kid-add{flex-direction:row;gap:4px;padding:5px 12px;opacity:.8;align-self:flex-start !important;border-radius:99px;font-size:11.5px}.rj-kid-add .czi{width:13px;height:13px}.rj-kid-add span{display:none}.rj-kid-add::after{content:'작은 카드 추가'}}
+@media(hover:none){.rj-kid-add{opacity:1}}
 </style>
 </head>
 <body>
@@ -5260,7 +5282,7 @@ function renderTimeline(){
   let html='';
   if(isLife){
     const rb=czObj('roadmap','roadmap'),rurl=rb.photo||'dream/dream-5.jpg';
-    const yrs=entries.map(function(e){return parseInt(e.year,10);}).filter(function(n){return !isNaN(n);});
+    const yrs=entries.filter(function(e){return !e.parentId;}).map(function(e){return parseInt(e.year,10);}).filter(function(n){return !isNaN(n);});
     const span=yrs.length?(Math.min.apply(null,yrs)===Math.max.apply(null,yrs)?String(yrs[0]):Math.min.apply(null,yrs)+' — '+Math.max.apply(null,yrs)):'';
     html+='<div class="rm-hero" style="background-image:url(\''+esc(rurl).replace(/'/g,'%27')+'\')"><div class="rm-hero-in">'+
       '<div class="rm-kick">MY ROADMAP'+(span?' · '+esc(span):'')+'</div>'+
@@ -5284,19 +5306,28 @@ function renderTimeline(){
 
   if(isLife){
     var nowY=new Date().getFullYear();
-    html+='<div class="rj">'+entries.map(function(e,i){
+    var ids={};entries.forEach(function(e){ids[e.id]=1;});
+    var kidsOf=function(pid){return entries.filter(function(k){return k.parentId===pid;});};
+    var tops=entries.filter(function(e){return !(e.parentId&&ids[e.parentId]);});
+    var kidHtml=function(k){return '<div class="rj-kid" onclick="openTlModal(\''+k.id+'\')">'+
+      '<div class="rj-btns"><button type="button" onclick="event.stopPropagation();delTlEntry(\''+k.id+'\')" title="삭제">×</button></div>'+
+      (k.year?'<span class="rj-kid-y">'+esc(k.year)+'</span>':'')+
+      (k.title?'<b>'+esc(k.title)+'</b>':'')+(k.subtitle?'<small>'+esc(k.subtitle)+'</small>':'')+(k.desc?'<p>'+esc(k.desc)+'</p>':'')+'</div>';};
+    html+='<div class="rj">'+tops.map(function(e,i){
       var tags=(e.tags||[]).map(function(t){return '<span class="rj-tag">'+esc(t)+'</span>';}).join('');
       var y=parseInt(e.year,10),state=isNaN(y)?'':y<nowY?'past':y===nowY?'now':'future';
       var small=e.size==='small';
       return '<div class="rj-item'+(small?' small':'')+' '+state+'" draggable="true" data-id="'+e.id+'" ondragstart="tlDragStart(event)" ondragend="tlDragEnd(event)" ondragover="tlDragOver(event)" ondragleave="tlDragLeave(event)" ondrop="tlDrop(event)">'+
         '<div class="rj-year">'+esc(e.year||'')+(state==='now'?'<em>now</em>':'')+'</div>'+
         '<div class="rj-mark"><span>'+(state==='past'?'✓':state==='now'?'✿':'')+'</span></div>'+
-        '<div class="rj-card" onclick="openTlModal(\''+e.id+'\')"'+(e.bgColor&&!small?' style="background:'+esc(e.bgColor)+'"':'')+'>'+
+        '<div class="rj-row"><div class="rj-card" onclick="openTlModal(\''+e.id+'\')"'+(e.bgColor&&!small?' style="background:'+esc(e.bgColor)+'"':'')+'>'+
           '<div class="rj-btns"><button type="button" onclick="event.stopPropagation();openTlModal(\''+e.id+'\')" title="수정">'+CZI.pen+'</button><button type="button" onclick="event.stopPropagation();delTlEntry(\''+e.id+'\')" title="삭제">×</button></div>'+
           (e.title?'<h3>'+esc(e.title)+'</h3>':'')+
           (e.subtitle?'<div class="rj-sub">'+esc(e.subtitle)+'</div>':'')+
           (e.desc?'<p>'+esc(e.desc)+'</p>':'')+
           (tags?'<div class="rj-tags">'+tags+'</div>':'')+
+        '</div>'+kidsOf(e.id).map(kidHtml).join('')+
+        '<button type="button" class="rj-kid rj-kid-add" onclick="openTlModal(null,\''+e.id+'\')" title="이 시점에 작은 카드 추가">'+CZI.plus+'<span>추가</span></button>'+
         '</div></div>';
     }).join('')+
     '<div class="rj-item rj-add"><div class="rj-year"></div><div class="rj-mark"><span>+</span></div><button type="button" class="rj-card" onclick="openTlModal()">새 시점 추가하기</button></div></div>';
@@ -5431,9 +5462,13 @@ function pickTlSize(sz){
   if(bgWrap) bgWrap.style.display=(sz==='big')?'':'none';
 }
 
-function openTlModal(id){
+var _tlParent=null;
+function openTlModal(id,parentId){
   const editing=id?(S.timeline||[]).find(x=>x.id===id):null;
+  _tlParent=editing?(editing.parentId||null):(parentId||null);
+  const parentE=_tlParent?(S.timeline||[]).find(x=>x.id===_tlParent):null;
   selTlSize=editing?(editing.size||'big'):'big';
+  if(_tlParent)selTlSize='small';
   const hasBg=!!(editing&&editing.bgColor);
   var sizeHtml='<div class="fg"><label class="fl">시점 크기</label><div style="display:flex;gap:8px">'+
     '<button type="button" class="daybtn" id="tl-size-big" onclick="pickTlSize(\'big\')" style="flex:1;'+(selTlSize==='big'?'background:var(--accent);color:#fff;border-color:var(--accent)':'')+'">● 큰 시점</button>'+
@@ -5445,9 +5480,10 @@ function openTlModal(id){
       '</label>'+
       '<input type="color" id="tl-bg-input" value="'+(hasBg?editing.bgColor:'#FFFFFF')+'" style="display:'+(hasBg?'inline-block':'none')+';width:100%;height:36px;border:1px solid var(--border);border-radius:8px;cursor:pointer">'+
     '</div>';
-  openMo(editing?'시점 수정':'새 시점 추가',
+  if(_tlParent){sizeHtml='<div style="font-size:0.82em;color:var(--t3);margin-bottom:12px;background:var(--s2);border-radius:10px;padding:8px 12px">'+esc(parentE&&parentE.title?parentE.title:'이 시점')+' 옆에 붙는 작은 카드예요</div>';bgHtml='';}
+  openMo(editing?(_tlParent?'작은 카드 수정':'시점 수정'):(_tlParent?'작은 카드 추가':'새 시점 추가'),
     sizeHtml+
-    '<div class="fg"><label class="fl">연도/시기</label><input class="inp" id="tl-year" placeholder="예: 2026" value="'+(editing?esc(editing.year):'')+'"></div>'+
+    '<div class="fg"><label class="fl">연도/시기'+(_tlParent?' <span style="font-size:0.8em;color:var(--t3);font-weight:400">(선택)</span>':'')+'</label><input class="inp" id="tl-year" placeholder="'+(_tlParent?'예: 3월, 상반기':'예: 2026')+'" value="'+(editing?esc(editing.year):'')+'"></div>'+
     '<div class="fg"><label class="fl">제목</label><input class="inp" id="tl-title" placeholder="예: 기반을 만드는 해" value="'+(editing?esc(editing.title):'')+'"></div>'+
     '<div class="fg"><label class="fl">부제</label><input class="inp" id="tl-sub" placeholder="예: 생활 시스템 + 본업 루틴" value="'+(editing?esc(editing.subtitle):'')+'"></div>'+
     '<div class="fg"><label class="fl">설명</label><textarea class="ta" id="tl-desc" placeholder="자세한 내용을 적어주세요" style="min-height:80px">'+(editing?esc(editing.desc):'')+'</textarea></div>'+
@@ -5479,14 +5515,16 @@ function saveTlEntry(id){
   } else {
     const entry={id:gid(),year:year,title:title,subtitle:sub,desc:desc,tags:tags,size:size};
     if(bgColor)entry.bgColor=bgColor;
+    if(_tlParent)entry.parentId=_tlParent;
     S.timeline.push(entry);
   }
   save();closeMo();render();
 }
 
 function delTlEntry(id){
-  if(!confirm('이 시점을 삭제할까요?'))return;
-  S.timeline=(S.timeline||[]).filter(function(x){return x.id!==id;});
+  var nk=(S.timeline||[]).filter(function(x){return x.parentId===id;}).length;
+  if(!confirm(nk?'이 시점과 옆의 작은 카드 '+nk+'개를 삭제할까요?':'이 시점을 삭제할까요?'))return;
+  S.timeline=(S.timeline||[]).filter(function(x){return x.id!==id&&x.parentId!==id;});
   save();render();
 }
 

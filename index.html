@@ -1899,6 +1899,31 @@ body.cozy .nav.on,body.cozy .nav.on:hover{background:color-mix(in srgb,var(--cz-
 .wf-kind button.on.k-do{border-color:#7FA394;background:#EEF5F1;color:#4F7466}
 body.cozy .app .dma-kind,body.cozy .app .wf-kind button b{font-weight:600 !important}
 @media(max-width:768px){.dma-filter button span{display:none}}
+
+/* 드림보드 ↔ 나의 라이프 연결 */
+.ar-dreams{display:flex;flex-wrap:wrap;gap:6px}
+.ar-dream{border:1px solid var(--border);background:var(--surface);color:var(--t2);border-radius:99px;padding:6px 12px;font-size:12.5px;cursor:pointer;font-family:inherit}
+.ar-dream.on{background:var(--cz-acc,var(--accent));border-color:var(--cz-acc,var(--accent));color:#fff}
+.la-dream{display:inline-flex;align-items:center;gap:4px;border:0;background:var(--cz-soft,var(--al));color:var(--cz-deep,var(--accent));border-radius:99px;padding:3px 10px;font-size:11.5px;cursor:pointer;margin:-4px 0 10px;font-family:inherit;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dma-goals-bar{margin-top:30px}
+.dma-golife{border:1px solid var(--border);background:var(--surface);color:var(--t2);border-radius:99px;padding:6px 13px;font-size:12.5px;cursor:pointer;font-family:inherit;white-space:nowrap}
+.dma-goals-empty{border:1.5px dashed #E5D9D3;border-radius:18px;padding:22px;text-align:center;color:#A39A9E;font-size:13px;line-height:1.7;background:#FFFCFA}
+.dma-goals-empty b{color:var(--cz-deep)}
+.dma-goals{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.dma-goal{display:flex;align-items:center;gap:13px;background:#fff;border-radius:18px;padding:12px 14px;box-shadow:0 3px 14px rgba(120,80,60,.08);cursor:pointer;transition:transform .2s;min-width:0}
+.dma-goal:hover{transform:translateY(-2px)}
+.dma-goal-ph{width:52px;height:52px;border-radius:14px;background:#F3E9E4 center/cover no-repeat;flex-shrink:0}
+.dma-goal-t{flex:1;min-width:0}
+.dma-goal-n{font-size:14.5px;color:var(--text);display:flex;align-items:center;gap:7px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dma-goal-n span{font-size:10.5px;color:var(--cz-deep);background:var(--cz-soft);border-radius:99px;padding:2px 7px;flex-shrink:0}
+.dma-goal-bar{height:6px;border-radius:99px;background:#F3ECE8;margin:7px 0 5px;overflow:hidden}
+.dma-goal-bar i{display:block;height:100%;border-radius:99px;background:var(--gc)}
+.dma-goal-m{display:flex;justify-content:space-between;gap:8px;font-size:11.5px;color:#9A8F93;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dma-goal-m b{color:#5E5458;flex-shrink:0}
+.cz-today-be{display:inline-flex;align-items:center;gap:7px;margin-top:10px;border:0;background:rgba(255,255,255,.9);color:#4A3F42;border-radius:99px;padding:4px 12px 4px 4px;font-size:12.5px;cursor:pointer;font-family:inherit;max-width:100%}
+.cz-today-be em{font-style:normal;background:#C98A8F;color:#fff;border-radius:99px;padding:2px 8px;font-size:10px;letter-spacing:1px}
+.cz-today-be span{color:var(--cz-deep);font-size:11.5px}
+body.cozy .app .dma-goal-n,body.cozy .app .dma-goal-m b{font-weight:600 !important}
 </style>
 </head>
 <body>
@@ -2641,6 +2666,7 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape'&&document.ge
 
 // ═══════════ 드림보드 분야 페이지: 커버 사진 + 갖고 싶은 것·하고 싶은 것 카드 (사진·이름·설명·디데이) ═══════════
 var dreamAreaId=null;
+function dreamAreaTitle(id){var d=DREAM_AREAS.find(function(x){return x.id===id;});if(!d)return '';var x=dreamData().areas[id];return (x&&x.title)||d.title;}
 function openDreamArea(id){dreamAreaId=id;try{localStorage.setItem('lucy_dream_area',id);}catch(e){}go('dreamArea');var m=document.getElementById('main');if(m)m.scrollTop=0;}
 function wishDday(w){
   if(!w.dday)return '';
@@ -2685,7 +2711,24 @@ function renderDreamArea(){
   });
   var addK=dreamWishFilter!=='all'?wishKindInfo(dreamWishFilter):null;
   h+='<button type="button" class="dma-card dma-add" onclick="openWishForm(\'\')"><span>＋</span>'+(addK?addK.ko+' 추가':'꿈 추가하기')+'</button>';
-  h+='</div></div>';
+  h+='</div>';
+  var linked=(S.lifeAreas||[]).filter(function(la){return la.dreamArea===a.id;});
+  h+='<div class="dma-bar dma-goals-bar"><div><div class="dm-eye">ON MY WAY</div><h2>이 꿈을 향해 가는 중</h2></div><button type="button" class="dma-golife" onclick="go(\'life\')">나의 라이프 →</button></div>';
+  if(!linked.length){
+    h+='<div class="dma-goals-empty">아직 연결된 목표가 없어요.<br><b>나의 라이프</b>에서 목표를 수정할 때 이 꿈을 골라 주세요.</div>';
+  }else{
+    h+='<div class="dma-goals">'+linked.map(function(la){
+      var projs=(S.projects||[]).filter(function(p){return p.lifeAreaId===la.id;});
+      var tot=0,dn2=0;projs.forEach(function(p){var tk=p.tasks||[];tot+=tk.length;dn2+=tk.filter(function(t){return t.done;}).length;});
+      var pc=tot?Math.round(dn2/tot*100):0,dl=la.dday?dLeft(la.dday):null;
+      return '<div class="dma-goal" onclick="goToArea(\''+la.id+'\')" style="--gc:'+esc(la.color||'#E07656')+'">'+
+        '<div class="dma-goal-ph" style="background-image:url(\''+esc(czAreaPhoto(la)).replace(/'/g,'%27')+'\')"></div>'+
+        '<div class="dma-goal-t"><div class="dma-goal-n">'+esc(la.name)+(dl!==null?'<span>'+(dl>0?'D-'+dl:dl===0?'D-DAY':'D+'+Math.abs(dl))+'</span>':'')+'</div>'+
+        '<div class="dma-goal-bar"><i style="width:'+pc+'%"></i></div>'+
+        '<div class="dma-goal-m">'+(projs.length?projs.slice(0,3).map(function(p){return esc(p.name);}).join(' · ')+(projs.length>3?' 외 '+(projs.length-3):''):'프로젝트 없음')+'<b>'+pc+'%</b></div></div></div>';
+    }).join('')+'</div>';
+  }
+  h+='</div>';
   return h;
 }
 var _wishDraft=null;
@@ -3440,6 +3483,14 @@ function czRotatePhoto(kind,id){
   });
 }
 (function(){var _r=render;render=function(){var v=_r.apply(this,arguments);try{czApplyPos();}catch(e){}return v;};})();
+// 오늘 배너: 날마다 바뀌는 '되고 싶은 나' 한 줄
+function czTodayBe(now){
+  var D=dreamData(),list=[];
+  DREAM_AREAS.forEach(function(ar){var x=D.areas[ar.id];(x&&x.wants||[]).forEach(function(w){if(!w.done&&wishKind(w)==='be')list.push({w:w,area:ar.id});});});
+  if(!list.length)return '';
+  var it=list[Math.floor(now.getTime()/86400000)%list.length],dd=wishDday(it.w);
+  return '<button type="button" class="cz-today-be" onclick="openDreamArea(\''+it.area+'\')"><em>BE</em>'+esc(it.w.text)+(dd?'<span>'+dd+'</span>':'')+'</button>';
+}
 function czTodayBanner(){
   var D=dreamData(),b=czObj('today'),now=new Date(),h=now.getHours();
   var hello=h<5?'고요한 밤이에요':h<11?'좋은 아침이에요':h<17?'좋은 오후예요':h<21?'편안한 저녁이에요':'오늘도 수고했어요';
@@ -3447,7 +3498,7 @@ function czTodayBanner(){
   var days=['일','월','화','수','목','금','토'];
   return '<div class="cz-today" style="background-image:url(\''+esc(url).replace(/'/g,'%27')+'\')">'
     +'<div class="cz-today-in"><div class="cz-today-date">'+(now.getMonth()+1)+'월 '+now.getDate()+'일 '+days[now.getDay()]+'요일</div>'
-    +'<div class="cz-today-hi">'+hello+'</div><div class="cz-today-int">'+esc(D.intention)+'</div></div>'
+    +'<div class="cz-today-hi">'+hello+'</div><div class="cz-today-int">'+esc(D.intention)+'</div>'+czTodayBe(now)+'</div>'
     +'<span class="cz-ph-btns"><button type="button" class="cz-ph-btn" onclick="czPickPhoto(\'today\',\'today\')" title="배너 사진 바꾸기">'+CZI.cam+'</button>'
     +(b.photo?'<button type="button" class="cz-ph-btn" onclick="czResetPhoto(\'today\',\'today\')" title="기본 사진으로 (날마다 바뀜)">'+CZI.reset+'</button>':'')+'</span></div>';
 }
@@ -4281,6 +4332,7 @@ function renderLife(){
       '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'+
     '</button>';
     html+='</div></div>';
+    if(a.dreamArea&&dreamAreaTitle(a.dreamArea)) html+='<div>'+'<button type="button" class="la-dream" onclick="event.stopPropagation();openDreamArea(\''+a.dreamArea+'\')" title="드림보드에서 보기">♡ '+esc(dreamAreaTitle(a.dreamArea))+'</button></div>';
     html+='<div style="width:32px;height:3px;border-radius:99px;background:'+a.color+';margin-bottom:12px"></div>';
     html+='<div class="pj-drop-zone" data-aid="'+a.id+'" style="min-height:28px">';
     if(projs.length===0){
@@ -4373,6 +4425,8 @@ function openAreaModal(id){
     '<div class="fg"><label class="fl">이모지</label><input class="inp" id="ar-e" value="'+(a?esc(a.emoji):'')+'" placeholder="🌱" maxlength="2" style="width:70px"></div>'+
     '<div class="fg"><label class="fl">이름</label><input class="inp" id="ar-n" value="'+(a?esc(a.name):'')+'" placeholder="예: 창작, 건강..."></div>'+
     '<div class="fg"><label class="fl">🎯 디데이 <span style="font-size:0.8em;color:var(--t3);font-weight:400">(상위 목표 날짜 자동 · 수정 가능)</span></label><input type="date" class="inp" id="ar-dday" value="'+ddayDefault+'"></div>'+
+    '<div class="fg"><label class="fl">♡ 어떤 꿈을 향한 목표인가요? <span style="font-size:0.8em;color:var(--t3);font-weight:400">(드림보드와 연결)</span></label>'+
+      '<div class="ar-dreams">'+['',].concat(DREAM_AREAS.map(function(d){return d.id;})).map(function(did){var on=(a&&a.dreamArea||'')===did;return '<button type="button" class="ar-dream'+(on?' on':'')+'" data-d="'+did+'" onclick="document.querySelectorAll(\'.ar-dream\').forEach(function(b){b.classList.remove(\'on\')});this.classList.add(\'on\')">'+(did?esc(dreamAreaTitle(did)):'연결 안 함')+'</button>';}).join('')+'</div></div>'+
     '<div class="fg"><label class="fl">색상</label><div class="cops">'+areaColorHtml+'</div></div>'+
     projHtml,
     '<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="saveArea(\''+( id||'')+'\')">저장</button>');
@@ -4440,9 +4494,10 @@ function pickAreaC(el,c){selAreaC=c;document.querySelectorAll('.cop').forEach(e=
 function saveArea(eid){
   const emoji=document.getElementById('ar-e').value||'📌',name=document.getElementById('ar-n').value.trim();
   const dday=document.getElementById('ar-dday').value||'';
+  const dOn=document.querySelector('.ar-dream.on'),dreamArea=dOn?dOn.dataset.d:'';
   if(!name)return;
-  if(eid){S.lifeAreas=(S.lifeAreas||[]).map(a=>a.id===eid?Object.assign({},a,{emoji,name,color:selAreaC,dday}):a);}
-  else{if(!S.lifeAreas)S.lifeAreas=[];S.lifeAreas.push({id:gid(),name,emoji,color:selAreaC,dday});}
+  if(eid){S.lifeAreas=(S.lifeAreas||[]).map(a=>a.id===eid?Object.assign({},a,{emoji,name,color:selAreaC,dday,dreamArea}):a);}
+  else{if(!S.lifeAreas)S.lifeAreas=[];S.lifeAreas.push({id:gid(),name,emoji,color:selAreaC,dday,dreamArea});}
   save();closeMo();render();
 }
 function delArea(id){

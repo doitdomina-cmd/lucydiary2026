@@ -2081,6 +2081,37 @@ body.cozy .app .dm-head .dm-eye-love{font-family:'Instrument Serif',Georgia,seri
 .tdl-go{display:block;margin:10px auto 0;border:0;background:transparent;color:var(--t3);font-size:11.5px;cursor:pointer;font-family:inherit}
 @media(min-width:1101px){.tdr-more,.tdr-full{display:none !important}}
 @media(max-width:1100px){.td-cz-wrap{display:block}.td-side{display:none}}
+/* 코지 Today 꾸미기 */
+.cz-season{margin-left:10px;padding-left:10px;border-left:1px solid rgba(255,255,255,.5);letter-spacing:.5px;opacity:.95}
+.td-cz{gap:20px !important}
+.td-cz-wrap{gap:20px !important}
+body.cozy .td-cz-wrap .card{border:0 !important;border-radius:24px !important;box-shadow:0 2px 14px rgba(120,80,60,.055) !important}
+.tdk{font-family:'Instrument Serif',Georgia,'Noto Serif KR',serif;font-size:19px;color:var(--text);display:flex;align-items:baseline;gap:7px;letter-spacing:-.2px}
+.tdk em{font-style:italic;font-size:14px;color:var(--cz-muted)}
+body.cozy .app .tdk,body.cozy .app .tdk *{font-weight:400 !important}
+body.cozy .td-cz-wrap .pj-slot .ct{font-family:'Instrument Serif',Georgia,'Noto Serif KR',serif !important;font-size:19px !important}
+body.cozy .app .td-cz-wrap .pj-slot .ct,body.cozy .app .td-cz-wrap .pj-slot .ct *{font-weight:400 !important}
+body.cozy .td-cz-wrap .pj-slot .ct svg{display:none}
+body.cozy .td-cz-wrap .pj-slot[data-card="todo"] .ct::before{content:'today';font-style:italic;font-size:14px;color:var(--cz-muted);margin-right:7px}
+body.cozy .td-cz-wrap .pj-slot[data-card="todoTmr"] .ct::before{content:'tomorrow';font-style:italic;font-size:14px;color:var(--cz-muted);margin-right:7px}
+body.cozy .td-cz-wrap .pj-slot[data-card="diary"] .ct::before{content:'grateful';font-style:italic;font-size:14px;color:var(--cz-muted);margin-right:7px}
+body.cozy .td-cz-wrap [data-card="rt"] .card{background:color-mix(in srgb,#F4E8D6 45%,var(--surface)) !important}
+body.cozy .td-cz-wrap [data-card="week"] .card{background:color-mix(in srgb,#E3ECDD 55%,var(--surface)) !important}
+body.cozy .td-cz-wrap [data-card="upcoming"] .card{background:color-mix(in srgb,#F4E3E2 50%,var(--surface)) !important}
+body.cozy .td-cz-wrap [data-card="diary"] .card{background-color:color-mix(in srgb,#F7EED3 45%,var(--surface)) !important}
+body.cozy .td-cz-wrap [data-card="diary"] textarea{line-height:32px !important;background-image:repeating-linear-gradient(transparent 0 31px,color-mix(in srgb,var(--cz-line) 80%,transparent) 31px 32px) !important;background-attachment:local !important;min-height:128px !important}
+.td-yay{margin-top:-6px;text-align:center;font-size:12.5px;color:var(--cz-deep);background:var(--cz-soft);border-radius:0 0 20px 20px;padding:8px}
+body.cozy .td-cz-wrap .tdl{background-color:color-mix(in srgb,#F6EFE3 55%,var(--surface)) !important;background-image:radial-gradient(color-mix(in srgb,var(--cz-line) 90%,transparent) 1px,transparent 1.3px) !important;background-size:14px 14px !important}
+.tdl-sun{display:flex;align-items:center;gap:8px;margin:2px 0 10px}
+.tdl-sun-bar{flex:1;height:7px;border-radius:99px;background:var(--surface);overflow:hidden}
+.tdl-sun-bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--cz-mid),var(--cz-acc))}
+.tdl-sun span{font-size:11px;color:var(--cz-deep);white-space:nowrap}
+.tdl-part{background:color-mix(in srgb,var(--surface) 85%,transparent);border-radius:16px;padding:8px 10px 6px;margin-bottom:8px}
+.tdl-ph{font-size:11px;color:var(--cz-muted);letter-spacing:.5px;margin-bottom:2px}
+.tdl-dot{width:15px !important;height:15px !important;border:1.5px solid var(--cz-mid) !important;font-size:9px;color:#fff;display:inline-flex !important;align-items:center;justify-content:center}
+.tdl-row{align-items:center !important;padding:4px 0 !important}
+.tdl-row.done .tdl-dot{background:var(--cz-acc) !important;border-color:var(--cz-acc) !important}
+.tdl-row.cur{background:var(--cz-soft);border-radius:10px;margin:0 -6px;padding:4px 6px !important}
 </style>
 </head>
 <body>
@@ -3525,6 +3556,7 @@ function renderTodayLegacy(){
 
 // ═══════════ 코지 Today: 오늘 · 이번 주 루틴 · 다가오는 것 · 마무리 ═══════════
 var _tdRtOpen=false,_tdMoreOpen=false;
+function tdHead(en,ko,right){return '<div class="tdr-h"><div class="tdk"><em>'+en+'</em>'+ko+'</div>'+(right||'')+'</div>';}
 function tdNowNext(ds){
   var now=new Date(),nowT=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
   var rs=routinesForDate(ds).slice().sort(function(a,b){return (a.time||'99').localeCompare(b.time||'99');});
@@ -3538,7 +3570,7 @@ function tdRoutineCard(ds){
   var n=tdNowNext(ds),dn=n.all.filter(function(r){return n.ck[r.id];}).length;
   var row=function(r){var on=!!n.ck[r.id],isCur=n.cur&&n.cur.id===r.id;
     return '<div class="tdr-row'+(on?' done':'')+(isCur?' cur':'')+'" onclick="calRoutineToggle(\''+r.id+'\',\''+ds+'\')"><span class="tdr-cb"></span><span class="tdr-t">'+esc(r.time||'—')+'</span><span class="tdr-n">'+esc(r.task)+(isCur?'<em>NOW</em>':'')+'</span></div>';};
-  var h='<div class="card tdr"><div class="tdr-h"><div class="ct">지금 루틴</div><span class="tdr-c">'+dn+' / '+n.all.length+'</span></div>';
+  var h='<div class="card tdr">'+tdHead('now','지금 루틴','<span class="tdr-c">'+dn+' / '+n.all.length+'</span>');
   if(!n.all.length) h+='<div class="tdr-empty">오늘 루틴이 없어요</div>';
   else{
     h+=n.list.map(row).join('');
@@ -3554,11 +3586,16 @@ function tdWeekCard(){
   var map={};
   days.forEach(function(ds){var ck=S.checks[ds]||{};routinesForDate(ds).forEach(function(r){if(!r.isRz)return;var k=r.id;if(!map[k])map[k]={r:r,cells:[]};map[k].cells.push({ds:ds,on:!!ck[r.id],future:ds>t});});});
   var ks=Object.keys(map);
-  var h='<div class="card tdw"><div class="tdr-h"><div class="ct">이번 주 루틴</div><span class="tdr-c">'+mon.slice(5).replace('-','.')+' ~ '+days[6].slice(5).replace('-','.')+'</span></div>';
+  var h='<div class="card tdw">'+tdHead('this week','이번 주 루틴','<span class="tdr-c">'+mon.slice(5).replace('-','.')+' ~ '+days[6].slice(5).replace('-','.')+'</span>');
   if(!ks.length) return h+'<div class="tdr-empty">프로젝트에서 루틴을 만들면 여기 모여요</div></div>';
   h+=ks.map(function(k){var m=map[k],d=m.cells.filter(function(c){return c.on;}).length,pr=m.r.rzProjectId?(S.projects||[]).find(function(p){return p.id===m.r.rzProjectId;}):null,col=(pr&&pr.color)||'var(--cz-acc)';
     return '<div class="tdw-row"'+(pr?' onclick="go(\'projects\',\''+pr.id+'\')"':'')+' style="--wc:'+esc(col)+'"><span class="tdw-n">'+esc(m.r.task)+'</span><span class="tdw-dots">'+m.cells.map(function(c){return '<i class="'+(c.on?'on':c.future?'fu':'')+(c.ds===t?' td':'')+'"></i>';}).join('')+'</span><b>'+d+' / '+m.cells.length+'</b></div>';}).join('');
   return h+'</div>';
+}
+function tdUpIcon(it){
+  if(/여행|휴가|비행|제주|해외|trip/i.test(it.n))return '✈︎';
+  if(/생일|파티|기념/.test(it.n))return '♡';
+  return {dl:'✎',hs:'♡',ev:'✦',do:'✿'}[it.c]||'✦';
 }
 function tdUpcomingCard(){
   var t=todStr(),lim=addDays(t,90),items=[];
@@ -3567,18 +3604,23 @@ function tdUpcomingCard(){
   (S.calEvents||[]).forEach(function(e){if(!e.rzId&&e.date&&e.date>=t&&e.date<=lim)items.push({ds:e.date,k:'일정',n:e.title||'',c:'ev',on:"openEvDetailModal('"+e.id+"')"});});
   try{var D=dreamData();DREAM_AREAS.forEach(function(a){((D.areas[a.id]||{}).wants||[]).forEach(function(w){if(w.dday&&!w.done&&w.dday>=t&&wishKind(w)==='do')items.push({ds:w.dday,k:'DO',n:w.text,c:'do',on:"openDreamArea('"+a.id+"')"});});});}catch(e){}
   items.sort(function(a,b){return a.ds.localeCompare(b.ds);});
-  var h='<div class="card tdu"><div class="tdr-h"><div class="ct">다가오는 것</div><span class="tdr-c">90일</span></div>';
+  var h='<div class="card tdu">'+tdHead('soon','다가오는 것','<span class="tdr-c">90일</span>');
   if(!items.length) return h+'<div class="tdr-empty">기다려지는 일을 일정이나 드림보드 DO에 날짜와 함께 넣어 보세요</div></div>';
   h+=items.slice(0,7).map(function(it){var dl=dLeft(it.ds),f=fmtDateObj(it.ds);
-    return '<div class="tdu-row" onclick="'+it.on+'"><div class="tdu-d"><small>'+f.month+'</small>'+f.day+'</div><div class="tdu-t"><span class="tdu-k k-'+it.c+'">'+it.k+'</span>'+esc(it.n)+'</div><b'+(dl<=3?' class="hot"':'')+'>'+(dl===0?'오늘':'D-'+dl)+'</b></div>';}).join('');
+    return '<div class="tdu-row" onclick="'+it.on+'"><div class="tdu-d"><small>'+f.month+'</small>'+f.day+'</div><div class="tdu-t"><span class="tdu-k k-'+it.c+'">'+tdUpIcon(it)+' '+it.k+'</span>'+esc(it.n)+'</div><b'+(dl<=3?' class="hot"':'')+'>'+(dl===0?'오늘':'D-'+dl)+'</b></div>';}).join('');
   return h+'</div>';
 }
 function tdRoutineList(ds){
-  var n=tdNowNext(ds),f=new Date(ds+'T00:00:00');
-  var h='<div class="card tdl"><div class="tdr-h"><div class="ct">데일리 루틴</div><span class="tdr-c">'+(f.getMonth()+1)+'/'+f.getDate()+'</span></div>';
-  if(!n.all.length) return h+'<div class="tdr-empty">오늘 루틴이 없어요</div></div>';
-  h+='<div class="tdl-list">'+n.all.map(function(r){var on=!!n.ck[r.id],cur=n.cur&&n.cur.id===r.id;
-    return '<div class="tdl-row'+(on?' done':'')+(cur?' cur':'')+'"><span class="tdl-dot"></span><span class="tdl-t">'+esc(r.time||'')+'</span><span class="tdl-n">'+esc(r.task)+'</span></div>';}).join('')+'</div>';
+  var n=tdNowNext(ds),dn=n.all.filter(function(r){return n.ck[r.id];}).length,tot=n.all.length,pc=tot?Math.round(dn/tot*100):0;
+  var h='<div class="card tdl">'+tdHead('daily','데일리 루틴','<span class="tdr-c">'+dn+' / '+tot+'</span>');
+  if(!tot) return h+'<div class="tdr-empty">오늘 루틴이 없어요</div></div>';
+  h+='<div class="tdl-sun"><div class="tdl-sun-bar"><i style="width:'+pc+'%"></i></div><span>'+(pc>=100?'✿ 오늘 루틴 완주!':pc>=50?'반 넘었어요 ☺':'천천히 하나씩')+'</span></div>';
+  var parts=[['☼ 아침',function(t){return t&&t<'12:00';}],['☁︎ 낮',function(t){return t&&t>='12:00'&&t<'18:00';}],['☾ 저녁',function(t){return !t||t>='18:00';}]];
+  parts.forEach(function(pt){
+    var rs=n.all.filter(function(r){return pt[1](r.time);});if(!rs.length)return;
+    h+='<div class="tdl-part"><div class="tdl-ph">'+pt[0]+'</div>'+rs.map(function(r){var on=!!n.ck[r.id],cur=n.cur&&n.cur.id===r.id;
+      return '<div class="tdl-row'+(on?' done':'')+(cur?' cur':'')+'"><span class="tdl-dot">'+(on?'✿':'')+'</span><span class="tdl-t">'+esc(r.time||'')+'</span><span class="tdl-n">'+esc(r.task)+'</span></div>';}).join('')+'</div>';
+  });
   return h+'<button type="button" class="tdl-go" onclick="go(\'routine\')">루틴 설정 →</button></div>';
 }
 function tdCozyLayout(t,TCB,tdVis){
@@ -3586,7 +3628,8 @@ function tdCozyLayout(t,TCB,tdVis){
   var slot=function(id,html,span){return html?'<div class="pj-slot" data-card="'+id+'" style="grid-column:span '+(span||1)+'">'+html+'</div>':'';};
   var g='';
   g+=slot('rt',tdRoutineCard(viewDate));
-  g+=slot('todo',TCB.todo);
+  var tdl=(S.todoList&&S.todoList[t])||[];
+  g+=slot('todo',TCB.todo+(tdl.length&&tdl.every(function(x){return x.done;})?'<div class="td-yay">✿ 오늘 할 일 끝! 오늘도 잘했어요</div>':''));
   if(eve) g+=slot('todoTmr',TCB.todoTmr);
   if(night) g+=slot('diary',TCB.diary,eve?1:2);
   g+=slot('week',tdWeekCard());
@@ -3758,13 +3801,20 @@ function czTodayBe(now){
   var it=list[Math.floor(now.getTime()/86400000)%list.length],dd=wishDday(it.w);
   return '<button type="button" class="cz-today-be" onclick="openDreamArea(\''+it.area+'\')"><em>BE</em>'+esc(it.w.text)+(dd?'<span>'+dd+'</span>':'')+'</button>';
 }
+function czSeason(now){
+  var m=now.getMonth()+1,h=now.getHours();
+  var se=m>=3&&m<=5?['봄','✿']:m>=6&&m<=8?['여름','☀︎']:m>=9&&m<=11?['가을','❦']:['겨울','❄︎'];
+  var mood={봄:['살랑이는','포근한','꽃 피는'],여름:['반짝이는','청량한','싱그러운'],가을:['선선한','포근한','노을 지는'],겨울:['고요한','따스한','하얀']}[se[0]];
+  var part=h<5?'밤':h<11?'아침':h<17?'오후':h<21?'저녁':'밤';
+  return se[1]+' '+se[0]+' · '+mood[(now.getDate())%3]+' '+part;
+}
 function czTodayBanner(){
   var D=dreamData(),b=czObj('today'),now=new Date(),h=now.getHours();
   var hello=h<5?'고요한 밤이에요':h<11?'좋은 아침이에요':h<17?'좋은 오후예요':h<21?'편안한 저녁이에요':'오늘도 수고했어요';
   var url=b.photo||('dream/dream-'+((Math.floor(now.getTime()/86400000))%6+1)+'.jpg'); // 기본은 날마다 바뀜
   var days=['일','월','화','수','목','금','토'];
   return '<div class="cz-today" style="background-image:url(\''+esc(url).replace(/'/g,'%27')+'\')">'
-    +'<div class="cz-today-in"><div class="cz-today-date">'+(now.getMonth()+1)+'월 '+now.getDate()+'일 '+days[now.getDay()]+'요일</div>'
+    +'<div class="cz-today-in"><div class="cz-today-date">'+(now.getMonth()+1)+'월 '+now.getDate()+'일 '+days[now.getDay()]+'요일<span class="cz-season">'+czSeason(now)+'</span></div>'
     +'<div class="cz-today-hi">'+hello+'</div><div class="cz-today-int">'+esc(D.intention)+'</div>'+czTodayNext(now)+czTodayBe(now)+'</div>'
     +'<span class="cz-ph-btns"><button type="button" class="cz-ph-btn" onclick="czPickPhoto(\'today\',\'today\')" title="배너 사진 바꾸기">'+CZI.cam+'</button>'
     +(b.photo?'<button type="button" class="cz-ph-btn" onclick="czResetPhoto(\'today\',\'today\')" title="기본 사진으로 (날마다 바뀜)">'+CZI.reset+'</button>':'')+'</span></div>';

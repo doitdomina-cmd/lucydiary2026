@@ -3362,7 +3362,7 @@ function czStartMove(el,t){
   var x=o.posX!=null?o.posX:50,y=o.posY!=null?o.posY:50,drag=null;
   el.classList.add('cz-moving');
   var bar=document.createElement('div');bar.className='cz-mv-bar';
-  bar.innerHTML='<span>사진을 끌어서 위치를 맞춰요</span><button type="button" class="cz-mv-reset">가운데</button><button type="button" class="cz-mv-done">완료</button>';
+  bar.innerHTML='<span>사진을 끌어서 위치를 맞춰요</span><button type="button" class="cz-mv-rot" title="오른쪽으로 90° 돌리기">↻ 돌리기</button><button type="button" class="cz-mv-reset">가운데</button><button type="button" class="cz-mv-done">완료</button>';
   el.appendChild(bar);
   function apply(){el.style.backgroundPosition=x+'% '+y+'%';}
   function down(e){if(e.target.closest('.cz-mv-bar'))return;e.preventDefault();e.stopPropagation();drag={sx:e.clientX,sy:e.clientY,x:x,y:y};try{el.setPointerCapture(e.pointerId);}catch(_){}}
@@ -3378,6 +3378,33 @@ function czStartMove(el,t){
   el.addEventListener('pointerdown',down,true);el.addEventListener('pointermove',move,true);el.addEventListener('pointerup',up,true);el.addEventListener('pointercancel',up,true);el.addEventListener('click',stopClick,true);
   bar.querySelector('.cz-mv-done').onclick=done;
   bar.querySelector('.cz-mv-reset').onclick=function(e){e.stopPropagation();x=50;y=50;apply();};
+  bar.querySelector('.cz-mv-rot').onclick=function(e){e.stopPropagation();e.preventDefault();var b=e.currentTarget;b.disabled=true;b.textContent='돌리는 중…';czRotatePhoto(t.kind,t.id).then(function(){done();}).catch(function(err){b.disabled=false;b.textContent='↻ 돌리기';alert((err&&err.message)||'사진을 돌리지 못했어요.');});};
+}
+// 사진을 오른쪽으로 90° 돌려서 다시 저장 (이 기기 사진이면 바로, 클라우드 사진이면 받아와서 돌림)
+function czRotatePhoto(kind,id){
+  var o=czObj(kind,id);if(!o||!o.photo)return Promise.reject(new Error('돌릴 사진이 없어요.'));
+  var src=o.photo;
+  return new Promise(function(resolve,reject){
+    var img=new Image();
+    if(src.indexOf('data:')!==0)img.crossOrigin='anonymous';
+    img.onload=function(){
+      try{
+        var w=img.naturalWidth,h=img.naturalHeight,c=document.createElement('canvas');c.width=h;c.height=w;
+        var ctx=c.getContext('2d',{alpha:false});ctx.fillStyle='#fff';ctx.fillRect(0,0,h,w);
+        ctx.translate(h,0);ctx.rotate(Math.PI/2);ctx.drawImage(img,0,0);
+        var d='';try{d=c.toDataURL('image/webp',0.8);}catch(e){throw new Error('이 사진은 돌릴 수 없어요. 사진을 다시 올려 주세요.');}
+        if(!d||d.indexOf('data:image/webp')!==0)d=c.toDataURL('image/jpeg',0.85);
+        var cur=czObj(kind,id);if(!cur){resolve();return;}
+        var oldPath=cur.photoPath;cur.photo=d;cur.photoPath=undefined;
+        var px=cur.posX,py=cur.posY;if(px!=null||py!=null){cur.posX=100-(py!=null?py:50);cur.posY=(px!=null?px:50);}
+        save();render();
+        if(oldPath){try{storage.ref().child(oldPath).delete().catch(function(){});}catch(_){}}
+        czUpload(kind,id);resolve();
+      }catch(err){reject(err);}
+    };
+    img.onerror=function(){reject(new Error('사진을 불러오지 못했어요. 사진을 다시 올려 주세요.'));};
+    img.src=src+(src.indexOf('data:')===0?'':(src.indexOf('?')>-1?'&':'?')+'rot='+Date.now());
+  });
 }
 (function(){var _r=render;render=function(){var v=_r.apply(this,arguments);try{czApplyPos();}catch(e){}return v;};})();
 function czTodayBanner(){

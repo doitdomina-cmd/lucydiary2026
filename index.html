@@ -1933,6 +1933,20 @@ body.cozy .app .dma-goal-n,body.cozy .app .dma-goal-m b{font-weight:600 !importa
 .wf-goal b{font-size:13.5px;color:var(--cz-deep)}
 .wf-goal span{font-size:11.5px;color:#A39A9E}
 .wf-goal.on{border-style:solid;background:var(--cz-soft)}
+
+/* 연간 대시보드 화면 */
+.ly-page{max-width:1100px;margin:0 auto}
+.ly-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
+.ly-back{border:0;background:transparent;color:var(--cz-deep,var(--accent));font-size:13.5px;cursor:pointer;font-family:inherit;padding:4px 0}
+.ly-yr{display:flex;align-items:center;gap:8px;font-size:15px;color:var(--text)}
+.ly-yr button{width:30px;height:30px;border-radius:50%;border:1px solid var(--border);background:var(--surface);color:var(--t2);cursor:pointer;font-size:16px;line-height:1}
+.ly-page .rp{gap:18px}
+.ly-page .rp-hero{padding:26px 28px 24px}
+.ly-page .rp-big{font-size:36px}
+.ly-page .rp-two{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.ly-page .rp-mb{height:120px;max-width:26px}
+.ly-page .rp-cols{gap:18px}
+@media(max-width:768px){.ly-page .rp-big{font-size:28px}.ly-page .rp-mb{height:80px}}
 </style>
 </head>
 <body>
@@ -2395,7 +2409,7 @@ let activePid = null;
 let pjFilter = '';
 let viewDate = todStr();
 
-const titles = {dream:'Dream Board',dreamArea:'Dream Board',today:'Today',diary:'Thanks Diary',calendar:'Monthly',todocal:'To Do',routine:'루틴 설정',life:'나의 라이프',overview:'목표 요약',projects:'프로젝트',deadlines:'목표 마감',savings:'저축 관리',health:'건강 관리',settings:'설정',ledger:'가계부',insights:'회고 & 통계',timeline:'Roadmap'};
+const titles = {dream:'Dream Board',dreamArea:'Dream Board',today:'Today',diary:'Thanks Diary',calendar:'Monthly',todocal:'To Do',routine:'루틴 설정',life:'나의 라이프',overview:'목표 요약',projects:'프로젝트',deadlines:'목표 마감',savings:'저축 관리',health:'건강 관리',settings:'설정',ledger:'가계부',insights:'회고 & 통계',timeline:'Roadmap',ledgerYear:'가계부'};
 
 function go(p, pid, _fromPopstate){
   page=p; activePid=pid||null; if(p!=='projects') pjFilter='';
@@ -2407,7 +2421,7 @@ function go(p, pid, _fromPopstate){
     history.pushState(state,'',(p==='today'&&!pid)?window.location.pathname:url);
   }
   document.querySelectorAll('.nav').forEach(e=>e.classList.remove('on'));
-  const n=document.getElementById('nav-'+(p==='dreamArea'?'dream':p));
+  const n=document.getElementById('nav-'+(p==='dreamArea'?'dream':p==='ledgerYear'?'ledger':p));
   if(n) n.classList.add('on');
   const tbTitle=document.getElementById('tb-title');
   const topbar=document.querySelector('.topbar');
@@ -2847,6 +2861,7 @@ function render(){
   else if(page==='overview') div.innerHTML=renderOverview();
   else if(page==='settings') div.innerHTML=renderSettings();
   else if(page==='ledger') div.innerHTML=renderLedger();
+  else if(page==='ledgerYear') div.innerHTML=renderLedgerYear();
   else if(page==='insights') div.innerHTML=renderInsights();
   else if(page==='timeline') div.innerHTML=renderTimeline();
   el.innerHTML=''; el.appendChild(div);
@@ -9893,7 +9908,18 @@ function openMonthlyLedgerReport(){
   openMo('📋 '+ledgerYear+'년 '+MN[ledgerMonth]+' 리포트',body,'<button class="btn bg" onclick="closeMo()">닫기</button>');
 }
 
+var ldDashYear=new Date().getFullYear();
 function openYearlyDashboard(year){
+  if(document.body.classList.contains('cozy')){ldDashYear=year;go('ledgerYear');var m=document.getElementById('main');if(m)m.scrollTop=0;return;}
+  return _yearlyDash(year,false);
+}
+function renderLedgerYear(){
+  var y=ldDashYear;
+  return '<div class="ly-page"><div class="ly-top"><button type="button" class="ly-back" onclick="go(\'ledger\')">‹ 가계부</button>'+
+    '<div class="ly-yr"><button type="button" onclick="ldDashYear--;render()" title="이전 해">‹</button><span>'+y+'</span><button type="button" onclick="ldDashYear++;render()" title="다음 해">›</button></div></div>'+
+    _yearlyDash(y,true)+'</div>';
+}
+function _yearlyDash(year,asPage){
   let totalInc=0,totalExp=0,totalSav=0;
   const incCats={},expCats={};
   (LD.fixedItems||[]).forEach(function(fi){
@@ -9971,6 +9997,7 @@ function openYearlyDashboard(year){
       '<div class="rp-cols"><div><div class="rp-sec"><h4>수입</h4></div>'+czCats(incCats,'inc')+'</div>'+
       '<div><div class="rp-sec"><h4>지출</h4></div>'+czCats(expCats,'exp')+'</div></div>'+
       '</div>';
+    if(asPage) return yb;
     openMo(year+'년 연간 대시보드',yb,'<button class="btn bg" onclick="closeMo()">닫기</button>');
     return;
   }

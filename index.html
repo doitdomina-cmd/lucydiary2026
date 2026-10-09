@@ -2060,6 +2060,27 @@ body.cozy .app .dm-head .dm-eye-love{font-family:'Instrument Serif',Georgia,seri
 .tdu-k.k-do{background:#EEF5F1;color:#4F7466}.tdu-k.k-dl{background:var(--cz-soft);color:var(--cz-deep)}.tdu-k.k-hs{background:#FBEFF0;color:#A0606A}
 .tdu-row b{font-size:11.5px;color:var(--t2);background:var(--s2);border-radius:99px;padding:3px 9px;white-space:nowrap;font-weight:500}
 .tdu-row b.hot{background:var(--cz-acc);color:#fff}
+
+/* 코지 Today: PC 왼쪽 작은 데일리 루틴 (보기 전용) */
+.td-cz-wrap{display:grid;grid-template-columns:250px minmax(0,1fr);gap:18px;align-items:start}
+.td-side{position:sticky;top:12px}
+.td-main{min-width:0}
+.td-main .td-cz{margin-top:0}
+.tdl{padding:16px 14px !important}
+.tdl .ct{font-size:14.5px !important}
+.tdl-list{position:relative;display:flex;flex-direction:column}
+.tdl-list::before{content:'';position:absolute;left:4px;top:8px;bottom:8px;width:1.5px;background:var(--cz-line)}
+.tdl-row{display:flex;align-items:baseline;gap:8px;padding:5px 0;position:relative;font-size:12.5px}
+.tdl-dot{width:9px;height:9px;border-radius:50%;background:var(--surface);border:2px solid var(--cz-mid);box-sizing:border-box;flex-shrink:0;position:relative;z-index:1;align-self:center}
+.tdl-row.done .tdl-dot{background:var(--cz-acc);border-color:var(--cz-acc)}
+.tdl-row.cur .tdl-dot{box-shadow:0 0 0 3px var(--cz-soft)}
+.tdl-t{width:36px;flex-shrink:0;color:var(--t3);font-variant-numeric:tabular-nums;font-size:11.5px}
+.tdl-n{flex:1;min-width:0;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tdl-row.done .tdl-n{color:var(--t3);text-decoration:line-through}
+.tdl-row.cur .tdl-n,.tdl-row.cur .tdl-t{color:var(--cz-deep)}
+.tdl-go{display:block;margin:10px auto 0;border:0;background:transparent;color:var(--t3);font-size:11.5px;cursor:pointer;font-family:inherit}
+@media(min-width:1101px){.tdr-more,.tdr-full{display:none !important}}
+@media(max-width:1100px){.td-cz-wrap{display:block}.td-side{display:none}}
 </style>
 </head>
 <body>
@@ -3552,6 +3573,14 @@ function tdUpcomingCard(){
     return '<div class="tdu-row" onclick="'+it.on+'"><div class="tdu-d"><small>'+f.month+'</small>'+f.day+'</div><div class="tdu-t"><span class="tdu-k k-'+it.c+'">'+it.k+'</span>'+esc(it.n)+'</div><b'+(dl<=3?' class="hot"':'')+'>'+(dl===0?'오늘':'D-'+dl)+'</b></div>';}).join('');
   return h+'</div>';
 }
+function tdRoutineList(ds){
+  var n=tdNowNext(ds),f=new Date(ds+'T00:00:00');
+  var h='<div class="card tdl"><div class="tdr-h"><div class="ct">데일리 루틴</div><span class="tdr-c">'+(f.getMonth()+1)+'/'+f.getDate()+'</span></div>';
+  if(!n.all.length) return h+'<div class="tdr-empty">오늘 루틴이 없어요</div></div>';
+  h+='<div class="tdl-list">'+n.all.map(function(r){var on=!!n.ck[r.id],cur=n.cur&&n.cur.id===r.id;
+    return '<div class="tdl-row'+(on?' done':'')+(cur?' cur':'')+'"><span class="tdl-dot"></span><span class="tdl-t">'+esc(r.time||'')+'</span><span class="tdl-n">'+esc(r.task)+'</span></div>';}).join('')+'</div>';
+  return h+'<button type="button" class="tdl-go" onclick="go(\'routine\')">루틴 설정 →</button></div>';
+}
 function tdCozyLayout(t,TCB,tdVis){
   var hr=new Date().getHours(),night=hr>=21,eve=hr>=20;
   var slot=function(id,html,span){return html?'<div class="pj-slot" data-card="'+id+'" style="grid-column:span '+(span||1)+'">'+html+'</div>':'';};
@@ -3567,9 +3596,9 @@ function tdCozyLayout(t,TCB,tdVis){
   if(!eve) more+=slot('todoTmr',TCB.todoTmr);
   more+=slot('stats',TCB.stats,2)+slot('monthlyGoal',TCB.monthlyGoal)+slot('lookback',TCB.lookback,2)+slot('projects',TCB.projects,2);
   if(tdVis.suppToday===true) more+=slot('suppToday',TCB.suppToday);
-  return '<div class="pj-layout td-cz">'+g+'</div>'+
+  return '<div class="td-cz-wrap"><aside class="td-side">'+tdRoutineList(viewDate)+'</aside><div class="td-main"><div class="pj-layout td-cz">'+g+'</div>'+
     '<button type="button" class="td-more-btn" onclick="_tdMoreOpen=!_tdMoreOpen;render()">'+(_tdMoreOpen?'접기 ▴':'더 보기 · 내일 할 일 · 저축 · 이번 달 목표 · 프로젝트 ▾')+'</button>'+
-    (_tdMoreOpen?'<div class="pj-layout td-cz td-more">'+more+'</div>':'');
+    (_tdMoreOpen?'<div class="pj-layout td-cz td-more">'+more+'</div>':'')+'</div></div>';
 }
 
 // ═══════════ TODAY (기존 기능 그대로 + 카드 스타일만 깔끔하게) ═══════════

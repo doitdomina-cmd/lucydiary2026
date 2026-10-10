@@ -2526,6 +2526,15 @@ body.cozy .app .spz-chip,body.cozy .app .spz-gh{font-weight:500 !important}
 .mem-note.nt-cream{background:color-mix(in srgb,#EAD7BC 38%,var(--surface))}
 .mem-note.nt-rose{background:color-mix(in srgb,#F2C4C0 38%,var(--surface))}
 .mem-note.nt-sage{background:color-mix(in srgb,#BCD0B6 38%,var(--surface))}
+.dnote{position:relative;overflow:hidden;border:1px solid var(--border);border-radius:8px;background:var(--s2);margin-bottom:14px;--nl:color-mix(in srgb,var(--accent) 28%,transparent)}
+.dnote.nt-lined{background:var(--surface) repeating-linear-gradient(transparent 0 31px,var(--nl) 31px 32px);background-position:0 8px}
+.dnote.nt-grid{background-color:var(--surface);background-image:linear-gradient(var(--nl) 1px,transparent 1px),linear-gradient(90deg,var(--nl) 1px,transparent 1px);background-size:18px 18px}
+.dnote.nt-cream{background:color-mix(in srgb,#EAD7BC 38%,var(--surface))}
+.dnote.nt-rose{background:color-mix(in srgb,#F2C4C0 38%,var(--surface))}
+.dnote.nt-sage{background:color-mix(in srgb,#BCD0B6 38%,var(--surface))}
+.dnote #diary-line-nums-clip{background:transparent!important}
+.dnote.nt-lined #diary-ta{line-height:32px!important}
+.dnote.nt-lined #diary-line-nums{line-height:32px!important}
 .mem-tape{position:absolute;top:-8px;left:50%;width:74px;height:16px;transform:translateX(-50%) rotate(-2deg);background:color-mix(in srgb,var(--cz-acc) 22%,rgba(255,255,255,.6));border-radius:2px;box-shadow:0 1px 2px rgba(0,0,0,.06)}
 .mem-with{font-family:'Instrument Serif',Georgia,'Noto Serif KR',serif;font-size:15px;color:var(--cz-deep);margin-bottom:6px}
 .mem-note .mem-vt{font-size:14px}
@@ -5457,7 +5466,7 @@ function openDiaryModal(ds){
     '<div style="margin-bottom:9px"><div style="font-size:0.76em;color:var(--t3);margin-bottom:4px">날씨</div>'+
     '<div style="display:flex;gap:4px;flex-wrap:wrap">'+weatherHtml+'</div></div>'+
     '<div style="margin-bottom:12px"><input id="diary-title-inp" class="inp" placeholder="제목 (선택)" value="'+esc(rawTitle)+'" style="font-family:'+dFF+';font-size:1em;font-weight:500;background:transparent;border-color:transparent;border-bottom:1px solid var(--border);border-radius:0;padding:6px 0"></div>'+
-    '<div style="position:relative;overflow:hidden;border:1px solid var(--border);border-radius:8px;background:var(--s2);margin-bottom:14px">'+
+    '<div class="dnote nt-'+memNoteId(entry.note)+'" id="diary-note">'+
       '<div id="diary-line-nums-clip" style="position:absolute;left:0;top:0;bottom:0;width:38px;overflow:hidden;pointer-events:none;background:var(--s2);border-right:1px solid var(--border)">'+
         '<div id="diary-line-nums" style="padding:8px 6px 8px 0;font-family:var(--mono);font-size:0.9286em;color:var(--t3);line-height:1.8;user-select:none;text-align:right">'+
           getLineNums(rawText)+
@@ -5466,6 +5475,7 @@ function openDiaryModal(ds){
       '<textarea id="diary-ta" style="width:100%;height:34vh;min-height:190px;border:none;border-radius:0;padding:8px 12px 8px 46px;font-size:0.9286em;font-family:'+dFF+';line-height:1.8;resize:none;background:transparent;color:var(--text);outline:none;display:block;box-sizing:border-box" '+
       'placeholder="오늘 감사한 일을 적어보세요..." oninput="updateLineNums(this)" onscroll="syncLineNums(this)">'+esc(rawText)+'</textarea>'+
     '</div>'+
+    '<div style="margin:-6px 0 14px"><div style="font-size:0.76em;color:var(--t3);margin-bottom:5px">노트 바탕</div><div class="mem-nts" id="diary-nts" data-n="'+memNoteId(entry.note)+'">'+MEM_NOTES.map(function(n){return '<button type="button" data-n="'+n.id+'" class="'+(memNoteId(entry.note)===n.id?'on':'')+'" onclick="diaryPickNote(\''+n.id+'\')"><span class="mem-note nt-'+n.id+'"></span>'+n.ko+'</button>';}).join('')+'</div></div>'+
     photoHtml,
     '<button class="btn bg" onclick="closeMo()">닫기</button>'+
     (rawText?'<button class="btn bg bsm" style="color:var(--red)" data-ds="'+ds+'" onclick="delDiaryEntry(this.dataset.ds)">삭제</button>':'')+
@@ -5518,6 +5528,11 @@ function saveTodayDiaryDirect(ds, text){
   S.diaryEntries[ds].text=text;
   save();
 }
+function diaryPickNote(n){
+  var box=document.getElementById('diary-note'),nts=document.getElementById('diary-nts');if(!box||!nts)return;
+  nts.dataset.n=n;box.className='dnote nt-'+memNoteId(n);
+  nts.querySelectorAll('button').forEach(function(b){b.classList.toggle('on',b.dataset.n===n);});
+}
 function saveDiaryFromModal(ds){
   var ta=document.getElementById('diary-ta'),ti=document.getElementById('diary-title-inp');
   if(!ta) return;
@@ -5525,6 +5540,7 @@ function saveDiaryFromModal(ds){
   if(!S.diaryEntries[ds]) S.diaryEntries[ds]={text:'',mood:'',title:''};
   S.diaryEntries[ds].text=ta.value;
   if(ti) S.diaryEntries[ds].title=ti.value.trim();
+  var nts=document.getElementById('diary-nts'); if(nts) S.diaryEntries[ds].note=memNoteId(nts.dataset.n);
   save(); closeMo(); render();
   // 사진은 저장 화면을 붙잡지 않고 뒤에서 업로드
   if(pendingDiaryPhoto[ds]) finishDiaryPhotoUpload(ds);

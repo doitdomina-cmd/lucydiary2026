@@ -631,6 +631,17 @@ body.page-life .topbar{display:none}
 .pjm-tg input{width:15px;height:15px;accent-color:var(--cz-acc,var(--accent));cursor:pointer;margin:0}
 .pjm-tg:has(input:checked){background:var(--cz-soft,var(--al));border-color:var(--cz-acc,var(--accent))}
 
+.lni{width:1.05em;height:1.05em;vertical-align:-.17em;margin-right:.3em;flex:none}
+.emo{filter:grayscale(.9) sepia(.25) opacity(.8);margin-right:.3em}
+.pjm-emoji{display:grid;place-items:center;color:#8B6E62;cursor:pointer}
+.pjm-ph{font-size:20px;color:var(--t3)}
+.pjm-icons{display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:8px;padding:12px;border:1px solid var(--cz-line,var(--border));border-radius:16px;background:var(--cz-paper,var(--s2));margin:-6px 0 2px}
+.pjm-icons[hidden]{display:none}
+.pjm-ic{height:42px;border:1px solid transparent;border-radius:12px;background:var(--surface);color:#8B6E62;display:grid;place-items:center;cursor:pointer;font-size:11px;font-family:var(--sans)}
+.pjm-ic .lni{width:22px;height:22px;margin:0}
+.pjm-ic:hover{border-color:var(--cz-line,var(--border))}
+.pjm-ic.on{border-color:var(--cz-acc,var(--accent));background:var(--cz-soft,var(--al))}
+
 .la-addpj{margin-top:10px;width:100%;border:1px dashed var(--cz-line,var(--border2));background:transparent;color:var(--cz-deep,var(--t2));border-radius:12px;padding:8px 10px;font-size:12.5px;cursor:pointer;font-family:inherit;transition:background .15s,border-color .15s}
 .la-addpj:hover{background:var(--cz-soft,var(--s2));border-color:var(--cz-acc,var(--accent))}
 .la-add{background:transparent;border:1.5px dashed var(--border2);border-radius:8px;padding:20px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:130px;transition:all .2s}
@@ -3298,7 +3309,7 @@ function go(p, pid, _fromPopstate){
     const proj=S.projects.find(x=>x.id===pid)||{name:'프로젝트'};
     const area=(S.lifeAreas||[]).find(a=>a.id===proj.lifeAreaId);
     const colorDot='<span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:'+(proj.color||'#999')+';margin-right:6px;vertical-align:middle;flex-shrink:0"></span>';
-    const areaBadge=area?'<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:99px;font-size:0.78em;font-weight:500;background:'+area.color+'18;color:'+area.color+';margin-left:8px;vertical-align:middle">'+(area.emoji?area.emoji+' ':'')+area.name+'</span>':'';
+    const areaBadge=area?'<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:99px;font-size:0.78em;font-weight:500;background:'+area.color+'18;color:'+area.color+';margin-left:8px;vertical-align:middle">'+icoHtml(area)+area.name+'</span>':'';
     tbTitle.innerHTML=proj.name+areaBadge;
     // 날짜 자리에 수정 버튼
     if(tbDate){
@@ -3574,7 +3585,7 @@ function makeWishGoal(){
   var w=(x.wants||[]).find(function(y){return y.id===_wishDraft.id;});if(!w)return;
   var ex=lifeForWish(dreamAreaId,w.id);if(ex){closeDreamDlg();goToArea(ex.id);return;}
   var d=DREAM_AREAS.find(function(z){return z.id===dreamAreaId;});
-  var la={id:gid(),name:w.text,emoji:'♡',color:(d&&d.ink)||COLORS[0],dday:w.dday||'',wishRef:dreamAreaId+'~'+w.id};
+  var la={id:gid(),name:w.text,emoji:'',icon:'heart',color:(d&&d.ink)||COLORS[0],dday:w.dday||'',wishRef:dreamAreaId+'~'+w.id};
   if(w.photo&&String(w.photo).indexOf('http')===0)la.photo=w.photo;
   if(!S.lifeAreas)S.lifeAreas=[];S.lifeAreas.push(la);
   save();closeDreamDlg();go('life');
@@ -4203,7 +4214,7 @@ function updateSB(){
       const isCollapsed=window._pjGroupCollapsed&&window._pjGroupCollapsed[a.id];
       html+='<div class="pj-group-hd'+(isCollapsed?' collapsed':'')+'" onclick="togglePjGroup(\''+a.id+'\')" style="margin-top:4px">'+
         '<div style="width:7px;height:7px;border-radius:50%;background:'+a.color+';flex-shrink:0"></div>'+
-        '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(a.emoji?a.emoji+' ':'')+a.name+'</span>'+
+        '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+icoHtml(a)+a.name+'</span>'+
         '<span class="pj-arrow">›</span>'+
       '</div>'+
       '<div class="pj-group-body'+(isCollapsed?' collapsed':'')+'" id="'+gid_+'" style="max-height:'+(isCollapsed?'0':'none')+'">'+
@@ -5821,7 +5832,7 @@ function saveGoal(){
 let selAreaC=COLORS[0];
 function openAreaModal(id){
   const a=id?(S.lifeAreas||[]).find(x=>x.id===id):null;
-  selAreaC=a?a.color:COLORS[0];
+  selAreaC=a?a.color:COLORS[0];selArI=a?(a.icon||''):'';
   var areaColorHtml=COLORS.map(function(c){var isOn=(a?c===a.color:c===COLORS[0]);return '<div class="cop '+(isOn?'on':'')+'" style="background:'+c+'" onclick="pickAreaC(this,\''+c+'\')"></div>';}).join('');
   // 신규 생성 시 상위 목표 날짜를 기본값으로
   var ddayDefault=a?(a.dday||''):((S.lifeGoal&&S.lifeGoal.dday)||'');
@@ -5837,7 +5848,7 @@ function openAreaModal(id){
     '</div>';
   }
   openMo(a?'영역 수정':'영역 추가',
-    '<div class="fg"><label class="fl">이모지</label><input class="inp" id="ar-e" value="'+(a?esc(a.emoji):'')+'" placeholder="🌱" maxlength="2" style="width:70px"></div>'+
+    '<div class="fg"><label class="fl">아이콘</label><div class="pjm-top">'+icoBtn(selArI,a&&a.emoji,'ar-ibtn','ar-icons')+'<span style="font-size:12px;color:var(--t3)">눌러서 고르기</span></div>'+icoPicker(selArI,'ar-icons','pickArIcon')+'</div>'+
     '<div class="fg"><label class="fl">이름</label><input class="inp" id="ar-n" value="'+(a?esc(a.name):'')+'" placeholder="예: 창작, 건강..."></div>'+
     '<div class="fg"><label class="fl">🎯 디데이 <span style="font-size:0.8em;color:var(--t3);font-weight:400">(상위 목표 날짜 자동 · 수정 가능)</span></label><input type="date" class="inp" id="ar-dday" value="'+ddayDefault+'"></div>'+
     '<div class="fg"><label class="fl">♡ 어떤 꿈 카드의 목표인가요? <span style="font-size:0.8em;color:var(--t3);font-weight:400">(드림보드와 연결)</span></label>'+
@@ -5907,12 +5918,13 @@ function removeAreaProj(aid,pid){
 }
 function pickAreaC(el,c){selAreaC=c;document.querySelectorAll('.cop').forEach(e=>e.classList.remove('on'));el.classList.add('on');}
 function saveArea(eid){
-  const emoji=document.getElementById('ar-e').value||'📌',name=document.getElementById('ar-n').value.trim();
+  const old=eid?((S.lifeAreas||[]).find(x=>x.id===eid)||{}):{};
+  const icon=selArI,emoji=selArI?'':(old.emoji||''),name=document.getElementById('ar-n').value.trim();
   const dday=document.getElementById('ar-dday').value||'';
   const wSel=document.getElementById('ar-wish'),wv=wSel?wSel.value:'',isAr=wv.indexOf('area:')===0,wishRef=isAr?'':wv,dreamArea=isAr?wv.slice(5):(wv?wv.split('~')[0]:'');
   if(!name)return;
-  if(eid){S.lifeAreas=(S.lifeAreas||[]).map(a=>a.id===eid?Object.assign({},a,{emoji,name,color:selAreaC,dday,dreamArea,wishRef}):a);}
-  else{if(!S.lifeAreas)S.lifeAreas=[];S.lifeAreas.push({id:gid(),name,emoji,color:selAreaC,dday,dreamArea,wishRef});}
+  if(eid){S.lifeAreas=(S.lifeAreas||[]).map(a=>a.id===eid?Object.assign({},a,{emoji,icon,name,color:selAreaC,dday,dreamArea,wishRef}):a);}
+  else{if(!S.lifeAreas)S.lifeAreas=[];S.lifeAreas.push({id:gid(),name,emoji,icon,color:selAreaC,dday,dreamArea,wishRef});}
   save();closeMo();render();
 }
 function delArea(id){
@@ -5970,7 +5982,7 @@ function renderProjects(){
           '<div class="pj-bar" style="background:'+col+'"></div>'+
           '<div class="pj-body">'+
             '<div style="display:flex;align-items:flex-start;min-width:0;padding-right:22px">'+
-              '<span class="pj-title-text" style="font-weight:600;font-size:1.02em;color:var(--text);min-width:0">'+(p.emoji?p.emoji+' ':'')+p.name+'</span>'+
+              '<span class="pj-title-text" style="font-weight:600;font-size:1.02em;color:var(--text);min-width:0">'+icoHtml(p)+p.name+'</span>'+
             '</div>'+
             '<button class="bi pj-card-del" onclick="event.stopPropagation();delPj(\''+p.id+'\')" style="position:absolute;top:6px;right:6px;color:var(--t3);opacity:0;transition:opacity .15s;padding:2px;line-height:0;font-size:0.85em;z-index:2">✕</button>'+
             (tk.length>0?'<div style="height:5px;border-radius:99px;background:var(--s2);overflow:hidden"><div style="height:100%;width:'+pc+'%;background:'+col+';border-radius:99px"></div></div>':'')+
@@ -6449,11 +6461,40 @@ function goToArea(areaId){pjFilter=areaId;go('projects');}
 
 let selPjC=COLORS[0],selPjA='';
 let selEvC=COLORS[0];
+// 프로젝트·영역 아이콘: 컬러 이모지 대신 선으로 된 단색 아이콘 (옛 이모지는 톤을 죽여서 그대로 보여 줌)
+var LINE_ICONS={
+  pen:'<path d="m16 3 5 5L8 21l-5 1 1-5L16 3Z"/><path d="m14 5 5 5"/>',
+  book:'<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2V5Z"/><path d="M19 19v3H6"/>',
+  heart:'<path d="M12 20S3 14 3 8a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 6-9 12-9 12Z"/>',
+  leaf:'<path d="M5 19C5 10 10 5 20 4c0 10-5 15-14 15Z"/><path d="M5 19c3-5 6-8 10-10"/>',
+  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5M17.5 17.5 19 19M5 19l1.5-1.5M17.5 6.5 19 5"/>',
+  moon:'<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/>',
+  star:'<path d="m12 3 2.6 5.6 6 .7-4.4 4.1 1.2 6L12 16.5l-5.4 2.9 1.2-6L3.4 9.3l6-.7L12 3Z"/>',
+  coffee:'<path d="M5 9h11v5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5V9Z"/><path d="M16 10h2a2.5 2.5 0 0 1 0 5h-2"/><path d="M8 3v3m4-3v3"/>',
+  flower:'<circle cx="12" cy="12" r="2"/><circle cx="12" cy="6.3" r="2.6"/><circle cx="17.4" cy="10.2" r="2.6"/><circle cx="15.3" cy="16.6" r="2.6"/><circle cx="8.7" cy="16.6" r="2.6"/><circle cx="6.6" cy="10.2" r="2.6"/>',
+  home:'<path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>',
+  wallet:'<path d="M4 7a2 2 0 0 1 2-2h12v4"/><rect x="3" y="7" width="18" height="13" rx="2"/><circle cx="16.5" cy="13.5" r="1.2"/>',
+  camera:'<path d="M4 8h3l2-3h6l2 3h3v12H4V8Z"/><circle cx="12" cy="13" r="3.5"/>',
+  music:'<path d="M9 18V6l11-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/>',
+  muscle:'<path d="M6 8v8M18 8v8M3 10v4M21 10v4M6 12h12"/>',
+  cloud:'<path d="M7 18a4 4 0 0 1-.6-7.95A5.5 5.5 0 0 1 17 9.5 4.3 4.3 0 0 1 17 18H7Z"/>',
+  gift:'<rect x="4" y="9" width="16" height="11" rx="1.5"/><path d="M4 13h16M12 9v11"/><path d="M12 9C10 9 8 8 8 6s3-2.5 4 3Zm0 0c2 0 4-1 4-3s-3-2.5-4 3Z"/>'
+};
+function lnIcon(k,size){var d=LINE_ICONS[k];if(!d)return '';return '<svg class="lni" viewBox="0 0 24 24"'+(size?' width="'+size+'" height="'+size+'"':'')+' fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'+d+'</svg>';}
+// 이름 앞에 붙는 아이콘 (선 아이콘이 있으면 그것, 없으면 옛 이모지를 차분하게)
+function icoHtml(o){if(!o)return '';if(o.icon&&LINE_ICONS[o.icon])return lnIcon(o.icon);return o.emoji?'<span class="emo">'+esc(o.emoji)+'</span>':'';}
+function icoPicker(sel,id,fn){
+  return '<div class="pjm-icons" id="'+id+'" hidden>'+Object.keys(LINE_ICONS).map(function(k){return '<button type="button" class="pjm-ic'+(sel===k?' on':'')+'" data-k="'+k+'" onclick="'+fn+'(this)" title="'+k+'">'+lnIcon(k)+'</button>';}).join('')+'<button type="button" class="pjm-ic pjm-ic-none'+(!sel?' on':'')+'" data-k="" onclick="'+fn+'(this)" title="아이콘 없음">없음</button></div>';
+}
+function icoBtn(sel,legacy,id,toggleId){return '<button type="button" class="pjm-emoji" id="'+id+'" onclick="var g=document.getElementById(\''+toggleId+'\');g.hidden=!g.hidden" title="아이콘 고르기">'+(sel&&LINE_ICONS[sel]?lnIcon(sel,26):(legacy?'<span class="emo">'+esc(legacy)+'</span>':'<span class="pjm-ph">＋</span>'))+'</button>';}
+var selPjI='',selArI='';
+function pickPjIcon(b){selPjI=b.dataset.k;document.querySelectorAll('#pj-icons .pjm-ic,#pje-icons .pjm-ic').forEach(function(x){x.classList.toggle('on',x===b);});var t=document.getElementById('pjm-ibtn');if(t)t.innerHTML=selPjI?lnIcon(selPjI,26):'<span class="pjm-ph">＋</span>';var g=b.parentElement;if(g)g.hidden=true;}
+function pickArIcon(b){selArI=b.dataset.k;document.querySelectorAll('#ar-icons .pjm-ic').forEach(function(x){x.classList.toggle('on',x===b);});var t=document.getElementById('ar-ibtn');if(t)t.innerHTML=selArI?lnIcon(selArI,26):'<span class="pjm-ph">＋</span>';var g=b.parentElement;if(g)g.hidden=true;}
 // 프로젝트 만들기·수정 창: 같은 모양으로 정돈 (이름 → 한 줄 설명 → 목표 → 디데이 → 색상)
 function pjmSec(en,ko,hint){return '<div class="pjm-sec"><em>'+en+'</em><b>'+ko+'</b>'+(hint?'<span>'+hint+'</span>':'')+'</div>';}
 function pjmChips(areas,sel,idPrefix){
   var h='<button type="button" class="pjm-chip'+(sel===''?' on':'')+'" id="'+idPrefix+'none" data-aid="" style="--c:#9A9A9A" onclick="pickPjA(this)">없음</button>';
-  areas.forEach(function(a){h+='<button type="button" class="pjm-chip'+(sel===a.id?' on':'')+'" id="'+idPrefix+a.id+'" data-aid="'+a.id+'" style="--c:'+esc(a.color||'#9A9A9A')+'" onclick="pickPjA(this)">'+(a.emoji?esc(a.emoji)+' ':'')+esc(a.name)+'</button>';});
+  areas.forEach(function(a){h+='<button type="button" class="pjm-chip'+(sel===a.id?' on':'')+'" id="'+idPrefix+a.id+'" data-aid="'+a.id+'" style="--c:'+esc(a.color||'#9A9A9A')+'" onclick="pickPjA(this)">'+icoHtml(a)+esc(a.name)+'</button>';});
   return '<div class="pjm-chips">'+h+'</div>';
 }
 function pjmSwatches(cur,id,pickFn){
@@ -6467,12 +6508,12 @@ function openPjModal(presetAid){
   const areas=S.lifeAreas||[];
   const initAid=(presetAid&&areas.find(a=>a.id===presetAid))?presetAid:(pjFilter&&areas.find(a=>a.id===pjFilter)?pjFilter:'');
   const initArea=areas.find(a=>a.id===initAid);
-  selPjA=initAid;
+  selPjA=initAid;selPjI='';
   selPjC=initArea?initArea.color:COLORS[0];
 
   openMo('새 프로젝트',
     '<div class="pjm">'+
-      '<div class="pjm-top"><input class="pjm-emoji" id="pj-e" placeholder="📁" maxlength="2" title="이모지"><input class="pjm-name" id="pj-n" placeholder="프로젝트 이름" autocomplete="off"></div>'+
+      '<div class="pjm-top">'+icoBtn(selPjI,'','pjm-ibtn','pj-icons')+'<input class="pjm-name" id="pj-n" placeholder="프로젝트 이름" autocomplete="off"></div>'+icoPicker(selPjI,'pj-icons','pickPjIcon')+
       '<input class="pjm-desc" id="pj-d" placeholder="한 줄 설명 (선택)" autocomplete="off">'+
       '<div>'+pjmSec('my goal','목표','(드림보드에서 만든 목표를 골라요)')+pjmChips(areas,selPjA,'pja-')+'</div>'+
       '<div>'+pjmSec('d-day','디데이','(목표 날짜가 있으면 자동으로 들어와요)')+'<input class="pjm-date" type="date" id="pj-dday" value="'+(initArea&&initArea.dday?initArea.dday:'')+'"></div>'+
@@ -6500,7 +6541,7 @@ function pickPjA(el,id){
 function savePj(){
   const name=document.getElementById('pj-n').value.trim();if(!name)return;
   const dday=document.getElementById('pj-dday').value||'';
-  S.projects.push({id:gid(),name,emoji:document.getElementById('pj-e').value,desc:document.getElementById('pj-d').value,dday,lifeAreaId:selPjA,color:selPjC,tasks:[],milestones:[],notes:'',routinized:[],links:[]});
+  S.projects.push({id:gid(),name,emoji:'',icon:selPjI,desc:document.getElementById('pj-d').value,dday,lifeAreaId:selPjA,color:selPjC,tasks:[],milestones:[],notes:'',routinized:[],links:[]});
   save();closeMo();render();
 }
 function delPj(id){if(!confirm('프로젝트를 삭제할까요?\n(관련 마감일, 루틴화 일정, 캘린더 이벤트도 함께 삭제됩니다)'))return;const pj=S.projects.find(p=>p.id===id);const rzIds=pj&&pj.routinized?pj.routinized.map(r=>r.id):[];S.deadlines=S.deadlines.filter(d=>d.projectId!==id);S.calEvents=S.calEvents.filter(e=>e.projectId!==id);if(rzIds.length>0)S.routines=S.routines.filter(r=>!rzIds.includes(r.id));if(S.savings&&S.savings.entries&&rzIds.length>0){rzIds.forEach(function(rid){var prefix='rzsave-'+rid+'-';S.savings.entries.filter(e=>e.id&&e.id.indexOf(prefix)===0).forEach(e=>{S.savings.current-=e.amount;});S.savings.entries=S.savings.entries.filter(e=>!(e.id&&e.id.indexOf(prefix)===0));});if(S.savings.current<0)S.savings.current=0;}S.projects=S.projects.filter(p=>p.id!==id);if(activePid===id){activePid=null;page='projects';}save();render();}
@@ -6508,12 +6549,12 @@ function delPj(id){if(!confirm('프로젝트를 삭제할까요?\n(관련 마감
 function openPjEditModal(pid){
   const p=S.projects.find(x=>x.id===pid);if(!p)return;
   const areas=S.lifeAreas||[];
-  selPjC=p.color; selPjA=p.lifeAreaId||'';
+  selPjC=p.color; selPjA=p.lifeAreaId||''; selPjI=p.icon||'';
   var cv=p.cardVis||{};
   var opts=[['achieve','루틴 달성도'],['milestone','마일스톤'],['link','링크 바로가기'],['material','학습 자료']];
   openMo('프로젝트 수정',
     '<div class="pjm">'+
-      '<div class="pjm-top"><input class="pjm-emoji" id="pje-e" value="'+esc(p.emoji||'')+'" placeholder="📁" maxlength="2" title="이모지"><input class="pjm-name" id="pje-n" value="'+esc(p.name)+'" placeholder="프로젝트 이름" autocomplete="off"></div>'+
+      '<div class="pjm-top">'+icoBtn(selPjI,p.emoji,'pjm-ibtn','pje-icons')+'<input class="pjm-name" id="pje-n" value="'+esc(p.name)+'" placeholder="프로젝트 이름" autocomplete="off"></div>'+icoPicker(selPjI,'pje-icons','pickPjIcon')+
       '<input class="pjm-desc" id="pje-d" value="'+esc(p.desc||'')+'" placeholder="한 줄 설명 (선택)" autocomplete="off">'+
       '<div>'+pjmSec('my goal','목표')+pjmChips(areas,selPjA,'pja-')+'</div>'+
       '<div>'+pjmSec('d-day','디데이','(카드에 표시돼요)')+'<input class="pjm-date" type="date" id="pje-dday" value="'+esc(p.dday||'')+'"></div>'+
@@ -6535,7 +6576,7 @@ function pickPjCEditColor(val){
 }
 function savePjEdit(pid){
   const name=document.getElementById('pje-n').value.trim();if(!name)return;
-  const emoji=document.getElementById('pje-e').value,desc=document.getElementById('pje-d').value;
+  const desc=document.getElementById('pje-d').value;
   const dday=document.getElementById('pje-dday').value||'';
   const cardVis={
     achieve:document.getElementById('pje-cv-achieve').checked,
@@ -6545,7 +6586,7 @@ function savePjEdit(pid){
   };
   S.projects=S.projects.map(function(p){
     if(p.id!==pid)return p;
-    return Object.assign({},p,{name:name,emoji:emoji,desc:desc,lifeAreaId:selPjA,color:selPjC,dday:dday,cardVis:cardVis});
+    return Object.assign({},p,{name:name,icon:selPjI,emoji:selPjI?'':(p.emoji||''),desc:desc,lifeAreaId:selPjA,color:selPjC,dday:dday,cardVis:cardVis});
   });
   // calEvents 색상도 같이 업데이트
   S.calEvents=S.calEvents.map(function(e){
@@ -7644,7 +7685,7 @@ function renderOverview(){
     var pjs=pjByArea[area.id]||[];
     html+=
       '<div style="display:flex;align-items:center;gap:9px;margin:16px 0 10px">'+
-        '<div style="width:30px;height:30px;border-radius:8px;background:'+area.color+'20;display:flex;align-items:center;justify-content:center;font-size:1.1em;flex-shrink:0">'+area.emoji+'</div>'+
+        '<div style="width:30px;height:30px;border-radius:8px;background:'+area.color+'20;display:flex;align-items:center;justify-content:center;font-size:1.1em;flex-shrink:0;color:'+area.color+'">'+(icoHtml(area)||'·')+'</div>'+
         '<div style="font-size:0.95em;font-weight:700;color:var(--text)">'+area.name+'</div>'+
         '<div style="flex:1;height:1.5px;background:linear-gradient(to right,'+area.color+'50,transparent);border-radius:2px"></div>'+
         '<div style="font-size:0.75em;color:var(--t3)">'+pjs.length+'개</div>'+
@@ -7818,7 +7859,7 @@ function printOverview(){
   areas.forEach(function(area){
     var pjs=pjByArea[area.id]||[];
     sectionsHtml+='<div class="area-section">'+
-      '<div class="area-header"><span class="area-emoji">'+area.emoji+'</span><span class="area-name">'+area.name+'</span></div>'+
+      '<div class="area-header"><span class="area-emoji">'+icoHtml(area)+'</span><span class="area-name">'+area.name+'</span></div>'+
       (pjs.length===0?'<p class="col-empty">이 영역에 연결된 프로젝트가 없어요</p>':pjs.map(buildPjCard).join(''))+
     '</div>';
   });
@@ -10696,7 +10737,7 @@ function renderCalendar(){
         '<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'+(d.done?'text-decoration:line-through;color:var(--t3)':'')+'">'+d.title+'</div>'+
         (pr?'<div style="font-size:0.75em;color:var(--t3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px">🗂️ '+pr.name+'</div>':'')+
       '</div>'+
-      (area?'<span style="font-size:0.7em;padding:1px 6px;border-radius:99px;background:'+area.color+'20;color:'+area.color+';flex-shrink:0">'+(area.emoji?area.emoji+' ':'')+area.name+'</span>':'')+
+      (area?'<span style="font-size:0.7em;padding:1px 6px;border-radius:99px;background:'+area.color+'20;color:'+area.color+';flex-shrink:0">'+icoHtml(area)+area.name+'</span>':'')+
       (d.done?'':'<span style="font-family:var(--mono);font-size:0.75em;font-weight:600;flex-shrink:0;color:'+(dd<=0?'var(--red)':dd<=7?'var(--accent)':'var(--t3)')+'">'+
         (dd<0?'D+'+Math.abs(dd):dd===0?'오늘':'D-'+dd)+'</span>')+
     '</div>';

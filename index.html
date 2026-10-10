@@ -2723,6 +2723,7 @@ async function saveToCloud(data) {
     });
     await batch.commit();
     showSaveIndicator('ok');
+    if (window._cloudTrimmed && !window._cloudTrimToast) { window._cloudTrimToast = 1; try { upMsg('⚠ 사진이 많아서 일부 사진은 이 기기에만 저장돼요 (클라우드 문서 한도)', false); } catch(e) {} }
   } catch(e) {
     console.error('Cloud save error:', e);
     showSaveIndicator('err');
@@ -2785,27 +2786,31 @@ function chunkData(data) {
   // 브라우저에 직접 저장된(base64) 일기 사진도 Firestore 1MB 문서 한도를 넘겨
   // 일기 전체 동기화를 막을 수 있으므로 클라우드 전송분에서만 제외한다.
   // (localStorage 원본은 그대로 유지되므로 이 기기에서는 계속 보인다)
-  // 추억·프로젝트 기록 사진: 아직 클라우드에 못 올린 base64 사본이 문서에 섞이면 1MB 한도를 넘겨 저장 전체가 막힐 수 있어 제외 (이 기기엔 그대로 남음)
-  if (chunks.memories) {
-    chunks.memories = chunks.memories.map(function(m){
-      if (!m || !Array.isArray(m.photos)) return m;
-      const ph = m.photos.map(function(x){
-        if (typeof x === 'string') return x.indexOf('data:') === 0 ? null : x;
-        if (x && typeof x === 'object' && !x.url && (x.lo || x.hi || x.data)) { const c = Object.assign({}, x); delete c.lo; delete c.hi; delete c.data; return c.drive ? c : null; }
-        return x;
-      }).filter(Boolean);
-      return Object.assign({}, m, { photos: ph });
-    });
+  // 추억·프로젝트 기록 사진은 (Firebase Storage가 없어서) base64 글자로 이 문서 안에 들어가 기기 사이에 동기화된다.
+  // 다만 문서 한 개는 1MB가 한도라서, 넘칠 때만 가장 큰 사진부터 클라우드 전송분에서 뺀다 (이 기기엔 그대로 남음).
+  // 한도 안이면 하나도 빼지 않는다.
+  var _chunkBytes = function(v){ try { return new Blob([JSON.stringify(v)]).size; } catch(e) { return JSON.stringify(v).length; } };
+  var CHUNK_LIMIT = 800 * 1024, trimmed = 0;
+  if (chunks.memories && _chunkBytes(chunks.memories) > CHUNK_LIMIT) {
+    const mem = chunks.memories.map(function(m){ return (m && Array.isArray(m.photos)) ? Object.assign({}, m, { photos: m.photos.slice() }) : m; });
+    const cand = [];
+    mem.forEach(function(m, i){ if (!m || !Array.isArray(m.photos)) return; m.photos.forEach(function(x, j){
+      if (typeof x === 'string' && x.indexOf('data:') === 0) cand.push({ size: x.length, drop: function(){ m.photos[j] = null; } });
+      else if (x && typeof x === 'object' && !x.url && x.lo) cand.push({ size: x.lo.length, drop: function(){ const c = Object.assign({}, x); delete c.lo; m.photos[j] = c.drive ? c : null; } });
+    }); });
+    cand.sort(function(a, b){ return b.size - a.size; });
+    for (var ci = 0; ci < cand.length && _chunkBytes(mem.map(function(m){ return (m && Array.isArray(m.photos)) ? Object.assign({}, m, { photos: m.photos.filter(Boolean) }) : m; })) > CHUNK_LIMIT; ci++) { cand[ci].drop(); trimmed++; }
+    chunks.memories = mem.map(function(m){ return (m && Array.isArray(m.photos)) ? Object.assign({}, m, { photos: m.photos.filter(Boolean) }) : m; });
   }
-  if (chunks.projects) {
-    chunks.projects = chunks.projects.map(function(pj){
-      if (!pj || !Array.isArray(pj.logs)) return pj;
-      return Object.assign({}, pj, { logs: pj.logs.map(function(l){
-        if (l && typeof l.photo === 'string' && l.photo.indexOf('data:') === 0) { const c = Object.assign({}, l); delete c.photo; return c; }
-        return l;
-      }) });
-    });
+  if (chunks.projects && _chunkBytes(chunks.projects) > CHUNK_LIMIT) {
+    const pj = chunks.projects.map(function(x){ return (x && Array.isArray(x.logs)) ? Object.assign({}, x, { logs: x.logs.map(function(l){ return Object.assign({}, l); }) }) : x; });
+    const cand = [];
+    pj.forEach(function(x){ if (!x || !Array.isArray(x.logs)) return; x.logs.forEach(function(l){ if (l && typeof l.photo === 'string' && l.photo.indexOf('data:') === 0) cand.push({ size: l.photo.length, drop: function(){ delete l.photo; } }); }); });
+    cand.sort(function(a, b){ return b.size - a.size; });
+    for (var cj = 0; cj < cand.length && _chunkBytes(pj) > CHUNK_LIMIT; cj++) { cand[cj].drop(); trimmed++; }
+    chunks.projects = pj;
   }
+  window._cloudTrimmed = trimmed;
   if (chunks.diaryEntries) {
     const slim = {};
     Object.keys(chunks.diaryEntries).forEach(k => {

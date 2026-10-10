@@ -182,7 +182,23 @@
         body.theme-cozy #tax-panel .bg-white.rounded-2xl, body.theme-cozy #tax-panel .rounded-2xl.bg-white { border-color: #EFE8DA; box-shadow: 0 3px 14px rgba(139,115,80,.05); }
         body.theme-cozy #tax-panel table thead tr, body.theme-cozy #tax-panel table thead th { background: #FAF6EE; color: #A39A8C; }
 
-        /* ── 출간 일정: 달력 칸은 둥글고 부드럽게, 출간 예정 카드는 티켓처럼 ── */
+        /* ── 출간 일정: 큰 영문 월 이름 헤더 + 오늘은 동그라미 + 부드러운 칸 + 티켓 같은 출간 예정 카드 ── */
+        #publish-cozy-hero { display: none; }
+        body.theme-cozy #publish-cozy-hero { display: block; margin: 2px 4px 22px; }
+        .cozy-pubhero .eyebrow { font-family: var(--cozy-en); font-style: italic; font-size: 18px; color: #A39A8C; }
+        .cozy-pubhero .row { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+        .cozy-pubhero .mname { font-family: var(--cozy-en); font-size: 66px; line-height: 1.04; color: var(--cozy-ink); }
+        .cozy-pubhero .yr { font-family: var(--cozy-serif); font-size: 19px; color: #B09A78; }
+        .cozy-pubhero .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+        .cozy-pubhero .chip { background: #F4EEE2; border: 1px solid #EBE2D1; border-radius: 999px; padding: 5px 14px; font-size: 12.5px; color: #6B5A43; }
+        .cozy-pubhero .chip b { color: var(--primary); margin-left: 4px; }
+        @media (max-width: 640px) { .cozy-pubhero .mname { font-size: 46px; } }
+        body.theme-cozy #tab-publish-cal .glass-card { background: linear-gradient(180deg, #FFFEFC 0%, #FBF8F1 100%); }
+        body.theme-cozy #publish-cal-title { display: none; }
+        body.theme-cozy #publish-cal-body .pc-today { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 26px; padding: 0 4px; border-radius: 999px; background: var(--primary); color: #fff !important; box-shadow: 0 3px 8px rgba(169,143,103,.35); }
+        body.theme-cozy #publish-cal-body > div.border-2 > .absolute { display: none; }
+        body.theme-cozy #publish-year-view-body > div > div:first-child { text-transform: lowercase; font-family: var(--cozy-en); font-style: italic; font-size: 1.2rem; letter-spacing: 0; color: var(--cozy-ink); }
+        body.theme-cozy #publish-year-view-body > div > div:first-child::first-letter { text-transform: uppercase; }
         body.theme-cozy #publish-cal-title, body.theme-cozy #publish-year-view-title { font-family: var(--cozy-serif); font-size: 1.45rem; font-weight: 700; color: var(--cozy-ink) !important; }
         body.theme-cozy #publish-cal-nav-row > button, body.theme-cozy #publish-year-nav-row > button { border-radius: 999px; padding-left: 18px; padding-right: 18px; }
         body.theme-cozy #tab-publish-cal .grid.grid-cols-7 > div.bg-slate-50 { background: #FAF6EE; color: #B7A584 !important; border-radius: 12px; letter-spacing: .06em; }
@@ -195,7 +211,7 @@
         body.theme-cozy #publish-dday-list > div { background: #FFFEFC; border: 1px dashed #E3D7BC; border-radius: 18px; box-shadow: none; transition: background-color .15s, transform .15s; }
         body.theme-cozy #publish-dday-list > div:hover { background: #FBF7EE; transform: translateX(2px); box-shadow: none; }
         body.theme-cozy #publish-year-view-body > div { border-radius: 22px; border-color: #F2ECE1; background: #FFFEFC; box-shadow: 0 3px 14px rgba(139,115,80,.05); }
-        body.theme-cozy #publish-year-view-body > div > div:first-child { color: #B09A78; letter-spacing: .16em; border-bottom-style: dashed; }
+        body.theme-cozy #publish-year-view-body > div > div:first-child { border-bottom-style: dashed; }
         body.theme-cozy #publish-year-view-body > div > div:not(:first-child) { border-radius: 12px; }
 
         /* ── 계약 출판사 현황: 줄노트 — 줄로 보기는 가로줄 공책 한 장, 카드로 보기는 줄 간격에 맞춘 메모 카드 ── */
@@ -1923,6 +1939,7 @@
                     <div id="publish-month-view-wrap" class="flex gap-5 items-start">
                         <!-- 좌측: 달력 -->
                         <div class="glass-card p-6 flex-1 min-w-0">
+                            <div id="publish-cozy-hero" class="cozy-pubhero"></div>
                             <div id="publish-cal-nav-row" class="flex justify-between items-center mb-5">
                                 <button onclick="changePublishCalMonth(-1)" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-bold text-slate-600 transition-all flex items-center gap-1.5"><i class="fa-solid fa-chevron-left text-xs"></i> 이전 달</button>
                                 <div id="publish-cal-title-group" class="flex items-center gap-3">
@@ -5351,6 +5368,23 @@
                 });
             });
 
+            // 코지 테마: 큰 영문 월 이름 + 이번 달 출간 수 + 다음 출간 D-day
+            (function renderPublishCozyHero() {
+                const box = document.getElementById('publish-cozy-hero');
+                if (!box) return;
+                if (!document.body.classList.contains('theme-cozy')) { box.innerHTML = ''; return; }
+                const MN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+                const moPrefix = `${y}-${String(m + 1).padStart(2, '0')}`;
+                const inMonth = allItems.filter(w => String(w.publishDate || '').startsWith(moPrefix));
+                const t0 = new Date().setHours(0, 0, 0, 0);
+                const next = allItems.map(w => ({ w, diff: Math.ceil((new Date(w.publishDate).setHours(0, 0, 0, 0) - t0) / 86400000) }))
+                    .filter(x => x.diff >= 0 && !x.w._pendingMonthOnly).sort((a, b) => a.diff - b.diff)[0];
+                const short = t => { t = String(t || ''); return t.length > 16 ? t.slice(0, 15) + '…' : t; };
+                box.innerHTML = `<div class="eyebrow">publishing calendar</div>
+                    <div class="row"><span class="mname">${MN[m]}</span><span class="yr">${y}</span></div>
+                    <div class="chips"><span class="chip">♥ 이번 달 출간 ${inMonth.length}개</span>${next ? `<span class="chip">다음 출간 · ${escapeHtml(short(next.w._displayTitle))} <b>${next.diff === 0 ? 'D-Day' : 'D-' + next.diff}</b></span>` : ''}</div>`;
+            })();
+
             // 사이드바 필터 드롭다운 체크박스 초기화 (genreList 기반)
             (function initDdayFilterCheckboxes() {
                 const dropdown = document.getElementById('dday-filter-dropdown');
@@ -5471,7 +5505,7 @@
                     }).join('');
                 }
                 const todayBadge = isToday ? `<span class="absolute top-1 right-2 text-[9px] font-black tracking-wide" style="color:${primary}">TODAY</span>` : '';
-                cell.innerHTML = `${todayBadge}<div class="text-[13px] font-bold mb-0.5" style="color:${dateColor}">${dayNum}</div>${badgesHtml}`;
+                cell.innerHTML = `${todayBadge}<div class="text-[13px] font-bold mb-0.5" style="color:${dateColor}"><span class="pc-num${isToday ? ' pc-today' : ''}">${dayNum}</span></div>${badgesHtml}`;
                 body.appendChild(cell);
             };
 

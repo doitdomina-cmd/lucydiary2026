@@ -3462,7 +3462,7 @@ function memPickPerson(i){var n=memPeople()[i]||'';memPerson=memPerson===n?'':n;
 function memKind(k){return MEM_KINDS.find(function(x){return x.id===k;})||MEM_KINDS[5];}
 function memList(){return (S.memories||[]).slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'');});}
 function memPhotoSrc(ph){return ph?(typeof ph==='string'?ph:(ph.url||ph.hi||ph.data||ph.lo||'')):'';}
-// 추억 사진은 화질 우선: 긴 변 2048px, 높은 품질 (업로드 실패 대비 작은 사본도 같이 만든다)
+// 추억 사진: 긴 변 1600px·품질 0.78 (장당 약 200~350KB). 업로드 실패 대비 900px 작은 사본도 만든다
 function memCompress(file,LONG,q){
   return new Promise(function(resolve,reject){
     var img=new Image(),u=URL.createObjectURL(file);
@@ -3561,7 +3561,7 @@ function memDrawPhotos(){
 }
 async function memAddPhotos(input){
   var fs=[].slice.call(input.files||[]);input.value='';
-  for(var i=0;i<fs.length&&_memDraft&&_memDraft.photos.length<6;i++){try{var hi=await memCompress(fs[i],2048,0.86),lo=await memCompress(fs[i],1080,0.72);_memDraft.photos.push({hi:hi,lo:lo});}catch(e){alert(e.message||'사진을 읽지 못했어요.');}}
+  for(var i=0;i<fs.length&&_memDraft&&_memDraft.photos.length<6;i++){try{var hi=await memCompress(fs[i],1600,0.78),lo=await memCompress(fs[i],900,0.6);_memDraft.photos.push({hi:hi,lo:lo});}catch(e){alert(e.message||'사진을 읽지 못했어요.');}}
   memDrawPhotos();
 }
 function memSetCover(i){if(!_memDraft||!_memDraft.photos[i])return;var ph=_memDraft.photos.splice(i,1)[0];_memDraft.photos.unshift(ph);memDrawPhotos();}

@@ -3461,7 +3461,23 @@ function togMemFav(id){var m=(S.memories||[]).find(function(x){return x.id===id;
 function memPickPerson(i){var n=memPeople()[i]||'';memPerson=memPerson===n?'':n;render();}
 function memKind(k){return MEM_KINDS.find(function(x){return x.id===k;})||MEM_KINDS[5];}
 function memList(){return (S.memories||[]).slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'');});}
-function memPhotoSrc(ph){return ph?(typeof ph==='string'?ph:(ph.url||ph.data||'')):'';}
+function memPhotoSrc(ph){return ph?(typeof ph==='string'?ph:(ph.url||ph.hi||ph.data||ph.lo||'')):'';}
+// 추억 사진은 화질 우선: 긴 변 2048px, 높은 품질 (업로드 실패 대비 작은 사본도 같이 만든다)
+function memCompress(file,LONG,q){
+  return new Promise(function(resolve,reject){
+    var img=new Image(),u=URL.createObjectURL(file);
+    img.onload=function(){try{
+      var w=img.naturalWidth,h=img.naturalHeight;if(!w||!h){reject(new Error('이미지 크기를 읽지 못했어요.'));return;}
+      var sc=Math.min(1,LONG/Math.max(w,h)),cw=Math.round(w*sc),ch=Math.round(h*sc),c=document.createElement('canvas');c.width=cw;c.height=ch;
+      var x=c.getContext('2d',{alpha:false});if(x.imageSmoothingQuality!==undefined)x.imageSmoothingQuality='high';x.fillStyle='#fff';x.fillRect(0,0,cw,ch);x.drawImage(img,0,0,cw,ch);URL.revokeObjectURL(u);
+      var d='';try{d=c.toDataURL('image/webp',q);}catch(e){}
+      if(!d||d.indexOf('data:image/webp')!==0){try{d=c.toDataURL('image/jpeg',q);}catch(e){d='';}}
+      d?resolve(d):reject(new Error('사진 압축에 실패했어요.'));
+    }catch(e){URL.revokeObjectURL(u);reject(e);}};
+    img.onerror=function(){URL.revokeObjectURL(u);reject(new Error('사진을 읽지 못했어요.'));};
+    img.src=u;
+  });
+}
 function memPeople(){var m={};(S.memories||[]).forEach(function(x){(x.people||[]).forEach(function(n){m[n]=(m[n]||0)+1;});});return Object.keys(m).sort(function(a,b){return m[b]-m[a];});}
 function renderMemories(){
   var all=memList(),t=todStr(),yr=t.slice(0,4);
@@ -3545,7 +3561,7 @@ function memDrawPhotos(){
 }
 async function memAddPhotos(input){
   var fs=[].slice.call(input.files||[]);input.value='';
-  for(var i=0;i<fs.length&&_memDraft&&_memDraft.photos.length<6;i++){try{_memDraft.photos.push(await compressDiaryPhotoToDataURL(fs[i]));}catch(e){alert(e.message||'사진을 읽지 못했어요.');}}
+  for(var i=0;i<fs.length&&_memDraft&&_memDraft.photos.length<6;i++){try{var hi=await memCompress(fs[i],2048,0.86),lo=await memCompress(fs[i],1080,0.72);_memDraft.photos.push({hi:hi,lo:lo});}catch(e){alert(e.message||'사진을 읽지 못했어요.');}}
   memDrawPhotos();
 }
 function memSetCover(i){if(!_memDraft||!_memDraft.photos[i])return;var ph=_memDraft.photos.splice(i,1)[0];_memDraft.photos.unshift(ph);memDrawPhotos();}
@@ -3555,8 +3571,23 @@ async function saveMem(){
   var g=function(i){return document.getElementById(i);};
   var title=g('mem-t').value.trim(),text=g('mem-x').value.trim();
   if(!title&&!text&&!_memDraft.photos.length){g('mem-t').focus();return;}
-  var rec={id:_memDraft.id||gid(),date:g('mem-d').value||todStr(),title:title,place:g('mem-pl').value.trim(),kind:_memDraft.kind,note:_memDraft.note,
-    people:g('mem-pp').value.split(',').map(function(x){return x.trim();}).filter(Boolean),text:text,photos:_memDraft.photos.slice()};
+  var rid=_memDraft.id||gid(),photos=_memDraft.photos.slice(),btn=g('mem-save');
+  // 새로 고른 사진은 저장 전에 원본 화질로 먼저 올린다 (로그인 상태일 때)
+  var fresh=photos.filter(function(ph){return ph&&ph.hi;});
+  if(fresh.length&&typeof currentUser!=='undefined'&&currentUser){
+    if(btn){btn.disabled=true;}
+    for(var i=0,n=0;i<photos.length;i++){
+      var ph=photos[i];if(!ph||!ph.hi)continue;n++;
+      if(btn)btn.textContent='사진 올리는 중 '+n+'/'+fresh.length;
+      try{var blob=dataUrlToBlob(ph.hi),path='users/'+currentUser.uid+'/cozy/mem-'+rid+'-'+gid()+'.'+(blob.type==='image/jpeg'?'jpg':'webp'),ref=storage.ref().child(path);
+        await ref.put(blob,{contentType:blob.type});photos[i]={url:await ref.getDownloadURL(),path:path};
+      }catch(e){console.warn('추억 사진 올리기 실패',e);}
+    }
+    if(!_memDraft)return;
+  }
+  photos=photos.map(function(ph){return ph&&ph.hi?ph.lo:ph;});
+  var rec={id:rid,date:g('mem-d').value||todStr(),title:title,place:g('mem-pl').value.trim(),kind:_memDraft.kind,note:_memDraft.note,
+    people:g('mem-pp').value.split(',').map(function(x){return x.trim();}).filter(Boolean),text:text,photos:photos};
   if(!S.memories)S.memories=[];
   var idx=S.memories.findIndex(function(x){return x.id===rec.id;});
   if(idx>=0)S.memories[idx]=Object.assign({},S.memories[idx],rec);else S.memories.push(rec);

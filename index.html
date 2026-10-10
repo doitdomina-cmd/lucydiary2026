@@ -2247,7 +2247,8 @@ body.cozy .td-cz-wrap [data-card="diary"] textarea{background-color:transparent 
 .pjx-ph img{width:100%;height:100%;object-fit:cover}
 .pjx-logs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .pjx-log{position:relative;background:var(--cz-paper,var(--s2));border-radius:14px;overflow:hidden}
-.pjx-log-ph{aspect-ratio:4/3;background:center/cover no-repeat}
+.pjx-log-ph{display:block;position:relative;aspect-ratio:4/3;background:center/cover no-repeat}
+.pjx-dv{position:absolute;right:6px;bottom:6px;font-style:normal;font-size:10px;background:rgba(255,255,255,.9);color:var(--cz-deep,#8a5a44);border-radius:99px;padding:1px 7px}
 .pjx-log-b{padding:8px 10px 10px}
 .pjx-log-d{font-size:11px;color:var(--cz-muted,var(--t3))}
 .pjx-log-t{font-size:12.5px;color:var(--text);line-height:1.45;margin-top:2px;word-break:break-all}
@@ -3735,8 +3736,8 @@ async function lsdSubFolder(name){
   m=lsdMeta();m.sub=m.sub||{};m.sub[name]=id;lsdSetMeta(m);return id;
 }
 // 사진 원본(파일 그대로)을 드라이브 '추억 사진' 폴더에 올리고 파일 id를 돌려준다
-async function lsdUploadOriginal(file,fileName){
-  var folder=await lsdSubFolder('추억 사진'),bd='lucy'+Date.now()+Math.random().toString(36).slice(2,8);
+async function lsdUploadOriginal(file,fileName,sub){
+  var folder=await lsdSubFolder(sub||'추억 사진'),bd='lucy'+Date.now()+Math.random().toString(36).slice(2,8);
   var meta=JSON.stringify({name:fileName,parents:[folder]});
   var body=new Blob(['--'+bd+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+meta+'\r\n--'+bd+'\r\nContent-Type: '+(file.type||'application/octet-stream')+'\r\n\r\n',file,'\r\n--'+bd+'--']);
   var r=await lsdFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',{method:'POST',headers:{'Content-Type':'multipart/related; boundary='+bd},body:body});
@@ -3786,7 +3787,7 @@ function lsDriveCard(){
   var m=lsdMeta();
   return '<div class="card" style="margin-bottom:14px"><div class="ct" style="margin-bottom:10px">☁️ 구글 드라이브 백업</div>'+
     '<div class="lsd-st">'+(m.at?'마지막 백업 <b>'+lsdWhen(m.at)+'</b>':'아직 드라이브 백업이 없어요')+'<span>· 최근 '+LSD_KEEP+'개만 남아요</span></div>'+
-    '<div class="lsd-help">내 드라이브의 <b>‘'+LSD_FOLDER+'’</b> 폴더에 저장돼요. 처음 백업하면 이 폴더가 드라이브 맨 앞에 생기는데, 드라이브 앱에서 <b>‘백업’ 폴더 안으로 한 번만 옮겨 주세요.</b> 옮긴 뒤에도 계속 그 폴더로 백업돼요.<br>권한을 받은 뒤 1시간 동안은 바뀐 게 있으면 저절로 백업하고, 하루 넘게 백업이 없으면 알려 드려요. 되살릴 땐 아래 <b>가져오기</b>로 백업 파일을 고르면 돼요.<br><b>추억 사진 원본</b>은 같은 폴더 안의 <b>‘추억 사진’</b> 폴더에 원본 그대로 저장돼요. 추억을 저장할 때 구글 권한 창이 뜰 수 있어요.</div>'+
+    '<div class="lsd-help">내 드라이브의 <b>‘'+LSD_FOLDER+'’</b> 폴더에 저장돼요. 처음 백업하면 이 폴더가 드라이브 맨 앞에 생기는데, 드라이브 앱에서 <b>‘백업’ 폴더 안으로 한 번만 옮겨 주세요.</b> 옮긴 뒤에도 계속 그 폴더로 백업돼요.<br>권한을 받은 뒤 1시간 동안은 바뀐 게 있으면 저절로 백업하고, 하루 넘게 백업이 없으면 알려 드려요. 되살릴 땐 아래 <b>가져오기</b>로 백업 파일을 고르면 돼요.<br><b>추억 사진 원본</b>은 같은 폴더 안의 <b>‘추억 사진’</b>·<b>‘프로젝트 기록’</b> 폴더에 원본 그대로 저장돼요. 추억을 저장할 때 구글 권한 창이 뜰 수 있어요.</div>'+
     '<button class="btn bp bsm" id="lsd-btn" onclick="lsdBackupClick()">지금 드라이브에 백업</button></div>';
 }
 
@@ -5752,22 +5753,30 @@ function delPjMetric(pid){var p=S.projects.find(function(x){return x.id===pid;})
 function addPjMetric(pid){var p=S.projects.find(function(x){return x.id===pid;});if(!p||!p.metric)return;var el=document.getElementById('pjm-v-'+pid),v=parseFloat(el&&el.value);if(isNaN(v))return;var t=todStr();p.metric.entries=(p.metric.entries||[]).filter(function(e){return e.date!==t;});p.metric.entries.push({date:t,val:v});save();render();}
 
 // 기록 · 사진 일지
-var _pjLogPhoto={};
+var _pjLogPhoto={},_pjLogFile={};
 function pjLogCard(p){
   var logs=(p.logs||[]).slice().sort(function(a,b){return b.date.localeCompare(a.date);}),show=window['_pjLogAll_'+p.id]?logs:logs.slice(0,6);
   var h='<div class="card" style="margin-bottom:0">'+pjCardHead('log','기록 · 사진 일지','<span class="pjx-c">'+logs.length+'개</span>');
   h+='<div class="pjx-logadd"><label class="pjx-ph" id="pjl-ph-'+p.id+'" title="사진 넣기">'+(_pjLogPhoto[p.id]?'<img src="'+_pjLogPhoto[p.id]+'">':'+ 사진')+'<input type="file" accept="image/*" hidden onchange="pjLogPick(\''+p.id+'\',this)"></label>'+
     '<input class="inp" id="pjl-t-'+p.id+'" placeholder="오늘 한 것 한 줄 (예: 필라테스 50분)" onkeydown="if(event.key===\'Enter\'&&!event.isComposing)addPjLog(\''+p.id+'\')"><button class="btn bp bsm" onclick="addPjLog(\''+p.id+'\')">남기기</button></div>';
   if(!logs.length) return h+'<div class="pjx-empty">운동 인증, 연습, 공부한 것을 날짜별로 쌓아 보세요</div></div>';
-  h+='<div class="pjx-logs">'+show.map(function(l){return '<div class="pjx-log">'+(l.photo?'<div class="pjx-log-ph" style="background-image:url(\''+esc(l.photo).replace(/'/g,'%27')+'\')"></div>':'')+'<div class="pjx-log-b"><div class="pjx-log-d">'+esc(l.date.slice(5).replace('-','.'))+'</div><div class="pjx-log-t">'+esc(l.text||'')+'</div></div><button type="button" class="pjx-x" onclick="delPjLog(\''+p.id+'\',\''+l.id+'\')">×</button></div>';}).join('')+'</div>';
+  h+='<div class="pjx-logs">'+show.map(function(l){return '<div class="pjx-log">'+(l.photo?'<a class="pjx-log-ph" href="'+(l.drive?'https://drive.google.com/file/d/'+esc(l.drive)+'/view':esc(l.photo))+'" target="_blank" rel="noopener" title="'+(l.drive?'드라이브 원본 열기':'크게 보기')+'" style="background-image:url(\''+esc(l.photo).replace(/'/g,'%27')+'\')">'+(l.drive?'<i class="pjx-dv">☁ 원본</i>':'')+'</a>':'')+'<div class="pjx-log-b"><div class="pjx-log-d">'+esc(l.date.slice(5).replace('-','.'))+'</div><div class="pjx-log-t">'+esc(l.text||'')+'</div></div><button type="button" class="pjx-x" onclick="delPjLog(\''+p.id+'\',\''+l.id+'\')">×</button></div>';}).join('')+'</div>';
   if(logs.length>6) h+='<button type="button" class="pjx-more" onclick="window[\'_pjLogAll_'+p.id+'\']=!window[\'_pjLogAll_'+p.id+'\'];render()">'+(window['_pjLogAll_'+p.id]?'접기':'전체 '+logs.length+'개 보기')+'</button>';
   return h+'</div>';
 }
-async function pjLogPick(pid,input){var f=input.files&&input.files[0];input.value='';if(!f)return;try{_pjLogPhoto[pid]=await compressDiaryPhotoToDataURL(f);render();}catch(e){alert(e.message||'사진을 읽지 못했어요.');}}
+async function pjLogPick(pid,input){var f=input.files&&input.files[0];input.value='';if(!f)return;try{_pjLogPhoto[pid]=await memCompress(f,1600,0.78);_pjLogFile[pid]=f;render();}catch(e){alert(e.message||'사진을 읽지 못했어요.');}}
 async function addPjLog(pid){
   var p=S.projects.find(function(x){return x.id===pid;});if(!p)return;var el=document.getElementById('pjl-t-'+pid),tx=(el&&el.value||'').trim(),ph=_pjLogPhoto[pid]||null;if(!tx&&!ph)return;
-  var l={id:gid(),date:todStr(),text:tx,photo:ph};if(!p.logs)p.logs=[];p.logs.push(l);delete _pjLogPhoto[pid];save();render();
+  var file=_pjLogFile[pid]||null,loggedIn=typeof currentUser!=='undefined'&&currentUser;
+  // 원본은 구글 드라이브에 보관 → 권한 창은 사용자가 누른 이 순간에만 띄울 수 있어서 가장 먼저 요청한다
+  var tkP=(file&&loggedIn)?Promise.resolve(lsdToken()||lsdEnsureToken()).catch(function(){return null;}):null;
+  var l={id:gid(),date:todStr(),text:tx,photo:ph};if(!p.logs)p.logs=[];p.logs.push(l);delete _pjLogPhoto[pid];delete _pjLogFile[pid];save();render();
   if(ph&&typeof currentUser!=='undefined'&&currentUser){try{var blob=dataUrlToBlob(ph),path='users/'+currentUser.uid+'/cozy/log-'+pid+'-'+l.id+'.'+(blob.type==='image/jpeg'?'jpg':'webp'),ref=storage.ref().child(path);await ref.put(blob,{contentType:blob.type});var url=await ref.getDownloadURL();var cur=(p.logs||[]).find(function(x){return x.id===l.id;});if(cur){cur.photo=url;cur.photoPath=path;save();render();}}catch(e){console.warn('기록 사진 올리기 실패',e);}}
+  if(tkP&&await tkP){
+    try{var fn=l.date+'_'+(p.name||'프로젝트').replace(/[\\/:*?"<>|]/g,'').slice(0,20)+'_'+(file.name||'photo.jpg'),did=await lsdUploadOriginal(file,fn,'프로젝트 기록');
+      var cur2=(p.logs||[]).find(function(x){return x.id===l.id;});if(cur2&&did){cur2.drive=did;save();render();}}
+    catch(e){console.warn('드라이브 원본 올리기 실패',e);lsdToast('원본은 드라이브에 못 올렸어요');}
+  }
 }
 function delPjLog(pid,lid){var p=S.projects.find(function(x){return x.id===pid;});if(!p)return;var l=(p.logs||[]).find(function(x){return x.id===lid;});if(l&&l.photoPath){try{storage.ref().child(l.photoPath).delete().catch(function(){});}catch(_){}}p.logs=(p.logs||[]).filter(function(x){return x.id!==lid;});save();render();}
 

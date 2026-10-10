@@ -3407,13 +3407,13 @@ function dreamAddWant(){
 function dreamToggleWant(id,on){var w=_dmDraft&&_dmDraft.wants.find(function(x){return x.id===id;});if(w){w.done=!!on;if(on)w.doneAt=todStr();else delete w.doneAt;renderDreamWants();}}
 function dreamDelWant(id){if(!_dmDraft)return;_dmDraft.wants=_dmDraft.wants.filter(function(x){return x.id!==id;});renderDreamWants();}
 function dreamResetPhoto(){if(!_dmDraft)return;_dmDraft.photo=null;_dmDraft._newPhoto=false;dreamDraftPhoto();}
-// 사진: 긴 쪽 1200px로 줄여서 저장 (로그인 중이면 클라우드에 올리고 주소만 남김)
+// 사진: 긴 쪽 2000px로 줄여서 저장 (로그인 중이면 클라우드에 올리고 주소만 남김)
 function compressDreamPhoto(file){
   return new Promise(function(resolve,reject){
     var img=new Image(),u=URL.createObjectURL(file);
     img.onload=function(){
       try{
-        var w=img.naturalWidth,h=img.naturalHeight,sc=Math.min(1,1200/Math.max(w,h));
+        var w=img.naturalWidth,h=img.naturalHeight,sc=Math.min(1,2000/Math.max(w,h));
         var c=document.createElement('canvas');c.width=Math.max(1,Math.round(w*sc));c.height=Math.max(1,Math.round(h*sc));
         var ctx=c.getContext('2d',{alpha:false});ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);ctx.drawImage(img,0,0,c.width,c.height);
         URL.revokeObjectURL(u);
@@ -3821,7 +3821,7 @@ function memDrawPhotos(){
 }
 async function memAddPhotos(input){
   var fs=[].slice.call(input.files||[]);input.value='';
-  for(var i=0;i<fs.length&&_memDraft&&_memDraft.photos.length<6;i++){try{var hi=await memCompress(fs[i],1200,0.72);_memDraft.photos.push({hi:hi,file:fs[i]});}catch(e){alert(e.message||'사진을 읽지 못했어요.');}}
+  for(var i=0;i<fs.length&&_memDraft&&_memDraft.photos.length<6;i++){try{var hi=await memCompress(fs[i],2000,0.72);_memDraft.photos.push({hi:hi,file:fs[i]});}catch(e){alert(e.message||'사진을 읽지 못했어요.');}}
   memDrawPhotos();
 }
 function memSetCover(i){if(!_memDraft||!_memDraft.photos[i])return;var ph=_memDraft.photos.splice(i,1)[0];_memDraft.photos.unshift(ph);memDrawPhotos();}
@@ -3836,7 +3836,7 @@ async function saveMem(){
   var date=g('mem-d').value||todStr();
   // 드라이브 권한 창은 사용자가 누른 이 순간에만 띄울 수 있어서 가장 먼저 요청 (기다리지 않고 계속 진행)
   var tkP=(loggedIn&&fresh.some(function(ph){return ph.file;}))?Promise.resolve(lsdToken()||lsdEnsureToken()).catch(function(){return null;}):null;
-  // 1) 기록과 사진(1200px)을 바로 저장 — 클라우드·다른 기기 동기화는 저장 과정에서 자동으로 된다
+  // 1) 기록과 사진(2000px)을 바로 저장 — 클라우드·다른 기기 동기화는 저장 과정에서 자동으로 된다
   var photos=_memDraft.photos.map(function(ph){return ph&&ph.hi?{src:ph.hi}:ph;});
   var rec={id:rid,date:date,title:title,place:g('mem-pl').value.trim(),kind:_memDraft.kind,note:_memDraft.note,
     people:g('mem-pp').value.split(',').map(function(x){return x.trim();}).filter(Boolean),text:text,photos:photos};
@@ -5173,8 +5173,8 @@ function compressDiaryPhotoToDataURL(file){
       try{
         var w=img.naturalWidth,h=img.naturalHeight;
         if(!w||!h){reject(new Error('이미지 크기를 읽지 못했어요.'));return;}
-        // 모든 사진은 긴 변 1200px · WebP 0.72 로 줄여서 보관한다 (폰 화면 가로 1440px에 거의 꽉 참)
-        var scale=1200/Math.max(w,h);
+        // 모든 사진은 긴 변 2000px · WebP 0.72 로 줄여서 보관한다 (Firebase Storage에 저장)
+        var scale=2000/Math.max(w,h);
         if(scale>1) scale=1;   // 원본보다 크게 늘리지 않음
         var cw=Math.max(1,Math.round(w*scale)),ch=Math.max(1,Math.round(h*scale));
         var canvas=document.createElement('canvas');
@@ -5981,7 +5981,7 @@ function pjLogCard(p){
   if(logs.length>6) h+='<button type="button" class="pjx-more" onclick="window[\'_pjLogAll_'+p.id+'\']=!window[\'_pjLogAll_'+p.id+'\'];render()">'+(window['_pjLogAll_'+p.id]?'접기':'전체 '+logs.length+'개 보기')+'</button>';
   return h+'</div>';
 }
-async function pjLogPick(pid,input){var f=input.files&&input.files[0];input.value='';if(!f)return;try{_pjLogPhoto[pid]=await memCompress(f,1200,0.72);_pjLogFile[pid]=f;render();}catch(e){alert(e.message||'사진을 읽지 못했어요.');}}
+async function pjLogPick(pid,input){var f=input.files&&input.files[0];input.value='';if(!f)return;try{_pjLogPhoto[pid]=await memCompress(f,2000,0.72);_pjLogFile[pid]=f;render();}catch(e){alert(e.message||'사진을 읽지 못했어요.');}}
 async function addPjLog(pid){
   var p=S.projects.find(function(x){return x.id===pid;});if(!p)return;var el=document.getElementById('pjl-t-'+pid),tx=(el&&el.value||'').trim(),ph=_pjLogPhoto[pid]||null;if(!tx&&!ph)return;
   var file=_pjLogFile[pid]||null,loggedIn=typeof currentUser!=='undefined'&&currentUser;
@@ -12971,7 +12971,6 @@ function migrateCondHistoryToRecords(){
   save();
 }
 function initApp(){
-  if(typeof currentUser!=='undefined'&&currentUser) setTimeout(lsDriveNudge,2500);
   load();
   migrateCondHistoryToRecords();
   loadLedger();

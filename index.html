@@ -2572,6 +2572,19 @@ body.cozy .app .spz-chip,body.cozy .app .spz-gh{font-weight:500 !important}
 .mem-dv{position:absolute;right:4px;bottom:4px;background:rgba(255,255,255,.9);color:var(--cz-deep);border-radius:99px;font-size:10px;padding:1px 6px}
 
 .mem-hd{border:0;border-radius:99px;background:var(--cz-acc);color:#fff;padding:5px 13px;font-size:12px;cursor:pointer;font-family:inherit}
+
+/* 앱 안 사진 뷰어 */
+#pbox{position:fixed;inset:0;z-index:10000;background:rgba(20,16,14,.92);display:flex;align-items:center;justify-content:center;padding:calc(env(safe-area-inset-top,0px) + 12px) 12px calc(env(safe-area-inset-bottom,0px) + 56px)}
+#pbox .pb-img{max-width:100%;max-height:100%;object-fit:contain;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.5)}
+#pbox .pb-x{position:absolute;top:calc(env(safe-area-inset-top,0px) + 10px);right:12px;width:40px;height:40px;border-radius:50%;border:0;background:rgba(255,255,255,.16);color:#fff;font-size:24px;cursor:pointer;line-height:1}
+#pbox .pb-n{position:absolute;top:50%;transform:translateY(-50%);width:42px;height:42px;border-radius:50%;border:0;background:rgba(255,255,255,.16);color:#fff;font-size:26px;cursor:pointer;line-height:1}
+#pbox .pb-prev{left:10px}#pbox .pb-next{right:10px}
+#pbox .pb-bar{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);display:flex;align-items:center;justify-content:center;gap:12px;color:rgba(255,255,255,.85);font-size:12.5px}
+#pbox #pb-hd{border:0;border-radius:99px;background:var(--cz-acc,#e07656);color:#fff;padding:6px 14px;font-size:12.5px;cursor:pointer;font-family:inherit}
+#pbox [hidden]{display:none !important}
+
+#up-ind{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:9002;width:max-content;max-width:calc(100vw - 32px);box-sizing:border-box;background:rgba(40,36,32,.92);color:#fff;border-radius:16px;padding:9px 16px;font-size:12.5px;line-height:1.5;text-align:center;display:none}
+#up-ind.ok{background:rgba(70,110,80,.95)}
 </style>
 </head>
 <body>
@@ -2692,6 +2705,7 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 const storage = firebase.storage();
+try{storage.setMaxUploadRetryTime(20000);storage.setMaxOperationRetryTime(20000);}catch(e){}
 let currentUser = null;
 
 // Firestore 저장/로드
@@ -2771,6 +2785,27 @@ function chunkData(data) {
   // 브라우저에 직접 저장된(base64) 일기 사진도 Firestore 1MB 문서 한도를 넘겨
   // 일기 전체 동기화를 막을 수 있으므로 클라우드 전송분에서만 제외한다.
   // (localStorage 원본은 그대로 유지되므로 이 기기에서는 계속 보인다)
+  // 추억·프로젝트 기록 사진: 아직 클라우드에 못 올린 base64 사본이 문서에 섞이면 1MB 한도를 넘겨 저장 전체가 막힐 수 있어 제외 (이 기기엔 그대로 남음)
+  if (chunks.memories) {
+    chunks.memories = chunks.memories.map(function(m){
+      if (!m || !Array.isArray(m.photos)) return m;
+      const ph = m.photos.map(function(x){
+        if (typeof x === 'string') return x.indexOf('data:') === 0 ? null : x;
+        if (x && typeof x === 'object' && !x.url && (x.lo || x.hi || x.data)) { const c = Object.assign({}, x); delete c.lo; delete c.hi; delete c.data; return c.drive ? c : null; }
+        return x;
+      }).filter(Boolean);
+      return Object.assign({}, m, { photos: ph });
+    });
+  }
+  if (chunks.projects) {
+    chunks.projects = chunks.projects.map(function(pj){
+      if (!pj || !Array.isArray(pj.logs)) return pj;
+      return Object.assign({}, pj, { logs: pj.logs.map(function(l){
+        if (l && typeof l.photo === 'string' && l.photo.indexOf('data:') === 0) { const c = Object.assign({}, l); delete c.photo; return c; }
+        return l;
+      }) });
+    });
+  }
   if (chunks.diaryEntries) {
     const slim = {};
     Object.keys(chunks.diaryEntries).forEach(k => {
@@ -3481,6 +3516,9 @@ function togMemFav(id){var m=(S.memories||[]).find(function(x){return x.id===id;
 function memPickPerson(i){var n=memPeople()[i]||'';memPerson=memPerson===n?'':n;render();}
 function memKind(k){return MEM_KINDS.find(function(x){return x.id===k;})||MEM_KINDS[5];}
 function memList(){return (S.memories||[]).slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'');});}
+// 업로드가 멈춰 있어도 앱이 기다리지 않게: 시간 제한을 둔다
+function withTimeout(promise,ms,label){return new Promise(function(res,rej){var t=setTimeout(function(){rej(Object.assign(new Error((label||'작업')+' 시간 초과'),{code:'timeout'}));},ms);promise.then(function(v){clearTimeout(t);res(v);},function(e){clearTimeout(t);rej(e);});});}
+function upMsg(text,ok){var el=document.getElementById('up-ind');if(!el){el=document.createElement('div');el.id='up-ind';document.body.appendChild(el);}el.className=ok?'ok':'';el.textContent=text;el.style.display='block';clearTimeout(upMsg._t);if(ok!==undefined)upMsg._t=setTimeout(function(){el.style.display='none';},ok?2500:7000);}
 function memPhotoSrc(ph){return ph?(typeof ph==='string'?ph:(ph.url||ph.hi||ph.data||ph.lo||'')):'';}
 // 추억 사진: 긴 변 1600px·품질 0.78 (장당 약 200~350KB). 업로드 실패 대비 900px 작은 사본도 만든다
 function memCompress(file,LONG,q){
@@ -3552,9 +3590,9 @@ function openMemView(id){
   var pl=(m.photos||[]).map(function(x){return {src:memPhotoSrc(x),drive:x&&x.drive};}).filter(function(x){return x.src;}),ph=pl.map(function(x){return x.src;}),k=memKind(m.kind);
   var hasDrv=pl.some(function(x){return x.drive;});
   openMo(esc(m.title||'추억'),
-    '<div class="mem-v">'+(ph.length?'<div class="mem-vph n'+Math.min(ph.length,4)+'">'+pl.map(function(x,i){return '<a href="'+esc(x.src)+'" target="_blank" rel="noopener" data-vi="'+i+'"><img src="'+esc(x.src)+'" alt=""></a>';}).join('')+'</div>':'')+
+    '<div class="mem-v">'+(ph.length?'<div class="mem-vph n'+Math.min(ph.length,4)+'">'+pl.map(function(x,i){return '<a href="'+esc(x.src)+'" target="_blank" rel="noopener" data-vi="'+i+'" onclick="return memBox(\''+m.id+'\','+i+')"><img src="'+esc(x.src)+'" alt=""></a>';}).join('')+'</div>':'')+
     '<div class="mem-vk">'+k.ic+' '+k.ko+' · '+esc((m.date||'').replace(/-/g,'. '))+(m.place?' · ⌖ '+esc(m.place):'')+'</div>'+
-    ((m.photos||[]).some(function(x){return x&&x.drive;})?'<div class="mem-orig"><span id="mem-hdst">☁ 원본은 구글 드라이브에 보관돼 있어요</span>'+(lsdToken()?'':'<button type="button" class="mem-hd" id="mem-hdbtn" onclick="memUpgrade(\''+m.id+'\',true)">✨ 원본 화질로 보기</button>')+(m.photos||[]).map(function(x,i){return x&&x.drive?'<a href="https://drive.google.com/file/d/'+esc(x.drive)+'/view" target="_blank" rel="noopener">원본 '+(i+1)+'</a>':'';}).join('')+'</div>':'')+
+    ((m.photos||[]).some(function(x){return x&&x.drive;})?'<div class="mem-orig"><span id="mem-hdst">☁ 선명한 사진은 구글 드라이브에 보관돼 있어요</span>'+(lsdToken()?'':'<button type="button" class="mem-hd" id="mem-hdbtn" onclick="memUpgrade(\''+m.id+'\',true)">✨ 선명하게 보기</button>')+(m.photos||[]).map(function(x,i){return x&&x.drive?'<a href="https://drive.google.com/file/d/'+esc(x.drive)+'/view" target="_blank" rel="noopener">큰 사진 '+(i+1)+'</a>':'';}).join('')+'</div>':'')+
     (((m.people||[]).length||m.text)?'<div class="mem-note nt-'+memNoteId(m.note)+'"><i class="mem-tape"></i>'+
       ((m.people||[]).length?'<div class="mem-with">♡ '+memWithPhrase(m)+'</div>':'')+
       (m.text?'<p class="mem-vt">'+esc(m.text)+'</p>':'')+'</div>':'')+'</div>',
@@ -3563,22 +3601,74 @@ function openMemView(id){
 }
 // 드라이브에 보관한 원본을 불러와 선명하게 보여 준다 (드라이브가 만든 큰 미리보기: 긴 변 2048px)
 // 권한이 살아 있으면 자동으로, 아니면 버튼을 눌렀을 때(권한 창) 불러온다
+var _drvBig={};
+// 드라이브에 보관한 사진 → 앱 안에서 바로 쓸 수 있는 큰 사진 주소 (드라이브가 만든 긴 변 2048px 미리보기)
+async function lsdBigUrl(did){
+  if(_drvBig[did])return _drvBig[did];
+  var f=await lsdFetch('https://www.googleapis.com/drive/v3/files/'+did+'?fields=thumbnailLink');
+  if(!f||!f.thumbnailLink)return null;
+  var url=f.thumbnailLink.replace(/=s\d+(-c)?$/,'=s2560');
+  var ok=await new Promise(function(res){var im=new Image();im.onload=function(){res(true);};im.onerror=function(){res(false);};im.src=url;});
+  if(ok)_drvBig[did]=url;return ok?url:null;
+}
+// 앱 안 사진 뷰어: 누르면 바로 크게. 드라이브 원본이 있으면 선명한 버전으로 바꿔 보여 준다
+function photoBox(list,i){
+  closePhotoBox();if(!list||!list.length)return false;window._pb={list:list,i:i||0};
+  var el=document.createElement('div');el.id='pbox';
+  el.innerHTML='<button type="button" class="pb-x" aria-label="닫기">×</button><button type="button" class="pb-n pb-prev" aria-label="이전">‹</button><img class="pb-img" alt=""><button type="button" class="pb-n pb-next" aria-label="다음">›</button><div class="pb-bar"><span id="pb-st"></span><button type="button" id="pb-hd" hidden>✨ 선명하게 보기</button><span id="pb-ct"></span></div>';
+  el.onclick=function(e){if(e.target===el||e.target.classList.contains('pb-x'))closePhotoBox();else if(e.target.classList.contains('pb-prev'))pbGo(-1);else if(e.target.classList.contains('pb-next'))pbGo(1);};
+  el.querySelector('#pb-hd').onclick=function(){pbUpgrade(true);};
+  document.body.appendChild(el);pbShow();
+  if(!window._pbKey){window._pbKey=function(e){if(!document.getElementById('pbox'))return;if(e.key==='Escape')closePhotoBox();else if(e.key==='ArrowLeft')pbGo(-1);else if(e.key==='ArrowRight')pbGo(1);};document.addEventListener('keydown',window._pbKey);}
+  return false;
+}
+function closePhotoBox(){var el=document.getElementById('pbox');if(el)el.remove();window._pb=null;}
+function pbGo(d){var b=window._pb;if(!b)return;b.i=(b.i+d+b.list.length)%b.list.length;pbShow();}
+function pbShow(){
+  var b=window._pb,el=document.getElementById('pbox');if(!b||!el)return;var it=b.list[b.i];
+  el.querySelector('.pb-img').src=_drvBig[it.drive]||it.src;
+  el.querySelector('.pb-prev').hidden=el.querySelector('.pb-next').hidden=b.list.length<2;
+  el.querySelector('#pb-ct').textContent=b.list.length>1?(b.i+1)+' / '+b.list.length:'';
+  el.querySelector('#pb-hd').hidden=true;var st=el.querySelector('#pb-st');st.textContent='';
+  if(!it.drive)return;
+  if(_drvBig[it.drive]){st.textContent='☁ 드라이브의 선명한 사진';return;}
+  if(lsdToken())pbUpgrade(false);else el.querySelector('#pb-hd').hidden=false;
+}
+async function pbUpgrade(ask){
+  var b=window._pb;if(!b)return;var it=b.list[b.i],at=b.i,st=document.getElementById('pb-st'),hd=document.getElementById('pb-hd');
+  var tk=lsdToken();if(!tk&&ask)tk=await lsdEnsureToken();if(!tk)return;
+  if(hd)hd.hidden=true;if(st)st.textContent='☁ 선명한 사진 불러오는 중…';
+  var url=null;try{url=await lsdBigUrl(it.drive);}catch(e){}
+  var now=window._pb;if(!now||now.i!==at||!document.getElementById('pbox'))return;
+  var im=document.querySelector('#pbox .pb-img'),st2=document.getElementById('pb-st');
+  if(url){im.src=url;if(st2)st2.textContent='☁ 드라이브의 선명한 사진';}
+  else{if(st2)st2.textContent='선명한 사진을 지금은 못 불러왔어요';var h2=document.getElementById('pb-hd');if(h2)h2.hidden=false;}
+}
+function memBox(id,i){
+  var m=(S.memories||[]).find(function(x){return x.id===id;});if(!m)return true;
+  var list=(m.photos||[]).map(function(x){return {src:memPhotoSrc(x),drive:x&&x.drive};}).filter(function(x){return x.src;});
+  return photoBox(list,i);
+}
+function pjBox(pid,lid){
+  var p=S.projects.find(function(x){return x.id===pid;});if(!p)return true;
+  var logs=(p.logs||[]).slice().sort(function(a,b){return b.date.localeCompare(a.date);}).filter(function(l){return l.photo;});
+  var list=logs.map(function(l){return {src:l.photo,drive:l.drive};}),i=logs.findIndex(function(l){return l.id===lid;});
+  return photoBox(list,Math.max(0,i));
+}
 async function memUpgrade(id,ask){
   var m=(S.memories||[]).find(function(x){return x.id===id;});if(!m)return;
   var st=document.getElementById('mem-hdst'),btn=document.getElementById('mem-hdbtn');
   var tk=lsdToken();if(!tk&&ask)tk=await lsdEnsureToken();
   if(!tk)return;
-  if(btn)btn.remove();if(st)st.textContent='☁ 원본 화질 불러오는 중…';
+  if(btn)btn.remove();if(st)st.textContent='☁ 선명한 사진 불러오는 중…';
   var pl=(m.photos||[]).map(function(x){return {src:memPhotoSrc(x),drive:x&&x.drive};}).filter(function(x){return x.src;}),got=0;
   await Promise.all(pl.map(async function(x,i){
     if(!x.drive)return;
-    try{var f=await lsdFetch('https://www.googleapis.com/drive/v3/files/'+x.drive+'?fields=thumbnailLink');
-      if(!f||!f.thumbnailLink)return;
-      var url=f.thumbnailLink.replace(/=s\d+(-c)?$/,'=s2048'),a=document.querySelector('.mem-vph a[data-vi="'+i+'"]');if(!a)return;
-      await new Promise(function(res){var im=new Image();im.onload=function(){a.href=url;var tg=a.querySelector('img');if(tg)tg.src=url;got++;res();};im.onerror=res;im.src=url;});
+    try{var url=await lsdBigUrl(x.drive),a=document.querySelector('.mem-vph a[data-vi="'+i+'"]');if(!url||!a)return;
+      a.href=url;var tg=a.querySelector('img');if(tg)tg.src=url;got++;
     }catch(e){console.warn('원본 불러오기 실패',e);}
   }));
-  var st2=document.getElementById('mem-hdst');if(st2)st2.textContent=got?'☁ 드라이브 원본 화질로 보는 중':'☁ 원본은 구글 드라이브에 보관돼 있어요 (지금은 못 불러왔어요)';
+  var st2=document.getElementById('mem-hdst');if(st2)st2.textContent=got?'☁ 드라이브의 선명한 사진으로 보는 중':'☁ 선명한 사진은 구글 드라이브에 보관돼 있어요 (지금은 못 불러왔어요)';
 }
 function openMemForm(id){
   var m=id?(S.memories||[]).find(function(x){return x.id===id;}):null;
@@ -3598,7 +3688,7 @@ function openMemForm(id){
 function memPickKind(k){if(!_memDraft)return;_memDraft.kind=k;document.querySelectorAll('#mem-kinds button').forEach(function(b){b.classList.toggle('on',b.dataset.k===k);});}
 function memDrawPhotos(){
   var el=document.getElementById('mem-fph');if(!el||!_memDraft)return;
-  el.innerHTML=_memDraft.photos.map(function(ph,i){return '<div class="mem-th'+(i===0?' cover':'')+'" style="background-image:url(\''+esc(memPhotoSrc(ph)).replace(/'/g,'%27')+'\')"><button type="button" onclick="memDelPhoto('+i+')" title="빼기">×</button>'+(ph&&(ph.drive||ph.file)?'<span class="mem-dv" title="원본은 구글 드라이브에 보관돼요">☁</span>':'')+(i===0?'<span class="mem-cv">대표</span>':'<button type="button" class="mem-cvb" onclick="memSetCover('+i+')" title="대표 사진으로">★ 대표로</button>')+'</div>';}).join('')+
+  el.innerHTML=_memDraft.photos.map(function(ph,i){return '<div class="mem-th'+(i===0?' cover':'')+'" style="background-image:url(\''+esc(memPhotoSrc(ph)).replace(/'/g,'%27')+'\')"><button type="button" onclick="memDelPhoto('+i+')" title="빼기">×</button>'+(ph&&(ph.drive||ph.file)?'<span class="mem-dv" title="선명한 사진은 구글 드라이브에 보관돼요">☁</span>':'')+(i===0?'<span class="mem-cv">대표</span>':'<button type="button" class="mem-cvb" onclick="memSetCover('+i+')" title="대표 사진으로">★ 대표로</button>')+'</div>';}).join('')+
     (_memDraft.photos.length<6?'<label class="mem-th add">'+CZI.cam+'<span>사진 추가</span><input type="file" accept="image/*" multiple hidden onchange="memAddPhotos(this)"></label>':'');
 }
 async function memAddPhotos(input){
@@ -3613,55 +3703,42 @@ async function saveMem(){
   var g=function(i){return document.getElementById(i);};
   var title=g('mem-t').value.trim(),text=g('mem-x').value.trim();
   if(!title&&!text&&!_memDraft.photos.length){g('mem-t').focus();return;}
-  var rid=_memDraft.id||gid(),photos=_memDraft.photos.slice(),btn=g('mem-save');
-  // 새로 고른 사진은 저장 전에 원본 화질로 먼저 올린다 (로그인 상태일 때)
-  var fresh=photos.filter(function(ph){return ph&&ph.hi;});
-  if(fresh.length&&typeof currentUser!=='undefined'&&currentUser){
-    if(btn){btn.disabled=true;}
-    // 원본은 구글 드라이브에 보관 → 권한 창은 저장 버튼을 누른 이 순간에만 띄울 수 있다 (이미 받았으면 생략)
-    var driveOk=false;
-    if(fresh.some(function(ph){return ph.file;})){
-      if(btn)btn.textContent='드라이브 권한 확인 중…';
-      try{driveOk=!!(lsdToken()||await lsdEnsureToken());}catch(e){driveOk=false;}
-    }
-    var driveFail=0;
-    for(var i=0,n=0;i<photos.length;i++){
-      var ph=photos[i];if(!ph||!ph.hi)continue;n++;
-      if(btn)btn.textContent='사진 올리는 중 '+n+'/'+fresh.length;
-      var out={lo:ph.lo};
-      try{var blob=dataUrlToBlob(ph.hi),path='users/'+currentUser.uid+'/cozy/mem-'+rid+'-'+gid()+'.'+(blob.type==='image/jpeg'?'jpg':'webp'),ref=storage.ref().child(path);
-        await ref.put(blob,{contentType:blob.type});out={url:await ref.getDownloadURL(),path:path};
-      }catch(e){console.warn('추억 사진 올리기 실패',e);}
-      if(driveOk&&ph.file){
-        try{var fn=(g('mem-d').value||todStr())+'_'+(title||'추억').replace(/[\\/:*?"<>|]/g,'').slice(0,20)+'_'+(n)+'_'+(ph.file.name||'photo.jpg');
-          out.drive=await lsdUploadOriginal(ph.file,fn);}
-        catch(e){driveFail++;console.warn('드라이브 원본 올리기 실패',e);}
-      }
-      photos[i]=out;
-    }
-    if(driveFail)lsdToast('원본 '+driveFail+'장은 드라이브에 못 올렸어요');
-    if(!_memDraft)return;
-  }
-  photos=photos.map(function(ph){return ph&&ph.hi?ph.lo:ph;});
-  var rec={id:rid,date:g('mem-d').value||todStr(),title:title,place:g('mem-pl').value.trim(),kind:_memDraft.kind,note:_memDraft.note,
+  var rid=_memDraft.id||gid(),loggedIn=typeof currentUser!=='undefined'&&currentUser;
+  var fresh=_memDraft.photos.filter(function(ph){return ph&&ph.hi;});
+  var date=g('mem-d').value||todStr();
+  // 드라이브 권한 창은 사용자가 누른 이 순간에만 띄울 수 있어서 가장 먼저 요청 (기다리지 않고 계속 진행)
+  var tkP=(loggedIn&&fresh.some(function(ph){return ph.file;}))?Promise.resolve(lsdToken()||lsdEnsureToken()).catch(function(){return null;}):null;
+  // 1) 기록은 바로 저장 (새 사진은 이 기기의 작은 사본으로 먼저 보인다)
+  var photos=_memDraft.photos.map(function(ph){return ph&&ph.hi?ph.lo:ph;});
+  var rec={id:rid,date:date,title:title,place:g('mem-pl').value.trim(),kind:_memDraft.kind,note:_memDraft.note,
     people:g('mem-pp').value.split(',').map(function(x){return x.trim();}).filter(Boolean),text:text,photos:photos};
   if(!S.memories)S.memories=[];
   var idx=S.memories.findIndex(function(x){return x.id===rec.id;});
   if(idx>=0)S.memories[idx]=Object.assign({},S.memories[idx],rec);else S.memories.push(rec);
-  var removed=_memDraft.removed||[];_memDraft=null;
+  var removed=_memDraft.removed||[],jobs=fresh.map(function(ph){return {lo:ph.lo,hi:ph.hi,file:ph.file};});_memDraft=null;
   save();closeMo();render();
   removed.forEach(function(pth){try{storage.ref().child(pth).delete().catch(function(){});}catch(_){}});
-  if(typeof currentUser!=='undefined'&&currentUser){
-    var changed=false;
-    for(var i=0;i<rec.photos.length;i++){
-      var ph=rec.photos[i];if(typeof ph!=='string'||ph.indexOf('data:')!==0)continue;
-      try{var blob=dataUrlToBlob(ph),path='users/'+currentUser.uid+'/cozy/mem-'+rec.id+'-'+gid()+'.'+(blob.type==='image/jpeg'?'jpg':'webp'),ref=storage.ref().child(path);
-        await ref.put(blob,{contentType:blob.type});var url=await ref.getDownloadURL();
-        var cur=(S.memories||[]).find(function(x){return x.id===rec.id;});if(cur&&cur.photos){var j=cur.photos.indexOf(ph);if(j>=0){cur.photos[j]={url:url,path:path};changed=true;}}
-      }catch(e){console.warn('추억 사진 올리기 실패',e);}
+  // 2) 사진은 뒤에서 올린다 (클라우드 선명한 사본 + 드라이브 선명한 사진). 오래 걸려도 앱은 그대로 쓸 수 있다
+  if(!loggedIn||!jobs.length)return;
+  var fbFail=0,drvFail=0,lastErr='',slug=(title||'추억').replace(/[\\/:*?"<>|]/g,'').slice(0,20);
+  for(var i=0;i<jobs.length;i++){
+    var j=jobs[i],out={};
+    upMsg('☁ 사진 올리는 중 '+(i+1)+'/'+jobs.length);
+    try{
+      var blob=dataUrlToBlob(j.hi),path='users/'+currentUser.uid+'/cozy/mem-'+rid+'-'+gid()+'.'+(blob.type==='image/jpeg'?'jpg':'webp'),ref=storage.ref().child(path);
+      await withTimeout(ref.put(blob,{contentType:blob.type}),30000,'클라우드 업로드');
+      out.url=await withTimeout(ref.getDownloadURL(),10000,'주소 받기');out.path=path;
+    }catch(e){fbFail++;lastErr=(e&&(e.code||e.message))||'';console.warn('추억 사진 클라우드 올리기 실패',e);}
+    if(tkP&&j.file&&await tkP){
+      try{out.drive=await withTimeout(lsdUploadOriginal(j.file,date+'_'+slug+'_'+(i+1)+'_'+(j.file.name||'photo.jpg')),90000,'드라이브 업로드');}
+      catch(e){drvFail++;lastErr=lastErr||(e&&(e.code||e.message))||'';console.warn('드라이브 사진 올리기 실패',e);}
     }
-    if(changed){save();render();}
+    var cur=(S.memories||[]).find(function(x){return x.id===rid;});
+    if(cur&&cur.photos){var k=cur.photos.findIndex(function(x){return x===j.lo;});
+      if(k>=0&&(out.url||out.drive)){cur.photos[k]=out.url?out:{lo:j.lo,drive:out.drive};save();render();}}
   }
+  if(fbFail||drvFail)upMsg('⚠ 사진 '+(fbFail?'클라우드 '+fbFail+'장':'')+(fbFail&&drvFail?' · ':'')+(drvFail?'드라이브 '+drvFail+'장':'')+' 못 올렸어요'+(lastErr?' ('+lastErr+')':'')+' · 기록은 저장됐어요',false);
+  else upMsg('☁ 사진 올렸어요 ✓',true);
 }
 function delMem(id){
   var m=(S.memories||[]).find(function(x){return x.id===id;});if(!m)return;
@@ -3736,7 +3813,24 @@ async function lsdSubFolder(name){
   m=lsdMeta();m.sub=m.sub||{};m.sub[name]=id;lsdSetMeta(m);return id;
 }
 // 사진 원본(파일 그대로)을 드라이브 '추억 사진' 폴더에 올리고 파일 id를 돌려준다
+// 선명하게 줄이기: 긴 변 2560px · JPEG 0.88 (폰 사진 5~12MB → 대략 0.5~2MB). 이미 작은 JPEG는 그대로 올린다
+function lsdSharpen(file){
+  return new Promise(function(resolve){
+    if(!file||!/^image\//.test(file.type||'')||/gif|svg/.test(file.type)){resolve({blob:file,name:null});return;}
+    var img=new Image(),u=URL.createObjectURL(file);
+    img.onload=function(){try{
+      var w=img.naturalWidth,h=img.naturalHeight,LONG=2560;
+      if(!w||!h||(Math.max(w,h)<=LONG&&file.type==='image/jpeg'&&file.size<=2*1024*1024)){URL.revokeObjectURL(u);resolve({blob:file,name:null});return;}
+      var sc=Math.min(1,LONG/Math.max(w,h)),c=document.createElement('canvas');c.width=Math.round(w*sc);c.height=Math.round(h*sc);
+      var x=c.getContext('2d',{alpha:false});if(x.imageSmoothingQuality!==undefined)x.imageSmoothingQuality='high';x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(u);
+      c.toBlob(function(b){resolve(b?{blob:b,name:'jpg'}:{blob:file,name:null});},'image/jpeg',0.88);
+    }catch(e){URL.revokeObjectURL(u);resolve({blob:file,name:null});}};
+    img.onerror=function(){URL.revokeObjectURL(u);resolve({blob:file,name:null});};
+    img.src=u;
+  });
+}
 async function lsdUploadOriginal(file,fileName,sub){
+  var sh=await lsdSharpen(file);file=sh.blob;if(sh.name)fileName=fileName.replace(/\.[A-Za-z0-9]+$/,'')+'.jpg';
   var folder=await lsdSubFolder(sub||'추억 사진'),bd='lucy'+Date.now()+Math.random().toString(36).slice(2,8);
   var meta=JSON.stringify({name:fileName,parents:[folder]});
   var body=new Blob(['--'+bd+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+meta+'\r\n--'+bd+'\r\nContent-Type: '+(file.type||'application/octet-stream')+'\r\n\r\n',file,'\r\n--'+bd+'--']);
@@ -3775,19 +3869,24 @@ function lsdToast(msg){var t=document.createElement('div');t.className='lsd-toas
 function lsdWhen(ms){var d=new Date(ms);return (d.getMonth()+1)+'월 '+d.getDate()+'일 '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
 function lsDriveNudge(){
   if(typeof currentUser==='undefined'||!currentUser||document.getElementById('lsd-nudge'))return;
-  var m=lsdMeta(),day=86400000;
-  if(m.at&&Date.now()-m.at<day)return;if(m.snooze&&Date.now()<m.snooze)return;if(m.sig&&m.sig===lsdSig())return;
-  var days=m.at?Math.floor((Date.now()-m.at)/day):0,el=document.createElement('div');el.id='lsd-nudge';
-  el.innerHTML='<span>☁ '+(m.at?'드라이브 백업한 지 '+days+'일 됐어요':'구글 드라이브에 백업해 둘까요?')+'</span><button type="button" class="go">지금 백업</button><button type="button" class="later">나중에</button>';
-  el.querySelector('.go').onclick=function(){el.remove();lsdBackupClick();};
-  el.querySelector('.later').onclick=function(){el.remove();var mm=lsdMeta();mm.snooze=Date.now()+12*3600000;lsdSetMeta(mm);};
+  if(lsdToken())return;                                   // 권한이 살아 있으면 묻지 않음
+  try{if(sessionStorage.getItem('lsd_nudge_off'))return;}catch(e){}   // '나중에'는 이번 접속에서만
+  var m=lsdMeta(),due=!m.at||Date.now()-m.at>=86400000,el=document.createElement('div');el.id='lsd-nudge';
+  el.innerHTML='<span>☁ '+(due?'구글 드라이브를 연결하면 사진을 선명하게 보고, 백업도 할 수 있어요':'구글 드라이브를 연결하면 사진을 선명하게 볼 수 있어요')+'</span><button type="button" class="go">연결하기</button><button type="button" class="later">나중에</button>';
+  el.querySelector('.go').onclick=async function(){
+    el.remove();
+    if(!await lsdEnsureToken())return;
+    lsdToast('드라이브에 연결했어요 ✓');
+    var mm=lsdMeta();if(!mm.at||Date.now()-mm.at>=86400000){try{await lsdBackupNow();lsdToast('드라이브에 백업했어요 ✓');}catch(e){}}
+  };
+  el.querySelector('.later').onclick=function(){el.remove();try{sessionStorage.setItem('lsd_nudge_off','1');}catch(e){}};
   document.body.appendChild(el);
 }
 function lsDriveCard(){
   var m=lsdMeta();
   return '<div class="card" style="margin-bottom:14px"><div class="ct" style="margin-bottom:10px">☁️ 구글 드라이브 백업</div>'+
     '<div class="lsd-st">'+(m.at?'마지막 백업 <b>'+lsdWhen(m.at)+'</b>':'아직 드라이브 백업이 없어요')+'<span>· 최근 '+LSD_KEEP+'개만 남아요</span></div>'+
-    '<div class="lsd-help">내 드라이브의 <b>‘'+LSD_FOLDER+'’</b> 폴더에 저장돼요. 처음 백업하면 이 폴더가 드라이브 맨 앞에 생기는데, 드라이브 앱에서 <b>‘백업’ 폴더 안으로 한 번만 옮겨 주세요.</b> 옮긴 뒤에도 계속 그 폴더로 백업돼요.<br>권한을 받은 뒤 1시간 동안은 바뀐 게 있으면 저절로 백업하고, 하루 넘게 백업이 없으면 알려 드려요. 되살릴 땐 아래 <b>가져오기</b>로 백업 파일을 고르면 돼요.<br><b>추억 사진 원본</b>은 같은 폴더 안의 <b>‘추억 사진’</b>·<b>‘프로젝트 기록’</b> 폴더에 원본 그대로 저장돼요. 추억을 저장할 때 구글 권한 창이 뜰 수 있어요.</div>'+
+    '<div class="lsd-help">내 드라이브의 <b>‘'+LSD_FOLDER+'’</b> 폴더에 저장돼요. 처음 백업하면 이 폴더가 드라이브 맨 앞에 생기는데, 드라이브 앱에서 <b>‘백업’ 폴더 안으로 한 번만 옮겨 주세요.</b> 옮긴 뒤에도 계속 그 폴더로 백업돼요.<br>권한을 받은 뒤 1시간 동안은 바뀐 게 있으면 저절로 백업하고, 하루 넘게 백업이 없으면 알려 드려요. 되살릴 땐 아래 <b>가져오기</b>로 백업 파일을 고르면 돼요.<br><b>추억·프로젝트 기록 사진</b>은 같은 폴더 안의 <b>‘추억 사진’</b>·<b>‘프로젝트 기록’</b> 폴더에 선명하게 줄여서(긴 변 2560px) 저장돼요. 추억을 저장할 때 구글 권한 창이 뜰 수 있어요.</div>'+
     '<button class="btn bp bsm" id="lsd-btn" onclick="lsdBackupClick()">지금 드라이브에 백업</button></div>';
 }
 
@@ -5760,7 +5859,7 @@ function pjLogCard(p){
   h+='<div class="pjx-logadd"><label class="pjx-ph" id="pjl-ph-'+p.id+'" title="사진 넣기">'+(_pjLogPhoto[p.id]?'<img src="'+_pjLogPhoto[p.id]+'">':'+ 사진')+'<input type="file" accept="image/*" hidden onchange="pjLogPick(\''+p.id+'\',this)"></label>'+
     '<input class="inp" id="pjl-t-'+p.id+'" placeholder="오늘 한 것 한 줄 (예: 필라테스 50분)" onkeydown="if(event.key===\'Enter\'&&!event.isComposing)addPjLog(\''+p.id+'\')"><button class="btn bp bsm" onclick="addPjLog(\''+p.id+'\')">남기기</button></div>';
   if(!logs.length) return h+'<div class="pjx-empty">운동 인증, 연습, 공부한 것을 날짜별로 쌓아 보세요</div></div>';
-  h+='<div class="pjx-logs">'+show.map(function(l){return '<div class="pjx-log">'+(l.photo?'<a class="pjx-log-ph" href="'+(l.drive?'https://drive.google.com/file/d/'+esc(l.drive)+'/view':esc(l.photo))+'" target="_blank" rel="noopener" title="'+(l.drive?'드라이브 원본 열기':'크게 보기')+'" style="background-image:url(\''+esc(l.photo).replace(/'/g,'%27')+'\')">'+(l.drive?'<i class="pjx-dv">☁ 원본</i>':'')+'</a>':'')+'<div class="pjx-log-b"><div class="pjx-log-d">'+esc(l.date.slice(5).replace('-','.'))+'</div><div class="pjx-log-t">'+esc(l.text||'')+'</div></div><button type="button" class="pjx-x" onclick="delPjLog(\''+p.id+'\',\''+l.id+'\')">×</button></div>';}).join('')+'</div>';
+  h+='<div class="pjx-logs">'+show.map(function(l){return '<div class="pjx-log">'+(l.photo?'<a class="pjx-log-ph" href="'+esc(l.photo)+'" target="_blank" rel="noopener" onclick="return pjBox(\''+p.id+'\',\''+l.id+'\')" title="크게 보기" style=""background-image:url(\''+esc(l.photo).replace(/'/g,'%27')+'\')">'+(l.drive?'<i class="pjx-dv">☁ 선명</i>':'')+'</a>':'')+'<div class="pjx-log-b"><div class="pjx-log-d">'+esc(l.date.slice(5).replace('-','.'))+'</div><div class="pjx-log-t">'+esc(l.text||'')+'</div></div><button type="button" class="pjx-x" onclick="delPjLog(\''+p.id+'\',\''+l.id+'\')">×</button></div>';}).join('')+'</div>';
   if(logs.length>6) h+='<button type="button" class="pjx-more" onclick="window[\'_pjLogAll_'+p.id+'\']=!window[\'_pjLogAll_'+p.id+'\'];render()">'+(window['_pjLogAll_'+p.id]?'접기':'전체 '+logs.length+'개 보기')+'</button>';
   return h+'</div>';
 }
@@ -5771,11 +5870,11 @@ async function addPjLog(pid){
   // 원본은 구글 드라이브에 보관 → 권한 창은 사용자가 누른 이 순간에만 띄울 수 있어서 가장 먼저 요청한다
   var tkP=(file&&loggedIn)?Promise.resolve(lsdToken()||lsdEnsureToken()).catch(function(){return null;}):null;
   var l={id:gid(),date:todStr(),text:tx,photo:ph};if(!p.logs)p.logs=[];p.logs.push(l);delete _pjLogPhoto[pid];delete _pjLogFile[pid];save();render();
-  if(ph&&typeof currentUser!=='undefined'&&currentUser){try{var blob=dataUrlToBlob(ph),path='users/'+currentUser.uid+'/cozy/log-'+pid+'-'+l.id+'.'+(blob.type==='image/jpeg'?'jpg':'webp'),ref=storage.ref().child(path);await ref.put(blob,{contentType:blob.type});var url=await ref.getDownloadURL();var cur=(p.logs||[]).find(function(x){return x.id===l.id;});if(cur){cur.photo=url;cur.photoPath=path;save();render();}}catch(e){console.warn('기록 사진 올리기 실패',e);}}
+  if(ph&&typeof currentUser!=='undefined'&&currentUser){try{var blob=dataUrlToBlob(ph),path='users/'+currentUser.uid+'/cozy/log-'+pid+'-'+l.id+'.'+(blob.type==='image/jpeg'?'jpg':'webp'),ref=storage.ref().child(path);await withTimeout(ref.put(blob,{contentType:blob.type}),30000,'클라우드 업로드');var url=await withTimeout(ref.getDownloadURL(),10000,'주소 받기');var cur=(p.logs||[]).find(function(x){return x.id===l.id;});if(cur){cur.photo=url;cur.photoPath=path;save();render();}}catch(e){console.warn('기록 사진 올리기 실패',e);upMsg('⚠ 사진을 클라우드에 못 올렸어요 ('+((e&&(e.code||e.message))||'')+') · 기록은 저장됐어요',false);}}
   if(tkP&&await tkP){
-    try{var fn=l.date+'_'+(p.name||'프로젝트').replace(/[\\/:*?"<>|]/g,'').slice(0,20)+'_'+(file.name||'photo.jpg'),did=await lsdUploadOriginal(file,fn,'프로젝트 기록');
+    try{var fn=l.date+'_'+(p.name||'프로젝트').replace(/[\\/:*?"<>|]/g,'').slice(0,20)+'_'+(file.name||'photo.jpg'),did=await withTimeout(lsdUploadOriginal(file,fn,'프로젝트 기록'),90000,'드라이브 업로드');
       var cur2=(p.logs||[]).find(function(x){return x.id===l.id;});if(cur2&&did){cur2.drive=did;save();render();}}
-    catch(e){console.warn('드라이브 원본 올리기 실패',e);lsdToast('원본은 드라이브에 못 올렸어요');}
+    catch(e){console.warn('드라이브 원본 올리기 실패',e);lsdToast('사진을 드라이브에 못 올렸어요');}
   }
 }
 function delPjLog(pid,lid){var p=S.projects.find(function(x){return x.id===pid;});if(!p)return;var l=(p.logs||[]).find(function(x){return x.id===lid;});if(l&&l.photoPath){try{storage.ref().child(l.photoPath).delete().catch(function(){});}catch(_){}}p.logs=(p.logs||[]).filter(function(x){return x.id!==lid;});save();render();}
@@ -12749,7 +12848,7 @@ function migrateCondHistoryToRecords(){
   save();
 }
 function initApp(){
-  if(typeof currentUser!=='undefined'&&currentUser) setTimeout(lsDriveNudge,6000);
+  if(typeof currentUser!=='undefined'&&currentUser) setTimeout(lsDriveNudge,2500);
   load();
   migrateCondHistoryToRecords();
   loadLedger();

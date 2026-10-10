@@ -599,6 +599,36 @@ body.page-life .topbar{display:none}
 /* ── LIFE AREA ── */
 .la-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px}
 .la-card{background:var(--surface);border-radius:8px;padding:20px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;border:1.5px solid transparent}
+/* 프로젝트 만들기·수정 창 */
+.pjm{display:flex;flex-direction:column;gap:20px;padding-top:2px}
+.pjm-top{display:flex;gap:12px;align-items:center}
+.pjm-emoji{width:56px;height:56px;flex:none;border-radius:20px;border:1px dashed var(--cz-line,var(--border2));background:var(--cz-paper,var(--s2));text-align:center;font-size:26px;outline:none;padding:0}
+.pjm-emoji:focus{border-color:var(--cz-acc,var(--accent))}
+.pjm-name{flex:1;min-width:0;border:0;border-bottom:2px solid var(--cz-line,var(--border));background:transparent;font:700 22px/1.3 var(--sans);color:var(--text);padding:6px 2px;outline:none;letter-spacing:-.4px}
+.pjm-name:focus{border-bottom-color:var(--cz-acc,var(--accent))}
+.pjm-desc,.pjm-date{width:100%;box-sizing:border-box;border:1px solid var(--cz-line,var(--border));background:var(--cz-paper,var(--s2));border-radius:14px;padding:11px 14px;font-size:14px;font-family:var(--sans);color:var(--text);outline:none}
+.pjm-date{width:auto;min-width:170px}
+.pjm-desc:focus,.pjm-date:focus{border-color:var(--cz-acc,var(--accent));background:var(--surface)}
+.pjm-sec{display:flex;align-items:baseline;gap:8px;margin-bottom:9px;flex-wrap:wrap}
+.pjm-sec em{font-family:'Instrument Serif',Georgia,serif;font-size:15px;color:var(--cz-acc,var(--accent));letter-spacing:.3px}
+.pjm-sec b{font-size:13.5px;font-weight:700;color:var(--text)}
+.pjm-sec span{font-size:11.5px;color:var(--t3)}
+.pjm-chips{display:flex;flex-wrap:wrap;gap:8px}
+.pjm-chip{border:1px solid color-mix(in srgb,var(--c,#999) 38%,var(--surface));background:color-mix(in srgb,var(--c,#999) 7%,var(--surface));color:var(--text);border-radius:99px;padding:7px 14px;font-size:13px;cursor:pointer;font-family:var(--sans);transition:background .15s,border-color .15s}
+.pjm-chip:hover{background:color-mix(in srgb,var(--c,#999) 14%,var(--surface))}
+.pjm-chip.on{background:color-mix(in srgb,var(--c,#999) 24%,var(--surface));border-color:var(--c,#999);font-weight:700}
+.pjm-chip.on::before{content:'✓ ';opacity:.7}
+.pjm .cops{gap:10px}
+.pjm .cop{width:28px;height:28px;border-radius:50%;border:2px solid var(--surface);box-shadow:0 0 0 1px var(--border);position:relative;transform:none}
+.pjm .cop:hover{transform:scale(1.08);border-color:var(--surface)}
+.pjm .cop.on{border-color:var(--surface);box-shadow:0 0 0 2.5px var(--text)}
+.pjm-pick{background:conic-gradient(#f2a5a5,#f2d9a0,#b9e0a8,#9fd6e6,#b9a8e6,#f2a5c8,#f2a5a5);display:block;overflow:hidden}
+.pjm-pick input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;padding:0;border:0}
+.pjm-tgs{display:flex;flex-wrap:wrap;gap:8px}
+.pjm-tg{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--cz-line,var(--border));background:var(--cz-paper,var(--s2));border-radius:99px;padding:7px 13px;font-size:13px;cursor:pointer}
+.pjm-tg input{width:15px;height:15px;accent-color:var(--cz-acc,var(--accent));cursor:pointer;margin:0}
+.pjm-tg:has(input:checked){background:var(--cz-soft,var(--al));border-color:var(--cz-acc,var(--accent))}
+
 .la-addpj{margin-top:10px;width:100%;border:1px dashed var(--cz-line,var(--border2));background:transparent;color:var(--cz-deep,var(--t2));border-radius:12px;padding:8px 10px;font-size:12.5px;cursor:pointer;font-family:inherit;transition:background .15s,border-color .15s}
 .la-addpj:hover{background:var(--cz-soft,var(--s2));border-color:var(--cz-acc,var(--accent))}
 .la-add{background:transparent;border:1.5px dashed var(--border2);border-radius:8px;padding:20px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:130px;transition:all .2s}
@@ -6416,6 +6446,20 @@ function goToArea(areaId){pjFilter=areaId;go('projects');}
 
 let selPjC=COLORS[0],selPjA='';
 let selEvC=COLORS[0];
+// 프로젝트 만들기·수정 창: 같은 모양으로 정돈 (이름 → 한 줄 설명 → 목표 → 디데이 → 색상)
+function pjmSec(en,ko,hint){return '<div class="pjm-sec"><em>'+en+'</em><b>'+ko+'</b>'+(hint?'<span>'+hint+'</span>':'')+'</div>';}
+function pjmChips(areas,sel,idPrefix){
+  var h='<button type="button" class="pjm-chip'+(sel===''?' on':'')+'" id="'+idPrefix+'none" data-aid="" style="--c:#9A9A9A" onclick="pickPjA(this)">없음</button>';
+  areas.forEach(function(a){h+='<button type="button" class="pjm-chip'+(sel===a.id?' on':'')+'" id="'+idPrefix+a.id+'" data-aid="'+a.id+'" style="--c:'+esc(a.color||'#9A9A9A')+'" onclick="pickPjA(this)">'+(a.emoji?esc(a.emoji)+' ':'')+esc(a.name)+'</button>';});
+  return '<div class="pjm-chips">'+h+'</div>';
+}
+function pjmSwatches(cur,id,pickFn){
+  var h=COLORS.map(function(c){return '<div class="cop'+(c===cur?' on':'')+'" data-c="'+c+'" style="background:'+c+'" onclick="'+pickFn+'"></div>';}).join('');
+  var custom=COLORS.indexOf(cur)<0&&cur?cur:'';
+  h+='<label class="cop pjm-pick'+(custom?' on':'')+'" title="직접 고르기"'+(custom?' style="background:'+esc(custom)+'"':'')+'><input type="color" value="'+(custom||'#c0a090')+'" onchange="pickPjCustom(this)"></label>';
+  return '<div class="cops" id="'+id+'">'+h+'</div>';
+}
+function pickPjCustom(inp){selPjC=inp.value;document.querySelectorAll('.pjm .cop').forEach(function(e){e.classList.remove('on');});var l=inp.parentElement;l.classList.add('on');l.style.background=inp.value;}
 function openPjModal(presetAid){
   const areas=S.lifeAreas||[];
   const initAid=(presetAid&&areas.find(a=>a.id===presetAid))?presetAid:(pjFilter&&areas.find(a=>a.id===pjFilter)?pjFilter:'');
@@ -6423,50 +6467,32 @@ function openPjModal(presetAid){
   selPjA=initAid;
   selPjC=initArea?initArea.color:COLORS[0];
 
-  // 영역 버튼
-  var aButtons=['<button type="button" class="daybtn" id="pja-none" onclick="pickPjA(this,String())" style="'+(selPjA===''?'background:var(--s2)':'')+'">없음</button>'];
-  areas.forEach(function(a){
-    var on=selPjA===a.id;
-    var st='border-color:'+a.color+'40;color:'+a.color+(on?';background:'+a.color+';color:#fff;border-color:'+a.color:'');
-    aButtons.push('<button type="button" class="daybtn" id="pja-'+a.id+'" onclick="pickPjA(this,\''+a.id+'\')" style="'+st+'">'+(a.emoji?a.emoji+' ':'')+a.name+'</button>');
-  });
-  var aHtml=aButtons.join('');
-
-  // 색상 팔레트
-  var cops=COLORS.map(function(c){return '<div class="cop '+(c===selPjC?'on':'')+'" style="background:'+c+'" onclick="pickPjC(this,\''+c+'\')"></div>';}).join('');
-  cops+='<label class="cop" style="background:linear-gradient(135deg,#f0f,#0ff,#ff0);border:2px dashed #ccc;display:flex;align-items:center;justify-content:center;overflow:hidden" title="직접 선택"><input type="color" style="opacity:0;position:absolute;width:0;height:0" onchange="pickPjC(this.parentElement,this.value);this.parentElement.style.background=this.value"></label>';
-
   openMo('새 프로젝트',
-    '<div class="fg"><label class="fl">이름</label><input class="inp" id="pj-n" placeholder="프로젝트 이름"></div>'+
-    '<div class="fg"><label class="fl">이모지</label><input class="inp" id="pj-e" placeholder="📁" maxlength="2" style="width:70px"></div>'+
-    '<div class="fg"><label class="fl">설명</label><input class="inp" id="pj-d" placeholder="한 줄 설명"></div>'+
-    '<div class="fg"><label class="fl">🎯 프로젝트 디데이 <span style="font-size:0.8em;color:var(--t3);font-weight:400">(라이프 영역 날짜 자동 · 수정 가능)</span></label><input class="inp" type="date" id="pj-dday" value="'+(initArea&&initArea.dday?initArea.dday:'')+'" style="max-width:180px"></div>'+
-    '<div class="fg"><label class="fl">🌿 라이프 영역</label><div style="display:flex;gap:6px;flex-wrap:wrap">'+aHtml+'</div></div>'+
-    '<div class="fg"><label class="fl">색상 <span style="font-size:0.8em;color:var(--t3);font-weight:400">(영역 선택 시 자동)</span></label><div class="cops" id="pj-cops">'+cops+'</div></div>',
+    '<div class="pjm">'+
+      '<div class="pjm-top"><input class="pjm-emoji" id="pj-e" placeholder="📁" maxlength="2" title="이모지"><input class="pjm-name" id="pj-n" placeholder="프로젝트 이름" autocomplete="off"></div>'+
+      '<input class="pjm-desc" id="pj-d" placeholder="한 줄 설명 (선택)" autocomplete="off">'+
+      '<div>'+pjmSec('my goal','목표','(드림보드에서 만든 목표를 골라요)')+pjmChips(areas,selPjA,'pja-')+'</div>'+
+      '<div>'+pjmSec('d-day','디데이','(목표 날짜가 있으면 자동으로 들어와요)')+'<input class="pjm-date" type="date" id="pj-dday" value="'+(initArea&&initArea.dday?initArea.dday:'')+'"></div>'+
+      '<div>'+pjmSec('color','색상','(목표를 고르면 목표 색으로)')+pjmSwatches(selPjC,'pj-cops','pickPjC(this,this.dataset.c)')+'</div>'+
+    '</div>',
     '<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="savePj()">만들기</button>');
+  setTimeout(function(){var n=document.getElementById('pj-n');if(n)n.focus();},60);
 }
-function pickPjC(el,c){selPjC=c;document.querySelectorAll('.cop').forEach(e=>e.classList.remove('on'));el.classList.add('on');}
+function pickPjC(el,c){selPjC=c;document.querySelectorAll('.pjm .cop').forEach(function(e){e.classList.remove('on');});el.classList.add('on');}
 function pickPjA(el,id){
   var aid=(id!==undefined)?id:(el.dataset.aid||'');
   selPjA=aid;
-  document.querySelectorAll('[id^="pja-"],[data-aid]').forEach(b=>{b.style.background='';b.style.color='';b.style.borderColor='';});
-  const area=(S.lifeAreas||[]).find(a=>a.id===aid);
-  if(area){
-    el.style.background=area.color;el.style.color='#fff';el.style.borderColor=area.color;
-    // 색상도 라이프 영역 색상으로 자동 변경
-    selPjC=area.color;
-    // 디데이도 영역 날짜로 자동 채움 (영역에 날짜가 있으면)
-    const ddayInput=document.getElementById('pj-dday');
-    if(ddayInput&&area.dday)ddayInput.value=area.dday;
-    const cops=document.querySelectorAll('#pj-cops .cop');
-    cops.forEach(c=>c.classList.remove('on'));
-    let matched=false;
-    cops.forEach(c=>{if(c.style.background===area.color||c.dataset.c===area.color){c.classList.add('on');matched=true;}});
-    // 팔레트에 없는 커스텀 색이면 마지막 label(color picker) 배경만 변경
-    if(!matched){const last=document.querySelector('#pj-cops label.cop');if(last)last.style.background=area.color;}
-  } else {
-    el.style.background='var(--s2)';
-  }
+  document.querySelectorAll('.pjm .pjm-chip').forEach(function(b){b.classList.toggle('on',b===el);});
+  var area=(S.lifeAreas||[]).find(function(a){return a.id===aid;});
+  if(!area)return;
+  // 목표를 고르면 색도 그 목표 색으로, 디데이는 (새로 만들 때) 목표 날짜로
+  selPjC=area.color;
+  var ddayInput=document.getElementById('pj-dday');
+  if(ddayInput&&area.dday)ddayInput.value=area.dday;
+  var matched=false;
+  document.querySelectorAll('.pjm .cop').forEach(function(c){var on=(c.dataset.c||'').toLowerCase()===String(area.color).toLowerCase();c.classList.toggle('on',on);if(on)matched=true;});
+  var custom=document.querySelector('.pjm .pjm-pick');
+  if(custom&&!matched){custom.classList.add('on');custom.style.background=area.color;}
 }
 function savePj(){
   const name=document.getElementById('pj-n').value.trim();if(!name)return;
@@ -6480,24 +6506,16 @@ function openPjEditModal(pid){
   const p=S.projects.find(x=>x.id===pid);if(!p)return;
   const areas=S.lifeAreas||[];
   selPjC=p.color; selPjA=p.lifeAreaId||'';
-  var noneStyle=selPjA===''?'background:var(--s2)':'';
-  let aHtml='<button type="button" class="daybtn" id="pja-none" data-aid="" onclick="pickPjA(this)" style="'+noneStyle+'">없음</button>';
-  areas.forEach(function(a){
-    var aStyle='border-color:'+a.color+'40;color:'+a.color+(selPjA===a.id?';background:'+a.color+';color:#fff;border-color:'+a.color:'');
-    aHtml+='<button type="button" class="daybtn" data-aid="'+a.id+'" onclick="pickPjA(this)" style="'+aStyle+'">'+(a.emoji?a.emoji+' ':'')+a.name+'</button>';
-  });
+  var cv=p.cardVis||{};
+  var opts=[['achieve','루틴 달성도'],['milestone','마일스톤'],['link','링크 바로가기'],['material','학습 자료']];
   openMo('프로젝트 수정',
-    '<div class="fg"><label class="fl">이름</label><input class="inp" id="pje-n" value="'+esc(p.name)+'" placeholder="프로젝트 이름"></div>'+
-    '<div class="fg"><label class="fl">이모지</label><input class="inp" id="pje-e" value="'+(p.emoji||'')+'" placeholder="📁" maxlength="2" style="width:70px"></div>'+
-    '<div class="fg"><label class="fl">설명</label><input class="inp" id="pje-d" value="'+(p.desc||'')+'" placeholder="한 줄 설명"></div>'+
-    '<div class="fg"><label class="fl">🎯 프로젝트 디데이 <span style="color:var(--t3)">(카드에 표시)</span></label><input class="inp" type="date" id="pje-dday" value="'+(p.dday||'')+'"></div>'+
-    '<div class="fg"><label class="fl">🌿 라이프 영역</label><div style="display:flex;gap:6px;flex-wrap:wrap">'+aHtml+'</div></div>'+
-    '<div class="fg"><label class="fl">색상</label><div class="cops" id="pje-cops">'+COLORS.map(function(c){return '<div class="cop '+(c===p.color?'on':'')+'" data-c="'+c+'" style="background:'+c+'" onclick="pickPjCEdit(this)"></div>';}).join('')+'<label class="cop" style="background:linear-gradient(135deg,#f0f,#0ff,#ff0);border:2px dashed #ccc;display:flex;align-items:center;justify-content:center;overflow:hidden" title="직접 선택"><input type="color" value="'+p.color+'" style="opacity:0;position:absolute;width:0;height:0" onchange="pickPjCEditColor(this.value);this.parentElement.style.background=this.value"></label></div></div>'+
-    '<div class="fg"><label class="fl">📋 표시할 카드 <span style="font-size:0.8em;color:var(--t3);font-weight:400">(태스크·마감일·루틴화는 항상 표시)</span></label>'+
-      (function(){var cv=p.cardVis||{};var opts=[['achieve','루틴 달성도'],['milestone','마일스톤'],['link','링크 바로가기'],['material','학습 자료']];
-        return '<div style="display:flex;flex-direction:column;gap:8px">'+opts.map(function(o){var on=cv[o[0]]!==false;
-          return '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.9em"><input type="checkbox" id="pje-cv-'+o[0]+'" '+(on?'checked':'')+' style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer">'+o[1]+'</label>';
-        }).join('')+'</div>';})()+
+    '<div class="pjm">'+
+      '<div class="pjm-top"><input class="pjm-emoji" id="pje-e" value="'+esc(p.emoji||'')+'" placeholder="📁" maxlength="2" title="이모지"><input class="pjm-name" id="pje-n" value="'+esc(p.name)+'" placeholder="프로젝트 이름" autocomplete="off"></div>'+
+      '<input class="pjm-desc" id="pje-d" value="'+esc(p.desc||'')+'" placeholder="한 줄 설명 (선택)" autocomplete="off">'+
+      '<div>'+pjmSec('my goal','목표')+pjmChips(areas,selPjA,'pja-')+'</div>'+
+      '<div>'+pjmSec('d-day','디데이','(카드에 표시돼요)')+'<input class="pjm-date" type="date" id="pje-dday" value="'+esc(p.dday||'')+'"></div>'+
+      '<div>'+pjmSec('color','색상')+pjmSwatches(p.color,'pje-cops','pickPjCEdit(this)')+'</div>'+
+      '<div>'+pjmSec('cards','보여줄 카드','(태스크·마감일·루틴화는 늘 보여요)')+'<div class="pjm-tgs">'+opts.map(function(o){var on=cv[o[0]]!==false;return '<label class="pjm-tg"><input type="checkbox" id="pje-cv-'+o[0]+'" '+(on?'checked':'')+'><span>'+o[1]+'</span></label>';}).join('')+'</div></div>'+
     '</div>',
     '<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" id="pje-save-btn">저장</button>');
   document.getElementById('pje-save-btn').onclick=function(){savePjEdit(pid);};
@@ -6505,7 +6523,7 @@ function openPjEditModal(pid){
 
 function pickPjCEdit(el){
   selPjC=el.dataset.c||'';
-  document.querySelectorAll('#pje-cops .cop').forEach(e=>e.classList.remove('on'));
+  document.querySelectorAll('.pjm .cop').forEach(function(e){e.classList.remove('on');});
   el.classList.add('on');
 }
 function pickPjCEditColor(val){

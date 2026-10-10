@@ -181,6 +181,13 @@
         body.theme-cozy #library-tabs > button { border-radius: 999px; }
         /* 신규 작품 등록 앞 초록 아이콘 → 코지 갈색 */
         body.theme-cozy #work-form-icon.bg-emerald-600 { background: var(--primary); border-radius: 999px; box-shadow: 0 3px 8px rgba(169,143,103,.3); }
+        /* ── 상세 기록 입력: 왼쪽 위 큰 영문 제목 + 크림 카드 ── */
+        #daily-cozy-hero { display: none; }
+        body.theme-cozy #daily-cozy-hero { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px 20px; margin: 0 4px 10px; }
+        body.theme-cozy #daily-main-card { background: linear-gradient(180deg, #FFFEFC 0%, #FBF8F1 100%); border-color: #EFE8DA; border-radius: 30px; padding: 28px 30px; box-shadow: 0 6px 22px rgba(139,115,80,.07); }
+        body.theme-cozy #daily-main-card > .flex.justify-center > button { border-radius: 999px; background: #F4EEE2; color: #7A6A52; }
+        body.theme-cozy #daily-main-card > .flex.justify-center > button[onclick^="writerGoToday"] { background: #fff; border: 1px solid #E7DFCF; }
+        body.theme-cozy #w-currentDateDisplay { font-family: var(--cozy-serif); color: var(--cozy-ink); }
         /* 스케줄·집필 달력: 이전/다음 달 칸을 출간 일정처럼 흐릿하게 (테두리·진한 배경 없이) */
         body.theme-cozy :is(#task-calendar-body, #write-calendar-body) > div[class~="bg-slate-50/50"] { opacity: .4; background-color: #FFFEFC; border-color: #F2ECE1; box-shadow: none !important; }
         body.theme-cozy :is(#task-calendar-body, #write-calendar-body) > div[class~="bg-slate-50/50"]:hover { opacity: .65; }
@@ -2324,7 +2331,8 @@ body.theme-cozy #month-detail-modal button.text-slate-400 { width: 34px; height:
 
                 <!-- 상세 기록 입력 탭 -->
                 <div id="tab-daily" class="tab-content pb-20">
-                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 max-w-[960px] mx-auto space-y-4">
+                    <div id="daily-main-card" class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 max-w-[960px] mx-auto space-y-4">
+                        <div id="daily-cozy-hero" class="cozy-pubhero"></div>
                         <!-- 날짜 네비 -->
                         <div class="flex justify-center items-center gap-3 relative">
                             <button onclick="writerMovePrevDay()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-bold text-slate-600 transition-all">◀ 이전 날</button>
@@ -19466,6 +19474,20 @@ body.theme-cozy #month-detail-modal button.text-slate-400 { width: 34px; height:
         }
         // ═════════════════════════
 
+        // 코지 테마: 왼쪽 위에 큰 영문 제목 (스케줄·집필 관리의 큰 월 이름처럼) + 보고 있는 날의 글자수 칩
+        function renderDailyCozyHero() {
+            const box = document.getElementById('daily-cozy-hero');
+            if (!box) return;
+            if (!document.body.classList.contains('theme-cozy')) { box.innerHTML = ''; return; }
+            const MN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+            const d = writerViewDate, ds = writerGetYYYYMMDD(d);
+            let total = 0, goal = 0;
+            try { total = writerGetDayTotal(ds) || 0; goal = writerGetDayGoal(ds) || 0; } catch (e) {}
+            const goalTxt = goal > 0 ? ` / 목표 ${goal.toLocaleString()}자` : '';
+            box.innerHTML = `<div class="left"><div class="eyebrow">daily record</div>
+                <div class="row"><span class="mname">Writing</span><span class="yr">${MN[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}</span></div></div>
+                <div class="chips"><span class="chip">♥ 오늘 ${total.toLocaleString()}자${goalTxt}</span></div>`;
+        }
         function writerRenderDaily(preferLastWorkKey) {
             document.getElementById('w-currentDateDisplay').textContent = writerGetKoreanDate(writerViewDate);
             const sel = document.getElementById('w-dailyWorkSelector');
@@ -19502,6 +19524,7 @@ body.theme-cozy #month-detail-modal button.text-slate-400 { width: 34px; height:
         }
 
         function writerRenderDailyTable() {
+            try { renderDailyCozyHero(); } catch (e) {}
             const ds = writerGetYYYYMMDD(writerViewDate);
             const sel = document.getElementById('w-dailyWorkSelector');
             const storageKey = sel.value;

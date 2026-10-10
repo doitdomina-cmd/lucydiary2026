@@ -1863,6 +1863,36 @@ window.manualFirebasePush = async function () {
             catch(e) { return false; }
         }
 
+        // .bak 사본 15개는 PC 안(~/.episode-board/backups)에만 둔다.
+        // (구글 드라이브 폴더 안에서 매번 이름을 바꾸면 드라이브가 파일 15개를 지웠다 만들었다 해서 '삭제할 수 없음' 알림이 쌓였음)
+        // 드라이브 폴더에는 본 파일 + 하루 1개 날짜별 사본(최근 7일)만 남긴다.
+        const DAILY_PREFIX = '시놉시스_일일백업_', DAILY_KEEP = 7;
+        let BAK_DIR = '';
+        if (isNodeEnvironment) { try { BAK_DIR = pathModule.join(os.homedir(), '.episode-board', 'backups'); } catch (e) {} }
+        const bakPath = (filePath, i) => BAK_DIR ? pathModule.join(BAK_DIR, pathModule.basename(filePath) + '.bak' + i) : `${filePath}.bak${i}`;
+        let _bakMigrated = false;
+        async function migrateOldBaks(filePath) {
+            if (_bakMigrated || !BAK_DIR) return; _bakMigrated = true;
+            try {
+                await fs.promises.mkdir(BAK_DIR, { recursive: true });
+                for (let i = 1; i <= MAX_BACKUPS; i++) {
+                    const old = `${filePath}.bak${i}`;
+                    if (!(await fileExistsAsync(old))) continue;
+                    try { if (!(await fileExistsAsync(bakPath(filePath, i)))) await fs.promises.copyFile(old, bakPath(filePath, i)); await fs.promises.unlink(old); } catch (e) {}
+                }
+            } catch (e) { console.warn('예전 백업 옮기기 실패:', e); }
+        }
+        async function dailyCopy(filePath) {
+            try {
+                const d = new Date(), ds = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+                const dir = pathModule.dirname(filePath), today = pathModule.join(dir, DAILY_PREFIX + ds + '.json');
+                if (await fileExistsAsync(today)) return;
+                await fs.promises.copyFile(filePath, today);
+                const list = (await fs.promises.readdir(dir)).filter(f => f.startsWith(DAILY_PREFIX) && f.endsWith('.json')).sort();
+                while (list.length > DAILY_KEEP) { try { await fs.promises.unlink(pathModule.join(dir, list.shift())); } catch (e) {} }
+            } catch (e) { console.warn('하루 백업 실패(저장은 계속):', e); }
+        }
+
         async function safeSaveWithBackup(filePath, dataStr) {
             // 변경 여부 확인
             let prev = null;
@@ -1875,14 +1905,15 @@ window.manualFirebasePush = async function () {
 
             // 본파일이 이미 있으면(=직전 상태가 존재) 백업 회전
             if (prev !== null) {
+                await migrateOldBaks(filePath);
                 try {
+                    if (BAK_DIR) await fs.promises.mkdir(BAK_DIR, { recursive: true });
                     for (let i = MAX_BACKUPS - 1; i >= 1; i--) {
-                        const src = `${filePath}.bak${i}`;
-                        const dst = `${filePath}.bak${i + 1}`;
-                        try { await fs.promises.rename(src, dst); } catch(e) {} // 없으면(ENOENT) 그냥 넘어감
+                        try { await fs.promises.rename(bakPath(filePath, i), bakPath(filePath, i + 1)); } catch(e) {} // 없으면(ENOENT) 그냥 넘어감
                     }
-                    await fs.promises.copyFile(filePath, `${filePath}.bak1`);
+                    await fs.promises.copyFile(filePath, bakPath(filePath, 1));
                 } catch(e) { console.warn('백업 회전 실패(저장은 계속):', e); }
+                await dailyCopy(filePath);
             }
 
             // 원자적 쓰기: tmp → rename
@@ -4225,8 +4256,10 @@ window.manualFirebasePush = async function () {
                 } catch(e) {
                     console.error("G드라이브 파일 읽기 실패 → 백업 시도:", e);
                     // 본파일이 깨졌으면 최신 백업(.bak1 → .bakN) 순서로 복구 시도
-                    for (let i = 1; i <= MAX_BACKUPS; i++) {
-                        const bak = `${targetFilePath}.bak${i}`;
+                    const baks = [];
+                    for (let i = 1; i <= MAX_BACKUPS; i++) baks.push([i, bakPath(targetFilePath, i)]);
+                    for (let i = 1; i <= MAX_BACKUPS; i++) baks.push([i, `${targetFilePath}.bak${i}`]); // 예전 위치(드라이브 폴더)
+                    for (const [i, bak] of baks) {
                         if (!fs.existsSync(bak)) continue;
                         try {
                             const d = JSON.parse(await fs.promises.readFile(bak, 'utf8'));

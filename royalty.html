@@ -4562,7 +4562,7 @@
         // [NEW] 집필 관리 분류 색상 (스케줄 관리와는 독립적으로 관리됨)
         const WRITE_COLORS = { "작교": "#FBC3C1", "시놉시스": "#BBD5DA", "기타": "#F2EAE0" };
 
-        // ── 회전 백업: 덮어쓰기 직전 현재 파일을 스냅샷으로 보관 (최근 5개 유지) ──
+        // ── 회전 백업: 덮어쓰기 직전 현재 파일을 스냅샷으로 보관 (12시간에 한 번, 최근 10개 유지) ──
         // 백업 위치: 로컬 홈 폴더 + 구글드라이브 백업 폴더
         let _backupDoneThisSession = false;
         const BACKUP_PREFIX = 'RoyaltyData_v6.backup.';
@@ -4586,7 +4586,8 @@
                     .filter(f => f.startsWith(BACKUP_PREFIX) && f.endsWith('.json'))
                     .sort();
                 let localExisting = listLocalBackups();
-                if (_backupDoneThisSession && localExisting.length > 0) {
+                // 앱을 몇 번 켜든 새 사본은 12시간에 한 번만 (예전엔 켤 때마다 23MB 사본이 하나씩 생겼음)
+                if (localExisting.length > 0) {
                     const newest = localExisting[localExisting.length - 1];
                     const m = fs.statSync(path.join(localDir, newest)).mtimeMs;
                     if ((now - m) < 12 * 3600 * 1000) {

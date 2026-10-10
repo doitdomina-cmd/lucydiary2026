@@ -1681,6 +1681,24 @@ body.cozy .health-tab-btn{transform:none !important;border-radius:99px !importan
 body.cozy .health-tab-btn.on{background:var(--surface) !important;color:var(--cz-deep) !important;box-shadow:0 2px 8px rgba(66,42,24,.08) !important}
 body.cozy .health-tab-btn svg{flex-shrink:0}
 
+/* 코지: 건강 관리 — 인사 카드 · 말랑한 카드 · 파스텔 수치 */
+.hl-hero{position:relative;overflow:hidden;border-radius:26px;padding:22px 26px;margin-bottom:14px;background:linear-gradient(135deg,var(--cz-soft),var(--cz-paper) 60%,color-mix(in srgb,#BCD0B6 28%,var(--surface)))}
+.hl-hero h1{margin:2px 0 4px;font-family:'Instrument Serif',Georgia,'Noto Serif KR',serif;font-weight:400;font-size:32px;letter-spacing:-.5px;color:var(--text)}
+.hl-hero p{margin:0;font-family:var(--hand);font-size:18px;color:var(--cz-deep);word-break:keep-all;line-height:1.45}
+.hl-hero p b{font-weight:700;color:var(--cz-acc)}
+.hl-eye{font-size:11.5px;letter-spacing:2.2px;text-transform:uppercase;color:var(--cz-muted,var(--t3))}
+.hl-b1,.hl-b2{position:absolute;border-radius:50%;pointer-events:none}
+.hl-b1{width:130px;height:130px;right:-26px;top:-40px;background:color-mix(in srgb,var(--cz-acc) 14%,transparent)}
+.hl-b2{width:78px;height:78px;right:70px;bottom:-34px;background:color-mix(in srgb,#BCD0B6 40%,transparent)}
+.hl-page .card{border-radius:24px;border:1px solid var(--cz-line);box-shadow:0 6px 22px rgba(120,80,60,.06)}
+.hl-page .ct{font-family:var(--hand);font-size:1.28em;font-weight:700;letter-spacing:0}
+.hl-page .card [style*="background:var(--s2);border-radius:8px;padding:8px 6px"]{border-radius:18px !important;padding:12px 6px !important}
+.hl-page .card [style*="background:var(--s2);border-radius:8px;padding:8px 6px"]:nth-child(1){background:color-mix(in srgb,#F2C4C0 34%,var(--surface)) !important}
+.hl-page .card [style*="background:var(--s2);border-radius:8px;padding:8px 6px"]:nth-child(2){background:color-mix(in srgb,#BCD0B6 36%,var(--surface)) !important}
+.hl-page .card [style*="background:var(--s2);border-radius:8px;padding:8px 6px"]:nth-child(3){background:color-mix(in srgb,#EAD7BC 42%,var(--surface)) !important}
+.hl-page .card [style*="background:var(--s2);border-radius:8px;padding:8px 6px"]:nth-child(4){background:color-mix(in srgb,#C9C3E6 36%,var(--surface)) !important}
+.hl-page .card [style*="background:var(--s2);border-radius:8px;padding:8px 6px"] div:nth-child(2){font-family:var(--hand);font-size:1.15em}
+.hl-page .cond-grid > *{border-radius:22px !important}
 /* 코지: 루틴 설정 */
 .rt-hero{position:relative;min-height:200px;border-radius:24px;overflow:hidden;background:#EADCD3 center/cover no-repeat;display:flex;align-items:flex-end;margin-bottom:26px;box-shadow:0 6px 22px rgba(120,80,60,.12)}
 .rt-hero::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(40,25,20,.15),rgba(40,25,20,.62))}
@@ -7847,6 +7865,12 @@ ${existingFontLinks}
 
 
 // ════ 건강 관리 ════
+// 건강 관리 맨 위 인사 카드: 다음 건강 일정까지 며칠 남았는지 다정하게 알려 준다
+function hlHero(H){
+  var nx=((H&&H.schedules)||[]).filter(function(x){return x.date&&!x.done&&dLeft(x.date)>=0;}).sort(function(a,b){return a.date.localeCompare(b.date);})[0];
+  var line=nx?'다음 건강 일정은 <b>'+esc(nx.title||'검진')+'</b>, '+(dLeft(nx.date)===0?'<b>오늘</b>이에요':'<b>D-'+dLeft(nx.date)+'</b> 남았어요'):'오늘도 내 몸을 다정하게 챙겨요';
+  return '<div class="hl-hero"><i class="hl-b1"></i><i class="hl-b2"></i><div class="hl-eye">my health</div><h1>건강 관리</h1><p>'+line+' ♡</p></div>';
+}
 function renderHealth(){
   if(!S.health) S.health={schedules:[],records:[],memo:'',inbody:[],tab:'summary'};
   const H=S.health;
@@ -8462,7 +8486,7 @@ function renderHealth(){
     }
   }
 
-  return html;
+  return '<div class="hl-page">'+hlHero(H)+html+'</div>';
 }
 
 function openSuppEditModal(slotKey,id){

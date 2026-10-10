@@ -2585,6 +2585,18 @@ body.cozy .app .spz-chip,body.cozy .app .spz-gh{font-weight:500 !important}
 
 #up-ind{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:9002;width:max-content;max-width:calc(100vw - 32px);box-sizing:border-box;background:rgba(40,36,32,.92);color:#fff;border-radius:16px;padding:9px 16px;font-size:12.5px;line-height:1.5;text-align:center;display:none}
 #up-ind.ok{background:rgba(70,110,80,.95)}
+
+/* 사진 보관 현황 */
+.lsp-n{font-size:15px;color:var(--text);margin-bottom:8px}
+.lsp-n b{font-size:22px;font-weight:500;color:var(--cz-deep,var(--accent))}
+.lsp-n span{color:var(--t2);font-size:13px}
+.lsp-bar{height:9px;border-radius:99px;background:var(--s2);overflow:hidden}
+.lsp-bar i{display:block;height:100%;border-radius:99px;background:var(--cz-mid,var(--accent))}
+.lsp-bar.mid i{background:#E0A24A}.lsp-bar.hi i{background:var(--red,#d9534f)}
+.lsp-sub{display:flex;justify-content:space-between;gap:10px;font-size:11.5px;color:var(--t3);margin:6px 0 10px;flex-wrap:wrap}
+.lsp-help{font-size:12px;line-height:1.7;color:var(--t2);background:var(--s2);border-radius:12px;padding:10px 12px}
+.lsp-help.mid{background:#FBF1DE;color:#7A5A1E}.lsp-help.hi{background:#FBE6E3;color:#8A2F26}
+.lsp-help small{color:inherit;opacity:.75;font-size:11px}
 </style>
 </head>
 <body>
@@ -2749,7 +2761,7 @@ function phIndex(){
   PH.idxP = phOpen().then(function(db){
     if(!db) return;
     var keys=function(store,fn){ return new Promise(function(r){ try{ var rq=db.transaction(store).objectStore(store).getAllKeys(); rq.onsuccess=function(){ (rq.result||[]).forEach(fn); r(); }; rq.onerror=function(){ r(); }; }catch(e){ r(); } }); };
-    return Promise.all([ keys('p',function(k){ PH.inIdb.add(k); }), keys('u',function(k){ PH.upKeys.add(k); }) ]);
+    return Promise.all([ keys('p',function(k){ PH.inIdb.add(k); }), keys('u',function(k){ PH.upKeys.add(k); }) ]).then(function(){ PH.idxDone=true; });
   });
   return PH.idxP;
 }
@@ -2777,11 +2789,33 @@ function phReg(d){
 function phLocalReplacer(k,v){ if(phIsData(v)){ var id=phReg(v); return PH.inIdb.has(id) ? PH_PRE+id : v; } return v; }
 function phStringifyLocal(o){ return JSON.stringify(o, phLocalReplacer); }
 function phUid(){ return currentUser ? currentUser.uid : ''; }
+// 이 앱이 지금 쓰는 사진 현황 (사진 장수·용량). 클라우드 문서를 읽지 않고 앱 안의 사진만 센다
+function phStats(){
+  var ids=new Map(), unloaded=0;
+  JSON.stringify(S, function(k,v){ if(phIsData(v)){ var id=phReg(v); if(!ids.has(id)) ids.set(id,v.length); return ''; } else if(phIsPH(v)) unloaded++; return v; });
+  var uid=phUid(), bytes=0, up=0;
+  ids.forEach(function(b,id){ bytes+=b; if(PH.upKeys.has(uid+'|'+id)) up++; });
+  return { n:ids.size, bytes:bytes, up:up, unloaded:unloaded };
+}
+function lsPhotoCard(){
+  if(!PH.idxDone && typeof phIndex==='function'){ phIndex().then(function(){ PH.idxDone=true; if(page==='settings') render(); }); }
+  var st=phStats(), LIM=1073741824, mb=function(b){ return (b/1048576).toFixed(1); };
+  var pct=Math.min(100,st.bytes/LIM*100), avg=st.n?st.bytes/st.n:133000, left=Math.max(0,Math.floor((LIM-st.bytes)/avg));
+  var level=st.bytes>=600*1048576?'hi':st.bytes>=300*1048576?'mid':'';
+  var note=level==='hi'?'사진이 꽤 많이 쌓였어요. Firebase 무료 1GiB는 정산·작업실 앱과 같이 써서, 이대로 더 올리면 저장이 막힐 수 있어요. 사진을 줄이거나 요금제를 올리는 걸 생각해 보세요.'
+    :level==='mid'?'사진이 제법 쌓였어요. 한도(1GiB)는 정산·작업실 앱과 같이 써요.'
+    :'아직 여유가 있어요. Firebase 무료 한도(1GiB)는 정산·작업실 앱과 같이 쓰는 공간이에요.';
+  return '<div class="card" style="margin-bottom:14px"><div class="ct" style="margin-bottom:10px">🖼️ 사진 보관 현황</div>'+
+    '<div class="lsp-n"><b>'+st.n+'</b>장<span> · 약 <b>'+mb(st.bytes)+'</b> MB</span></div>'+
+    '<div class="lsp-bar'+(level?' '+level:'')+'"><i style="width:'+Math.max(st.n?1.5:0,pct).toFixed(1)+'%"></i></div>'+
+    '<div class="lsp-sub"><span>무료 한도 1GiB 중 '+pct.toFixed(1)+'%</span><span>같은 크기면 최대 약 '+left.toLocaleString('ko-KR')+'장 더</span></div>'+
+    '<div class="lsp-help'+(level?' '+level:'')+'">'+note+'<br><small>클라우드에 올라간 사진 '+st.up+'장'+(st.n-st.up>0?' · 올리는 중 '+(st.n-st.up)+'장':'')+(st.unloaded?' · 불러오는 중 '+st.unloaded+'장':'')+' · 정산·작업실 앱이 쓰는 용량은 포함되지 않았어요.</small></div></div>';
+}
 // 클라우드에 아직 없는 사진을 올린다. 올리지 못한 사진 번호 집합을 돌려준다
 async function phEnsureCloud(chunks){
   await phIndex();
   var uid=phUid(), need=new Map(), failed=new Set();
-  JSON.stringify(chunks, function(k,v){ if(phIsData(v)){ var id=phReg(v); if(!PH.upKeys.has(uid+'|'+id)) need.set(id,v); } return v; });
+  JSON.stringify(chunks, function(k,v){ if(phIsData(v)){ var id=phReg(v); if(!PH.upKeys.has(uid+'|'+id)) need.set(id,v); return ''; } return v; });
   var ids=Array.from(need.keys()), i=0, firstErr='';
   var worker=async function(){
     while(i<ids.length){
@@ -2796,6 +2830,7 @@ async function phEnsureCloud(chunks){
     }
   };
   await Promise.all([worker(),worker(),worker()]);
+  if(need.size && !PH.sizeWarned){ try{ var stt=phStats(); if(stt.bytes>=600*1048576){ PH.sizeWarned=true; upMsg('⚠ 사진이 약 '+(stt.bytes/1048576).toFixed(0)+'MB 쌓였어요. 무료 1GiB는 다른 앱과 같이 써요 (설정 → 사진 보관 현황)', false); } }catch(e){} }
   if(failed.size && firstErr && !PH.warned){ PH.warned=true; try{ upMsg('⚠ 사진 '+failed.size+'장을 클라우드에 못 올렸어요 ('+firstErr+') · 이 기기에는 저장돼 있어요', false); }catch(e){} }
   return failed;
 }
@@ -10825,7 +10860,7 @@ function renderSettings(){
         }).join('')+
       '</div></div>'+
     '</div>'+
-    lsDriveCard()+
+    lsPhotoCard()+lsDriveCard()+
     '<div class="card"><div class="ct" style="margin-bottom:12px">💾 데이터</div>'+
       '<div style="display:flex;gap:8px">'+
         '<button class="btn bg bsm" style="flex:1" onclick="exportD()">📤 내보내기</button>'+
@@ -10837,8 +10872,8 @@ function renderSettings(){
 }
 function czSettingsWrap(h){
   if(!document.body.classList.contains('cozy'))return h;
-  var TT={'테마 색상':['theme','테마 색상'],'프로젝트 · My Goals 카드':['cards','프로젝트 · My Goals 카드'],'글씨체':['font','글씨체'],'로고 글씨체':['logo','로고 글씨체'],'메뉴 아이콘':['icons','메뉴 아이콘'],'글자 크기':['size','글자 크기'],'글자 굵기':['weight','글자 굵기'],'구글 드라이브 백업':['drive','구글 드라이브 백업'],'데이터':['backup','데이터']};
-  h=h.replace(/<div class="ct"([^>]*)>(?:🎨|▣|✍️|🔤|💗|🔠|🅱️|💾|☁️) ([^<]+)/g,function(m,st,t){var k=TT[t.trim()];return k?'<div class="ct czs-t"'+st+'><em>'+k[0]+'</em>'+k[1]:m;});
+  var TT={'테마 색상':['theme','테마 색상'],'프로젝트 · My Goals 카드':['cards','프로젝트 · My Goals 카드'],'글씨체':['font','글씨체'],'로고 글씨체':['logo','로고 글씨체'],'메뉴 아이콘':['icons','메뉴 아이콘'],'글자 크기':['size','글자 크기'],'글자 굵기':['weight','글자 굵기'],'사진 보관 현황':['photos','사진 보관 현황'],'구글 드라이브 백업':['drive','구글 드라이브 백업'],'데이터':['backup','데이터']};
+  h=h.replace(/<div class="ct"([^>]*)>(?:🎨|▣|✍️|🔤|💗|🔠|🅱️|💾|☁️|🖼️) ([^<]+)/g,function(m,st,t){var k=TT[t.trim()];return k?'<div class="ct czs-t"'+st+'><em>'+k[0]+'</em>'+k[1]:m;});
   h=h.replace(/>(?:📤|📥|🗑️) /g,'>');
   var fN=(S.font||'pretendard');
   return '<div class="czs">'+ldBanner('settingsPage','dream/dream-3.jpg','MY SPACE · 설정','나의 공간 꾸미기',['코지 스타일 <b>'+(S.cozyOff?'꺼짐':'켜짐')+'</b>','바꾸면 바로 적용돼요'],'','')+h+'</div>';

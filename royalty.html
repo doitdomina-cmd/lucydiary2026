@@ -372,6 +372,38 @@
         .dday-swatch-polaroid { background: linear-gradient(180deg, #EFD9D6 0 45%, #fff 45%); }
 
                 body.theme-cozy .dday-ko { display: none; }
+        /* 스케줄·집필 달력 카드의 인디고/파랑 포인트 → 차분한 갈색 */
+        body.theme-cozy :is(#task-calendar-body, #write-calendar-body) .text-indigo-500 { color: #A98F67; }
+        body.theme-cozy :is(#task-calendar-body, #write-calendar-body) .hover\:text-indigo-500:hover { color: #A98F67; }
+        body.theme-cozy #task-calendar-body span[style*="color:#"] { filter: saturate(.7); }
+
+        /* ── 인사이트(세무 · 글자수 · 목표 · 작품 분석): 코지 헤더 + 따뜻한 갈색·더스티 로즈 카드 ── */
+        body.theme-cozy #insight-cozy-hero { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px 20px; margin: 0 4px 6px; }
+        body.theme-cozy #tax-panel h2.text-xl { display: none; }
+        @media (max-width: 767px) { body.theme-cozy #tax-panel { padding-top: 54px; } }
+        body.theme-cozy #tax-panel .glass-card { background: #FFFEFC; border: 1px solid #EFE8DA; border-radius: 26px; box-shadow: 0 6px 20px rgba(139,115,80,.06); }
+        body.theme-cozy #tax-panel p.uppercase { letter-spacing: .14em; color: #B09A78; }
+        body.theme-cozy #tax-panel .text-2xl.font-black { font-family: var(--cozy-serif); font-weight: 700; color: #3F3A33; }
+        body.theme-cozy #tax-panel .text-2xl.font-black.text-emerald-600 { color: #8A7050; }
+        body.theme-cozy #tax-panel .text-2xl.font-black.text-rose-500, body.theme-cozy #tax-panel .text-rose-500 { color: #B9746E; }
+        body.theme-cozy #tax-panel .bg-slate-50.rounded-xl.p-3 { background: #FAF6EE; border: 1px dashed #E8DFCB; border-radius: 16px; }
+        body.theme-cozy #tax-panel .bg-blue-50.rounded-xl.p-3 { background: #F6F0E3; border: 1px dashed #D9C7A0; border-radius: 16px; }
+        body.theme-cozy #tax-panel .bg-slate-50.rounded-xl.p-3 .font-bold, body.theme-cozy #tax-panel .bg-blue-50.rounded-xl.p-3 .font-bold { font-family: var(--cozy-serif); color: #3F3A33; }
+        body.theme-cozy #tax-panel input[type="text"], body.theme-cozy #tax-panel input[type="number"] { background: #FFFEFC !important; border: 1px solid #E3D7BC; border-radius: 12px; color: #3F3A33; }
+        body.theme-cozy #tax-panel input[type="text"]:focus, body.theme-cozy #tax-panel input[type="number"]:focus { border-color: #C9AE7C; box-shadow: 0 0 0 3px rgba(169,143,103,.18); outline: none; }
+        body.theme-cozy #tax-panel button.bg-blue-50 { background: #F4EEE2; color: #7A6A52; border: 1px solid #E7DFCF; border-radius: 999px; }
+        body.theme-cozy #tax-panel button.bg-blue-50:hover { background: #EBDFC6; }
+        body.theme-cozy #tax-panel button.bg-white.shadow-sm { border-radius: 999px; }
+        body.theme-cozy #tax-panel button.bg-slate-100 { border-radius: 999px; }
+        body.theme-cozy #tax-panel .border-slate-50, body.theme-cozy #tax-panel .border-slate-100 { border-color: #F2ECE1; }
+        body.theme-cozy #tax-panel tbody tr { border-bottom: 1px dotted #EDE5D6; }
+        body.theme-cozy #tax-panel tbody td { color: #6B5A43; }
+        body.theme-cozy #tax-panel span.rounded-full[style*="#cbd5e1"] { background: #E8DFCB !important; color: #7A6A52; }
+        body.theme-cozy #tax-panel h4 > span[style*="background:var(--primary)"] { background: #F4EEE2 !important; color: #6B5A43 !important; border-radius: 999px; padding-left: 14px; padding-right: 14px; font-family: var(--cozy-serif); }
+        body.theme-cozy #tax-panel h4 > span.text-slate-400 { color: #B09A78; }
+        body.theme-cozy #tax-panel .text-slate-700 { color: #3F3A33; }
+        body.theme-cozy #tax-panel .text-slate-400 { color: #A39A8C; }
+
         /* 스케줄·집필 달력 칸 카드: 복사·삭제 버튼(마우스 올릴 때만 보임)이 글자 자리를 차지하지 않게 글자 위로 띄움 */
         body.theme-cozy :is(#task-calendar-body, #write-calendar-body) .cal-selectable > .flex.items-start > button:nth-last-child(-n+2) { position: absolute; top: 3px; width: 17px; height: 17px; margin: 0 !important; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 999px; background: rgba(255,254,252,.94); box-shadow: 0 1px 3px rgba(60,45,25,.15); z-index: 2; }
         body.theme-cozy :is(#task-calendar-body, #write-calendar-body) .cal-selectable > .flex.items-start > button:last-child { right: 3px; }
@@ -12605,7 +12637,20 @@
             const lifeData = taxGoalSubTab === 'analysis' ? buildLifecycleData() : null;
             const analysisSectionHtml = taxGoalSubTab === 'analysis' ? renderWorkAnalysisTabHtml(lifeData, buildWritingDayValueData(), buildNewVsOldData()) : '';
 
+            // 코지 테마: 큰 영문 제목 + 연도 + 요약 칩 (출간 일정·정산 입금일과 같은 분위기)
+            const insightCozyHeroHtml = (() => {
+                if (!document.body.classList.contains('theme-cozy')) return '';
+                const EY = { goal: 'goals & progress', analysis: 'work analysis', chars: 'writing output', tax: 'tax & income' }[taxGoalSubTab] || 'insight';
+                const big = taxGoalSubTab === 'analysis' ? 'All time' : String(taxViewYear);
+                let chips = '';
+                if (taxGoalSubTab === 'tax') chips = `<span class="chip">♥ 세후 실수령 ₩ ${taxFmt(net)}</span><span class="chip">원천징수 ₩ ${taxFmt(withhold)}</span>`;
+                else if (taxGoalSubTab === 'chars') chips = `<span class="chip">♥ ${taxViewYear} 누적 ${charTotal.toLocaleString()}자</span>`;
+                else if (taxGoalSubTab === 'goal') chips = `<span class="chip">♥ 수익 목표 ${goal > 0 ? pct + '%' : '미설정'}</span><span class="chip">글자수 목표 ${charGoal > 0 ? charPct + '%' : '미설정'}</span>`;
+                return `<div id="insight-cozy-hero" class="cozy-pubhero"><div class="left"><div class="eyebrow">${EY}</div><div class="row"><span class="mname">${big}</span><span class="yr">insight</span></div></div><div class="chips">${chips}</div></div>`;
+            })();
+
             panel.innerHTML = `
+            ${insightCozyHeroHtml}
             <div class="flex items-center justify-between flex-wrap gap-3 no-print">
                 <div class="flex items-center gap-4 flex-wrap">
                     <h2 class="text-xl font-bold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-receipt text-emerald-500"></i> 인사이트</h2>
@@ -13680,7 +13725,7 @@
                 if(t.workId && !work) return ''; // 작품이 삭제된 경우만 숨김 (작품 미지정 할 일은 항상 표시)
                 if(work && taskGenreFilter !== '전체' && work.genre !== taskGenreFilter) return '';
 
-                const catColor = TASK_COLORS[t.category] || "#64748b";
+                const catColor = ddayMute(TASK_COLORS[t.category] || "#64748b");
                 let opacity = t.isCompleted ? 'opacity-70' : '';
                 const titlePart = work ? ' ' + resolved.displayTitle : '';
 

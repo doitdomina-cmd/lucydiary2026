@@ -2552,6 +2552,18 @@ body.cozy .app .spz-chip,body.cozy .app .spz-gh{font-weight:500 !important}
 .mem-fl button.fav{background:var(--cz-soft);color:var(--cz-deep)}
 .mem-fl button.fav.on{background:var(--cz-acc);color:#fff}
 .mem-favbtn.on{color:var(--cz-acc) !important;border-color:var(--cz-acc) !important}
+
+/* 드라이브 백업 */
+.lsd-st{font-size:13px;color:var(--text);margin-bottom:8px}
+.lsd-st b{font-weight:500}
+.lsd-st span{color:var(--t3);margin-left:6px;font-size:12px}
+.lsd-help{font-size:12px;line-height:1.7;color:var(--t2);background:var(--s2);border-radius:12px;padding:10px 12px;margin-bottom:12px}
+.lsd-help b{font-weight:500;color:var(--text)}
+#lsd-nudge{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:9000;display:flex;align-items:center;gap:10px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:16px;padding:10px 12px 10px 16px;box-shadow:0 10px 30px rgba(0,0,0,.14);font-size:13px;width:max-content;max-width:calc(100vw - 32px);box-sizing:border-box}
+#lsd-nudge span{min-width:0;flex:1}
+#lsd-nudge .go{border:0;background:var(--accent);color:#fff;border-radius:99px;padding:7px 14px;cursor:pointer;white-space:nowrap;font-family:inherit}
+#lsd-nudge .later{border:0;background:none;color:var(--t3);cursor:pointer;white-space:nowrap;font-family:inherit}
+.lsd-toast{width:max-content;max-width:calc(100vw - 32px);position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:9001;background:rgba(40,36,32,.9);color:#fff;border-radius:99px;padding:9px 18px;font-size:13px}
 </style>
 </head>
 <body>
@@ -3626,6 +3638,92 @@ function memLookbackCard(){
   hits.sort(function(a,b){return a.ago-b.ago;});var x=hits[0],m=x.m,ph=(m.photos||[]).map(memPhotoSrc).filter(Boolean)[0];
   return '<div class="card mem-lb" onclick="go(\'memories\');setTimeout(function(){openMemView(\''+m.id+'\')},50)">'+(ph?'<div class="mem-lb-ph" style="background-image:url(\''+esc(ph).replace(/'/g,'%27')+'\')"></div>':'')+
     '<div class="mem-lb-b"><div class="tdk"><em>memories</em>'+x.ago+'년 전 이맘때</div><b>'+esc(m.title||'')+'</b><small>'+esc(m.date.replace(/-/g,'. '))+(m.place?' · '+esc(m.place):'')+((m.people||[]).length?' · '+esc(m.people.join(', ')):'')+'</small></div></div>';
+}
+
+// ═══════════ 구글 드라이브 백업 ═══════════
+// 드라이브의 '루시의 스페이스' 폴더에 전체 백업(JSON)을 쌓고 최근 10개만 남김.
+// 권한은 이 앱이 만든 파일만 다루는 drive.file → 처음 만든 폴더를 '백업' 폴더 안으로 직접 옮겨도 폴더 id로 계속 찾아감.
+// 드라이브 권한은 구글 창을 거친 뒤 약 55분만 유지돼서, 그동안 바뀐 게 있으면 1시간마다 저절로 백업하고
+// 하루 넘게 백업이 없으면 '지금 백업' 알림을 띄움 (권한 창은 버튼을 눌러야 열 수 있음)
+var LSD_SCOPE='https://www.googleapis.com/auth/drive.file',LSD_FOLDER='루시의 스페이스',LSD_KEEP=10;
+var lsd={token:null,busy:false};
+function lsdMeta(){try{return JSON.parse(localStorage.getItem('lucy_drive_meta')||'{}')||{};}catch(e){return {};}}
+function lsdSetMeta(m){try{localStorage.setItem('lucy_drive_meta',JSON.stringify(m));}catch(e){}}
+function lsdKeep(cred){if(!cred||!cred.accessToken)return;lsd.token={t:cred.accessToken,exp:Date.now()+55*60*1000};try{sessionStorage.setItem('lucy_drive_token',JSON.stringify(lsd.token));}catch(e){}}
+function lsdToken(){var tk=lsd.token;if(!tk)try{tk=JSON.parse(sessionStorage.getItem('lucy_drive_token')||'null');}catch(e){}return tk&&tk.exp>Date.now()?tk.t:null;}
+function lsdProvider(){var p=new firebase.auth.GoogleAuthProvider();p.addScope(LSD_SCOPE);return p;}
+try{auth.getRedirectResult().then(function(r){if(r&&r.credential)lsdKeep(r.credential);}).catch(function(){});}catch(e){}
+async function lsdEnsureToken(){
+  if(lsdToken())return lsdToken();
+  if(!auth.currentUser){alert('먼저 구글로 로그인해 주세요.');return null;}
+  try{var r=await auth.currentUser.reauthenticateWithPopup(lsdProvider());lsdKeep(r.credential);}
+  catch(e){
+    if(e&&(e.code==='auth/popup-blocked'||e.code==='auth/operation-not-supported-in-this-environment')){auth.currentUser.reauthenticateWithRedirect(lsdProvider());return null;}
+    if(e&&e.code!=='auth/popup-closed-by-user'&&e.code!=='auth/cancelled-popup-request')alert('구글 드라이브 권한을 받지 못했어요. '+(e.message||''));
+  }
+  return lsdToken();
+}
+async function lsdFetch(url,opt){
+  opt=opt||{};var tk=lsdToken();if(!tk)throw Object.assign(new Error('드라이브 권한이 끝났어요'),{code:'no-token'});
+  var r=await fetch(url,Object.assign({},opt,{headers:Object.assign({Authorization:'Bearer '+tk},opt.headers||{})}));
+  if(r.status===401){lsd.token=null;try{sessionStorage.removeItem('lucy_drive_token');}catch(e){}throw Object.assign(new Error('드라이브 권한이 끝났어요'),{code:'no-token'});}
+  if(!r.ok){var t=await r.text();throw new Error(r.status===403&&/accessNotConfigured|has not been used|disabled/i.test(t)?'Google Drive API가 꺼져 있어요.':'드라이브 오류 '+r.status);}
+  return r.status===204?null:r.json();
+}
+async function lsdFolder(){
+  var m=lsdMeta();
+  if(m.folder){try{var f=await lsdFetch('https://www.googleapis.com/drive/v3/files/'+m.folder+'?fields=id,trashed');if(f&&!f.trashed)return m.folder;}catch(e){if(e.code==='no-token')throw e;}}
+  var q=encodeURIComponent("name='"+LSD_FOLDER+"' and mimeType='application/vnd.google-apps.folder' and trashed=false");
+  var found=await lsdFetch('https://www.googleapis.com/drive/v3/files?q='+q+'&fields=files(id)&spaces=drive');
+  var id=found.files&&found.files.length?found.files[0].id:null;
+  if(!id){var made=await lsdFetch('https://www.googleapis.com/drive/v3/files?fields=id',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:LSD_FOLDER,mimeType:'application/vnd.google-apps.folder'})});id=made.id;m.fresh=true;}
+  m.folder=id;lsdSetMeta(m);return id;
+}
+function lsdPayload(){var app=Object.assign({},S);delete app.customFontData;return JSON.stringify({app:app,ledger:LD,meta:{from:'lucy-space',at:new Date().toISOString()}});}
+function lsdSig(){var s=JSON.stringify([S,LD]),h=0;for(var i=0;i<s.length;i+=7)h=(h*31+s.charCodeAt(i))>>>0;return s.length+':'+h;}
+async function lsdBackupNow(){
+  var folder=await lsdFolder(),d=new Date(),p2=function(n){return String(n).padStart(2,'0');};
+  var name='루시의스페이스_백업_'+d.getFullYear()+p2(d.getMonth()+1)+p2(d.getDate())+'-'+p2(d.getHours())+p2(d.getMinutes())+p2(d.getSeconds())+'.json';
+  var bd='lucy'+Date.now();
+  var body='--'+bd+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+JSON.stringify({name:name,parents:[folder],mimeType:'application/json'})+'\r\n--'+bd+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+lsdPayload()+'\r\n--'+bd+'--';
+  await lsdFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',{method:'POST',headers:{'Content-Type':'multipart/related; boundary='+bd},body:body});
+  var q=encodeURIComponent("'"+folder+"' in parents and trashed=false");
+  var list=await lsdFetch('https://www.googleapis.com/drive/v3/files?q='+q+'&orderBy=createdTime%20desc&fields=files(id)&pageSize=100');
+  var fs=(list&&list.files)||[];for(var i=LSD_KEEP;i<fs.length;i++){try{await lsdFetch('https://www.googleapis.com/drive/v3/files/'+fs[i].id,{method:'DELETE'});}catch(e){}}
+  var m=lsdMeta();m.at=Date.now();m.sig=lsdSig();m.name=name;lsdSetMeta(m);
+  return name;
+}
+async function lsdBackupClick(){
+  if(lsd.busy)return;var b=document.getElementById('lsd-btn');
+  if(!await lsdEnsureToken())return;
+  lsd.busy=true;if(b){b.disabled=true;b.textContent='백업하는 중…';}
+  try{await lsdBackupNow();lsdToast('드라이브에 백업했어요 ✓');}catch(e){lsdToast('백업하지 못했어요. '+(e.message||''));}
+  lsd.busy=false;if(page==='settings')render();
+}
+async function lsdAuto(){
+  if(lsd.busy||!lsdToken()||typeof currentUser==='undefined'||!currentUser)return;
+  var m=lsdMeta();if(m.at&&Date.now()-m.at<60*60*1000)return;if(m.sig&&m.sig===lsdSig())return;
+  lsd.busy=true;try{await lsdBackupNow();}catch(e){if(e.code!=='no-token')console.warn('드라이브 백업 실패',e);}lsd.busy=false;
+}
+setInterval(lsdAuto,5*60*1000);
+function lsdToast(msg){var t=document.createElement('div');t.className='lsd-toast';t.textContent=msg;document.body.appendChild(t);setTimeout(function(){t.remove();},2800);}
+function lsdWhen(ms){var d=new Date(ms);return (d.getMonth()+1)+'월 '+d.getDate()+'일 '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+function lsDriveNudge(){
+  if(typeof currentUser==='undefined'||!currentUser||document.getElementById('lsd-nudge'))return;
+  var m=lsdMeta(),day=86400000;
+  if(m.at&&Date.now()-m.at<day)return;if(m.snooze&&Date.now()<m.snooze)return;if(m.sig&&m.sig===lsdSig())return;
+  var days=m.at?Math.floor((Date.now()-m.at)/day):0,el=document.createElement('div');el.id='lsd-nudge';
+  el.innerHTML='<span>☁ '+(m.at?'드라이브 백업한 지 '+days+'일 됐어요':'구글 드라이브에 백업해 둘까요?')+'</span><button type="button" class="go">지금 백업</button><button type="button" class="later">나중에</button>';
+  el.querySelector('.go').onclick=function(){el.remove();lsdBackupClick();};
+  el.querySelector('.later').onclick=function(){el.remove();var mm=lsdMeta();mm.snooze=Date.now()+12*3600000;lsdSetMeta(mm);};
+  document.body.appendChild(el);
+}
+function lsDriveCard(){
+  var m=lsdMeta();
+  return '<div class="card" style="margin-bottom:14px"><div class="ct" style="margin-bottom:10px">☁️ 구글 드라이브 백업</div>'+
+    '<div class="lsd-st">'+(m.at?'마지막 백업 <b>'+lsdWhen(m.at)+'</b>':'아직 드라이브 백업이 없어요')+'<span>· 최근 '+LSD_KEEP+'개만 남아요</span></div>'+
+    '<div class="lsd-help">내 드라이브의 <b>‘'+LSD_FOLDER+'’</b> 폴더에 저장돼요. 처음 백업하면 이 폴더가 드라이브 맨 앞에 생기는데, 드라이브 앱에서 <b>‘백업’ 폴더 안으로 한 번만 옮겨 주세요.</b> 옮긴 뒤에도 계속 그 폴더로 백업돼요.<br>권한을 받은 뒤 1시간 동안은 바뀐 게 있으면 저절로 백업하고, 하루 넘게 백업이 없으면 알려 드려요. 되살릴 땐 아래 <b>가져오기</b>로 백업 파일을 고르면 돼요.</div>'+
+    '<button class="btn bp bsm" id="lsd-btn" onclick="lsdBackupClick()">지금 드라이브에 백업</button></div>';
 }
 
 // ═══════════ RENDER ═══════════
@@ -10486,6 +10584,7 @@ function renderSettings(){
         }).join('')+
       '</div></div>'+
     '</div>'+
+    lsDriveCard()+
     '<div class="card"><div class="ct" style="margin-bottom:12px">💾 데이터</div>'+
       '<div style="display:flex;gap:8px">'+
         '<button class="btn bg bsm" style="flex:1" onclick="exportD()">📤 내보내기</button>'+
@@ -10497,8 +10596,8 @@ function renderSettings(){
 }
 function czSettingsWrap(h){
   if(!document.body.classList.contains('cozy'))return h;
-  var TT={'테마 색상':['theme','테마 색상'],'프로젝트 · My Goals 카드':['cards','프로젝트 · My Goals 카드'],'글씨체':['font','글씨체'],'로고 글씨체':['logo','로고 글씨체'],'메뉴 아이콘':['icons','메뉴 아이콘'],'글자 크기':['size','글자 크기'],'글자 굵기':['weight','글자 굵기'],'데이터':['backup','데이터']};
-  h=h.replace(/<div class="ct"([^>]*)>(?:🎨|▣|✍️|🔤|💗|🔠|🅱️|💾) ([^<]+)/g,function(m,st,t){var k=TT[t.trim()];return k?'<div class="ct czs-t"'+st+'><em>'+k[0]+'</em>'+k[1]:m;});
+  var TT={'테마 색상':['theme','테마 색상'],'프로젝트 · My Goals 카드':['cards','프로젝트 · My Goals 카드'],'글씨체':['font','글씨체'],'로고 글씨체':['logo','로고 글씨체'],'메뉴 아이콘':['icons','메뉴 아이콘'],'글자 크기':['size','글자 크기'],'글자 굵기':['weight','글자 굵기'],'구글 드라이브 백업':['drive','구글 드라이브 백업'],'데이터':['backup','데이터']};
+  h=h.replace(/<div class="ct"([^>]*)>(?:🎨|▣|✍️|🔤|💗|🔠|🅱️|💾|☁️) ([^<]+)/g,function(m,st,t){var k=TT[t.trim()];return k?'<div class="ct czs-t"'+st+'><em>'+k[0]+'</em>'+k[1]:m;});
   h=h.replace(/>(?:📤|📥|🗑️) /g,'>');
   var fN=(S.font||'pretendard');
   return '<div class="czs">'+ldBanner('settingsPage','dream/dream-3.jpg','MY SPACE · 설정','나의 공간 꾸미기',['코지 스타일 <b>'+(S.cozyOff?'꺼짐':'켜짐')+'</b>','바꾸면 바로 적용돼요'],'','')+h+'</div>';
@@ -12577,6 +12676,7 @@ function migrateCondHistoryToRecords(){
   save();
 }
 function initApp(){
+  if(typeof currentUser!=='undefined'&&currentUser) setTimeout(lsDriveNudge,6000);
   load();
   migrateCondHistoryToRecords();
   loadLedger();

@@ -6739,6 +6739,7 @@ async function cloudStart(user) {
         renderCloudBadge(); scheduleSave(); scheduleCloudPush();
     }, err => cloudError(err));
     maybeDriveBackup();
+    setTimeout(driveNudge, 4000);
 }
 // 예시 작품(첫 실행 때 자동으로 만든 것)을 손대지 않았는지
 function untouchedSeed() {
@@ -6877,6 +6878,27 @@ async function maybeDriveBackup() {
     driveBusy = false;
 }
 setInterval(maybeDriveBackup, 5 * 60 * 1000);
+// 마지막 드라이브 백업이 하루 넘었으면 '지금 백업' 알림 띄우기 (권한 창은 버튼을 눌러야 열 수 있어서)
+function driveNudge() {
+    if (!cloud.user || document.getElementById('drv-nudge')) return;
+    const last = pref.driveAt || 0, day = 24 * 60 * 60 * 1000;
+    if (Date.now() - last < day || (pref.driveSnooze && Date.now() < pref.driveSnooze)) return;
+    if (pref.driveSig && pref.driveSig === backupSig()) return; // 바뀐 게 없으면 묻지 않음
+    const days = last ? Math.floor((Date.now() - last) / day) : 0;
+    const el = document.createElement('div'); el.id = 'drv-nudge';
+    el.style.cssText = 'position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:9000;display:flex;align-items:center;gap:10px;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:14px;padding:10px 12px 10px 16px;box-shadow:0 8px 28px rgba(0,0,0,.14);font-size:13px;width:max-content;max-width:calc(100vw - 32px);box-sizing:border-box';
+    el.innerHTML = '<span>☁ ' + (last ? '드라이브 백업한 지 ' + days + '일 됐어요' : '아직 드라이브 백업이 없어요') + '</span>' +
+        '<button type="button" data-a="go" style="border:0;background:var(--accent);color:#fff;border-radius:9px;padding:7px 12px;font-weight:700;cursor:pointer;white-space:nowrap">지금 백업</button>' +
+        '<button type="button" data-a="later" style="border:0;background:none;color:var(--muted);cursor:pointer;white-space:nowrap">나중에</button>';
+    el.onclick = async (e) => {
+        const a = e.target.dataset && e.target.dataset.a; if (!a) return;
+        el.remove();
+        if (a === 'later') { pref.driveSnooze = Date.now() + 12 * 60 * 60 * 1000; savePref(); return; }
+        if (!await ensureDriveToken()) return;
+        try { await driveBackupNow(); toast('드라이브에 백업했어요 ✓'); } catch (err) { toast('백업하지 못했어요. ' + (err.message || '')); }
+    };
+    document.body.appendChild(el);
+}
 
 /* ---------- PC 폴더 백업 ----------
    크롬 '폴더 접근'으로 고른 폴더(예: G:\내 드라이브\백업\루시의 작업실)에 백업 파일을 저절로 저장.

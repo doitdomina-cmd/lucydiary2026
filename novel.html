@@ -7404,7 +7404,8 @@ function refreshLeads() {
         const ws = w.workspaces.find(x => x.id === map[wk.id]) || w.workspaces.find(x => normTitle(x.title) === normTitle(wk.title)); if (!ws) return;
         const pf = ws.charProfiles || {}, m = String(pf.mainMale?.name || '').trim(), f = String(pf.mainFemale?.name || '').trim();
         const pl = get('plan_' + wk.id) || ensurePlan(wk.id);
-        if ((pl.leadM || '') !== m || (pl.leadF || '') !== f) { pl.leadM = m; pl.leadF = f; touch(pl); changed = true; }
+        const nm = m || pl.leadM || '', nf = f || pl.leadF || '';   // 보드에 이름이 있을 때만 덮어씀 (직접 적은 이름은 그대로)
+        if ((pl.leadM || '') !== nm || (pl.leadF || '') !== nf) { pl.leadM = nm; pl.leadF = nf; touch(pl); changed = true; }
     });
     return changed;
 }
@@ -7482,6 +7483,7 @@ function workMenu(anchor, w) {
         ${WORK_GENRES.map(x => `<button data-m="g:${x}">${x === g ? '● ' : ''}${x}</button>`).join('')}<hr>
         <button data-m="done"><i class="ic ic-circle-check"></i> ${w.done ? '미완고로 되돌리기' : '완고로 표시'}</button>
         <button data-m="cover"><i class="ic ic-image"></i> ${w.cover ? '표지 사진 바꾸기' : '표지 사진 올리기'}</button>${w.cover ? '<button data-m="cover-del">표지 사진 지우기</button>' : ''}
+        <button data-m="leads">♡ 남주·여주 이름 적기</button>
         <button data-m="rename">이름 바꾸기</button><hr><button data-m="del" class="danger">작품 삭제</button>`);
     pop.addEventListener('click', async e => {
         const m = e.target.closest('[data-m]')?.dataset.m; if (!m) return;
@@ -7489,6 +7491,13 @@ function workMenu(anchor, w) {
         if (m === 'open') enterWork(w.id);
         if (m.startsWith('g:')) { const pl = ensurePlan(w.id); pl.genre = m.slice(2); touch(pl); renderHome(); }
         if (m === 'done') { w.done = !w.done; touch(w); renderHome(); toast(w.done ? `'${w.title}'을(를) 완고로 옮겼어요. 수고하셨어요!` : '미완고로 되돌렸어요.'); }
+        if (m === 'leads') {
+            const pl = get('plan_' + w.id) || ensurePlan(w.id);
+            const bl = workGenre(w.id).startsWith('BL');
+            const a = await ask(bl ? '공 이름' : '남주 이름', pl.leadM || ''); if (a == null) return;
+            const b = await ask(bl ? '수 이름' : '여주 이름', pl.leadF || ''); if (b == null) return;
+            pl.leadM = a.trim(); pl.leadF = b.trim(); touch(pl); renderHome();
+        }
         if (m === 'cover') pickCover(w);
         if (m === 'cover-del') { delete w.cover; touch(w); renderHome(); toast('표지 사진을 지웠어요.'); }
         if (m === 'rename') { const t = await ask('작품 이름', w.title); if (t != null) { w.title = t.trim() || '제목 없음'; touch(w); renderHome(); } }

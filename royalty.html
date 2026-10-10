@@ -3304,9 +3304,20 @@
 
                 <!-- ── 3열: 위젯 색상 / 글자 / 크기 / 데이터 관리 ── -->
                 <div class="space-y-4">
+                    <!-- 위젯·입력창 디자인 -->
+                    <div>
+                        <p class="text-xs font-bold text-slate-400 uppercase mb-1">위젯 디자인 <span class="font-normal normal-case text-slate-300">(위젯 + 미니 입력창)</span></p>
+                        <div class="grid grid-cols-2 gap-2" id="widget-design-picker">
+                            <button type="button" data-design="default" onclick="setWidgetDesign('default')" class="widget-design-btn p-2 rounded-xl border text-xs font-bold text-slate-600 bg-white border-slate-200 hover:border-slate-300 transition-all"><span class="block h-7 mb-1 rounded-lg" style="background:linear-gradient(180deg,#fff,#eef2f6);border:1px solid #e2e8f0"></span>기본</button>
+                            <button type="button" data-design="label" onclick="setWidgetDesign('label')" class="widget-design-btn p-2 rounded-xl border text-xs font-bold text-slate-600 bg-white border-slate-200 hover:border-slate-300 transition-all"><span class="flex h-7 mb-1 rounded-lg gap-1 p-1" style="background:#FFFCF4;border:1.5px dashed #E1D2B2"><i class="flex-1 rounded" style="background:#FBDADA"></i><i class="flex-1 rounded" style="background:#FCEFC4"></i><i class="flex-1 rounded" style="background:#D3E6F3"></i></span>견출지 손글씨</button>
+                            <button type="button" data-design="polaroid" onclick="setWidgetDesign('polaroid')" class="widget-design-btn p-2 rounded-xl border text-xs font-bold text-slate-600 bg-white border-slate-200 hover:border-slate-300 transition-all"><span class="block h-7 mb-1 rounded" style="background:#FFFEFC;border:1px solid #ECE6DA;box-shadow:0 2px 5px rgba(60,45,25,.18);border-top:6px solid #F6CD8A"></span>폴라로이드</button>
+                            <button type="button" data-design="cozy" onclick="setWidgetDesign('cozy')" class="widget-design-btn p-2 rounded-xl border text-xs font-bold text-slate-600 bg-white border-slate-200 hover:border-slate-300 transition-all"><span class="block h-7 mb-1 rounded-xl" style="background:linear-gradient(180deg,#FFFEFB,#F6F0E3);border:1px solid #EBE2D1"></span>코지</button>
+                        </div>
+                    </div>
+                    <hr class="border-slate-100">
                     <!-- 배경/글자 색상 -->
                     <div class="space-y-2.5">
-                        <p class="text-xs font-bold text-slate-400 uppercase mb-1">위젯 색상</p>
+                        <p class="text-xs font-bold text-slate-400 uppercase mb-1">위젯 색상 <span class="font-normal normal-case text-slate-300">(기본 디자인에서만 적용)</span></p>
                         <div>
                             <label class="text-xs text-slate-400 font-bold block mb-1">배경 색상 / 투명도</label>
                             <div class="flex gap-2 items-center bg-slate-50 rounded-xl p-2 border border-slate-200">
@@ -7063,6 +7074,27 @@
         let widgetTextSize = 13;
         let widgetSectionSize = 10;
 
+        // 위젯 + 미니 입력창 디자인 선택 (default / label / polaroid / cozy)
+        function markWidgetDesignButtons(d) {
+            d = d || 'default';
+            document.querySelectorAll('#widget-design-picker .widget-design-btn').forEach(b => {
+                const on = b.dataset.design === d;
+                b.style.borderColor = on ? '#10b981' : '';
+                b.style.boxShadow = on ? '0 0 0 2px rgba(16,185,129,.25)' : '';
+            });
+        }
+        function setWidgetDesign(d) {
+            widgetSettingsData.widgetDesign = d;
+            save(true);
+            markWidgetDesignButtons(d);
+            try {
+                if (typeof require !== 'undefined') {
+                    const { ipcRenderer } = require('electron');
+                    ipcRenderer.send('widget-update-settings', { widgetDesign: d });
+                }
+            } catch(e) {}
+        }
+
         function changeWidgetTextSize(delta) {
             widgetTextSize = Math.max(9, Math.min(20, widgetTextSize + delta));
             const lbl = document.getElementById('widget-text-size-val');
@@ -7151,6 +7183,7 @@
             const s = widgetSettingsData;
             if (!s) return;
             const set = (id, val) => { const el = document.getElementById(id); if (el && val !== undefined) el.value = val; };
+            markWidgetDesignButtons(s.widgetDesign);
             set('widget-bg-color', s.bgHex);
             set('widget-opacity', Math.round((s.opacity||0.92)*100));
             set('widget-text-color', s.textHex);

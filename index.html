@@ -3835,8 +3835,6 @@ async function saveMem(){
   var rid=_memDraft.id||gid(),loggedIn=typeof currentUser!=='undefined'&&currentUser;
   var fresh=_memDraft.photos.filter(function(ph){return ph&&ph.hi;});
   var date=g('mem-d').value||todStr();
-  // 드라이브 권한 창은 사용자가 누른 이 순간에만 띄울 수 있어서 가장 먼저 요청 (기다리지 않고 계속 진행)
-  var tkP=(loggedIn&&fresh.some(function(ph){return ph.file;}))?Promise.resolve(lsdToken()||lsdEnsureToken()).catch(function(){return null;}):null;
   // 1) 기록과 사진(2000px)을 바로 저장 — 클라우드·다른 기기 동기화는 저장 과정에서 자동으로 된다
   var photos=_memDraft.photos.map(function(ph){return ph&&ph.hi?{src:ph.hi}:ph;});
   var rec={id:rid,date:date,title:title,place:g('mem-pl').value.trim(),kind:_memDraft.kind,note:_memDraft.note,
@@ -3846,21 +3844,6 @@ async function saveMem(){
   if(idx>=0)S.memories[idx]=Object.assign({},S.memories[idx],rec);else S.memories.push(rec);
   var jobs=fresh.filter(function(ph){return ph.file;}).map(function(ph){return {src:ph.hi,file:ph.file};});_memDraft=null;
   save();closeMo();render();
-  // 2) 선명한 큰 사진(2560px)은 구글 드라이브에 보관 (권한을 줬을 때만)
-  if(!tkP||!jobs.length)return;
-  if(!await tkP)return;
-  var drvFail=0,lastErr='',slug=(title||'추억').replace(/[\\/:*?"<>|]/g,'').slice(0,20);
-  for(var i=0;i<jobs.length;i++){
-    var j=jobs[i];
-    upMsg('☁ 선명한 사진을 드라이브에 올리는 중 '+(i+1)+'/'+jobs.length);
-    try{
-      var did=await withTimeout(lsdUploadOriginal(j.file,date+'_'+slug+'_'+(i+1)+'_'+(j.file.name||'photo.jpg')),90000,'드라이브 업로드');
-      var cur=(S.memories||[]).find(function(x){return x.id===rid;});
-      if(cur&&cur.photos){var k=cur.photos.findIndex(function(x){return x&&x.src===j.src;});if(k>=0&&did){cur.photos[k]=Object.assign({},cur.photos[k],{drive:did});save();render();}}
-    }catch(e){drvFail++;lastErr=lastErr||(e&&(e.code||e.message))||'';console.warn('드라이브 사진 올리기 실패',e);}
-  }
-  if(drvFail)upMsg('⚠ 드라이브에 사진 '+drvFail+'장 못 올렸어요'+(lastErr?' ('+lastErr+')':'')+' · 기록과 사진은 저장됐어요',false);
-  else upMsg('☁ 드라이브에 올렸어요 ✓',true);
 }
 function delMem(id){
   var m=(S.memories||[]).find(function(x){return x.id===id;});if(!m)return;
@@ -3889,7 +3872,7 @@ function memLookbackCard(){
 // 권한은 이 앱이 만든 파일만 다루는 drive.file → 처음 만든 폴더를 '백업' 폴더 안으로 직접 옮겨도 폴더 id로 계속 찾아감.
 // 드라이브 권한은 구글 창을 거친 뒤 약 55분만 유지돼서, 그동안 바뀐 게 있으면 1시간마다 저절로 백업하고
 // 하루 넘게 백업이 없으면 '지금 백업' 알림을 띄움 (권한 창은 버튼을 눌러야 열 수 있음)
-var LSD_SCOPE='https://www.googleapis.com/auth/drive.file',LSD_FOLDER='루시의 스페이스',LSD_KEEP=10;
+var LSD_SCOPE='https://www.googleapis.com/auth/drive.file',LSD_FOLDER='루시의 스페이스',LSD_KEEP=3;
 var lsd={token:null,busy:false};
 function lsdMeta(){try{return JSON.parse(localStorage.getItem('lucy_drive_meta')||'{}')||{};}catch(e){return {};}}
 function lsdSetMeta(m){try{localStorage.setItem('lucy_drive_meta',JSON.stringify(m));}catch(e){}}
@@ -5986,14 +5969,7 @@ async function pjLogPick(pid,input){var f=input.files&&input.files[0];input.valu
 async function addPjLog(pid){
   var p=S.projects.find(function(x){return x.id===pid;});if(!p)return;var el=document.getElementById('pjl-t-'+pid),tx=(el&&el.value||'').trim(),ph=_pjLogPhoto[pid]||null;if(!tx&&!ph)return;
   var file=_pjLogFile[pid]||null,loggedIn=typeof currentUser!=='undefined'&&currentUser;
-  // 원본은 구글 드라이브에 보관 → 권한 창은 사용자가 누른 이 순간에만 띄울 수 있어서 가장 먼저 요청한다
-  var tkP=(file&&loggedIn)?Promise.resolve(lsdToken()||lsdEnsureToken()).catch(function(){return null;}):null;
   var l={id:gid(),date:todStr(),text:tx,photo:ph};if(!p.logs)p.logs=[];p.logs.push(l);delete _pjLogPhoto[pid];delete _pjLogFile[pid];save();render();
-  if(tkP&&await tkP){
-    try{var fn=l.date+'_'+(p.name||'프로젝트').replace(/[\\/:*?"<>|]/g,'').slice(0,20)+'_'+(file.name||'photo.jpg'),did=await withTimeout(lsdUploadOriginal(file,fn,'프로젝트 기록'),90000,'드라이브 업로드');
-      var cur2=(p.logs||[]).find(function(x){return x.id===l.id;});if(cur2&&did){cur2.drive=did;save();render();}}
-    catch(e){console.warn('드라이브 원본 올리기 실패',e);lsdToast('사진을 드라이브에 못 올렸어요');}
-  }
 }
 function delPjLog(pid,lid){var p=S.projects.find(function(x){return x.id===pid;});if(!p)return;var l=(p.logs||[]).find(function(x){return x.id===lid;});if(l&&l.photoPath){try{storage.ref().child(l.photoPath).delete().catch(function(){});}catch(_){}}p.logs=(p.logs||[]).filter(function(x){return x.id!==lid;});save();render();}
 

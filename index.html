@@ -2569,6 +2569,8 @@ body.cozy .app .spz-chip,body.cozy .app .spz-gh{font-weight:500 !important}
 .mem-orig span{margin-right:4px}
 .mem-orig a{border-radius:99px;background:var(--cz-soft);color:var(--cz-deep);padding:3px 11px;text-decoration:none;font-size:11.5px}
 .mem-dv{position:absolute;right:4px;bottom:4px;background:rgba(255,255,255,.9);color:var(--cz-deep);border-radius:99px;font-size:10px;padding:1px 6px}
+
+.mem-hd{border:0;border-radius:99px;background:var(--cz-acc);color:#fff;padding:5px 13px;font-size:12px;cursor:pointer;font-family:inherit}
 </style>
 </head>
 <body>
@@ -3546,15 +3548,36 @@ function renderMemories(){
 }
 function openMemView(id){
   var m=(S.memories||[]).find(function(x){return x.id===id;});if(!m)return;
-  var ph=(m.photos||[]).map(memPhotoSrc).filter(Boolean),k=memKind(m.kind);
+  var pl=(m.photos||[]).map(function(x){return {src:memPhotoSrc(x),drive:x&&x.drive};}).filter(function(x){return x.src;}),ph=pl.map(function(x){return x.src;}),k=memKind(m.kind);
+  var hasDrv=pl.some(function(x){return x.drive;});
   openMo(esc(m.title||'추억'),
-    '<div class="mem-v">'+(ph.length?'<div class="mem-vph n'+Math.min(ph.length,4)+'">'+ph.map(function(u){return '<a href="'+esc(u)+'" target="_blank" rel="noopener"><img src="'+esc(u)+'" alt=""></a>';}).join('')+'</div>':'')+
+    '<div class="mem-v">'+(ph.length?'<div class="mem-vph n'+Math.min(ph.length,4)+'">'+pl.map(function(x,i){return '<a href="'+esc(x.src)+'" target="_blank" rel="noopener" data-vi="'+i+'"><img src="'+esc(x.src)+'" alt=""></a>';}).join('')+'</div>':'')+
     '<div class="mem-vk">'+k.ic+' '+k.ko+' · '+esc((m.date||'').replace(/-/g,'. '))+(m.place?' · ⌖ '+esc(m.place):'')+'</div>'+
-    ((m.photos||[]).some(function(x){return x&&x.drive;})?'<div class="mem-orig"><span>☁ 원본은 구글 드라이브에 보관돼 있어요</span>'+(m.photos||[]).map(function(x,i){return x&&x.drive?'<a href="https://drive.google.com/file/d/'+esc(x.drive)+'/view" target="_blank" rel="noopener">원본 '+(i+1)+'</a>':'';}).join('')+'</div>':'')+
+    ((m.photos||[]).some(function(x){return x&&x.drive;})?'<div class="mem-orig"><span id="mem-hdst">☁ 원본은 구글 드라이브에 보관돼 있어요</span>'+(lsdToken()?'':'<button type="button" class="mem-hd" id="mem-hdbtn" onclick="memUpgrade(\''+m.id+'\',true)">✨ 원본 화질로 보기</button>')+(m.photos||[]).map(function(x,i){return x&&x.drive?'<a href="https://drive.google.com/file/d/'+esc(x.drive)+'/view" target="_blank" rel="noopener">원본 '+(i+1)+'</a>':'';}).join('')+'</div>':'')+
     (((m.people||[]).length||m.text)?'<div class="mem-note nt-'+memNoteId(m.note)+'"><i class="mem-tape"></i>'+
       ((m.people||[]).length?'<div class="mem-with">♡ '+memWithPhrase(m)+'</div>':'')+
       (m.text?'<p class="mem-vt">'+esc(m.text)+'</p>':'')+'</div>':'')+'</div>',
     '<button class="btn bg" style="color:var(--red)" onclick="delMem(\''+m.id+'\')">삭제</button><button class="btn bg mem-favbtn'+(m.fav?' on':'')+'" style="margin-right:auto" onclick="togMemFav(\''+m.id+'\')">'+(m.fav?'♥ 특별한 추억':'♡ 특별한 추억으로')+'</button><button class="btn bg" onclick="closeMo()">닫기</button><button class="btn bp" onclick="openMemForm(\''+m.id+'\')">수정</button>');
+  if(hasDrv&&lsdToken())memUpgrade(m.id,false);
+}
+// 드라이브에 보관한 원본을 불러와 선명하게 보여 준다 (드라이브가 만든 큰 미리보기: 긴 변 2048px)
+// 권한이 살아 있으면 자동으로, 아니면 버튼을 눌렀을 때(권한 창) 불러온다
+async function memUpgrade(id,ask){
+  var m=(S.memories||[]).find(function(x){return x.id===id;});if(!m)return;
+  var st=document.getElementById('mem-hdst'),btn=document.getElementById('mem-hdbtn');
+  var tk=lsdToken();if(!tk&&ask)tk=await lsdEnsureToken();
+  if(!tk)return;
+  if(btn)btn.remove();if(st)st.textContent='☁ 원본 화질 불러오는 중…';
+  var pl=(m.photos||[]).map(function(x){return {src:memPhotoSrc(x),drive:x&&x.drive};}).filter(function(x){return x.src;}),got=0;
+  await Promise.all(pl.map(async function(x,i){
+    if(!x.drive)return;
+    try{var f=await lsdFetch('https://www.googleapis.com/drive/v3/files/'+x.drive+'?fields=thumbnailLink');
+      if(!f||!f.thumbnailLink)return;
+      var url=f.thumbnailLink.replace(/=s\d+(-c)?$/,'=s2048'),a=document.querySelector('.mem-vph a[data-vi="'+i+'"]');if(!a)return;
+      await new Promise(function(res){var im=new Image();im.onload=function(){a.href=url;var tg=a.querySelector('img');if(tg)tg.src=url;got++;res();};im.onerror=res;im.src=url;});
+    }catch(e){console.warn('원본 불러오기 실패',e);}
+  }));
+  var st2=document.getElementById('mem-hdst');if(st2)st2.textContent=got?'☁ 드라이브 원본 화질로 보는 중':'☁ 원본은 구글 드라이브에 보관돼 있어요 (지금은 못 불러왔어요)';
 }
 function openMemForm(id){
   var m=id?(S.memories||[]).find(function(x){return x.id===id;}):null;

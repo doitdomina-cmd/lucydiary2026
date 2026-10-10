@@ -985,13 +985,30 @@ async function githubPush(cfg, dataStr) {
 
 // --- Firebase 동기화 (Firebase JS SDK, 익명/구글 인증 + 실시간 리스너) ---
 // 기본 프로젝트 설정값 (사용자가 별도로 설정하지 않아도 자동으로 이 값으로 동기화됩니다)
-const DEFAULT_FIREBASE_CONFIG = {
+// 웹(브라우저)은 루시의 스페이스·작업실·정산과 같은 Firebase 프로젝트(writer-routine)를 쓴다.
+//  - 같은 구글 로그인을 같이 쓰고, 내 시놉은 users/{내 계정}/synop/main 에 저장돼서 내 계정만 읽고 쓸 수 있다.
+// 데스크탑(Electron)·안드로이드 앱은 익명 로그인이라 계정 구분이 안 돼서 예전 프로젝트(syno-eb309)를 그대로 쓴다.
+const LEGACY_FIREBASE_CONFIG = {
     apiKey: "AIzaSyC1I0GQHJ4U5t0bIgWyXWlKT6pZZMZh2yI",
     projectId: "syno-eb309",
     collection: "episodeBoards",
     docId: "main",
     autoSync: true
 };
+const DEFAULT_FIREBASE_CONFIG = isAutoAuthEnvironment ? LEGACY_FIREBASE_CONFIG : {
+    apiKey: "AIzaSyCYWsMUSAaxnnTNoNjxw8YfZThv9-5mHak",
+    projectId: "writer-routine",
+    collection: "synop",
+    docId: "main",
+    autoSync: true
+};
+// 웹은 앱 이름 없이(기본 앱) 만들어야 다른 앱과 로그인 상태가 같이 유지된다
+const FB_APP_NAME = isAutoAuthEnvironment ? 'episodeBoardApp' : undefined;
+function fbFindApp() { const n = FB_APP_NAME || '[DEFAULT]'; return (firebase.apps || []).find(a => a.name === n); }
+function fbInitApp(cfg) {
+    const conf = { apiKey: cfg.apiKey, projectId: cfg.projectId, authDomain: cfg.authDomain || (cfg.projectId + '.firebaseapp.com') };
+    return fbFindApp() || (FB_APP_NAME ? firebase.initializeApp(conf, FB_APP_NAME) : firebase.initializeApp(conf));
+}
 let fbConfigPath = '';
 if (isNodeEnvironment) {
     try {
@@ -1019,6 +1036,12 @@ function loadFirebaseConfig() {
         } catch (e) { stored = null; }
     }
     // 저장된 설정이 없으면 기본값(코드에 내장된 apiKey/프로젝트ID)을 사용
+    // 웹에 예전 프로젝트(syno-eb309) 설정이 남아 있으면 새 프로젝트 설정으로 바꾼다
+    if (!isAutoAuthEnvironment && stored && stored.projectId === 'syno-eb309') {
+        const next = { ...DEFAULT_FIREBASE_CONFIG, autoSync: stored.autoSync !== false, clientId: stored.clientId };
+        try { saveFirebaseConfig(next); } catch (e) {}
+        return next;
+    }
     if (!stored || !stored.apiKey || !stored.projectId) {
         return { ...DEFAULT_FIREBASE_CONFIG, ...(stored || {}) };
     }
@@ -1068,7 +1091,7 @@ function fbUpdateAuthUI(user) {
     const badge = document.getElementById('fb-login-badge');
     if (badge && !isAutoAuthEnvironment) {
         if (user && !user.isAnonymous) {
-            badge.innerHTML = `<i data-lucide="cloud" class="w-3.5 h-3.5 text-green-600"></i> <span class="text-green-700 font-bold">${esc ? esc(user.displayName || user.email || '로그인됨') : (user.displayName || user.email || '로그인됨')}</span> <button onclick="window.fbGoogleSignOut()" class="text-gray-400 underline hover:text-gray-600 ml-1">로그아웃</button>`;
+            badge.innerHTML = `<i data-lucide="cloud" class="w-3.5 h-3.5 text-green-600"></i> <span class="text-green-700 font-bold">${esc ? esc(user.displayName || user.email || '로그인됨') : (user.displayName || user.email || '로그인됨')}</span> <button onclick="window.fbGoogleSignOut()" class="text-gray-400 underline hover:text-gray-600 ml-1">로그아웃</button>${(() => { try { return localStorage.getItem('fb-legacy-imported') ? '' : ' <button onclick="window.fbImportLegacy()" class="text-blue-500 underline hover:text-blue-700 ml-1">예전 데이터 가져오기</button>'; } catch (e) { return ''; } })()}`;
             badge.classList.remove('hidden');
         } else {
             badge.innerHTML = `<i data-lucide="cloud-off" class="w-3.5 h-3.5 text-orange-500"></i> <button onclick="window.fbGoogleSignIn()" class="text-orange-600 font-bold underline hover:text-orange-700">구글 로그인 (온라인 동기화)</button>`;
@@ -1106,8 +1129,7 @@ async function fbConnect(cfg) {
         throw new Error('Firebase SDK를 불러오지 못했습니다. 인터넷 연결을 확인하세요.');
     }
     if (!fbApp) {
-        fbApp = (firebase.apps || []).find(a => a.name === 'episodeBoardApp')
-            || firebase.initializeApp({ apiKey: cfg.apiKey, projectId: cfg.projectId, authDomain: cfg.authDomain || (cfg.projectId + '.firebaseapp.com') }, 'episodeBoardApp');
+        fbApp = fbInitApp(cfg);
         fbAuthObj = fbApp.auth();
         fbDb = fbApp.firestore();
         if (!_fbAuthListenerAttached) {
@@ -1150,8 +1172,7 @@ window.fbGoogleSignIn = async function () {
         if (!fbApp) {
             const cfg = loadFirebaseConfig() || {};
             if (!cfg.apiKey || !cfg.projectId) { fbSetStatus('먼저 API Key / 프로젝트 ID를 입력하고 저장하세요.', 'err'); return; }
-            fbApp = (firebase.apps || []).find(a => a.name === 'episodeBoardApp')
-                || firebase.initializeApp({ apiKey: cfg.apiKey, projectId: cfg.projectId, authDomain: cfg.authDomain || (cfg.projectId + '.firebaseapp.com') }, 'episodeBoardApp');
+            fbApp = fbInitApp(cfg);
             fbAuthObj = fbApp.auth();
             fbDb = fbApp.firestore();
             try { await fbAuthObj.setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch (e) {}
@@ -1201,8 +1222,42 @@ window.fbCheckConnection = async function () {
 };
 
 function fbDocRef(cfg) {
+    if (!isAutoAuthEnvironment && cfg.projectId === 'writer-routine') {
+        const u = fbAuthObj && fbAuthObj.currentUser;
+        if (!u) throw new Error('LOGIN_REQUIRED');
+        return fbDb.collection('users').doc(u.uid).collection('synop').doc(cfg.docId || 'main');
+    }
     return fbDb.collection(cfg.collection || 'episodeBoards').doc(cfg.docId || 'main');
 }
+
+// 예전 저장소(syno-eb309)에 있던 시놉시스를 새 저장소로 한 번 가져온다 (버튼을 눌렀을 때만: 구글 로그인 팝업이 필요해서)
+window.fbImportLegacy = async function () {
+    try {
+        if (isAutoAuthEnvironment) { alert('이 기능은 웹 버전에서만 써요.'); return; }
+        const cur = fbAuthObj && fbAuthObj.currentUser;
+        if (!cur || cur.isAnonymous) { alert('먼저 구글로 로그인해 주세요.'); return; }
+        const L = LEGACY_FIREBASE_CONFIG;
+        const lapp = (firebase.apps || []).find(a => a.name === 'legacySynoApp')
+            || firebase.initializeApp({ apiKey: L.apiKey, projectId: L.projectId, authDomain: L.projectId + '.firebaseapp.com' }, 'legacySynoApp');
+        const lauth = lapp.auth();
+        try { await lauth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch (e) {}
+        if (!lauth.currentUser) await lauth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+        const snap = await lapp.firestore().collection(L.collection).doc(L.docId).get();
+        const d = snap.exists && snap.data();
+        let data = null;
+        try { data = d && d.data ? JSON.parse(d.data) : null; } catch (e) {}
+        if (!data || !Array.isArray(data) || !data.length) { alert('예전 저장소에 가져올 시놉시스가 없어요.'); return; }
+        if (!confirm('예전 저장소에서 시놉시스 ' + data.length + '개를 찾았어요.\n지금 화면의 데이터를 이걸로 바꾸고 새 저장소에 올릴까요?')) return;
+        await fbApplyRemoteData(data);
+        await firestorePush(loadFirebaseConfig(), JSON.stringify(window.workspaces));
+        try { localStorage.setItem('fb-legacy-imported', '1'); } catch (e) {}
+        fbUpdateAuthUI();
+        alert('가져와서 새 저장소에 올렸어요 ✓');
+    } catch (e) {
+        console.error(e);
+        alert('가져오지 못했어요. (' + (e.code || e.message) + ')');
+    }
+};
 
 async function firestorePull(cfg) {
     await fbConnect(cfg);

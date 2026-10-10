@@ -2564,6 +2564,11 @@ body.cozy .app .spz-chip,body.cozy .app .spz-gh{font-weight:500 !important}
 #lsd-nudge .go{border:0;background:var(--accent);color:#fff;border-radius:99px;padding:7px 14px;cursor:pointer;white-space:nowrap;font-family:inherit}
 #lsd-nudge .later{border:0;background:none;color:var(--t3);cursor:pointer;white-space:nowrap;font-family:inherit}
 .lsd-toast{width:max-content;max-width:calc(100vw - 32px);position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:9001;background:rgba(40,36,32,.9);color:#fff;border-radius:99px;padding:9px 18px;font-size:13px}
+
+.mem-orig{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12px;color:var(--t2)}
+.mem-orig span{margin-right:4px}
+.mem-orig a{border-radius:99px;background:var(--cz-soft);color:var(--cz-deep);padding:3px 11px;text-decoration:none;font-size:11.5px}
+.mem-dv{position:absolute;right:4px;bottom:4px;background:rgba(255,255,255,.9);color:var(--cz-deep);border-radius:99px;font-size:10px;padding:1px 6px}
 </style>
 </head>
 <body>
@@ -3545,6 +3550,7 @@ function openMemView(id){
   openMo(esc(m.title||'추억'),
     '<div class="mem-v">'+(ph.length?'<div class="mem-vph n'+Math.min(ph.length,4)+'">'+ph.map(function(u){return '<a href="'+esc(u)+'" target="_blank" rel="noopener"><img src="'+esc(u)+'" alt=""></a>';}).join('')+'</div>':'')+
     '<div class="mem-vk">'+k.ic+' '+k.ko+' · '+esc((m.date||'').replace(/-/g,'. '))+(m.place?' · ⌖ '+esc(m.place):'')+'</div>'+
+    ((m.photos||[]).some(function(x){return x&&x.drive;})?'<div class="mem-orig"><span>☁ 원본은 구글 드라이브에 보관돼 있어요</span>'+(m.photos||[]).map(function(x,i){return x&&x.drive?'<a href="https://drive.google.com/file/d/'+esc(x.drive)+'/view" target="_blank" rel="noopener">원본 '+(i+1)+'</a>':'';}).join('')+'</div>':'')+
     (((m.people||[]).length||m.text)?'<div class="mem-note nt-'+memNoteId(m.note)+'"><i class="mem-tape"></i>'+
       ((m.people||[]).length?'<div class="mem-with">♡ '+memWithPhrase(m)+'</div>':'')+
       (m.text?'<p class="mem-vt">'+esc(m.text)+'</p>':'')+'</div>':'')+'</div>',
@@ -3568,12 +3574,12 @@ function openMemForm(id){
 function memPickKind(k){if(!_memDraft)return;_memDraft.kind=k;document.querySelectorAll('#mem-kinds button').forEach(function(b){b.classList.toggle('on',b.dataset.k===k);});}
 function memDrawPhotos(){
   var el=document.getElementById('mem-fph');if(!el||!_memDraft)return;
-  el.innerHTML=_memDraft.photos.map(function(ph,i){return '<div class="mem-th'+(i===0?' cover':'')+'" style="background-image:url(\''+esc(memPhotoSrc(ph)).replace(/'/g,'%27')+'\')"><button type="button" onclick="memDelPhoto('+i+')" title="빼기">×</button>'+(i===0?'<span class="mem-cv">대표</span>':'<button type="button" class="mem-cvb" onclick="memSetCover('+i+')" title="대표 사진으로">★ 대표로</button>')+'</div>';}).join('')+
+  el.innerHTML=_memDraft.photos.map(function(ph,i){return '<div class="mem-th'+(i===0?' cover':'')+'" style="background-image:url(\''+esc(memPhotoSrc(ph)).replace(/'/g,'%27')+'\')"><button type="button" onclick="memDelPhoto('+i+')" title="빼기">×</button>'+(ph&&(ph.drive||ph.file)?'<span class="mem-dv" title="원본은 구글 드라이브에 보관돼요">☁</span>':'')+(i===0?'<span class="mem-cv">대표</span>':'<button type="button" class="mem-cvb" onclick="memSetCover('+i+')" title="대표 사진으로">★ 대표로</button>')+'</div>';}).join('')+
     (_memDraft.photos.length<6?'<label class="mem-th add">'+CZI.cam+'<span>사진 추가</span><input type="file" accept="image/*" multiple hidden onchange="memAddPhotos(this)"></label>':'');
 }
 async function memAddPhotos(input){
   var fs=[].slice.call(input.files||[]);input.value='';
-  for(var i=0;i<fs.length&&_memDraft&&_memDraft.photos.length<6;i++){try{var hi=await memCompress(fs[i],1600,0.78),lo=await memCompress(fs[i],900,0.6);_memDraft.photos.push({hi:hi,lo:lo});}catch(e){alert(e.message||'사진을 읽지 못했어요.');}}
+  for(var i=0;i<fs.length&&_memDraft&&_memDraft.photos.length<6;i++){try{var hi=await memCompress(fs[i],1600,0.78),lo=await memCompress(fs[i],900,0.6);_memDraft.photos.push({hi:hi,lo:lo,file:fs[i]});}catch(e){alert(e.message||'사진을 읽지 못했어요.');}}
   memDrawPhotos();
 }
 function memSetCover(i){if(!_memDraft||!_memDraft.photos[i])return;var ph=_memDraft.photos.splice(i,1)[0];_memDraft.photos.unshift(ph);memDrawPhotos();}
@@ -3588,13 +3594,28 @@ async function saveMem(){
   var fresh=photos.filter(function(ph){return ph&&ph.hi;});
   if(fresh.length&&typeof currentUser!=='undefined'&&currentUser){
     if(btn){btn.disabled=true;}
+    // 원본은 구글 드라이브에 보관 → 권한 창은 저장 버튼을 누른 이 순간에만 띄울 수 있다 (이미 받았으면 생략)
+    var driveOk=false;
+    if(fresh.some(function(ph){return ph.file;})){
+      if(btn)btn.textContent='드라이브 권한 확인 중…';
+      try{driveOk=!!(lsdToken()||await lsdEnsureToken());}catch(e){driveOk=false;}
+    }
+    var driveFail=0;
     for(var i=0,n=0;i<photos.length;i++){
       var ph=photos[i];if(!ph||!ph.hi)continue;n++;
       if(btn)btn.textContent='사진 올리는 중 '+n+'/'+fresh.length;
+      var out={lo:ph.lo};
       try{var blob=dataUrlToBlob(ph.hi),path='users/'+currentUser.uid+'/cozy/mem-'+rid+'-'+gid()+'.'+(blob.type==='image/jpeg'?'jpg':'webp'),ref=storage.ref().child(path);
-        await ref.put(blob,{contentType:blob.type});photos[i]={url:await ref.getDownloadURL(),path:path};
+        await ref.put(blob,{contentType:blob.type});out={url:await ref.getDownloadURL(),path:path};
       }catch(e){console.warn('추억 사진 올리기 실패',e);}
+      if(driveOk&&ph.file){
+        try{var fn=(g('mem-d').value||todStr())+'_'+(title||'추억').replace(/[\\/:*?"<>|]/g,'').slice(0,20)+'_'+(n)+'_'+(ph.file.name||'photo.jpg');
+          out.drive=await lsdUploadOriginal(ph.file,fn);}
+        catch(e){driveFail++;console.warn('드라이브 원본 올리기 실패',e);}
+      }
+      photos[i]=out;
     }
+    if(driveFail)lsdToast('원본 '+driveFail+'장은 드라이브에 못 올렸어요');
     if(!_memDraft)return;
   }
   photos=photos.map(function(ph){return ph&&ph.hi?ph.lo:ph;});
@@ -3679,6 +3700,25 @@ async function lsdFolder(){
   if(!id){var made=await lsdFetch('https://www.googleapis.com/drive/v3/files?fields=id',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:LSD_FOLDER,mimeType:'application/vnd.google-apps.folder'})});id=made.id;m.fresh=true;}
   m.folder=id;lsdSetMeta(m);return id;
 }
+// '루시의 스페이스' 폴더 안의 하위 폴더(예: '추억 사진')를 찾거나 만든다
+async function lsdSubFolder(name){
+  var m=lsdMeta();m.sub=m.sub||{};
+  if(m.sub[name]){try{var f=await lsdFetch('https://www.googleapis.com/drive/v3/files/'+m.sub[name]+'?fields=id,trashed');if(f&&!f.trashed)return m.sub[name];}catch(e){if(e.code==='no-token')throw e;}}
+  var parent=await lsdFolder();
+  var q=encodeURIComponent("name='"+name+"' and '"+parent+"' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false");
+  var found=await lsdFetch('https://www.googleapis.com/drive/v3/files?q='+q+'&fields=files(id)');
+  var id=found.files&&found.files.length?found.files[0].id:null;
+  if(!id){var made=await lsdFetch('https://www.googleapis.com/drive/v3/files?fields=id',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,mimeType:'application/vnd.google-apps.folder',parents:[parent]})});id=made.id;}
+  m=lsdMeta();m.sub=m.sub||{};m.sub[name]=id;lsdSetMeta(m);return id;
+}
+// 사진 원본(파일 그대로)을 드라이브 '추억 사진' 폴더에 올리고 파일 id를 돌려준다
+async function lsdUploadOriginal(file,fileName){
+  var folder=await lsdSubFolder('추억 사진'),bd='lucy'+Date.now()+Math.random().toString(36).slice(2,8);
+  var meta=JSON.stringify({name:fileName,parents:[folder]});
+  var body=new Blob(['--'+bd+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+meta+'\r\n--'+bd+'\r\nContent-Type: '+(file.type||'application/octet-stream')+'\r\n\r\n',file,'\r\n--'+bd+'--']);
+  var r=await lsdFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',{method:'POST',headers:{'Content-Type':'multipart/related; boundary='+bd},body:body});
+  return r&&r.id;
+}
 function lsdPayload(){var app=Object.assign({},S);delete app.customFontData;return JSON.stringify({app:app,ledger:LD,meta:{from:'lucy-space',at:new Date().toISOString()}});}
 function lsdSig(){var s=JSON.stringify([S,LD]),h=0;for(var i=0;i<s.length;i+=7)h=(h*31+s.charCodeAt(i))>>>0;return s.length+':'+h;}
 async function lsdBackupNow(){
@@ -3687,7 +3727,8 @@ async function lsdBackupNow(){
   var bd='lucy'+Date.now();
   var body='--'+bd+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+JSON.stringify({name:name,parents:[folder],mimeType:'application/json'})+'\r\n--'+bd+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+lsdPayload()+'\r\n--'+bd+'--';
   await lsdFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',{method:'POST',headers:{'Content-Type':'multipart/related; boundary='+bd},body:body});
-  var q=encodeURIComponent("'"+folder+"' in parents and trashed=false");
+  // 정리 대상은 '루시의스페이스_백업_…json' 파일만 (같은 폴더 안의 '추억 사진' 폴더는 건드리지 않는다)
+  var q=encodeURIComponent("'"+folder+"' in parents and trashed=false and mimeType='application/json' and name contains '루시의스페이스_백업_'");
   var list=await lsdFetch('https://www.googleapis.com/drive/v3/files?q='+q+'&orderBy=createdTime%20desc&fields=files(id)&pageSize=100');
   var fs=(list&&list.files)||[];for(var i=LSD_KEEP;i<fs.length;i++){try{await lsdFetch('https://www.googleapis.com/drive/v3/files/'+fs[i].id,{method:'DELETE'});}catch(e){}}
   var m=lsdMeta();m.at=Date.now();m.sig=lsdSig();m.name=name;lsdSetMeta(m);
@@ -3722,7 +3763,7 @@ function lsDriveCard(){
   var m=lsdMeta();
   return '<div class="card" style="margin-bottom:14px"><div class="ct" style="margin-bottom:10px">☁️ 구글 드라이브 백업</div>'+
     '<div class="lsd-st">'+(m.at?'마지막 백업 <b>'+lsdWhen(m.at)+'</b>':'아직 드라이브 백업이 없어요')+'<span>· 최근 '+LSD_KEEP+'개만 남아요</span></div>'+
-    '<div class="lsd-help">내 드라이브의 <b>‘'+LSD_FOLDER+'’</b> 폴더에 저장돼요. 처음 백업하면 이 폴더가 드라이브 맨 앞에 생기는데, 드라이브 앱에서 <b>‘백업’ 폴더 안으로 한 번만 옮겨 주세요.</b> 옮긴 뒤에도 계속 그 폴더로 백업돼요.<br>권한을 받은 뒤 1시간 동안은 바뀐 게 있으면 저절로 백업하고, 하루 넘게 백업이 없으면 알려 드려요. 되살릴 땐 아래 <b>가져오기</b>로 백업 파일을 고르면 돼요.</div>'+
+    '<div class="lsd-help">내 드라이브의 <b>‘'+LSD_FOLDER+'’</b> 폴더에 저장돼요. 처음 백업하면 이 폴더가 드라이브 맨 앞에 생기는데, 드라이브 앱에서 <b>‘백업’ 폴더 안으로 한 번만 옮겨 주세요.</b> 옮긴 뒤에도 계속 그 폴더로 백업돼요.<br>권한을 받은 뒤 1시간 동안은 바뀐 게 있으면 저절로 백업하고, 하루 넘게 백업이 없으면 알려 드려요. 되살릴 땐 아래 <b>가져오기</b>로 백업 파일을 고르면 돼요.<br><b>추억 사진 원본</b>은 같은 폴더 안의 <b>‘추억 사진’</b> 폴더에 원본 그대로 저장돼요. 추억을 저장할 때 구글 권한 창이 뜰 수 있어요.</div>'+
     '<button class="btn bp bsm" id="lsd-btn" onclick="lsdBackupClick()">지금 드라이브에 백업</button></div>';
 }
 

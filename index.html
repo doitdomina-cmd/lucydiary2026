@@ -2704,26 +2704,160 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
-const storage = firebase.storage();
-try{storage.setMaxUploadRetryTime(20000);storage.setMaxOperationRetryTime(20000);}catch(e){}
+// Firebase Storage는 이 프로젝트에서 쓸 수 없다(Blaze 요금제 필요). 사진은 아래 '사진 보관소'(IndexedDB + Firestore)가 맡는다.
+// 예전 코드가 Storage에 올리려는 부분은 바로 실패해서, 사진을 이 기기에 그대로 두는 쪽으로 넘어간다.
+const storage = { ref(){ return { child(){ return {
+  put(){ return Promise.reject({code:'storage/disabled'}); },
+  getDownloadURL(){ return Promise.reject({code:'storage/disabled'}); },
+  delete(){ return Promise.resolve(); } }; } }; } };
 let currentUser = null;
 
 // Firestore 저장/로드
 let _lastCloudSaveData = null;
+
+// ═══════════ 사진 보관소 ═══════════
+// 사진(base64)은 앱 데이터 안에 글자로 넣지 않고 따로 보관한다.
+//  · 이 기기: IndexedDB (localStorage 5MB 한도에 안 걸리게)
+//  · 클라우드: Firestore 'photos' 컬렉션에 사진 한 장 = 문서 하나 (사진마다 1MB 한도를 따로 씀)
+//  · 앱 데이터(localStorage·클라우드 서랍)에는 'fs:사진번호' 자리표시자만 저장 → 서랍이 작아진다
+// 화면에 쓰는 S 안에는 항상 진짜 사진(base64)이 들어 있어서 다른 코드는 바꿀 필요가 없다.
+var PH_PRE = 'data:image/gif;base64,R0lGODlhAQABAAAAACw=#fs:';   // 안 풀렸을 땐 투명 점 1개로 보이는 자리표시자
+var PH = { mem:{}, idMap:new Map(), inIdb:new Set(), upKeys:new Set(), putting:{}, failAt:{}, ready:Promise.resolve(0), done:true, dbP:null, idxP:null, warned:false };
+function phOpen(){
+  if(PH.dbP) return PH.dbP;
+  PH.dbP = new Promise(function(res){
+    try{
+      var r = indexedDB.open('lucy_photos', 1);
+      r.onupgradeneeded = function(){ var d=r.result; if(!d.objectStoreNames.contains('p')) d.createObjectStore('p',{keyPath:'id'}); if(!d.objectStoreNames.contains('u')) d.createObjectStore('u'); };
+      r.onsuccess = function(){ res(r.result); }; r.onerror = r.onblocked = function(){ res(null); };
+    }catch(e){ res(null); }
+  });
+  return PH.dbP;
+}
+function phTx(store, mode, fn){
+  return phOpen().then(function(db){
+    if(!db) return null;
+    return new Promise(function(res){
+      try{ var tx=db.transaction(store,mode), rq=fn(tx.objectStore(store));
+        tx.oncomplete=function(){ res(rq&&rq.result!==undefined ? rq.result : null); }; tx.onerror=tx.onabort=function(){ res(null); };
+      }catch(e){ res(null); }
+    });
+  });
+}
+function phIndex(){
+  if(PH.idxP) return PH.idxP;
+  PH.idxP = phOpen().then(function(db){
+    if(!db) return;
+    var keys=function(store,fn){ return new Promise(function(r){ try{ var rq=db.transaction(store).objectStore(store).getAllKeys(); rq.onsuccess=function(){ (rq.result||[]).forEach(fn); r(); }; rq.onerror=function(){ r(); }; }catch(e){ r(); } }); };
+    return Promise.all([ keys('p',function(k){ PH.inIdb.add(k); }), keys('u',function(k){ PH.upKeys.add(k); }) ]);
+  });
+  return PH.idxP;
+}
+function phHash(str){
+  var h1=0xdeadbeef, h2=0x41c6ce57;
+  for(var i=0,ch;i<str.length;i++){ ch=str.charCodeAt(i); h1=Math.imul(h1^ch,2654435761); h2=Math.imul(h2^ch,1597334677); }
+  h1=Math.imul(h1^(h1>>>16),2246822507)^Math.imul(h2^(h2>>>13),3266489909);
+  h2=Math.imul(h2^(h2>>>16),2246822507)^Math.imul(h1^(h1>>>13),3266489909);
+  return 4294967296*(2097151&h2)+(h1>>>0);
+}
+function phIsData(v){ return typeof v==='string' && v.length>256 && v.indexOf('data:image/')===0 && v.indexOf('#fs:')<0; }
+function phIsPH(v){ return typeof v==='string' && v.length<256 && v.indexOf('data:image/gif')===0 && v.indexOf('#fs:')>0; }
+// 사진 하나의 번호(내용으로 정함 → 같은 사진은 한 번만 보관). 처음 보는 사진은 이 기기 보관소(IndexedDB)에도 넣는다
+function phReg(d){
+  var id = PH.idMap.get(d);
+  if(id) return id;
+  id = 'p'+phHash(d).toString(36)+d.length.toString(36);
+  PH.idMap.set(d,id); PH.mem[id]=d;
+  if(!PH.inIdb.has(id) && !PH.putting[id]){
+    PH.putting[id] = phTx('p','readwrite',function(os){ return os.put({id:id,d:d,at:Date.now()}); }).then(function(ok){ if(ok) PH.inIdb.add(id); delete PH.putting[id]; });
+  }
+  return id;
+}
+// 이 기기 저장(localStorage): 보관소에 들어간 게 확인된 사진만 자리표시자로 바꾼다 (아직이면 안전하게 그대로 둠)
+function phLocalReplacer(k,v){ if(phIsData(v)){ var id=phReg(v); return PH.inIdb.has(id) ? PH_PRE+id : v; } return v; }
+function phStringifyLocal(o){ return JSON.stringify(o, phLocalReplacer); }
+function phUid(){ return currentUser ? currentUser.uid : ''; }
+// 클라우드에 아직 없는 사진을 올린다. 올리지 못한 사진 번호 집합을 돌려준다
+async function phEnsureCloud(chunks){
+  await phIndex();
+  var uid=phUid(), need=new Map(), failed=new Set();
+  JSON.stringify(chunks, function(k,v){ if(phIsData(v)){ var id=phReg(v); if(!PH.upKeys.has(uid+'|'+id)) need.set(id,v); } return v; });
+  var ids=Array.from(need.keys()), i=0, firstErr='';
+  var worker=async function(){
+    while(i<ids.length){
+      var id=ids[i++], d=need.get(id);
+      if(PH.failAt[id] && Date.now()-PH.failAt[id] < 5*60*1000){ failed.add(id); continue; }   // 방금 실패한 사진은 5분 쉬었다가 다시
+      if(d.length > 900*1024){ failed.add(id); continue; }                                    // 문서 1MB 한도
+      try{
+        await withTimeout(db.collection('users').doc(uid).collection('photos').doc(id).set({ d:d, at:firebase.firestore.FieldValue.serverTimestamp() }), 30000, '사진 올리기');
+        PH.upKeys.add(uid+'|'+id); delete PH.failAt[id];
+        phTx('u','readwrite',function(os){ return os.put(1, uid+'|'+id); });
+      }catch(e){ failed.add(id); PH.failAt[id]=Date.now(); if(!firstErr) firstErr=(e&&(e.code||e.message))||'오류'; console.warn('사진 클라우드 올리기 실패',id,e); }
+    }
+  };
+  await Promise.all([worker(),worker(),worker()]);
+  if(failed.size && firstErr && !PH.warned){ PH.warned=true; try{ upMsg('⚠ 사진 '+failed.size+'장을 클라우드에 못 올렸어요 ('+firstErr+') · 이 기기에는 저장돼 있어요', false); }catch(e){} }
+  return failed;
+}
+// 서랍 하나를 클라우드용 글자로: 올라간 사진은 자리표시자로, 못 올린 사진은 (한도 안이면) 예전처럼 그대로 넣는다
+function phCloudStringify(val, failed){
+  var run=function(inlineFailed){ return JSON.stringify(val, function(k,v){ if(phIsData(v)){ var id=phReg(v); return (inlineFailed && failed.has(id)) ? v : PH_PRE+id; } return v; }); };
+  var j = failed.size ? run(true) : run(false);
+  if(failed.size && j.length > 850*1024) j = run(false);
+  return j;
+}
+// 자리표시자를 진짜 사진으로 되돌린다 (이 기기 보관소 → 없으면 클라우드)
+async function phHydrate(root){
+  PH.done=false;
+  var refs=[];
+  (function walk(o){
+    if(!o||typeof o!=='object') return;
+    var ks = Array.isArray(o) ? o.map(function(_,i){ return i; }) : Object.keys(o);
+    for(var i=0;i<ks.length;i++){ var k=ks[i], x=o[k];
+      if(phIsPH(x)) refs.push([o,k,x.slice(x.indexOf('#fs:')+4)]); else if(x&&typeof x==='object') walk(x); }
+  })(root);
+  if(!refs.length){ PH.done=true; return 0; }
+  await phIndex();
+  var ids=Array.from(new Set(refs.map(function(r){ return r[2]; }))), got={}, i=0, uid=phUid();
+  var worker=async function(){
+    while(i<ids.length){
+      var id=ids[i++], d=PH.mem[id];
+      if(!d){ var rec=await phTx('p','readonly',function(os){ return os.get(id); }); d = rec&&rec.d || null; }
+      if(!d && uid){
+        try{
+          var snap=await withTimeout(db.collection('users').doc(uid).collection('photos').doc(id).get(), 20000, '사진 받기');
+          if(snap.exists && snap.data().d){ d=snap.data().d; PH.upKeys.add(uid+'|'+id); phTx('u','readwrite',function(os){ return os.put(1,uid+'|'+id); });
+            phTx('p','readwrite',function(os){ return os.put({id:id,d:d,at:Date.now()}); }).then(function(ok){ if(ok) PH.inIdb.add(id); }); }
+        }catch(e){ console.warn('사진 받기 실패',id,e); }
+      }
+      if(d){ got[id]=d; PH.mem[id]=d; PH.idMap.set(d,id); }
+    }
+  };
+  await Promise.all([worker(),worker(),worker(),worker()]);
+  var n=0; refs.forEach(function(r){ var d=got[r[2]]; if(d){ r[0][r[1]]=d; n++; } });
+  PH.done=true; return n;
+}
+
+// 클라우드에 마지막으로 쓴 서랍 내용 — 바뀐 서랍만 다시 쓰기 위한 기준
+var _cloudBase = {}, _cloudBaseUid = '';
 async function saveToCloud(data) {
   if (!currentUser) return;
   _lastCloudSaveData = data;
   showSaveIndicator('loading');
   try {
+    if (_cloudBaseUid !== currentUser.uid) { _cloudBase = {}; _cloudBaseUid = currentUser.uid; }
     const chunks = chunkData(data);
-    const batch = db.batch();
-    Object.entries(chunks).forEach(([key, val]) => {
-      const ref = db.collection('users').doc(currentUser.uid).collection('data').doc(key);
-      batch.set(ref, { value: JSON.stringify(val), updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    const failed = await phEnsureCloud(chunks);            // 1) 새 사진 먼저 올리기
+    const batch = db.batch(), base = {};
+    let n = 0;
+    Object.entries(chunks).forEach(([key, val]) => {        // 2) 바뀐 서랍만 쓰기
+      const json = phCloudStringify(val, failed);
+      if (_cloudBase[key] === json) return;
+      batch.set(db.collection('users').doc(currentUser.uid).collection('data').doc(key), { value: json, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+      base[key] = json; n++;
     });
-    await batch.commit();
+    if (n) { await batch.commit(); Object.assign(_cloudBase, base); }
     showSaveIndicator('ok');
-    if (window._cloudTrimmed && !window._cloudTrimToast) { window._cloudTrimToast = 1; try { upMsg('⚠ 사진이 많아서 일부 사진은 이 기기에만 저장돼요 (클라우드 문서 한도)', false); } catch(e) {} }
   } catch(e) {
     console.error('Cloud save error:', e);
     showSaveIndicator('err');
@@ -2760,8 +2894,9 @@ async function loadFromCloud() {
     if (snap.empty) return null;
     const merged = {};
     let latestUpdatedAt = 0;
+    _cloudBase = {}; _cloudBaseUid = currentUser.uid;
     snap.forEach(doc => {
-      try { merged[doc.id] = JSON.parse(doc.data().value); } catch(e) {}
+      try { merged[doc.id] = JSON.parse(doc.data().value); _cloudBase[doc.id] = doc.data().value; } catch(e) {}
       try {
         const ts = doc.data().updatedAt;
         const ms = ts && ts.toMillis ? ts.toMillis() : 0;
@@ -2783,72 +2918,12 @@ function chunkData(data) {
   const chunks = {};
   FIELDS.forEach(f => { if (data[f] !== undefined) chunks[f] = data[f]; });
   // customFontData는 Firestore 용량 초과 → 저장 제외 (localStorage에만)
-  // 브라우저에 직접 저장된(base64) 일기 사진도 Firestore 1MB 문서 한도를 넘겨
-  // 일기 전체 동기화를 막을 수 있으므로 클라우드 전송분에서만 제외한다.
-  // (localStorage 원본은 그대로 유지되므로 이 기기에서는 계속 보인다)
-  // 추억·프로젝트 기록 사진은 (Firebase Storage가 없어서) base64 글자로 이 문서 안에 들어가 기기 사이에 동기화된다.
-  // 다만 문서 한 개는 1MB가 한도라서, 넘칠 때만 가장 큰 사진부터 클라우드 전송분에서 뺀다 (이 기기엔 그대로 남음).
-  // 한도 안이면 하나도 빼지 않는다.
-  var _chunkBytes = function(v){ try { return new Blob([JSON.stringify(v)]).size; } catch(e) { return JSON.stringify(v).length; } };
-  var CHUNK_LIMIT = 800 * 1024, trimmed = 0;
-  if (chunks.memories && _chunkBytes(chunks.memories) > CHUNK_LIMIT) {
-    const mem = chunks.memories.map(function(m){ return (m && Array.isArray(m.photos)) ? Object.assign({}, m, { photos: m.photos.slice() }) : m; });
-    const cand = [];
-    mem.forEach(function(m, i){ if (!m || !Array.isArray(m.photos)) return; m.photos.forEach(function(x, j){
-      if (typeof x === 'string' && x.indexOf('data:') === 0) cand.push({ size: x.length, drop: function(){ m.photos[j] = null; } });
-      else if (x && typeof x === 'object' && !x.url && x.lo) cand.push({ size: x.lo.length, drop: function(){ const c = Object.assign({}, x); delete c.lo; m.photos[j] = c.drive ? c : null; } });
-    }); });
-    cand.sort(function(a, b){ return b.size - a.size; });
-    for (var ci = 0; ci < cand.length && _chunkBytes(mem.map(function(m){ return (m && Array.isArray(m.photos)) ? Object.assign({}, m, { photos: m.photos.filter(Boolean) }) : m; })) > CHUNK_LIMIT; ci++) { cand[ci].drop(); trimmed++; }
-    chunks.memories = mem.map(function(m){ return (m && Array.isArray(m.photos)) ? Object.assign({}, m, { photos: m.photos.filter(Boolean) }) : m; });
-  }
-  if (chunks.projects && _chunkBytes(chunks.projects) > CHUNK_LIMIT) {
-    const pj = chunks.projects.map(function(x){ return (x && Array.isArray(x.logs)) ? Object.assign({}, x, { logs: x.logs.map(function(l){ return Object.assign({}, l); }) }) : x; });
-    const cand = [];
-    pj.forEach(function(x){ if (!x || !Array.isArray(x.logs)) return; x.logs.forEach(function(l){ if (l && typeof l.photo === 'string' && l.photo.indexOf('data:') === 0) cand.push({ size: l.photo.length, drop: function(){ delete l.photo; } }); }); });
-    cand.sort(function(a, b){ return b.size - a.size; });
-    for (var cj = 0; cj < cand.length && _chunkBytes(pj) > CHUNK_LIMIT; cj++) { cand[cj].drop(); trimmed++; }
-    chunks.projects = pj;
-  }
-  window._cloudTrimmed = trimmed;
-  if (chunks.diaryEntries) {
-    const slim = {};
-    Object.keys(chunks.diaryEntries).forEach(k => {
-      const e = chunks.diaryEntries[k];
-      if (e && e.photoStorage === 'local') {
-        const copy = Object.assign({}, e);
-        delete copy.photoUrl;
-        delete copy.photoStorage;
-        delete copy.photoSize;
-        slim[k] = copy;
-      } else {
-        slim[k] = e;
-      }
-    });
-    chunks.diaryEntries = slim;
-  }
-  // 라이프·프로젝트 카드 사진도 아직 이 기기에만 있는(base64) 것은 클라우드 전송분에서 뺌
-  ['lifeAreas','projects'].forEach(k => {
-    if (Array.isArray(chunks[k]) && chunks[k].some(x => x && typeof x.photo === 'string' && x.photo.indexOf('data:') === 0))
-      chunks[k] = chunks[k].map(x => (x && typeof x.photo === 'string' && x.photo.indexOf('data:') === 0) ? Object.assign({}, x, { photo: null }) : x);
-  });
-  // 드림보드 사진 중 아직 이 기기에만 있는(base64) 것은 클라우드 전송분에서 뺌 (올리기가 끝나면 주소로 바뀜)
-  if (chunks.dream && chunks.dream.areas) {
-    const dc = JSON.parse(JSON.stringify(chunks.dream));
-    Object.values(dc.areas).forEach(a => { if (a && typeof a.photo === 'string' && a.photo.indexOf('data:') === 0) a.photo = null;
-      (a && Array.isArray(a.wants) ? a.wants : []).forEach(w => { if (w && typeof w.photo === 'string' && w.photo.indexOf('data:') === 0) w.photo = null; }); });
-    chunks.dream = dc;
-  }
+  // 사진은 saveToCloud가 '사진 보관소'로 따로 올리고 서랍에는 자리표시자만 남긴다.
   // 나머지 소형 데이터
   const rest = {};
   Object.keys(data).forEach(k => {
     if (!FIELDS.includes(k) && k !== 'customFontData') rest[k] = data[k];
   });
-  // 배너 사진도 아직 이 기기에만 있는(base64) 것은 클라우드 전송분에서 뺌
-  const noData = o => (o && typeof o.photo === 'string' && o.photo.indexOf('data:') === 0) ? Object.assign({}, o, { photo: null }) : o;
-  if (rest.todayBanner) rest.todayBanner = noData(rest.todayBanner);
-  if (rest.ledgerBanner) rest.ledgerBanner = noData(rest.ledgerBanner);
-  if (rest.banners) { const bb = {}; Object.keys(rest.banners).forEach(k => { bb[k] = noData(rest.banners[k]); }); rest.banners = bb; }
   if (Object.keys(rest).length > 0) chunks['_misc'] = rest;
   return chunks;
 }
@@ -3001,7 +3076,7 @@ let S = {
 function load(){try{const d=localStorage.getItem(KEY);if(d)S=Object.assign({},S,JSON.parse(d));}catch(e){}}
 function save(){
   try{
-    localStorage.setItem(KEY,JSON.stringify(S));
+    localStorage.setItem(KEY,phStringifyLocal(S));
     localStorage.setItem(KEY+'_savedAt', String(Date.now()));
   }catch(e){
     // 저장 공간 초과(주로 일기 사진 누적) — 데이터를 잃지 않도록 안내만 하고 진행
@@ -3524,7 +3599,7 @@ function memList(){return (S.memories||[]).slice().sort(function(a,b){return (b.
 // 업로드가 멈춰 있어도 앱이 기다리지 않게: 시간 제한을 둔다
 function withTimeout(promise,ms,label){return new Promise(function(res,rej){var t=setTimeout(function(){rej(Object.assign(new Error((label||'작업')+' 시간 초과'),{code:'timeout'}));},ms);promise.then(function(v){clearTimeout(t);res(v);},function(e){clearTimeout(t);rej(e);});});}
 function upMsg(text,ok){var el=document.getElementById('up-ind');if(!el){el=document.createElement('div');el.id='up-ind';document.body.appendChild(el);}el.className=ok?'ok':'';el.textContent=text;el.style.display='block';clearTimeout(upMsg._t);if(ok!==undefined)upMsg._t=setTimeout(function(){el.style.display='none';},ok?2500:7000);}
-function memPhotoSrc(ph){return ph?(typeof ph==='string'?ph:(ph.url||ph.hi||ph.data||ph.lo||'')):'';}
+function memPhotoSrc(ph){return ph?(typeof ph==='string'?ph:(ph.src||ph.url||ph.hi||ph.data||ph.lo||'')):'';}
 // 추억 사진: 긴 변 1600px·품질 0.78 (장당 약 200~350KB). 업로드 실패 대비 900px 작은 사본도 만든다
 function memCompress(file,LONG,q){
   return new Promise(function(resolve,reject){
@@ -3698,7 +3773,7 @@ function memDrawPhotos(){
 }
 async function memAddPhotos(input){
   var fs=[].slice.call(input.files||[]);input.value='';
-  for(var i=0;i<fs.length&&_memDraft&&_memDraft.photos.length<6;i++){try{var hi=await memCompress(fs[i],1600,0.78),lo=await memCompress(fs[i],900,0.6);_memDraft.photos.push({hi:hi,lo:lo,file:fs[i]});}catch(e){alert(e.message||'사진을 읽지 못했어요.');}}
+  for(var i=0;i<fs.length&&_memDraft&&_memDraft.photos.length<6;i++){try{var hi=await memCompress(fs[i],1200,0.72);_memDraft.photos.push({hi:hi,file:fs[i]});}catch(e){alert(e.message||'사진을 읽지 못했어요.');}}
   memDrawPhotos();
 }
 function memSetCover(i){if(!_memDraft||!_memDraft.photos[i])return;var ph=_memDraft.photos.splice(i,1)[0];_memDraft.photos.unshift(ph);memDrawPhotos();}
@@ -3713,37 +3788,30 @@ async function saveMem(){
   var date=g('mem-d').value||todStr();
   // 드라이브 권한 창은 사용자가 누른 이 순간에만 띄울 수 있어서 가장 먼저 요청 (기다리지 않고 계속 진행)
   var tkP=(loggedIn&&fresh.some(function(ph){return ph.file;}))?Promise.resolve(lsdToken()||lsdEnsureToken()).catch(function(){return null;}):null;
-  // 1) 기록은 바로 저장 (새 사진은 이 기기의 작은 사본으로 먼저 보인다)
-  var photos=_memDraft.photos.map(function(ph){return ph&&ph.hi?ph.lo:ph;});
+  // 1) 기록과 사진(1200px)을 바로 저장 — 클라우드·다른 기기 동기화는 저장 과정에서 자동으로 된다
+  var photos=_memDraft.photos.map(function(ph){return ph&&ph.hi?{src:ph.hi}:ph;});
   var rec={id:rid,date:date,title:title,place:g('mem-pl').value.trim(),kind:_memDraft.kind,note:_memDraft.note,
     people:g('mem-pp').value.split(',').map(function(x){return x.trim();}).filter(Boolean),text:text,photos:photos};
   if(!S.memories)S.memories=[];
   var idx=S.memories.findIndex(function(x){return x.id===rec.id;});
   if(idx>=0)S.memories[idx]=Object.assign({},S.memories[idx],rec);else S.memories.push(rec);
-  var removed=_memDraft.removed||[],jobs=fresh.map(function(ph){return {lo:ph.lo,hi:ph.hi,file:ph.file};});_memDraft=null;
+  var jobs=fresh.filter(function(ph){return ph.file;}).map(function(ph){return {src:ph.hi,file:ph.file};});_memDraft=null;
   save();closeMo();render();
-  removed.forEach(function(pth){try{storage.ref().child(pth).delete().catch(function(){});}catch(_){}});
-  // 2) 사진은 뒤에서 올린다 (클라우드 선명한 사본 + 드라이브 선명한 사진). 오래 걸려도 앱은 그대로 쓸 수 있다
-  if(!loggedIn||!jobs.length)return;
-  var fbFail=0,drvFail=0,lastErr='',slug=(title||'추억').replace(/[\\/:*?"<>|]/g,'').slice(0,20);
+  // 2) 선명한 큰 사진(2560px)은 구글 드라이브에 보관 (권한을 줬을 때만)
+  if(!tkP||!jobs.length)return;
+  if(!await tkP)return;
+  var drvFail=0,lastErr='',slug=(title||'추억').replace(/[\\/:*?"<>|]/g,'').slice(0,20);
   for(var i=0;i<jobs.length;i++){
-    var j=jobs[i],out={};
-    upMsg('☁ 사진 올리는 중 '+(i+1)+'/'+jobs.length);
+    var j=jobs[i];
+    upMsg('☁ 선명한 사진을 드라이브에 올리는 중 '+(i+1)+'/'+jobs.length);
     try{
-      var blob=dataUrlToBlob(j.hi),path='users/'+currentUser.uid+'/cozy/mem-'+rid+'-'+gid()+'.'+(blob.type==='image/jpeg'?'jpg':'webp'),ref=storage.ref().child(path);
-      await withTimeout(ref.put(blob,{contentType:blob.type}),30000,'클라우드 업로드');
-      out.url=await withTimeout(ref.getDownloadURL(),10000,'주소 받기');out.path=path;
-    }catch(e){fbFail++;lastErr=(e&&(e.code||e.message))||'';console.warn('추억 사진 클라우드 올리기 실패',e);}
-    if(tkP&&j.file&&await tkP){
-      try{out.drive=await withTimeout(lsdUploadOriginal(j.file,date+'_'+slug+'_'+(i+1)+'_'+(j.file.name||'photo.jpg')),90000,'드라이브 업로드');}
-      catch(e){drvFail++;lastErr=lastErr||(e&&(e.code||e.message))||'';console.warn('드라이브 사진 올리기 실패',e);}
-    }
-    var cur=(S.memories||[]).find(function(x){return x.id===rid;});
-    if(cur&&cur.photos){var k=cur.photos.findIndex(function(x){return x===j.lo;});
-      if(k>=0&&(out.url||out.drive)){cur.photos[k]=out.url?out:{lo:j.lo,drive:out.drive};save();render();}}
+      var did=await withTimeout(lsdUploadOriginal(j.file,date+'_'+slug+'_'+(i+1)+'_'+(j.file.name||'photo.jpg')),90000,'드라이브 업로드');
+      var cur=(S.memories||[]).find(function(x){return x.id===rid;});
+      if(cur&&cur.photos){var k=cur.photos.findIndex(function(x){return x&&x.src===j.src;});if(k>=0&&did){cur.photos[k]=Object.assign({},cur.photos[k],{drive:did});save();render();}}
+    }catch(e){drvFail++;lastErr=lastErr||(e&&(e.code||e.message))||'';console.warn('드라이브 사진 올리기 실패',e);}
   }
-  if(fbFail||drvFail)upMsg('⚠ 사진 '+(fbFail?'클라우드 '+fbFail+'장':'')+(fbFail&&drvFail?' · ':'')+(drvFail?'드라이브 '+drvFail+'장':'')+' 못 올렸어요'+(lastErr?' ('+lastErr+')':'')+' · 기록은 저장됐어요',false);
-  else upMsg('☁ 사진 올렸어요 ✓',true);
+  if(drvFail)upMsg('⚠ 드라이브에 사진 '+drvFail+'장 못 올렸어요'+(lastErr?' ('+lastErr+')':'')+' · 기록과 사진은 저장됐어요',false);
+  else upMsg('☁ 드라이브에 올렸어요 ✓',true);
 }
 function delMem(id){
   var m=(S.memories||[]).find(function(x){return x.id===id;});if(!m)return;
@@ -3845,6 +3913,7 @@ async function lsdUploadOriginal(file,fileName,sub){
 function lsdPayload(){var app=Object.assign({},S);delete app.customFontData;return JSON.stringify({app:app,ledger:LD,meta:{from:'lucy-space',at:new Date().toISOString()}});}
 function lsdSig(){var s=JSON.stringify([S,LD]),h=0;for(var i=0;i<s.length;i+=7)h=(h*31+s.charCodeAt(i))>>>0;return s.length+':'+h;}
 async function lsdBackupNow(){
+  await PH.ready;
   var folder=await lsdFolder(),d=new Date(),p2=function(n){return String(n).padStart(2,'0');};
   var name='루시의스페이스_백업_'+d.getFullYear()+p2(d.getMonth()+1)+p2(d.getDate())+'-'+p2(d.getHours())+p2(d.getMinutes())+p2(d.getSeconds())+'.json';
   var bd='lucy'+Date.now();
@@ -5056,12 +5125,8 @@ function compressDiaryPhotoToDataURL(file){
       try{
         var w=img.naturalWidth,h=img.naturalHeight;
         if(!w||!h){reject(new Error('이미지 크기를 읽지 못했어요.'));return;}
-        // 캘린더 칸은 background-size:cover라 '짧은 변'이 칸을 채운다.
-        // 칸 너비 약 160px + 고해상도(2x) 화면 대비 → 짧은 변을 330px로 맞춘다.
-        // (긴 변은 640px로 상한을 둬서 용량이 과하게 커지지 않게 한다)
-        var SHORT=330, LONG_CAP=640;
-        var scale=SHORT/Math.min(w,h);
-        if(Math.max(w,h)*scale>LONG_CAP) scale=LONG_CAP/Math.max(w,h);
+        // 모든 사진은 긴 변 1200px · WebP 0.72 로 줄여서 보관한다 (폰 화면 가로 1440px에 거의 꽉 참)
+        var scale=1200/Math.max(w,h);
         if(scale>1) scale=1;   // 원본보다 크게 늘리지 않음
         var cw=Math.max(1,Math.round(w*scale)),ch=Math.max(1,Math.round(h*scale));
         var canvas=document.createElement('canvas');
@@ -5072,10 +5137,10 @@ function compressDiaryPhotoToDataURL(file){
         ctx.drawImage(img,0,0,cw,ch);
         URL.revokeObjectURL(tempUrl);
         var dataUrl='';
-        try{ dataUrl=canvas.toDataURL('image/webp',0.25); }catch(e){ dataUrl=''; }
+        try{ dataUrl=canvas.toDataURL('image/webp',0.72); }catch(e){ dataUrl=''; }
         // 일부 브라우저(WebP 인코딩 미지원)는 png로 그대로 돌려주므로 webp가 아니면 jpeg로 재시도
         if(!dataUrl || dataUrl.indexOf('data:image/webp')!==0){
-          try{ dataUrl=canvas.toDataURL('image/jpeg',0.5); }catch(e2){ dataUrl=''; }
+          try{ dataUrl=canvas.toDataURL('image/jpeg',0.8); }catch(e2){ dataUrl=''; }
         }
         if(!dataUrl){reject(new Error('사진 압축에 실패했어요.'));return;}
         resolve(dataUrl);
@@ -5868,14 +5933,13 @@ function pjLogCard(p){
   if(logs.length>6) h+='<button type="button" class="pjx-more" onclick="window[\'_pjLogAll_'+p.id+'\']=!window[\'_pjLogAll_'+p.id+'\'];render()">'+(window['_pjLogAll_'+p.id]?'접기':'전체 '+logs.length+'개 보기')+'</button>';
   return h+'</div>';
 }
-async function pjLogPick(pid,input){var f=input.files&&input.files[0];input.value='';if(!f)return;try{_pjLogPhoto[pid]=await memCompress(f,1600,0.78);_pjLogFile[pid]=f;render();}catch(e){alert(e.message||'사진을 읽지 못했어요.');}}
+async function pjLogPick(pid,input){var f=input.files&&input.files[0];input.value='';if(!f)return;try{_pjLogPhoto[pid]=await memCompress(f,1200,0.72);_pjLogFile[pid]=f;render();}catch(e){alert(e.message||'사진을 읽지 못했어요.');}}
 async function addPjLog(pid){
   var p=S.projects.find(function(x){return x.id===pid;});if(!p)return;var el=document.getElementById('pjl-t-'+pid),tx=(el&&el.value||'').trim(),ph=_pjLogPhoto[pid]||null;if(!tx&&!ph)return;
   var file=_pjLogFile[pid]||null,loggedIn=typeof currentUser!=='undefined'&&currentUser;
   // 원본은 구글 드라이브에 보관 → 권한 창은 사용자가 누른 이 순간에만 띄울 수 있어서 가장 먼저 요청한다
   var tkP=(file&&loggedIn)?Promise.resolve(lsdToken()||lsdEnsureToken()).catch(function(){return null;}):null;
   var l={id:gid(),date:todStr(),text:tx,photo:ph};if(!p.logs)p.logs=[];p.logs.push(l);delete _pjLogPhoto[pid];delete _pjLogFile[pid];save();render();
-  if(ph&&typeof currentUser!=='undefined'&&currentUser){try{var blob=dataUrlToBlob(ph),path='users/'+currentUser.uid+'/cozy/log-'+pid+'-'+l.id+'.'+(blob.type==='image/jpeg'?'jpg':'webp'),ref=storage.ref().child(path);await withTimeout(ref.put(blob,{contentType:blob.type}),30000,'클라우드 업로드');var url=await withTimeout(ref.getDownloadURL(),10000,'주소 받기');var cur=(p.logs||[]).find(function(x){return x.id===l.id;});if(cur){cur.photo=url;cur.photoPath=path;save();render();}}catch(e){console.warn('기록 사진 올리기 실패',e);upMsg('⚠ 사진을 클라우드에 못 올렸어요 ('+((e&&(e.code||e.message))||'')+') · 기록은 저장됐어요',false);}}
   if(tkP&&await tkP){
     try{var fn=l.date+'_'+(p.name||'프로젝트').replace(/[\\/:*?"<>|]/g,'').slice(0,20)+'_'+(file.name||'photo.jpg'),did=await withTimeout(lsdUploadOriginal(file,fn,'프로젝트 기록'),90000,'드라이브 업로드');
       var cur2=(p.logs||[]).find(function(x){return x.id===l.id;});if(cur2&&did){cur2.drive=did;save();render();}}
@@ -10844,20 +10908,22 @@ function restoreCustomFont(){
     fontFace.load().then(function(ff){ document.fonts.add(ff); });
   });
 }
-function exportD(){var all={app:S,ledger:LD};var a=document.createElement('a');a.href='data:text/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(all,null,2));a.download='lucy_backup_'+todStr()+'.json';a.click();}
+function exportD(){if(!PH.done){alert('사진을 불러오는 중이에요. 잠시 뒤에 다시 눌러 주세요.');return;}var all={app:S,ledger:LD};var a=document.createElement('a');a.href='data:text/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(all,null,2));a.download='lucy_backup_'+todStr()+'.json';a.click();}
 function importD(inp){const file=inp.files[0];if(!file)return;const r=new FileReader();r.onload=e=>{try{var d=JSON.parse(e.target.result);if(d.app){S=Object.assign({},S,d.app);if(d.ledger)LD=Object.assign({},LD,d.ledger);} else {S=Object.assign({},S,d);}save();saveLedger();render();alert('복원 완료!');}catch{alert('파일 오류');}};r.readAsText(file);}
 function resetD(){
   if(!confirm('모든 데이터를 삭제할까요?\n이 작업은 되돌릴 수 없어요.'))return;
   // localStorage 삭제
   localStorage.removeItem(KEY);
   localStorage.removeItem(LEDGER_KEY);
-  // Firestore도 삭제
+  try{ indexedDB.deleteDatabase('lucy_photos'); }catch(e){}
+  // Firestore도 삭제 (서랍 + 사진)
   if(currentUser){
-    db.collection('users').doc(currentUser.uid).collection('data').get().then(function(snap){
-      const batch=db.batch();
-      snap.forEach(function(doc){batch.delete(doc.ref);});
-      return batch.commit();
-    }).then(function(){location.reload();}).catch(function(){location.reload();});
+    const wipe=function(coll){ return db.collection('users').doc(currentUser.uid).collection(coll).get().then(function(snap){
+      const docs=[];snap.forEach(function(doc){docs.push(doc.ref);});
+      let p=Promise.resolve();
+      for(let i=0;i<docs.length;i+=400){ const part=docs.slice(i,i+400); p=p.then(function(){ const b=db.batch(); part.forEach(function(r){b.delete(r);}); return b.commit(); }); }
+      return p; }); };
+    wipe('data').then(function(){ return wipe('photos'); }).then(function(){location.reload();}).catch(function(){location.reload();});
   } else {
     location.reload();
   }
@@ -12857,6 +12923,7 @@ function initApp(){
   load();
   migrateCondHistoryToRecords();
   loadLedger();
+  PH.ready = phHydrate(S).then(function(n){ if(n){ try{ render(); }catch(e){} } return n; });
   cleanupStaleDiaryPhotos();
   if(!S.lifeThemeOnce){ S.lifeThemeOnce=1; S.theme='life'; save(); } // 새 모양(Lucy's life)으로 한 번 바꿔 둠 · 설정에서 예전 테마로 돌아갈 수 있음
   applyTheme(S.theme||'sky');  // 저장된 테마 복원
@@ -13014,7 +13081,7 @@ auth.onAuthStateChanged(async function(user){
 
       // localStorage 업데이트 (용량 초과로 실패해도 아래 클라우드 복구는 계속 진행)
       try{
-        localStorage.setItem(KEY, JSON.stringify(S));
+        localStorage.setItem(KEY, phStringifyLocal(S));
         localStorage.setItem(LEDGER_KEY, JSON.stringify(LD));
       }catch(e){ console.error('로컬 캐시 저장 실패:',e); }
       // 클라우드에 가계부가 없어서 로컬에서 살렸다면, 클라우드에도 다시 올려둔다

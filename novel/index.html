@@ -159,8 +159,9 @@ body.cozy .row.open { background: color-mix(in srgb, var(--accent-soft) 85%, var
 .modal .exb-row input[type=checkbox] { width: auto; margin: 0; accent-color: var(--accent); }
 .modal .exb-row input[type=number] { width: 52px; margin: 0; padding: 2px 6px; text-align: right; }
 .ex-preview { max-height: 150px; overflow-y: auto; white-space: pre-wrap; font: 12px/1.7 inherit; font-family: inherit; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 0; color: var(--text); }
-.fsz { display: inline-flex; align-items: center; gap: 0; }
-.fsz b { font-size: 12px; font-weight: 600; min-width: 36px; text-align: center; font-variant-numeric: tabular-nums; color: var(--text); }
+.fsz { display: inline-flex; align-items: center; gap: 0; margin: 0 2px; }
+.fsz .tb { min-width: 24px; padding: 0; font-size: 16px; line-height: 1; }
+.fsz b { font-size: 12px; font-weight: 600; min-width: 24px; text-align: center; font-variant-numeric: tabular-nums; color: var(--text); }
 .fold-item { display: flex; flex-direction: column; gap: 3px; width: 100%; text-align: left; padding: 9px 10px; }
 .fold-item:hover { background: var(--panel2); }
 .fold-item small { font-size: 11px; color: var(--muted); } .fold-item small b { color: #c4553a; font-weight: 700; }
@@ -673,14 +674,14 @@ a.mini { text-decoration: none; color: inherit; display: inline-flex; align-item
 .fs-cand .fs-quote { flex: 1; min-width: 0; }
 .fs-cand-btns { display: flex; gap: 2px; flex: none; }
 /* 테마 */
-.theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
-.theme-card { border: 2px solid transparent; border-radius: 10px; padding: 6px; display: flex; flex-direction: column; gap: 4px; text-align: left; box-shadow: 0 0 0 1px rgba(0,0,0,.08); }
+.theme-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+.theme-card { border: 2px solid transparent; border-radius: 8px; padding: 4px; min-width: 0; display: flex; flex-direction: column; gap: 3px; text-align: left; box-shadow: 0 0 0 1px rgba(0,0,0,.08); }
 .theme-card.on { border-color: var(--accent); }
-.theme-card b { font-size: 12px; }
-.tc-bar { height: 10px; border: 1px solid; border-radius: 3px; display: flex; align-items: center; padding: 0 3px; }
+.theme-card b { font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
+.tc-bar { height: 7px; border: 1px solid; border-radius: 3px; display: flex; align-items: center; padding: 0 3px; }
 .tc-bar i { width: 14px; height: 4px; border-radius: 2px; }
-.tc-page { height: 38px; border: 1px solid; border-radius: 3px; padding: 5px; display: flex; flex-direction: column; gap: 4px; }
-.tc-page i { height: 3px; border-radius: 2px; width: 90%; }
+.tc-page { height: 26px; border: 1px solid; border-radius: 3px; padding: 4px; display: flex; flex-direction: column; gap: 4px; }
+.tc-page i { height: 2px; border-radius: 2px; width: 90%; }
 /* 자동 치환 · 단축키 */
 .rp-list { display: flex; flex-direction: column; gap: 6px; max-height: 45vh; overflow-y: auto; }
 .rp-row { display: flex; align-items: center; gap: 6px; }
@@ -1143,6 +1144,8 @@ body.th-fountain .row.open { box-shadow: inset 3px 0 0 var(--accent); border-rad
 .crop-stage canvas { max-width: 100%; touch-action: none; cursor: crosshair; }
 
 /* 모달 */
+.modal { scrollbar-width: none; }
+.modal::-webkit-scrollbar { display: none; }
 .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
 .modal { background: var(--panel); border-radius: 12px; padding: 18px; width: 100%; max-width: 420px; box-shadow: 0 16px 48px rgba(0,0,0,.25); max-height: 90vh; overflow-y: auto; }
 .modal h3 { margin: 0 0 12px; font-size: 15px; }
@@ -1259,7 +1262,7 @@ nav.mtabs { display: none; }
     <button class="tb" data-cmd="justifyRight" title="오른쪽 정렬"><i class="ic ic-align-right"></i></button>
     <span class="sep"></span>
     <button class="tb" id="btn-img" title="사진 넣기"><i class="ic ic-image"></i></button>
-    <span class="fsz"><button class="tb" data-fsz="-1" title="원고 글자 작게">－</button><b id="fsz-v"></b><button class="tb" data-fsz="1" title="원고 글자 크게">＋</button></span>
+    <span class="fsz"><button class="tb" data-fsz="-1" title="원고 글자 작게">−</button><b id="fsz-v"></b><button class="tb" data-fsz="1" title="원고 글자 크게">+</button></span>
     <span class="sep"></span>
     <button class="tb small" id="btn-fold" title="고른 단락을 제자리에 접기"><i class="ic ic-fold-vertical"></i> 접기</button>
     <span class="spacer"></span>
@@ -2823,7 +2826,7 @@ $('#editor-grid').addEventListener('click', async e => {
     if (a === 'pages') { setWL(W => { W.panes[i].pageView = !W.panes[i].pageView; }); renderAll(); return; }
 });
 // 원고 글자 크기 (위 도구줄)
-function renderFsz() { const v = $('#fsz-v'); if (v) v.textContent = settings().size + 'px'; }
+function renderFsz() { const v = $('#fsz-v'); if (v) v.textContent = settings().size; }
 document.addEventListener('click', e => {
     const b = e.target.closest && e.target.closest('[data-fsz]'); if (!b) return;
     const S = settings(); S.size = Math.max(11, Math.min(30, S.size + +b.dataset.fsz)); touch(S);

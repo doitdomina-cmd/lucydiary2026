@@ -5748,7 +5748,7 @@ body.theme-cozy :is(#tab-library, #tab-publishers, #tab-works, #tab-webtoon, #ta
             if (parsed.crosshairSettings) crosshairSettings = parsed.crosshairSettings;
             writeSchedules = parsed.writeSchedules || {};
             writeSpans = parsed.writeSpans || [];
-            writeSpans.forEach(sp => { if (sp && sp.color) sp.color = migrateSpanColor(sp.color); });
+            try { migrateAllSpanColors(); } catch (e) { /* 아직 준비 전이면 그릴 때 다시 변환 */ }
             writeVolumes = parsed.writeVolumes || {};
             writeMergedVolumeWorks = parsed.writeMergedVolumeWorks || {};
             migrateWriteResetToVolumes();   // 예전 '새 구간 시작' 표시를 권으로 옮긴다
@@ -17794,6 +17794,10 @@ body.theme-cozy :is(#tab-library, #tab-publishers, #tab-works, #tab-webtoon, #ta
             if (typeof c !== 'string') return c;
             return SPAN_COLOR_MIGRATE[c.trim().toLowerCase()] || c;
         }
+        function migrateAllSpanColors() {
+            if (!Array.isArray(writeSpans)) return;
+            writeSpans.forEach(sp => { if (sp && sp.color) sp.color = migrateSpanColor(sp.color); });
+        }
         function selectSpanColor(color) {
             currentSpanColor = color;
             document.querySelectorAll('.span-color-btn').forEach(btn => {
@@ -18009,6 +18013,7 @@ body.theme-cozy :is(#tab-library, #tab-publishers, #tab-works, #tab-webtoon, #ta
         function renderWriteSpans() {
             const container = document.getElementById('write-calendar-body');
             if (!container) return;
+            try { migrateAllSpanColors(); } catch (e) {}
             container.style.position = 'relative';
 
             const old = document.getElementById('write-span-layer');

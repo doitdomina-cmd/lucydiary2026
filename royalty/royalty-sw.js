@@ -1,5 +1,5 @@
-const CACHE_NAME = 'royalty-pwa-v3';
-const SHELL_FILES = ['./', './royalty-manifest.json', './royalty-icon-256.png'];
+const CACHE_NAME = 'royalty-pwa-v4';
+const SHELL_FILES = ['./', './royalty-manifest.json', './royalty-icon-256.png?v=2'];
 
 self.addEventListener('install', (e) => {
     e.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_FILES)));

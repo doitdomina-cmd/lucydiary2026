@@ -932,11 +932,17 @@ body.theme-cozy #month-detail-modal button.text-slate-400 { width: 34px; height:
         body.theme-cozy[data-modal="fountain"] .modal-content h3 { font-family: 'Hi Melody', var(--cozy-hand); font-size: 1.45rem; font-weight: 400; color: #1B2A5C; text-shadow: 0 0 .7px rgba(27,42,92,.5); }
         /* 기간 일정 막대 색상: 물 빠진 코지 톤 (타임라인 막대 + 막대 색상 고르는 칩) */
         /* 상세 기록 입력: 창 높이에 맞춰 표 행 높이를 줄여서 페이지 스크롤이 생기지 않게 한다 (JS가 --rp 를 조절) */
-#w-dailyTableContainer td input { padding-top: var(--rp, 4px); padding-bottom: var(--rp, 4px); transition: none !important; }
-#w-dailyTableContainer tbody td { padding-top: var(--tp, 2px); padding-bottom: var(--tp, 2px); }
-#w-dailyTableContainer td input { line-height: var(--lh, 18px); }
+#w-dailyTableContainer tbody tr { height: var(--rh, 34px); }
+#w-dailyTableContainer td input { height: calc(var(--rh, 34px) - 6px); padding-top: 0; padding-bottom: 0; line-height: 1.2; transition: none !important; }
         /* 출판사 관리 그룹(작품 라이브러리·출판사·작품 관리·웹툰 관리) 페이지 제목 앞 아이콘: 쨍한 초록·노랑·파랑 대신 코지한 말린 장미색 */
 body.theme-cozy :is(#tab-library, #tab-publishers, #tab-works, #tab-webtoon, #tab-workmanage) h3 > i[class*="fa-"] { color: #B98B8F !important; }
+        /* 오늘 날짜 숫자: 모든 테마에서 포인트색 원형 배지 (예전엔 코지 테마에서만) — 'TODAY' 글자 배지는 숨김 */
+#publish-cal-body .pc-today, #task-calendar-body .pc-today, #write-calendar-body .pc-today { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 26px; padding: 0 4px; border-radius: 999px; background: var(--primary); color: #fff !important; box-shadow: 0 3px 8px color-mix(in srgb, var(--primary) 40%, transparent); }
+#task-calendar-body .cal-today-badge, #write-calendar-body .cal-today-badge { display: none; }
+        /* 상세 기록 입력 오른쪽 버튼 2개: 쨍한 노랑·민트 대신 코지한 크림 알약 */
+body.theme-cozy .daily-side-btn { background: color-mix(in srgb, var(--primary) 11%, #fffdf9) !important; border: 1px solid color-mix(in srgb, var(--primary) 32%, #fffdf9) !important; color: color-mix(in srgb, var(--primary) 52%, #2b2620) !important; border-radius: 14px !important; padding-top: 10px !important; padding-bottom: 10px !important; font-size: 12.5px !important; letter-spacing: .01em; box-shadow: 0 1px 2px rgba(60,45,25,.05); transition: background .15s, box-shadow .15s, transform .15s; }
+body.theme-cozy .daily-side-btn:hover { background: color-mix(in srgb, var(--primary) 20%, #fffdf9) !important; box-shadow: 0 3px 8px rgba(139,115,80,.12); transform: translateY(-1px); }
+body.theme-cozy .daily-side-btn i { color: var(--primary); font-size: 12px !important; }
         /* 막대 색상 스와치는 실제 색 그대로 보여준다 */
         body.theme-cozy #year-timeline-body [title][style*="cursor:grab"] { filter: saturate(.6) brightness(1.03); }
         /* 페이지 큰 제목: 세리프 + 앞에 ✽ (아이콘은 숨김) — 카드 제목·숫자는 산세리프 그대로 */
@@ -2726,11 +2732,11 @@ body.theme-cozy :is(#tab-library, #tab-publishers, #tab-works, #tab-webtoon, #ta
 
 
                                 <!-- 이전 글자수 불러오기 버튼 -->
-                                <button onclick="writerCarryYesterdayLast()" class="w-full px-3 py-2 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 leading-none">
+                                <button onclick="writerCarryYesterdayLast()" class="daily-side-btn w-full px-3 py-2 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 leading-none">
                                     <i class="fa-solid fa-clock-rotate-left text-[11px]"></i> 이전 글자수 불러오기
                                 </button>
                                 <!-- 이미 글자수를 채웠는데 완료 처리가 안 된 지난 카드들을 한 번에 정리 -->
-                                <button onclick="bulkSyncWriteCompletionFromDaily()" class="w-full px-3 py-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 leading-none">
+                                <button onclick="bulkSyncWriteCompletionFromDaily()" class="daily-side-btn w-full px-3 py-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 leading-none">
                                     <i class="fa-solid fa-broom text-[11px]"></i> 지난 기록 완료 처리 일괄 정리
                                 </button>
                             </div>
@@ -20178,14 +20184,15 @@ body.theme-cozy :is(#tab-library, #tab-publishers, #tab-works, #tab-webtoon, #ta
             const tab = document.getElementById('tab-daily');
             const cont = document.getElementById('w-dailyTableContainer');
             if (!tab || !cont || !tab.classList.contains('active')) return;
+            const rows = cont.querySelectorAll('tbody tr').length || 19;
             const over = () => Math.max(document.documentElement.scrollHeight, document.body.scrollHeight) - window.innerHeight;
-            let rp = 4, tp = 2;
-            cont.style.setProperty('--rp', rp + 'px'); cont.style.setProperty('--tp', tp + 'px'); cont.style.setProperty('--lh', '18px');
-            // 먼저 입력칸 위아래 여백을, 그래도 넘치면 칸(td) 여백을 줄인다
-            while (over() > 0 && rp > 0) { rp--; cont.style.setProperty('--rp', rp + 'px'); }
-            while (over() > 0 && tp > 0) { tp--; cont.style.setProperty('--tp', tp + 'px'); }
-            let lh = 18; cont.style.setProperty('--lh', lh + 'px');
-            while (over() > 0 && lh > 14) { lh--; cont.style.setProperty('--lh', lh + 'px'); }
+            const MIN = 26, MAX = 40, GAP = 10;                 // 행 높이 범위(px), 화면 아래 남겨둘 여유
+            let rh = 34;
+            cont.style.setProperty('--rh', rh + 'px');
+            // 남는/모자란 높이를 행 수로 나눠 한 번에 맞추고, 그래도 넘치면 1px씩 줄인다
+            rh = Math.max(MIN, Math.min(MAX, rh - Math.ceil((over() + GAP) / rows)));
+            cont.style.setProperty('--rh', rh + 'px');
+            while (over() > 0 && rh > MIN) { rh--; cont.style.setProperty('--rh', rh + 'px'); }
         }
         window.addEventListener('resize', () => { requestAnimationFrame(writerFitDailyTable); });
 

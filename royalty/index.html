@@ -13879,7 +13879,9 @@ body.theme-cozy #month-detail-modal button.text-slate-400 { width: 34px; height:
                     });
 
                     let rawSum = 0;       // 실제 진행률 계산용 누적 (권과 무관하게 계속 쌓임)
+                    const lastIdByVol = {};   // 권(또는 무권)마다 날짜상 마지막 카드 — 현재 글자수를 여기에 보여준다
                     items.forEach(item => {
+                        lastIdByVol[item.volumeId || ''] = item.id;
                         const vKey = item.volumeId || '';
                         if (volSums[vKey] === undefined) volSums[vKey] = 0;
 
@@ -13898,6 +13900,7 @@ body.theme-cozy #month-detail-modal button.text-slate-400 { width: 34px; height:
                             volStartDate: vKey ? (volFirstDate[vKey] || '') : ''
                         };
                     });
+                    Object.values(lastIdByVol).forEach(id => { if (map[id]) map[id].isLast = true; });
                 });
                 return map;
             })();
@@ -13969,13 +13972,13 @@ body.theme-cozy #month-detail-modal button.text-slate-400 { width: 34px; height:
                         ? `<span class="text-[9px] font-bold text-amber-600 bg-amber-100 rounded px-1 py-px mr-1 align-middle">${segName}</span>` : '';
                     // 지금 실제로 원고가 이 카드 구간 "안"에 걸쳐있을 때만(=한창 채워지고 있는 카드),
                     // 제목 줄 오른쪽에 지금 실제 원고 위치를 테마색으로 보여준다
-                    const latestPosText = (fillPct > 0 && fillPct < 100 && !s.isCompleted)
+                    const latestPosText = ((fillPct > 0 && fillPct < 100 && !s.isCompleted) || (goalData && goalData.isLast && fillPct >= 100 && gaugeWritten > 0))
                         ? `<span class="text-[11px] font-medium shrink-0 rounded-full px-1.5 py-0.5" style="background:var(--primary-light);"><span style="color:var(--primary); filter:saturate(2.2) brightness(0.9);">${gaugeWritten.toLocaleString()}자</span></span>` : '';
 
                     content = `<div class="font-bold text-slate-700 ${opacity} flex items-center justify-between gap-1" style="white-space:normal; word-break:break-word;"><span class="min-w-0">${segTag}${titleForDisplay}</span>${latestPosText}</div>
                                <div class="flex items-baseline justify-between gap-2 ${opacity}" style="margin-top:3px;">
-                                   <span class="text-[11px] font-medium" style="color:${color}">${ownGoalText}</span>
-                                   <span class="text-[10px] font-medium text-slate-400">${cumulativeText}</span>
+                                   <span class="text-[11px] font-bold" style="color:color-mix(in srgb, ${color} 35%, #2b2620)">${ownGoalText}</span>
+                                   <span class="text-[10px] font-semibold" style="color:#5f5547">${cumulativeText}</span>
                                </div>`;
                     
                     s._fillPct = fillPct;

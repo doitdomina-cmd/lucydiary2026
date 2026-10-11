@@ -4545,6 +4545,36 @@ window.manualFirebasePush = async function () {
                 wrapper.scrollTop = window.scrollTop - (y - window.startY) * 1.5;
             });
             
+            // 폰: 한 손가락은 브라우저 기본 스크롤(상하좌우 자유 이동), 두 손가락은 확대/축소(핀치)
+            (function () {
+                const zc = document.getElementById('zoom-container');
+                const txt = document.getElementById('zoom-level-text');
+                let pinch = null;
+                const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY) || 1;
+                const focus = (t) => { const r = wrapper.getBoundingClientRect(); return { x: (t[0].clientX + t[1].clientX) / 2 - r.left, y: (t[0].clientY + t[1].clientY) / 2 - r.top }; };
+                wrapper.addEventListener('touchstart', e => {
+                    if (e.touches.length !== 2) return;
+                    const cs = getComputedStyle(wrapper), f = focus(e.touches), z = window.zoomLevel || 1;
+                    const padL = parseFloat(cs.paddingLeft) || 0, padT = parseFloat(cs.paddingTop) || 0;
+                    pinch = { d: dist(e.touches), z, padL, padT, cx: (wrapper.scrollLeft + f.x - padL) / z, cy: (wrapper.scrollTop + f.y - padT) / z };
+                    zc.style.transition = 'none';
+                }, { passive: true });
+                wrapper.addEventListener('touchmove', e => {
+                    if (!pinch || e.touches.length !== 2) return;
+                    e.preventDefault();
+                    const z = Math.min(2, Math.max(0.5, pinch.z * dist(e.touches) / pinch.d)), f = focus(e.touches);
+                    window.zoomLevel = z;
+                    zc.style.transform = 'scale(' + z + ')';
+                    if (txt) txt.textContent = Math.round(z * 100) + '%';
+                    wrapper.scrollLeft = pinch.cx * z + pinch.padL - f.x;
+                    wrapper.scrollTop = pinch.cy * z + pinch.padT - f.y;
+                }, { passive: false });
+                const endPinch = e => { if (pinch && e.touches.length < 2) { pinch = null; zc.style.transition = ''; } };
+                wrapper.addEventListener('touchend', endPinch);
+                wrapper.addEventListener('touchcancel', endPinch);
+                wrapper.addEventListener('gesturestart', e => e.preventDefault());
+            })();
+
             // 팔레트 밖 클릭 시 닫기
             document.addEventListener('click', (e) => {
                 const palette = document.getElementById('text-color-palette');
@@ -5073,6 +5103,8 @@ body:has(#synop-home.show) #synop-home-btn { display: none; }
   #synop-home .sh-head > .sh-hbtn:nth-of-type(1) { grid-area: b1; }
   #synop-home .sh-head > .sh-hbtn:nth-of-type(2) { grid-area: b2; }
 }
+/* 플롯 화면: 한 손가락 이동은 기본 스크롤, 두 손가락 확대/축소는 직접 처리(브라우저 전체 확대 방지) */
+#canvas-wrapper { touch-action: pan-x pan-y; overscroll-behavior: contain; }
 </style>
 <div id="synop-home" class="theme-canvas">
   <div class="sh-head theme-panel">

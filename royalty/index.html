@@ -270,9 +270,12 @@ body.theme-cozy #publish-cal-body[data-card="label"] [draggable="true"]:nth-chil
         /* 폴라로이드: 흰 종이 + 작은 테이프 */
 body.theme-cozy #publish-cal-body[data-card="polaroid"] [draggable="true"], body.theme-cozy #task-calendar-body[data-card="polaroid"] .cal-selectable, body.theme-cozy #write-calendar-body[data-card="polaroid"] .cal-selectable { position: relative; border: 1px solid #EFE7D6 !important; border-radius: 3px !important; background-color: #FFFEFC !important; box-shadow: 0 2px 6px rgba(60,45,25,.16) !important; }
 body.theme-cozy #publish-cal-body[data-card="polaroid"] [draggable="true"], body.theme-cozy #publish-cal-body[data-card="polaroid"] [draggable="true"] *, body.theme-cozy #task-calendar-body[data-card="polaroid"] .cal-selectable, body.theme-cozy #task-calendar-body[data-card="polaroid"] .cal-selectable *, body.theme-cozy #write-calendar-body[data-card="polaroid"] .cal-selectable, body.theme-cozy #write-calendar-body[data-card="polaroid"] .cal-selectable * { font-family: "Gaegu", sans-serif !important; }
-body.theme-cozy #publish-cal-body[data-card="polaroid"] [draggable="true"]::before, body.theme-cozy #task-calendar-body[data-card="polaroid"] .cal-selectable::before, body.theme-cozy #write-calendar-body[data-card="polaroid"] .cal-selectable::before { content: ""; position: absolute; top: -3px; left: 8px; width: 24px; height: 8px; transform: rotate(-5deg); background: repeating-linear-gradient(135deg, rgba(226,205,170,.92) 0 5px, rgba(236,220,192,.92) 5px 10px); pointer-events: none; z-index: 2; }
+body.theme-cozy #publish-cal-body[data-card="polaroid"] [draggable="true"]::before, body.theme-cozy #task-calendar-body[data-card="polaroid"] .cal-selectable::before, body.theme-cozy #write-calendar-body[data-card="polaroid"] .cal-selectable::before { content: ""; position: absolute; top: 1px; right: var(--tx, 40px); width: var(--tw, 28px); height: 10px; transform: rotate(var(--tr, -4deg)); background: var(--tape, repeating-linear-gradient(135deg, rgba(226,205,170,.92) 0 5px, rgba(236,220,192,.92) 5px 10px)); box-shadow: 0 1px 1px rgba(60,45,25,.12); pointer-events: none; z-index: 2; }
 body.theme-cozy #publish-cal-body[data-card="polaroid"] [draggable="true"]:nth-child(even), body.theme-cozy #task-calendar-body[data-card="polaroid"] .cal-selectable:nth-child(even), body.theme-cozy #write-calendar-body[data-card="polaroid"] .cal-selectable:nth-child(even) { transform: rotate(.4deg); }
 body.theme-cozy #publish-cal-body[data-card="polaroid"] [draggable="true"]:nth-child(odd), body.theme-cozy #task-calendar-body[data-card="polaroid"] .cal-selectable:nth-child(odd), body.theme-cozy #write-calendar-body[data-card="polaroid"] .cal-selectable:nth-child(odd) { transform: rotate(-.4deg); }
+        /* 폴라로이드 데코: 카드마다 고정된 무작위 스티커 2~3개 (JS가 .pc-stk 를 붙임, 폴라로이드가 아닐 땐 숨김) */
+body.theme-cozy .pc-stk { display: none; }
+body.theme-cozy :is(#publish-cal-body, #task-calendar-body, #write-calendar-body)[data-card="polaroid"] .pc-stk { display: block; position: absolute; line-height: 1; pointer-events: none; z-index: 1; font-family: 'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif !important; font-size: var(--ss, 13px); right: var(--sx); top: var(--sy); transform: rotate(var(--sr, 0deg)); filter: drop-shadow(0 1px 1px rgba(60,45,25,.2)); }
         /* 엽서: 에어메일 테두리 + 펜글씨 */
 body.theme-cozy #publish-cal-body[data-card="postcard"] [draggable="true"], body.theme-cozy #task-calendar-body[data-card="postcard"] .cal-selectable, body.theme-cozy #write-calendar-body[data-card="postcard"] .cal-selectable { border: 2px solid transparent !important; border-image: repeating-linear-gradient(-45deg, #D8A39D 0 3px, #FCF8EE 3px 5px, #9FB7CC 5px 8px, #FCF8EE 8px 10px) 2 !important; border-radius: 0 !important; background-color: #FCF8EE !important; box-shadow: 0 2px 5px rgba(60,45,25,.14) !important; }
 body.theme-cozy #publish-cal-body[data-card="postcard"] [draggable="true"], body.theme-cozy #publish-cal-body[data-card="postcard"] [draggable="true"] *, body.theme-cozy #task-calendar-body[data-card="postcard"] .cal-selectable, body.theme-cozy #task-calendar-body[data-card="postcard"] .cal-selectable *, body.theme-cozy #write-calendar-body[data-card="postcard"] .cal-selectable, body.theme-cozy #write-calendar-body[data-card="postcard"] .cal-selectable * { font-family: "Nanum Pen Script", sans-serif !important; }
@@ -14215,6 +14218,54 @@ body.theme-cozy #month-detail-modal button.text-slate-400 { width: 34px; height:
             { k: 'fountain', n: '만년필', d: '상아색 종이 + 잉크', sw: 'fountain' }
         ];
         const CAL_CARD_IDS = { pub: 'publish-cal-body', task: 'task-calendar-body', write: 'write-calendar-body', tl: 'year-timeline-content', works: 'master-works-by-genre-container' };
+        // 폴라로이드 카드 데코: 테이프 7종(색·무늬·크기·기울기) + 스티커 2~3개를 카드마다 고정된 무작위로 (같은 카드는 다시 그려도 똑같이)
+        (function setupPolaroidDeco() {
+            const EMO = ['🍒', '🍀', '🌸', '🍎', '🐰', '🍪', '🦋', '🌙', '☁️', '⭐', '🍓', '🌷'];
+            const TAPES = [
+                'repeating-linear-gradient(135deg, rgba(240,200,110,.95) 0 5px, rgba(250,222,150,.95) 5px 10px)',
+                'repeating-linear-gradient(135deg, rgba(238,150,160,.92) 0 5px, rgba(247,190,196,.92) 5px 10px)',
+                'repeating-linear-gradient(135deg, rgba(140,200,150,.92) 0 5px, rgba(180,223,186,.92) 5px 10px)',
+                'repeating-linear-gradient(135deg, rgba(120,170,225,.92) 0 5px, rgba(170,205,240,.92) 5px 10px)',
+                'repeating-linear-gradient(135deg, rgba(175,140,215,.92) 0 5px, rgba(208,185,236,.92) 5px 10px)',
+                'radial-gradient(circle, rgba(255,255,255,.85) 1.4px, transparent 1.6px) 0 0/6px 6px, rgba(246,180,150,.92)',
+                'linear-gradient(90deg, rgba(255,255,255,.5) 50%, transparent 50%) 0 0/8px 8px, linear-gradient(rgba(255,255,255,.5) 50%, transparent 50%) 0 0/8px 8px, rgba(150,215,200,.92)'
+            ];
+            function mulberry(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+            function hash(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+            function decorate(root) {
+                root.querySelectorAll('.cal-selectable, [draggable="true"]').forEach(el => {
+                    if (el.dataset.deco) return;
+                    el.dataset.deco = '1';
+                    const rnd = mulberry(hash(el.dataset.blockId || el.textContent || String(el.className)));
+                    el.style.setProperty('--tape', TAPES[Math.floor(rnd() * TAPES.length)]);
+                    el.style.setProperty('--tw', (24 + Math.floor(rnd() * 12)) + 'px');
+                    el.style.setProperty('--tr', (-8 + Math.floor(rnd() * 17)) + 'deg');
+                    el.style.setProperty('--tx', (58 + Math.floor(rnd() * 30)) + 'px');
+                    const n = 2 + (rnd() < 0.5 ? 1 : 0);
+                    const pool = EMO.slice();
+                    for (let i = 0; i < n; i++) {
+                        const sp = document.createElement('span');
+                        sp.className = 'pc-stk';
+                        sp.textContent = pool.splice(Math.floor(rnd() * pool.length), 1)[0];
+                        sp.style.setProperty('--sx', (3 + i * 17 + Math.floor(rnd() * 4)) + 'px');
+                        sp.style.setProperty('--sy', (3 + Math.floor(rnd() * 8)) + 'px');
+                        sp.style.setProperty('--sr', (-20 + Math.floor(rnd() * 41)) + 'deg');
+                        sp.style.setProperty('--ss', (12 + Math.floor(rnd() * 4)) + 'px');
+                        el.appendChild(sp);
+                    }
+                });
+            }
+            function start() {
+                ['publish-cal-body', 'task-calendar-body', 'write-calendar-body'].forEach(id => {
+                    const root = document.getElementById(id);
+                    if (!root) return;
+                    let tm = 0;
+                    new MutationObserver(() => { clearTimeout(tm); tm = setTimeout(() => decorate(root), 0); }).observe(root, { childList: true, subtree: true });
+                    decorate(root);
+                });
+            }
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+        })();
         function applyCalCardDesign() {
             Object.keys(CAL_CARD_IDS).forEach(k => {
                 const el = document.getElementById(CAL_CARD_IDS[k]);

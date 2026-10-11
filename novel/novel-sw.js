@@ -1,5 +1,5 @@
-const CACHE_NAME = 'novel-writer-v89';
-const ASSETS = ['./novel.html', './novel-manifest.json', './novel-icon-192.png', './novel-icon-512.png'];
+const CACHE_NAME = 'novel-writer-v90';
+const ASSETS = ['./', './novel-manifest.json', './novel-icon-192.png', './novel-icon-512.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)));

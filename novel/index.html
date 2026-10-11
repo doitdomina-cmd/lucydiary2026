@@ -7612,7 +7612,7 @@ function renderHome() {
             <button class="sync-badge" data-h="cloud" title="동기화 · 백업">이 기기에 저장</button><div class="seg"><button class="${mode === 'genre' ? 'on' : ''}" data-hg="genre">장르별</button><button class="${mode === 'status' ? 'on' : ''}" data-hg="status">완고 · 미완고</button></div>
             <button class="icon-btn" data-h="settings" title="설정 (테마 · 글꼴)"><i class="ic ic-settings"></i></button></header>
         <main class="home-body">
-            ${cozy ? homeHero(list) : ''}
+            ${(pref.homeHero ?? cozy) ? homeHero(list) : ''}
             <div class="home-intro"><h1>내 작품</h1><button class="btn primary" data-h="new"><i class="ic ic-book-plus"></i> 새 작품</button></div>
             ${groups.filter(([, l]) => l.length || mode === 'status').map(([name, l]) => `<section class="home-group">
                 <h2>${mode === 'genre' ? `<span class="gdot" style="background:${GENRE_COLOR[name] || 'var(--muted)'};box-shadow:0 0 0 1px ${GENRE_INK[name] || 'transparent'}"></span>` : name === '완고' ? '<i class="ic ic-circle-check"></i>' : '<i class="ic ic-pen-line"></i>'} ${esc(name)} <small>${l.length}</small></h2>
@@ -7741,7 +7741,8 @@ function openSettings(focus) {
     const render = () => {
         bg.innerHTML = `<div class="modal wide"><div style="display:flex;align-items:center;margin-bottom:8px"><h3 style="margin:0;flex:1"><i class="ic ic-settings"></i> 설정</h3><button class="mini" data-x="close">✕</button></div>
             <label>테마 색상</label><div class="theme-grid">${THEMES.light.map(t => card(t, 'light')).join('')}</div>
-            <label>홈 상단 그림 <small>(코지 테마의 작품 목록 맨 위)</small></label>
+            <label>홈 상단 그림 <small>(작품 목록 맨 위 · 코지가 아닌 테마에서도 켤 수 있어요)</small></label>
+            <div class="seg" style="margin:2px 0 4px">${[[true, '켜기'], [false, '끄기']].map(([k, n]) => `<button class="${(pref.homeHero ?? document.body.classList.contains('cozy')) === k ? 'on' : ''}" data-hhon="${k}">${n}</button>`).join('')}</div>
             <div class="seg" style="margin:2px 0 4px">${[['photo', '사진 (시간대별)'], ['art', '일러스트 (창가 책상)'], ['none', '없음']].map(([k, n]) => `<button class="${(pref.homeCover || 'photo') === k ? 'on' : ''}" data-hc="${k}">${n}</button>`).join('')}</div>
             <label>원고 본문 글꼴 <small>(집필하는 본문에만 적용)</small></label>
             ${fontRow('font', S.font, `<button class="fp ${S.font === 'custom' ? 'on' : ''}" data-font="font:custom"><b>내 글꼴</b><span>${esc(S.customFont || '컴퓨터에 설치된 글꼴')}</span></button>`)}
@@ -7776,6 +7777,7 @@ function openSettings(focus) {
         const t = e.target.closest('button'); if (e.target === bg || t?.dataset.x === 'close') { bg.remove(); return; }
         if (!t) return;
         if (t.dataset.x === 'typo') { bg.remove(); typoModal(); return; }
+        if (t.dataset.hhon) { pref.homeHero = t.dataset.hhon === 'true'; savePref(); if ($('.home')) renderHome(); render(); return; }
         if (t.dataset.hc) { pref.homeCover = t.dataset.hc; savePref(); if ($('.home')) renderHome(); render(); return; }
         if (t.dataset.aip) { pref.aiProvider = t.dataset.aip; savePref(); render(); $('#set-ai', bg)?.scrollIntoView({ block: 'center' }); return; }
         if (t.dataset.x === 'aitest') {

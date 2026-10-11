@@ -4968,6 +4968,15 @@ body:has(#synop-home.show) #synop-home-btn { display: none; }
 <button id="synop-home-btn" onclick="window.showSynopHome()" title="시놉시스 목록으로">← 목록</button>
 <script>
 (function () {
+    // 루시의 작업실 안에 끼워져(iframe) 쓰일 때는 목록 화면·목록 버튼을 쓰지 않는다 (작업실이 직접 시놉을 고르고 바로 플롯을 보여줌)
+    let embedded = false;
+    try { embedded = window.self !== window.top; } catch (e) { embedded = true; }
+    if (embedded) {
+        const st = document.createElement('style');
+        st.textContent = '#synop-home, #synop-home-btn { display: none !important; }';
+        document.head.appendChild(st);
+        return;
+    }
     const $ = id => document.getElementById(id);
     const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const get = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };

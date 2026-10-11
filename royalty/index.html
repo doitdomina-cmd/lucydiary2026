@@ -290,7 +290,8 @@ body.theme-cozy #publish-cal-body[data-card="fountain"] [draggable="true"], body
         /* ── 집필 달력 '기간 일정' 막대: 집필 관리 설정의 카드 디자인을 따라간다 (막대 고유색은 --sc 로 왼쪽 띠에 남김) ── */
 body.theme-cozy #write-calendar-body .write-span-bar { box-shadow: 0 1px 3px rgba(60,45,25,.10); }
 body.theme-cozy #write-calendar-body[data-card="label"] .write-span-bar { border-radius: 5px !important; outline: 1.5px dashed rgba(90,74,58,.35); outline-offset: -3px; box-shadow: 0 1px 3px rgba(60,45,25,.12) !important; }
-body.theme-cozy #write-calendar-body[data-card="polaroid"] .write-span-bar { background: linear-gradient(to right, var(--sc) 0 5px, #FFFEFC 5px) !important; border: 1px solid #EFE7D6; border-radius: 3px !important; box-shadow: 0 2px 6px rgba(60,45,25,.16) !important; }
+body.theme-cozy #write-calendar-body[data-card="polaroid"] .write-span-bar { background: linear-gradient(to right, var(--sc) 0 5px, color-mix(in srgb, var(--sc) 32%, #FFFEFC) 5px) !important; border: 1px solid #EFE7D6; border-radius: 3px !important; box-shadow: 0 2px 6px rgba(60,45,25,.16) !important; }
+body.theme-cozy #write-calendar-body[data-card="polaroid"] .write-span-bar > span { padding-right: 100px !important; }
 body.theme-cozy #write-calendar-body[data-card="polaroid"] .write-span-bar::before { content: ""; position: absolute; top: -2px; left: 22px; width: 22px; height: 7px; transform: rotate(-4deg); background: repeating-linear-gradient(135deg, rgba(226,205,170,.92) 0 5px, rgba(236,220,192,.92) 5px 10px); pointer-events: none; }
 body.theme-cozy #write-calendar-body[data-card="postcard"] .write-span-bar { background: linear-gradient(to right, var(--sc) 0 5px, #FCF8EE 5px) !important; border: 2px solid transparent; border-image: repeating-linear-gradient(-45deg, #D8A39D 0 3px, #FCF8EE 3px 5px, #9FB7CC 5px 8px, #FCF8EE 8px 10px) 2; border-radius: 0 !important; box-shadow: 0 2px 5px rgba(60,45,25,.14) !important; }
 body.theme-cozy #write-calendar-body[data-card="fountain"] .write-span-bar { background: linear-gradient(to right, var(--sc) 0 4px, #FBF7EC 4px) !important; border: 1px solid rgba(27,42,92,.28); border-radius: 4px !important; box-shadow: inset 0 0 0 2px #FBF7EC, inset 0 0 0 3px rgba(166,134,64,.45) !important; color: #1B2A5C !important; }
@@ -14242,22 +14243,23 @@ body.theme-cozy #month-detail-modal button.text-slate-400 { width: 34px; height:
             function mulberry(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
             function hash(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
             function decorate(root) {
-                root.querySelectorAll('.cal-selectable, [draggable="true"]').forEach(el => {
+                root.querySelectorAll('.cal-selectable, [draggable="true"], .write-span-bar').forEach(el => {
                     if (el.dataset.deco) return;
                     el.dataset.deco = '1';
-                    const rnd = mulberry(hash(el.dataset.blockId || el.textContent || String(el.className)));
+                    const isBar = el.classList.contains('write-span-bar');   // 기간 일정 막대
+                    const rnd = mulberry(hash(isBar ? (el.dataset.seed || 'bar') : (el.dataset.blockId || el.textContent || String(el.className))));
                     el.style.setProperty('--tape', TAPES[Math.floor(rnd() * TAPES.length)]);
                     el.style.setProperty('--tw', (24 + Math.floor(rnd() * 12)) + 'px');
                     el.style.setProperty('--tr', (-8 + Math.floor(rnd() * 17)) + 'deg');
-                    el.style.setProperty('--tx', (58 + Math.floor(rnd() * 30)) + 'px');
-                    const n = 2 + (rnd() < 0.5 ? 1 : 0);
+                    el.style.setProperty('--tx', (36 + Math.floor(rnd() * 30)) + 'px');
+                    const n = isBar ? 4 : 1 + (rnd() < 0.5 ? 1 : 0);
                     const pool = EMO.slice();
                     for (let i = 0; i < n; i++) {
                         const sp = document.createElement('span');
                         sp.className = 'pc-stk';
                         sp.textContent = pool.splice(Math.floor(rnd() * pool.length), 1)[0];
-                        sp.style.setProperty('--sx', (3 + i * 17 + Math.floor(rnd() * 4)) + 'px');
-                        sp.style.setProperty('--sy', (3 + Math.floor(rnd() * 8)) + 'px');
+                        sp.style.setProperty('--sx', (isBar ? 20 + i * 21 + Math.floor(rnd() * 5) : 3 + i * 17 + Math.floor(rnd() * 4)) + 'px');
+                        sp.style.setProperty('--sy', (isBar ? 2 + Math.floor(rnd() * 3) : 3 + Math.floor(rnd() * 8)) + 'px');
                         sp.style.setProperty('--sr', (-20 + Math.floor(rnd() * 41)) + 'deg');
                         sp.style.setProperty('--ss', (12 + Math.floor(rnd() * 4)) + 'px');
                         el.appendChild(sp);
@@ -17979,7 +17981,7 @@ body.theme-cozy #month-detail-modal button.text-slate-400 { width: 34px; height:
                 const a = cells[p.si], z = cells[firstEnd];
                 if (!a || !z) return;
                 const barW = z.offsetLeft + z.offsetWidth - a.offsetLeft - 6;
-                probe.innerHTML = `<span style="padding:0 18px 0 16px;">${startsInView(p.span) ? '' : '◀ '}${p.info.label}</span>`;
+                probe.innerHTML = `<span style="padding:0 ${container.dataset.card === 'polaroid' ? 100 : 18}px 0 16px;">${startsInView(p.span) ? '' : '◀ '}${p.info.label}</span>`;
                 // 다음 주로 이어지는 막대만 해당 (이어지지 않으면 첫 조각에 그대로 쓰고 잘리면 말줄임)
                 p.statsNextRow = probe.scrollWidth > barW && Math.floor(p.ei/7) > Math.floor(p.si/7);
             });
@@ -18035,6 +18037,7 @@ body.theme-cozy #month-detail-modal button.text-slate-400 { width: 34px; height:
 
                     const bar = document.createElement('div');
                     bar.className = 'write-span-bar';
+                    bar.dataset.seed = s.id + ':' + r;
                     bar.style.cssText = `position:absolute; pointer-events:${(spanResizeState || spanMoveState) ? 'none' : 'auto'}; cursor:${spanMoveState ? 'grabbing' : 'grab'};
                         left:${a.offsetLeft + 3}px;
                         top:${a.offsetTop + topBase + laneTop[p.lane]}px;

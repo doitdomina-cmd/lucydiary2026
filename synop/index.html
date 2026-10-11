@@ -4888,6 +4888,10 @@ window.manualFirebasePush = async function () {
         if (cardBold) css += 'html body[data-theme] :is(.card-wrapper, .rounded-2xl[style*="border-top"]) .font-bold { font-family: ' + cardBold + ' !important; }';
         const cs = parseInt(get(LS.cscale) || '100', 10) || 100;
         if (cs !== 100) css += 'html body[data-theme] :is(.rich-editor, textarea, .card-wrapper input, #page-character input, #page-memo input) { zoom: ' + (cs / 100) + '; }';
+        // 첫 화면 글자 크기: 메뉴 글자 크기는 화면 전체에, 내용 글자 크기는 제목에 (메뉴 배율과 겹치지 않게 비율로 보정)
+        const ms = parseInt(get(LS.scale) || '100', 10) || 100;
+        if (ms !== 100) css += 'html body[data-theme] #synop-home { zoom: ' + (ms / 100) + '; }';
+        if (cs !== ms) css += 'html body[data-theme] #synop-home :is(.sh-title, .sh-intro h1, .sh-pen) { zoom: ' + (cs / ms) + '; }';
         st.textContent = css;
     }
     window.setContentScale = function (pct) {
@@ -4903,6 +4907,7 @@ window.manualFirebasePush = async function () {
     window.setAppScale = function (pct) {
         pct = Math.max(80, Math.min(140, parseInt(pct, 10) || 100));
         set(LS.scale, String(pct));
+        applyContentFont();
         document.documentElement.style.fontSize = pct === 100 ? '' : (16 * pct / 100) + 'px';
         const r = document.getElementById('as-scale'); if (r) r.value = pct;
         const l = document.getElementById('as-scale-val'); if (l) l.textContent = '(' + pct + '%)';

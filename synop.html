@@ -1,6 +1,11 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
+    <!-- 웹앱 설치 시작 -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#f9fafb">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <!-- 웹앱 설치 끝 -->
     <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700&family=Noto+Sans+KR:wght@400;700&family=Nanum+Gothic:wght@400;700&family=Nanum+Myeongjo:wght@400;700&family=Gowun+Batang:wght@400;700&family=Gowun+Dodum&family=Gaegu:wght@400;700&family=Nanum+Pen+Script&family=Hi+Melody&family=Single+Day&family=Jua&display=swap">
     <meta charset="UTF-8">
@@ -5128,5 +5133,24 @@ body:has(#synop-home.show) #synop-home-btn { display: none; }
 })();
 </script>
 <!-- 시놉 홈 끝 -->
+<!-- 웹앱 설치 시작 -->
+<script>
+// 웹앱(홈 화면 설치)용 서비스워커: synop 주소 범위만 맡는다. 작업실 안 iframe·폰 앱(APK)·PC 앱에서는 쓰지 않는다.
+(function () {
+    try {
+        const embedded = window.self !== window.top;
+        const native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+        if (embedded || native || !('serviceWorker' in navigator) || !/^https?:$/.test(location.protocol)) return;
+        window.addEventListener('load', () => {
+            // 예전에 사이트 전체 범위로 등록돼 있던 sw.js 는 다른 웹앱과 겹치니 걷어낸다
+            navigator.serviceWorker.getRegistrations().then(list => list.forEach(r => {
+                const u = (r.active || r.waiting || r.installing || {}).scriptURL || '';
+                if (/\/sw\.js$/.test(u) && !/\/synop$/.test(r.scope.replace(/\/$/, ''))) r.unregister();
+            })).catch(() => {}).then(() => navigator.serviceWorker.register('sw.js', { scope: './synop' })).catch(() => {});
+        });
+    } catch (e) {}
+})();
+</script>
+<!-- 웹앱 설치 끝 -->
 </body>
 </html>

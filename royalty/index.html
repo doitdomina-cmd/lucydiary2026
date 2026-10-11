@@ -943,6 +943,21 @@ body.theme-cozy :is(#tab-library, #tab-publishers, #tab-works, #tab-webtoon, #ta
 body.theme-cozy .daily-side-btn { background: color-mix(in srgb, var(--primary) 11%, #fffdf9) !important; border: 1px solid color-mix(in srgb, var(--primary) 32%, #fffdf9) !important; color: color-mix(in srgb, var(--primary) 52%, #2b2620) !important; border-radius: 14px !important; padding-top: 10px !important; padding-bottom: 10px !important; font-size: 12.5px !important; letter-spacing: .01em; box-shadow: 0 1px 2px rgba(60,45,25,.05); transition: background .15s, box-shadow .15s, transform .15s; }
 body.theme-cozy .daily-side-btn:hover { background: color-mix(in srgb, var(--primary) 20%, #fffdf9) !important; box-shadow: 0 3px 8px rgba(139,115,80,.12); transform: translateY(-1px); }
 body.theme-cozy .daily-side-btn i { color: var(--primary); font-size: 12px !important; }
+        /* 설정 프리셋 카드 5칸 */
+.preset-card { background: #fffdf9; border: 1px solid color-mix(in srgb, var(--primary) 22%, #fffdf9); border-radius: 14px; padding: 10px 11px 11px; }
+.preset-card.filled { border-color: color-mix(in srgb, var(--primary) 55%, #fffdf9); box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 16%, transparent); }
+.preset-no { width: 20px; height: 20px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; background: color-mix(in srgb, var(--primary) 22%, #fffdf9); color: color-mix(in srgb, var(--primary) 60%, #2b2620); }
+.preset-card.filled .preset-no { background: var(--primary); color: #fff; }
+.preset-name { width: 100%; font-size: 13px; font-weight: 700; color: #3f3a33; background: transparent; border: 0; border-bottom: 1px dashed color-mix(in srgb, var(--primary) 35%, #fffdf9); padding: 2px 0; outline: none; }
+.preset-name:focus { border-bottom-color: var(--primary); }
+.preset-date { font-size: 10.5px; color: #a39a8c; margin-top: 3px; }
+.preset-btn { flex: 1; padding: 6px 0; border-radius: 10px; font-size: 12px; font-weight: 700; border: 1px solid color-mix(in srgb, var(--primary) 40%, #fffdf9); color: color-mix(in srgb, var(--primary) 55%, #2b2620); background: color-mix(in srgb, var(--primary) 10%, #fffdf9); transition: background .15s, transform .15s; }
+.preset-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--primary) 22%, #fffdf9); transform: translateY(-1px); }
+.preset-btn.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+.preset-btn.primary:hover:not(:disabled) { background: color-mix(in srgb, var(--primary) 88%, #000); }
+.preset-btn:disabled { opacity: .4; cursor: default; }
+.preset-x { color: #c4bcae; font-size: 12px; padding: 0 2px; } .preset-x:hover { color: #c0766f; }
+.preset-flash { font-size: 11px; font-weight: 700; color: var(--primary); opacity: 0; transition: opacity .3s; }
         /* 막대 색상 스와치는 실제 색 그대로 보여준다 */
         body.theme-cozy #year-timeline-body [title][style*="cursor:grab"] { filter: saturate(.6) brightness(1.03); }
         /* 페이지 큰 제목: 세리프 + 앞에 ✽ (아이콘은 숨김) — 카드 제목·숫자는 산세리프 그대로 */
@@ -3794,6 +3809,11 @@ body.theme-cozy .daily-side-btn i { color: var(--primary); font-size: 12px !impo
                 <button onclick="closeSettingsPanel()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-times text-xl"></i></button>
             </div>
             <div class="overflow-y-auto custom-scrollbar flex-1 min-h-0">
+            <!-- 설정 프리셋 5칸: 지금 화면 설정을 저장해 두고 웹·다른 기기에서도 불러오기 -->
+            <div class="mb-5 p-4 rounded-2xl border border-slate-100 bg-slate-50/60">
+                <p class="text-xs font-bold text-slate-400 uppercase mb-2">설정 프리셋 <span class="font-normal normal-case text-slate-300">· 테마, 카드 디자인·글씨체·색 같은 화면 설정을 5칸에 저장해요. 웹이나 다른 기기에서도 그대로 불러올 수 있어요 (일정·작품 데이터는 포함되지 않아요)</span></p>
+                <div id="settings-presets-box" class="grid grid-cols-5 gap-3"></div>
+            </div>
             <div class="grid grid-cols-3 gap-x-7 gap-y-4">
 
                 <!-- ── 1열: 테마 / 바탕화면 위젯(+크기) / 데이터 관리 ── -->
@@ -5500,6 +5520,7 @@ body.theme-cozy .daily-side-btn i { color: var(--primary); font-size: 12px !impo
         let publisherViewMode = { publishers: 'list', studios: 'list' }; // [NEW] 출판사/스튜디오 줄로 보기 · 카드로 보기
         let publisherCardSortOrder = []; // [NEW] 카드 보기 전용 순서 (줄 보기 순서와 별도 저장)
         let taxViewYear = new Date().getFullYear();
+        let settingsPresets = [null, null, null, null, null];   // 설정 프리셋 5칸 ({name, savedAt, data})
         let calCardSizes = { pub: 12 };   // 출간 일정 카드 글자 크기(px)
         let calCardFonts = { pub: 'auto', task: 'auto', write: 'auto', tl: 'auto', works: 'auto' };   // 달력/목록 카드 글씨체(화면마다): auto | sans | serif | hand | pen | ink | single | dodum
         let calCardDesigns = { pub: 'cozy', task: 'cozy', write: 'cozy', tl: 'cozy', works: 'cozy' };   // 달력 칸 안 카드 디자인(화면마다): cozy(기본) | label | polaroid | postcard | fountain
@@ -5690,7 +5711,7 @@ body.theme-cozy .daily-side-btn i { color: var(--primary); font-size: 12px !impo
             saveTimeout = setTimeout(() => {
                 try {
                     try { localStorage.setItem('lastModified_v6', new Date().toISOString()); } catch(e) {}
-                    const dataToSave = { 
+                    const dataToSave = { settingsPresets, 
                         masterWorks, monthlyData, years, publisherData, analysisData, 
                         publisherSortOrder, publisherCardSortOrder, publisherViewMode, genreList, genreBadgeOpacity, tableFontSettings, crosshairSettings,
                         writeSchedules, writeSpans, writeVolumes, writeMergedVolumeWorks, taskSchedules, contacts, penNames, widgetSettingsData, ddayCardDesigns, ddayCardFonts, modalDesign, calCardDesigns, calCardFonts, calCardSizes, writeCardSettings, taskCardSettings, taskColors: TASK_COLORS, taskCategoryList, writeColors: WRITE_COLORS, writeCategoryList,
@@ -5774,6 +5795,7 @@ body.theme-cozy .daily-side-btn i { color: var(--primary); font-size: 12px !impo
             charGoals = parsed.charGoals || {};
             webtoonManage = parsed.webtoonManage || {};
             penNameColorOverrides = parsed.penNameColorOverrides || {};
+            try { if (Array.isArray(parsed.settingsPresets)) settingsPresets = [0, 1, 2, 3, 4].map(i => parsed.settingsPresets[i] || null); } catch (e) { console.error(e); }
             if (parsed.webtoonCardSettings) Object.assign(webtoonCardSettings, parsed.webtoonCardSettings);
             workManage = parsed.workManage || {};
             if (parsed.workManageCardSettings) Object.assign(workManageCardSettings, parsed.workManageCardSettings);
@@ -6391,7 +6413,7 @@ body.theme-cozy .daily-side-btn i { color: var(--primary); font-size: 12px !impo
                 // ─────────────────────────────────────────────────────────
 
         function downloadBackup() { 
-            const data = { 
+            const data = { settingsPresets, 
                 masterWorks, monthlyData, years, publisherData, analysisData, publisherSortOrder, publisherCardSortOrder, publisherViewMode, genreList, theme: localStorage.getItem('theme_v6'), customColor: localStorage.getItem('custom_color_v6'), genreBadgeOpacity, bgMain: localStorage.getItem('bg_main_v6'), tableFontSettings, crosshairSettings, 
                 writeSchedules, writeSpans, writeVolumes, writeMergedVolumeWorks, taskSchedules, writeCardSettings, taskCardSettings, taskColors: TASK_COLORS, taskCategoryList, writeColors: WRITE_COLORS, writeCategoryList,
                 contacts, penNames, widgetSettingsData, ddayCardDesigns, ddayCardFonts, modalDesign, calCardDesigns, calCardFonts, calCardSizes, submissions, webtoonSubs, webtoonSubOrder, contactSortMode, webtoonViewFilter, webtoonSortMode,
@@ -7361,9 +7383,112 @@ body.theme-cozy .daily-side-btn i { color: var(--primary); font-size: 12px !impo
         function saveWorkMemo() { closeWorkMemo(); }
         function execCmd(cmd, val) { document.execCommand(cmd, false, val||null); }
 
+        // ═══ 설정 프리셋 5칸 ═══
+        // 테마·카드 디자인·글씨체·카드 색 같은 '화면 설정'을 5칸에 저장해 두고 한 번에 불러온다.
+        // 데이터 파일/클라우드에 같이 저장되므로 웹이나 다른 기기에서도 똑같이 쓸 수 있다. (일정·작품 같은 데이터는 들어가지 않음)
+        function presetSnapshot() {
+            const cp = v => JSON.parse(JSON.stringify(v === undefined ? null : v));
+            return {
+                theme: activeTheme,
+                customColor: localStorage.getItem('custom_color_v6') || '',
+                bgMain: document.documentElement.style.getPropertyValue('--bg-main').trim() || localStorage.getItem('bg_main_v6') || '',
+                modalDesign: modalDesign,
+                calCardDesigns: cp(calCardDesigns), calCardFonts: cp(calCardFonts), calCardSizes: cp(calCardSizes),
+                ddayCardDesigns: cp(ddayCardDesigns), ddayCardFonts: cp(ddayCardFonts),
+                writeCardSettings: cp(writeCardSettings), taskCardSettings: cp(taskCardSettings),
+                workManageCardSettings: cp(workManageCardSettings), webtoonCardSettings: cp(webtoonCardSettings),
+                tableFontSettings: cp(tableFontSettings), crosshairSettings: cp(crosshairSettings),
+                genreBadgeOpacity: genreBadgeOpacity,
+                taskColors: cp(TASK_COLORS), writeColors: cp(WRITE_COLORS)
+            };
+        }
+        function presetApply(d) {
+            if (!d) return;
+            const cp = v => JSON.parse(JSON.stringify(v));
+            const step = fn => { try { fn(); } catch (e) { console.error('프리셋 적용 중 오류', e); } };
+            step(() => { if (d.modalDesign) modalDesign = d.modalDesign; });
+            step(() => { if (d.calCardDesigns) calCardDesigns = Object.assign({ pub: 'cozy', task: 'cozy', write: 'cozy', tl: 'cozy', works: 'cozy' }, cp(d.calCardDesigns)); });
+            step(() => { if (d.calCardFonts) calCardFonts = Object.assign({ pub: 'auto', task: 'auto', write: 'auto', tl: 'auto', works: 'auto' }, cp(d.calCardFonts)); });
+            step(() => { if (d.calCardSizes) calCardSizes = Object.assign({ pub: 12 }, cp(d.calCardSizes)); });
+            step(() => { if (d.ddayCardDesigns) ddayCardDesigns = Object.assign({ pub: 'heart', task: 'heart' }, cp(d.ddayCardDesigns)); });
+            step(() => { if (d.ddayCardFonts) ddayCardFonts = Object.assign({ pub: 'auto', task: 'auto' }, cp(d.ddayCardFonts)); });
+            step(() => { if (d.writeCardSettings) writeCardSettings = Object.assign({}, writeCardSettings, cp(d.writeCardSettings)); });
+            step(() => { if (d.taskCardSettings) taskCardSettings = Object.assign({}, taskCardSettings, cp(d.taskCardSettings)); });
+            step(() => { if (d.workManageCardSettings) workManageCardSettings = cp(d.workManageCardSettings); });
+            step(() => { if (d.webtoonCardSettings) webtoonCardSettings = cp(d.webtoonCardSettings); });
+            step(() => { if (d.tableFontSettings) tableFontSettings = cp(d.tableFontSettings); });
+            step(() => { if (d.crosshairSettings) crosshairSettings = cp(d.crosshairSettings); });
+            step(() => { if (typeof d.genreBadgeOpacity === 'number') genreBadgeOpacity = d.genreBadgeOpacity; });
+            step(() => { if (d.taskColors) Object.assign(TASK_COLORS, cp(d.taskColors)); });
+            step(() => { if (d.writeColors) Object.assign(WRITE_COLORS, cp(d.writeColors)); });
+            // 화면에 반영
+            step(() => {
+                const root = document.documentElement;
+                root.style.setProperty('--cell-font-size', tableFontSettings.cell.size + 'rem'); root.style.setProperty('--cell-font-color', tableFontSettings.cell.color); root.style.setProperty('--cell-font-weight', tableFontSettings.cell.weight);
+                root.style.setProperty('--total-font-size', tableFontSettings.total.size + 'rem'); root.style.setProperty('--total-font-color', tableFontSettings.total.color); root.style.setProperty('--total-font-weight', tableFontSettings.total.weight);
+                root.style.setProperty('--grand-total-font-size', tableFontSettings.grand.size + 'rem'); root.style.setProperty('--grand-total-font-color', tableFontSettings.grand.color); root.style.setProperty('--grand-total-font-weight', tableFontSettings.grand.weight);
+                root.style.setProperty('--crosshair-color', crosshairSettings.color);
+            });
+            step(() => { if (d.bgMain) setPageBackgroundColor(d.bgMain); });
+            step(() => { if (d.theme === 'custom' && d.customColor) localStorage.setItem('custom_color_v6', d.customColor); });
+            step(() => { if (d.theme) setTheme(d.theme); });
+            step(() => applyCalCardDesign());
+            step(() => applyDdayDesign());
+            step(() => applyModalDesign());
+            step(() => updateUI());
+            save();
+        }
+        function presetSave(i) {
+            const cur = settingsPresets[i];
+            if (cur && !confirm('프리셋 ' + (i + 1) + '번에 이미 저장된 설정이 있어요.\n지금 화면 설정으로 덮어쓸까요?')) return;
+            const input = document.getElementById('preset-name-' + i);
+            const name = (input && input.value.trim()) || (cur && cur.name) || ('프리셋 ' + (i + 1));
+            settingsPresets[i] = { name, savedAt: new Date().toISOString(), data: presetSnapshot() };
+            save(); renderPresetUi(); presetFlash(i, '저장됨 ✓');
+        }
+        function presetLoad(i) {
+            const p = settingsPresets[i];
+            if (!p || !p.data) return;
+            presetApply(p.data);
+            renderPresetUi(); presetFlash(i, '적용됨 ✓');
+        }
+        function presetClear(i) {
+            if (!settingsPresets[i]) return;
+            if (!confirm('프리셋 ' + (i + 1) + '번(' + (settingsPresets[i].name || '') + ')을 비울까요?')) return;
+            settingsPresets[i] = null; save(); renderPresetUi();
+        }
+        function presetRename(i, v) {
+            if (settingsPresets[i]) { settingsPresets[i].name = v.trim() || ('프리셋 ' + (i + 1)); save(true); }
+        }
+        function presetFlash(i, msg) {
+            const el = document.getElementById('preset-flash-' + i);
+            if (!el) return; el.textContent = msg; el.style.opacity = '1';
+            setTimeout(() => { el.style.opacity = '0'; }, 1800);
+        }
+        function renderPresetUi() {
+            const box = document.getElementById('settings-presets-box');
+            if (!box) return;
+            const esc = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+            box.innerHTML = [0, 1, 2, 3, 4].map(i => {
+                const p = settingsPresets[i];
+                const date = p && p.savedAt ? new Date(p.savedAt).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' }) + ' 저장' : '비어 있음';
+                return '<div class="preset-card' + (p ? ' filled' : '') + '">' +
+                    '<div class="flex items-center justify-between mb-1.5"><span class="preset-no">' + (i + 1) + '</span>' +
+                    '<span id="preset-flash-' + i + '" class="preset-flash"></span>' +
+                    (p ? '<button type="button" onclick="presetClear(' + i + ')" class="preset-x" title="이 칸 비우기"><i class="fa-solid fa-xmark"></i></button>' : '') + '</div>' +
+                    '<input id="preset-name-' + i + '" type="text" maxlength="14" value="' + esc(p ? p.name : '') + '" placeholder="프리셋 ' + (i + 1) + '" onchange="presetRename(' + i + ', this.value)" class="preset-name">' +
+                    '<div class="preset-date">' + date + '</div>' +
+                    '<div class="flex gap-1.5 mt-2">' +
+                    '<button type="button" onclick="presetSave(' + i + ')" class="preset-btn">저장</button>' +
+                    '<button type="button" onclick="presetLoad(' + i + ')" class="preset-btn primary"' + (p ? '' : ' disabled') + '>적용</button>' +
+                    '</div></div>';
+            }).join('');
+        }
+
         function openSettingsPanel() {
             document.getElementById('settings-panel-modal').classList.add('open');
             try { applyModalDesign(); } catch (e) {}
+            try { renderPresetUi(); } catch (e) {}
             updateWidgetToggleBtn();
             updateBriefAutoOpenBtn();
             updateBriefSidebarIconBtn();

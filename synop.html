@@ -1091,7 +1091,7 @@ function fbUpdateAuthUI(user) {
     const badge = document.getElementById('fb-login-badge');
     if (badge && !isAutoAuthEnvironment) {
         if (user && !user.isAnonymous) {
-            badge.innerHTML = `<i data-lucide="cloud" class="w-3.5 h-3.5 text-green-600"></i> <span class="text-green-700 font-bold">${esc ? esc(user.displayName || user.email || '로그인됨') : (user.displayName || user.email || '로그인됨')}</span> <button onclick="window.fbGoogleSignOut()" class="text-gray-400 underline hover:text-gray-600 ml-1">로그아웃</button>${(() => { try { return localStorage.getItem('fb-legacy-imported') ? '' : ' <button onclick="window.fbImportLegacy()" class="text-blue-500 underline hover:text-blue-700 ml-1">예전 데이터 가져오기</button>'; } catch (e) { return ''; } })()}`;
+            badge.innerHTML = `<i data-lucide="cloud" class="w-3.5 h-3.5 text-green-600"></i> <span class="text-green-700 font-bold">${esc ? esc(user.displayName || user.email || '로그인됨') : (user.displayName || user.email || '로그인됨')}</span> <button onclick="window.fbGoogleSignOut()" class="text-gray-400 underline hover:text-gray-600 ml-1">로그아웃</button>${(() => { try { return localStorage.getItem('fb-legacy-imported') ? '' : ' <button onclick="window.fbImportLegacy()" class="text-blue-500 underline hover:text-blue-700 ml-1">예전 저장소에서 없는 것만 추가</button>'; } catch (e) { return ''; } })()}`;
             badge.classList.remove('hidden');
         } else {
             badge.innerHTML = `<i data-lucide="cloud-off" class="w-3.5 h-3.5 text-orange-500"></i> <button onclick="window.fbGoogleSignIn()" class="text-orange-600 font-bold underline hover:text-orange-700">구글 로그인 (온라인 동기화)</button>`;
@@ -1230,6 +1230,22 @@ function fbDocRef(cfg) {
     return fbDb.collection(cfg.collection || 'episodeBoards').doc(cfg.docId || 'main');
 }
 
+// 덮어쓰기 같은 위험한 작업 전에, 지금 상태를 파일로 내려받아 둔다 (되돌릴 수 있게)
+function downloadSafety(label) {
+    try {
+        const d = new Date(), p2 = n => String(n).padStart(2, '0');
+        const a = document.createElement('a');
+        a.download = `synop_${label}_${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}.json`;
+        a.href = URL.createObjectURL(new Blob([JSON.stringify(window.workspaces)], { type: 'application/json' }));
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    } catch (e) { console.warn('안전 백업 실패', e); }
+}
+// 지금 있는 시놉시스는 그대로 두고, 없는 것(id 기준)만 골라낸다
+function missingBoards(current, incoming) {
+    const have = new Set((current || []).map(b => b && b.id));
+    return (incoming || []).filter(b => b && b.id && !have.has(b.id));
+}
 // 예전 저장소(syno-eb309)에 있던 시놉시스를 새 저장소로 한 번 가져온다 (버튼을 눌렀을 때만: 구글 로그인 팝업이 필요해서)
 window.fbImportLegacy = async function () {
     try {
@@ -1247,12 +1263,18 @@ window.fbImportLegacy = async function () {
         let data = null;
         try { data = d && d.data ? JSON.parse(d.data) : null; } catch (e) {}
         if (!data || !Array.isArray(data) || !data.length) { alert('예전 저장소에 가져올 시놉시스가 없어요.'); return; }
-        if (!confirm('예전 저장소에서 시놉시스 ' + data.length + '개를 찾았어요.\n지금 화면의 데이터를 이걸로 바꾸고 새 저장소에 올릴까요?')) return;
-        await fbApplyRemoteData(data);
+        const add = missingBoards(window.workspaces, data);
+        if (!add.length) { try { localStorage.setItem('fb-legacy-imported', '1'); } catch (e) {} fbUpdateAuthUI(); alert('예전 저장소의 시놉시스(' + data.length + '개)가 지금 화면에 이미 모두 있어요. 가져올 게 없어요.'); return; }
+        const names = add.slice(0, 5).map(b => '· ' + (b.title || '제목 없음')).join('\n') + (add.length > 5 ? '\n· 외 ' + (add.length - 5) + '개' : '');
+        if (!confirm('예전 저장소에는 ' + data.length + '개가 있고, 지금 화면에 없는 ' + add.length + '개를 추가할 수 있어요.\n\n' + names + '\n\n⚠ 지금 화면의 시놉시스는 건드리지 않고 없는 것만 더해요. (덮어쓰지 않아요)\n추가하기 전에 지금 상태를 파일로 한 번 내려받아 둘게요. 계속할까요?')) return;
+        downloadSafety('before-import');
+        pushHistory();
+        window.workspaces = normalizeData(window.workspaces.concat(add));
+        renderAll();
         await firestorePush(loadFirebaseConfig(), JSON.stringify(window.workspaces));
         try { localStorage.setItem('fb-legacy-imported', '1'); } catch (e) {}
         fbUpdateAuthUI();
-        alert('가져와서 새 저장소에 올렸어요 ✓');
+        alert(add.length + '개를 추가해서 새 저장소에 올렸어요 ✓');
     } catch (e) {
         console.error(e);
         alert('가져오지 못했어요. (' + (e.code || e.message) + ')');
@@ -2183,6 +2205,8 @@ window.manualFirebasePush = async function () {
                 try {
                     const importedData = JSON.parse(e.target.result);
                     if (Array.isArray(importedData) && importedData.length > 0 && importedData[0].id) {
+                        if (!confirm('지금 화면의 시놉시스 전체를 이 파일의 내용(' + importedData.length + '개)으로 바꿔요.\n바꾸기 전에 지금 상태를 파일로 한 번 내려받아 둘게요. 계속할까요?')) { event.target.value = ''; return; }
+                        downloadSafety('before-overwrite');
                         pushHistory();
                         window.workspaces = normalizeData(importedData);
                         window.currentWorkspaceId = window.workspaces[0].id;

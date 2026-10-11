@@ -902,18 +902,19 @@ body[data-theme="follow"] .theme-canvas ::placeholder { color: var(--pf-muted, #
             </div>
 
             <!-- 하단 상태바: 저장/동기화 상태 + 로그인 배지 + Zoom Controls -->
-            <div class="absolute bottom-6 right-6 flex items-center gap-2 z-30">
+            <div id="board-status-bar" class="absolute bottom-6 right-6 flex items-center gap-2 z-30">
+                <div id="save-mini" class="hidden" role="status" aria-live="polite"></div>
                 <div id="save-indicator" class="text-xs font-bold px-3 py-1.5 rounded-full shadow-sm bg-white border border-gray-200 transition-opacity duration-300 opacity-0 pointer-events-none flex items-center whitespace-nowrap shrink-0">
                 </div>
                 <div id="fb-login-badge" class="hidden text-xs font-bold px-3 py-1.5 rounded-full shadow-sm bg-white border border-gray-200 flex items-center gap-1.5 whitespace-nowrap shrink-0">
                 </div>
                 <div class="flex items-center bg-white border border-gray-200 shadow-lg rounded-full px-3 py-1.5 gap-3 shrink-0 whitespace-nowrap">
-                    <button onclick="window.changeZoom(-0.1)" class="text-gray-500 hover:text-gray-800"><i data-lucide="zoom-out" class="w-4 h-4"></i></button>
-                    <span id="zoom-level-text" class="text-xs font-semibold w-10 text-center">100%</span>
-                    <button onclick="window.changeZoom(0.1)" class="text-gray-500 hover:text-gray-800"><i data-lucide="zoom-in" class="w-4 h-4"></i></button>
-                    <div class="w-px h-4 bg-gray-300 mx-1"></div>
-                    <button onclick="window.resetZoom()" class="text-xs text-gray-500 hover:text-gray-800 font-medium">초기화</button>
-                    <div class="w-px h-4 bg-gray-300 mx-1"></div>
+                    <button onclick="window.changeZoom(-0.1)" class="zoom-ctl text-gray-500 hover:text-gray-800"><i data-lucide="zoom-out" class="w-4 h-4"></i></button>
+                    <span id="zoom-level-text" class="zoom-ctl text-xs font-semibold w-10 text-center">100%</span>
+                    <button onclick="window.changeZoom(0.1)" class="zoom-ctl text-gray-500 hover:text-gray-800"><i data-lucide="zoom-in" class="w-4 h-4"></i></button>
+                    <div class="zoom-ctl w-px h-4 bg-gray-300 mx-1"></div>
+                    <button onclick="window.resetZoom()" class="zoom-ctl text-xs text-gray-500 hover:text-gray-800 font-medium">초기화</button>
+                    <div class="zoom-ctl w-px h-4 bg-gray-300 mx-1"></div>
                     <button id="undo-btn" onclick="window.undoAction()" class="undo-btn text-gray-500 hover:text-gray-800 disabled:opacity-30" title="되돌리기 (Ctrl+Z)" disabled>
                         <i data-lucide="undo-2" class="w-4 h-4"></i>
                     </button>
@@ -2410,7 +2411,23 @@ window.manualFirebasePush = async function () {
             if (/unavailable|network|offline/.test(c)) return '클라우드 저장 실패 — 인터넷 연결을 확인해 주세요';
             return '클라우드 저장 실패' + (c ? ' (' + String(c).slice(0, 40) + ')' : '');
         }
+        // 폰 화면용: 사라지지 않는 짧은 저장 상태 (loading=저장 중, *_success=저장됨, 그 외=실패)
+        function updateSaveMini(state, err) {
+            const m = document.getElementById('save-mini');
+            if (!m) return;
+            let cls = 'ok', label = '저장됨', tip = '';
+            if (state === 'loading') { cls = 'busy'; label = '저장 중…'; }
+            else if (state === 'init') { label = '저장됨'; }
+            else if (state === 'local_success') { label = '기기에 저장됨'; }
+            else if (/_success$/.test(state)) { label = '클라우드 저장됨'; }
+            else if (state === 'firebase_error' || state === 'github_error') { cls = 'err'; label = '클라우드 저장 실패'; tip = state === 'firebase_error' ? fbErrText(err) : 'GitHub 동기화 실패'; }
+            else { cls = 'err'; label = '저장 실패'; }
+            m.className = 'sm-' + cls;
+            m.title = tip;
+            m.textContent = label;
+        }
         function showSaveIndicator(state, err) {
+            updateSaveMini(state, err);
             const ind = document.getElementById('save-indicator');
             if(!ind) return;
             ind.classList.remove('opacity-0');
@@ -2439,6 +2456,8 @@ window.manualFirebasePush = async function () {
             }
             if(window.lucide) window.lucide.createIcons({el: ind});
         }
+
+        updateSaveMini('init');
 
         // --- Global State ---
         window.workspaces = [
@@ -5111,6 +5130,23 @@ body:has(#synop-home.show) #synop-home-btn { display: none; }
   div:has(> #char-page-tabs)::before, div:has(> #note-page-tabs)::before { content: ''; }
   #char-page-tabs, #note-page-tabs { justify-self: center; justify-content: center; max-width: 100%; }
 }
+/* 폰: 아래 상태 줄 — 확대/초기화 버튼은 없애고(두 손가락으로 확대·축소), 사라지지 않는 저장 상태를 LUCY 옆에 표시 */
+#save-mini { display: none; }
+#save-mini:empty { display: none !important; }
+@media (max-width: 768px) {
+  #board-status-bar { left: 10px; right: 10px; bottom: 10px; justify-content: flex-end; gap: 6px; }
+  #board-status-bar .zoom-ctl { display: none !important; }
+  #save-indicator { display: none !important; }
+  #save-mini { display: inline-flex !important; align-items: center; flex: none; white-space: nowrap; font-size: 11px; font-weight: 700; padding: 6px 10px; border-radius: 999px; background: #fff; border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  #save-mini::before { content: ''; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; background: currentColor; }
+  #save-mini.sm-ok { color: #15803d; }
+  #save-mini.sm-busy { color: #2563eb; }
+  #save-mini.sm-busy::before { animation: sm-pulse 1s ease-in-out infinite; }
+  #save-mini.sm-err { color: #dc2626; }
+  #board-status-bar #fb-login-badge { min-width: 0; max-width: 46vw; padding: 6px 10px; font-size: 11px; overflow: hidden; }
+  #board-status-bar #fb-login-badge > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+}
+@keyframes sm-pulse { 50% { opacity: .25; } }
 /* 플롯 화면: 한 손가락 이동은 기본 스크롤, 두 손가락 확대/축소는 직접 처리(브라우저 전체 확대 방지) */
 #canvas-wrapper { touch-action: pan-x pan-y; overscroll-behavior: contain; }
 </style>

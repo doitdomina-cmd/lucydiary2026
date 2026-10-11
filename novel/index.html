@@ -2089,6 +2089,7 @@ function applyPref() {
     s.setProperty('--home-scale', pref.homeScale || 1);
     document.documentElement.classList.toggle('ed-crisp', S.crisp !== false);
     document.documentElement.classList.toggle('q-serif', S.quoteSerif !== false);
+    applySynopFont();
     applyPalette();
 }
 /* 캐릭터 칸: 시놉 보드의 캐릭터 설정을 원고 옆에 켜 두고 보기 (보기 전용, 고치기는 연필 → 시놉 보드) */
@@ -7916,6 +7917,16 @@ function lockSynopList() {
     const b = $('#btn-synop-pick'); if (b) { b.classList.toggle('hidden', !sbBoard() && !synopPicking); b.classList.toggle('on', synopPicking); b.textContent = synopPicking ? '고르는 중… 닫기' : '시놉 바꾸기'; }
 }
 let synopFrameWid = null, synopAutoId = null; // synopAutoId: 작업실이 맞춰 준(또는 처음 열려 있던) 시놉 — 사람이 바꾼 것만 기억하려고
+// 시놉 보드(iframe) 글꼴을 원고 본문 글꼴에 맞춤. 같은 출처라서 안쪽 문서에 스타일을 넣을 수 있음
+function applySynopFont() {
+    try {
+        const d = $('#sb-host iframe')?.contentDocument; if (!d || !d.head) return;
+        let st = d.getElementById('lucy-font');
+        if (!st) { st = d.createElement('style'); st.id = 'lucy-font'; d.head.appendChild(st); }
+        const S = settings();
+        st.textContent = `body, body *:not(svg):not(svg *):not([style*="font-family"]) { font-family: ${fontFamily(S.font, S.customFont)} !important; }`;
+    } catch (e) {}
+}
 function synopWin() { try { const w = $('#sb-host iframe')?.contentWindow; return w && Array.isArray(w.workspaces) && w.workspaces.length && typeof w.switchBoard === 'function' ? w : null; } catch (e) { return null; } }
 function applySynopMode() {
     const on = true; // 시놉 칸은 언제나 내 시놉 보드
@@ -7938,7 +7949,7 @@ function ensureSynopFrame() {
     document.body.appendChild(host);
     let tries = 0;
     const wait = () => { if (synopWin()) { syncSynopBoard(); renderTree(); renderSbViews(); return; } if (++tries < 60) setTimeout(wait, 500); };
-    $('iframe', host).addEventListener('load', wait);
+    $('iframe', host).addEventListener('load', () => { applySynopFont(); wait(); });
 }
 const normTitle = t => String(t || '').replace(/\s+/g, '').toLowerCase();
 function syncSynopBoard() {

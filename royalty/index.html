@@ -3805,6 +3805,8 @@ body.theme-cozy :is(#tab-library, #tab-publishers, #tab-works, #tab-webtoon, #ta
                             <div onclick="setTheme('coral')" class="theme-dot bg-[#B1D3B9] cursor-pointer" data-theme="coral" title="Coral"></div>
                             <div onclick="setTheme('cream')" class="theme-dot bg-[#BFC6C4] cursor-pointer" data-theme="cream" title="Cream"></div>
                             <div onclick="setTheme('cozy')" class="theme-dot bg-[#A98F67] cursor-pointer" data-theme="cozy" title="Cozy (크림 · 폴라로이드)"></div>
+                            <div onclick="setTheme('cozy-rose')" class="theme-dot cursor-pointer" data-theme="cozy-rose" title="Cozy Rose (코지 디자인 + 로즈)" style="background: radial-gradient(circle, #FDFCFA 0 26%, #d9b4b8 30%);"></div>
+                            <div onclick="setTheme('cozy-mint')" class="theme-dot cursor-pointer" data-theme="cozy-mint" title="Cozy Mint (코지 디자인 + 민트)" style="background: radial-gradient(circle, #FDFCFA 0 26%, #87ada1 30%);"></div>
                             <div class="theme-dot flex items-center justify-center relative cursor-pointer" id="custom-theme-dot" title="커스텀 색상" style="background-color:#b07d7d;">
                                 <input type="color" id="custom-color-picker" class="sidebar-color-picker" oninput="setCustomTheme(this.value); document.getElementById('custom-hex-input').value=this.value;" value="#b07d7d">
                             </div>
@@ -6445,11 +6447,73 @@ body.theme-cozy :is(#tab-library, #tab-publishers, #tab-works, #tab-webtoon, #ta
         function resetData() { if(confirm("초기화하시겠습니까?")) { try { if(fs) fs.unlinkSync(dataFilePath); } catch(e) {} localStorage.clear(); location.reload(); } }
         // body의 theme-* 클래스만 교체 — className을 통째로 바꾸면 sidebar-web(웹 표시)·sidebar-collapsed(메뉴 접힘) 같은
         // 다른 클래스까지 지워져서, 웹에서 메뉴 접기 버튼이 사라지는 문제가 있었음
-        function applyThemeClass(theme) {
-            [...document.body.classList].filter(c => c.startsWith('theme-')).forEach(c => document.body.classList.remove(c));
-            if (theme) document.body.classList.add('theme-' + theme);
+        // ── 코지 변형 테마(cozy-rose / cozy-mint): 디자인은 코지 그대로, 갈색 계열 색만 로즈·민트 색으로 ──
+        // 코지 CSS 규칙(body.theme-cozy …) 중 갈색·크림 계열 색이 들어간 것만 골라서, 색의 색조(hue)만 돌린 복사본을
+        // <style id="cozy-variant-style"> 로 만들어 얹는다. (명도·채도는 유지해서 같은 분위기, 코지 CSS를 고치면 자동으로 따라감)
+        const COZY_VARIANTS = {
+            rose: { delta: -44, sat: 0.95, primary: '#d9b4b8', light: '#fcf3f4' },
+            mint: { delta: 123, sat: 0.8, primary: '#87ada1', light: '#effcf6' }
+        };
+        function cozyShiftRgb(r, g, b, v) {
+            const rn = r / 255, gn = g / 255, bn = b / 255;
+            const mx = Math.max(rn, gn, bn), mn = Math.min(rn, gn, bn), d = mx - mn;
+            if (d === 0) return null;
+            const l = (mx + mn) / 2, sat = d / (1 - Math.abs(2 * l - 1));
+            let h = mx === rn ? ((gn - bn) / d) % 6 : mx === gn ? (bn - rn) / d + 2 : (rn - gn) / d + 4;
+            h *= 60; if (h < 0) h += 360;
+            if (h < 15 || h > 75 || sat < 0.06) return null;          // 갈색·크림·골드 계열만 바꾼다
+            h = (h + v.delta + 360) % 360;
+            const s2 = Math.min(1, sat * v.sat), c = (1 - Math.abs(2 * l - 1)) * s2, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = l - c / 2;
+            const k = Math.floor(h / 60);
+            const [r1, g1, b1] = [[c, x, 0], [x, c, 0], [0, c, x], [0, x, c], [x, 0, c], [c, 0, x]][k % 6];
+            return [Math.round((r1 + m) * 255), Math.round((g1 + m) * 255), Math.round((b1 + m) * 255)];
         }
-        function setTheme(theme) { try { applyDdayDesign(); applyModalDesign(); } catch (e) {} const _wasCozy = document.body.classList.contains('theme-cozy'); _cozyLaunchSig = ''; activeTheme = theme; localStorage.setItem('theme_v6', theme); document.querySelectorAll('.theme-dot').forEach(d => { d.classList.remove('active'); if(d.dataset.theme === theme) d.classList.add('active'); }); if (theme === 'custom') { setCustomTheme(localStorage.getItem('custom_color_v6') || '#b07d7d'); } else { applyThemeClass(theme); document.body.style.removeProperty('--primary'); document.body.style.removeProperty('--primary-light'); } if (_wasCozy !== (theme === 'cozy')) setTimeout(() => { try { updateUI(); } catch (e) {} }, 0); updateDashboardStats(); }
+        function cozyShiftCssColors(text, v) {
+            return text
+                .replace(/#([0-9a-fA-F]{6})(?![0-9a-zA-Z_-])/g, (mm, hx) => {
+                    const o = cozyShiftRgb(parseInt(hx.substr(0, 2), 16), parseInt(hx.substr(2, 2), 16), parseInt(hx.substr(4, 2), 16), v);
+                    return o ? '#' + o.map(n => n.toString(16).padStart(2, '0')).join('') : mm;
+                })
+                .replace(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(,\s*[\d.]+\s*)?\)/g, (mm, r, g, b, a) => {
+                    const o = cozyShiftRgb(+r, +g, +b, v);
+                    return o ? (a ? 'rgba(' + o.join(',') + a + ')' : 'rgb(' + o.join(',') + ')') : mm;
+                });
+        }
+        function buildCozyVariant(name) {
+            const old = document.getElementById('cozy-variant-style'); if (old) old.remove();
+            const v = COZY_VARIANTS[name]; if (!v) return;
+            const cls = 'body.theme-cozy.cozyv-' + name;
+            const rules = [];
+            const convRule = (r) => {
+                if (!r.selectorText || !/body\.theme-cozy(?![\w-])/.test(r.selectorText)) return '';
+                const txt = r.cssText, i = txt.indexOf('{');
+                const sel = txt.slice(0, i).replace(/body\.theme-cozy(?![\w-])/g, cls);
+                const body = txt.slice(i), shifted = cozyShiftCssColors(body, v);
+                return shifted === body ? '' : sel + shifted;
+            };
+            for (const sheet of document.styleSheets) {
+                let list; try { list = sheet.cssRules; } catch (e) { continue; }   // 외부 CSS(폰트어썸 등)는 건너뜀
+                for (const r of list) {
+                    if (r.cssRules && !r.selectorText) {                              // @media 등
+                        if (!r.conditionText) continue;
+                        const inner = [...r.cssRules].map(convRule).filter(Boolean).join('\n');
+                        if (inner) rules.push('@media ' + r.conditionText + ' {\n' + inner + '\n}');
+                    } else { const t = convRule(r); if (t) rules.push(t); }
+                }
+            }
+            rules.push(cls + ' { --primary: ' + v.primary + '; --primary-light: ' + v.light + '; }');
+            const st = document.createElement('style'); st.id = 'cozy-variant-style'; st.textContent = rules.join('\n');
+            document.head.appendChild(st);
+        }
+        function applyThemeClass(theme) {
+            [...document.body.classList].filter(c => c.startsWith('theme-') || c.startsWith('cozyv-')).forEach(c => document.body.classList.remove(c));
+            const old = document.getElementById('cozy-variant-style'); if (old) old.remove();
+            if (theme && String(theme).indexOf('cozy-') === 0) {
+                document.body.classList.add('theme-cozy', 'cozyv-' + theme.slice(5));
+                try { buildCozyVariant(theme.slice(5)); } catch (e) { console.error(e); }
+            } else if (theme) document.body.classList.add('theme-' + theme);
+        }
+        function setTheme(theme) { try { applyDdayDesign(); applyModalDesign(); } catch (e) {} const _wasCozy = document.body.classList.contains('theme-cozy'); _cozyLaunchSig = ''; activeTheme = theme; localStorage.setItem('theme_v6', theme); document.querySelectorAll('.theme-dot').forEach(d => { d.classList.remove('active'); if(d.dataset.theme === theme) d.classList.add('active'); }); if (theme === 'custom') { setCustomTheme(localStorage.getItem('custom_color_v6') || '#b07d7d'); } else { applyThemeClass(theme); document.body.style.removeProperty('--primary'); document.body.style.removeProperty('--primary-light'); } if (_wasCozy !== (theme === 'cozy' || String(theme).indexOf('cozy-') === 0)) setTimeout(() => { try { updateUI(); } catch (e) {} }, 0); updateDashboardStats(); }
         function setCustomTheme(color) { const _wasCozy = document.body.classList.contains('theme-cozy'); activeTheme = 'custom'; localStorage.setItem('theme_v6', 'custom'); localStorage.setItem('custom_color_v6', color); document.querySelectorAll('.theme-dot').forEach(d => d.classList.remove('active')); document.getElementById('custom-theme-dot').classList.add('active'); document.getElementById('custom-theme-dot').style.backgroundColor = color; applyThemeClass(null); document.documentElement.style.setProperty('--primary', color); const r = parseInt(color.substr(1,2), 16), g = parseInt(color.substr(3,2), 16), b = parseInt(color.substr(5,2), 16); document.documentElement.style.setProperty('--primary-light', `rgba(${r},${g},${b},0.1)`); if (_wasCozy) setTimeout(() => { try { updateUI(); } catch (e) {} }, 0); updateDashboardStats(); }
         function setPageBackgroundColor(color) { document.documentElement.style.setProperty('--bg-main', color); localStorage.setItem('bg_main_v6', color); }
         function switchTab(tabName) { 

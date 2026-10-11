@@ -869,13 +869,13 @@ kbd { font: 12px/1.4 ui-monospace, monospace; background: var(--panel2); border:
 /* 회차 개요 칸 */
 .ed-main { flex: 1; min-height: 0; display: flex; }
 .ed-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.outline { width: 230px; flex: none; display: flex; flex-direction: column; border-left: 1px solid var(--line); background: var(--panel2); }
-.ol-head { display: flex; align-items: center; gap: 4px; padding: 6px 8px 4px 10px; font-size: 12px; color: var(--muted); }
+.outline { width: 230px; flex: none; display: flex; flex-direction: column; border-left: 1px solid var(--line); border-top: 1px solid var(--line); background: var(--panel2); }
+.ol-head { display: flex; align-items: center; gap: 4px; padding: 6px 8px 6px 10px; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--muted); }
 .ol-head b { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 120px; }
 .outline textarea { flex: 1; border: 0; outline: none; resize: none; background: transparent; padding: 4px 12px; font-size: 13px; line-height: 1.7; min-height: 120px; }
 .ol-note { font-size: 10px; color: var(--muted); padding: 4px 10px 8px; opacity: .8; }
 .editor-grid.n3 .outline, .editor-grid.n4 .outline { width: 170px; }
-@media (max-width: 760px) { .ed-main { flex-direction: column; } .outline { width: auto !important; border-left: 0; border-bottom: 1px solid var(--line); order: -1; max-height: 34vh; } .outline textarea { min-height: 70px; } }
+@media (max-width: 760px) { .ed-main { flex-direction: column; } .outline { width: auto !important; border-left: 0; border-top: 0; border-bottom: 1px solid var(--line); order: -1; max-height: 34vh; } .outline textarea { min-height: 70px; } }
 /* 아이콘: Lucide (ISC License, lucide.dev) — 글자색(테마)을 따라감 */
 .ic { display: inline-block; width: 1.15em; height: 1.15em; vertical-align: -0.2em; flex: none; background-color: currentColor; -webkit-mask: var(--i) center / contain no-repeat; mask: var(--i) center / contain no-repeat; }
 .ic-feather { --i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14.086 18.412A2 2 0 0112.67 19H5v-7.672a2 2 0 01.586-1.414L11.75 3.75a6 6 0 118.49 8.49z' /%3E %3Cpath d='M16 8 2 22' /%3E %3Cpath d='M17.488 15H9' /%3E%3C/svg%3E"); }
@@ -3012,49 +3012,57 @@ async function newWork() {
 }
 function switchWork(id) { layout().workId = id; touch(layout()); renderAll(); }
 
-function typoModal() {
-    const S = settings();
-    const bg = document.createElement('div'); bg.className = 'modal-bg';
-    const AL = [['justify', 'align-justify', '양쪽'], ['left', 'align-left', '왼쪽'], ['center', 'align-center', '가운데'], ['right', 'align-right', '오른쪽']];
+const TYPO_AL = [['justify', 'align-justify', '양쪽'], ['left', 'align-left', '왼쪽'], ['center', 'align-center', '가운데'], ['right', 'align-right', '오른쪽']];
+// 원고 글자 · 문단 모양 입력칸 (팝업과 설정 '원고' 탭이 같이 씀)
+function typoHTML(withFont) {
     const num = (k, unit, min, max, step) => `<span class="unit"><input type="number" data-k="${k}" min="${min}" max="${max}" step="${step}"><small>${unit}</small></span>`;
-    bg.innerHTML = `<div class="modal"><div style="display:flex;align-items:center;margin-bottom:4px"><h3 style="margin:0;flex:1"><i class="ic ic-type"></i> 원고 글자 · 문단 모양</h3><button class="mini" data-x="1">✕</button></div>
-        <label>글꼴</label><select data-k="font">${FONT_CHOICES.map(([k, n]) => `<option value="${k}">${n}</option>`).join('')}<option value="custom">내 컴퓨터 글꼴 (이름 입력)</option></select>
-        <div data-custom><label>글꼴 이름 (컴퓨터에 설치된 글꼴, 예: 리디바탕, KoPub바탕체)</label><input type="text" data-k="customFont" placeholder="글꼴 이름"></div>
+    return `${withFont ? `<label>글꼴</label><select data-k="font">${FONT_CHOICES.map(([k, n]) => `<option value="${k}">${n}</option>`).join('')}<option value="custom">내 컴퓨터 글꼴 (이름 입력)</option></select>
+        <div data-custom><label>글꼴 이름 (컴퓨터에 설치된 글꼴, 예: 리디바탕, KoPub바탕체)</label><input type="text" data-k="customFont" placeholder="글꼴 이름"></div>` : ''}
         <div class="para-grid" style="margin-top:8px"><span>글자 크기</span>${num('size', 'px', 11, 30, 1)}<span>본문 폭</span>${num('width', 'px', 400, 1400, 20)}</div>
         <div class="para-h">문단 모양 <small style="font-weight:400;color:var(--muted)">(한글 ‘문단 모양’과 같은 단위)</small></div>
-        <div class="para-grid"><span>정렬</span><div class="align-pick" style="grid-column:span 3">${AL.map(([k, ic, n]) => `<button data-al="${k}" title="${n} 정렬"><i class="ic ic-${ic}"></i></button>`).join('')}</div>
+        <div class="para-grid"><span>정렬</span><div class="align-pick" style="grid-column:span 3">${TYPO_AL.map(([k, ic, n]) => `<button data-al="${k}" title="${n} 정렬"><i class="ic ic-${ic}"></i></button>`).join('')}</div>
             <span>여백 왼쪽</span>${num('leftPt', 'pt', 0, 100, 1)}<span>오른쪽</span>${num('rightPt', 'pt', 0, 100, 1)}
             <span>첫 줄 들여쓰기</span>${num('indentPt', 'pt', 0, 60, 1)}<span>줄 간격</span>${num('lhPct', '%', 100, 300, 5)}
             <span>문단 위</span>${num('beforePt', 'pt', 0, 60, 1)}<span>문단 아래</span>${num('afterPt', 'pt', 0, 60, 1)}</div>
         <div class="para-h">쓰는 자리</div>
         <div class="tw-row"><span>글 아래 빈 공간</span><input type="range" min="0" max="80" step="5" data-k="bottomPad"><b data-bp></b></div>
         <label class="tw-row tw-check"><span>커서 높이 고정 <small>쓰는 줄이 화면 아래로 내려가지 않게 화면이 같이 올라가요 (빈 공간이 0%면 못 켜요)</small></span><input type="checkbox" data-tw></label>
-        <p class="modal-note" style="margin:10px 0 0">내보내기(한글·워드·HTML·EPUB)에도 같은 문단 모양이 들어가요. 이 설정은 구글 로그인한 모든 기기에 똑같이 적용돼요.</p>
-        <div class="row2"><button class="btn" data-reset>한글 기본값으로</button><button class="btn primary" data-x="1">닫기</button></div></div>`;
-    document.body.appendChild(bg);
+        <p class="modal-note" style="margin:10px 0 0">내보내기(한글·워드·HTML·EPUB)에도 같은 문단 모양이 들어가요. 이 설정은 구글 로그인한 모든 기기에 똑같이 적용돼요.</p>`;
+}
+// typoHTML로 그린 칸에 값을 채우고 입력을 연결
+function typoWire(root) {
+    const S = settings();
     const sync = () => {
-        $('[data-custom]', bg).classList.toggle('hidden', S.font !== 'custom');
-        $$('[data-al]', bg).forEach(b => b.classList.toggle('on', (S.align || 'justify') === b.dataset.al));
+        const cu = $('[data-custom]', root); if (cu) cu.classList.toggle('hidden', S.font !== 'custom');
+        $$('[data-al]', root).forEach(b => b.classList.toggle('on', (S.align || 'justify') === b.dataset.al));
         if (S.bottomPad == null) S.bottomPad = 45;
-        $('[data-bp]', bg).textContent = S.bottomPad + '%';
-        const tw = $('[data-tw]', bg); tw.checked = !!S.typewriter && S.bottomPad > 0; tw.disabled = !(S.bottomPad > 0);
-        $$('[data-k]', bg).forEach(el => { if (document.activeElement !== el) el.value = S[el.dataset.k] ?? ''; });
+        $('[data-bp]', root).textContent = S.bottomPad + '%';
+        const tw = $('[data-tw]', root); tw.checked = !!S.typewriter && S.bottomPad > 0; tw.disabled = !(S.bottomPad > 0);
+        $$('[data-k]', root).forEach(el => { if (document.activeElement !== el) el.value = S[el.dataset.k] ?? ''; });
     };
-    $$('[data-k]', bg).forEach(el => {
+    $$('[data-k]', root).forEach(el => {
         el.addEventListener('input', () => {
             const k = el.dataset.k;
             S[k] = (k === 'font' || k === 'customFont') ? el.value : (parseFloat(el.value) >= 0 ? parseFloat(el.value) : S[k]);
             touch(S); applyPref(); sync();
         });
     });
-    $('[data-tw]', bg).addEventListener('change', e => { S.typewriter = e.target.checked; touch(S); sync(); });
-    sync();
-    bg.addEventListener('click', e => {
+    $('[data-tw]', root).addEventListener('change', e => { S.typewriter = e.target.checked; touch(S); sync(); });
+    root.addEventListener('click', e => {
         const al = e.target.closest('[data-al]');
         if (al) { S.align = al.dataset.al; touch(S); applyPref(); sync(); return; }
-        if (e.target.closest('[data-reset]')) { Object.assign(S, HWP_PARA); touch(S); applyPref(); sync(); return; }
-        if (e.target === bg || e.target.closest('[data-x]')) { bg.remove(); renderEditors(); }
+        if (e.target.closest('[data-reset]')) { Object.assign(S, HWP_PARA); touch(S); applyPref(); sync(); }
     });
+    sync();
+}
+function typoModal() {
+    const bg = document.createElement('div'); bg.className = 'modal-bg';
+    bg.innerHTML = `<div class="modal"><div style="display:flex;align-items:center;margin-bottom:4px"><h3 style="margin:0;flex:1"><i class="ic ic-type"></i> 원고 글자 · 문단 모양</h3><button class="mini" data-x="1">✕</button></div>
+        <div data-typo>${typoHTML(true)}</div>
+        <div class="row2"><button class="btn" data-reset>한글 기본값으로</button><button class="btn primary" data-x="1">닫기</button></div></div>`;
+    document.body.appendChild(bg);
+    typoWire(bg);
+    bg.addEventListener('click', e => { if (e.target === bg || e.target.closest('[data-x]')) { bg.remove(); renderEditors(); } });
 }
 
 /* 패널 너비 조절 */
@@ -7761,17 +7769,17 @@ function openSettings(focus) {
             <label>홈 화면 글꼴 · 크기 <small>(첫 화면의 인사말 · 내 작품 · 작품 카드)</small></label>
             <div class="font-pick">${[['', '기본 (개구)', "'Gaegu', cursive"], ...FONT_CHOICES.map(f => [f[0], f[1], f[2]])].map(([k, n, fam]) => `<button class="fp ${(pref.homeFont || '') === k ? 'on' : ''}" data-hfont="${k}" style="font-family:${fam}"><b>${n}</b><span>오늘도 수고했어요</span></button>`).join('')}</div>
             <div class="seg" style="margin:6px 0 4px">${[[0.85, '작게'], [1, '보통'], [1.15, '크게'], [1.3, '아주 크게']].map(([k, n]) => `<button class="${(pref.homeScale || 1) === k ? 'on' : ''}" data-hscale="${k}">${n}</button>`).join('')}</div>
-            </div><div data-sp="manu"><label>원고 본문 글꼴 <small>(집필하는 본문에만 적용)</small></label>
+            <label>원고 본문 글꼴 <small>(집필하는 본문에만 적용)</small></label>
             ${fontRow('font', S.font, `<button class="fp ${S.font === 'custom' ? 'on' : ''}" data-font="font:custom"><b>내 글꼴</b><span>${esc(S.customFont || '컴퓨터에 설치된 글꼴')}</span></button>`)}
             <label>시놉 · 트릿 · 메모 글꼴 <small>(시놉 블록, 회차 트릿, 작품 기획, 프리 노트, 포스트잇)</small></label>
             ${fontRow('noteFont', S.noteFont || 'pretendard')}
+            </div><div data-sp="manu"><div data-typo>${typoHTML(false)}<div class="row2"><button class="btn" data-reset>한글 기본값으로</button></div></div>
             <label>원고 도우미</label>
             ${LIVE_SPELL_OK ? `<label class="check"><input type="checkbox" data-opt="liveSpell" ${liveSpellOn() ? 'checked' : ''}> 틀린 맞춤법에 물결 밑줄</label>
             <label class="check"><input type="checkbox" data-opt="repeatMark" ${repeatOn() ? 'checked' : ''}> 한 회차에 ${SYN_REPEAT_MIN}번 이상 쓴 비슷한 표현에 점선 밑줄</label>` : ''}
  <label class="check"><input type="checkbox" data-opt="nativeSpell" ${S.nativeSpell === true ? 'checked' : ''}> 윈도우(브라우저) 맞춤법 검사도 같이 쓰기 <small style="color:var(--muted)">(인물 이름·맞는 말에도 줄이 생길 수 있어요)</small></label>
             <label class="check"><input type="checkbox" data-opt="aiAuto" ${S.aiAuto !== false ? 'checked' : ''}> AI 맞춤법 자동 검사 <small style="color:var(--muted)">(연 회차를 뒤에서 한 번씩 읽고, 새로 쓴 문단도 몇 초 뒤 검사)</small> ${aiReady() ? '' : '<small style="color:var(--danger)">— 아래에 AI 키를 넣어야 돌아가요</small>'}</label>
             <label class="check"><input type="checkbox" data-opt="crisp" ${S.crisp !== false ? 'checked' : ''}> 원고 글자 진하게 <small style="color:var(--muted)">(명조체 가로획이 흐리거나 끊겨 보일 때)</small></label>
-            <div style="display:flex;gap:6px;margin-top:12px"><button class="btn" data-x="typo">원고 글자 크기 · 줄간격 · 문단…</button></div>
             </div><div data-sp="etc"><label id="set-ai">AI 표현 추천 <small>(비슷한 표현에서 ‘AI 추천’을 쓸 때)</small></label>
             ${synSample ? '<p class="modal-note" style="margin:0">지금은 Claude 미리보기 화면이라 키 없이 바로 돼요. GitHub 주소에서 쓰려면 아래에 키를 넣어 주세요.</p>' : ''}
             <div class="seg" style="margin:4px 0 6px">${Object.entries(AI_PROVIDERS).map(([k, v]) => `<button class="${(pref.aiProvider || 'gemini') === k ? 'on' : ''}" data-aip="${k}">${v.name}</button>`).join('')}</div>
@@ -7780,7 +7788,9 @@ function openSettings(focus) {
             ${(pref.aiProvider || 'gemini') === 'gemini' ? `<label class="check" style="margin-top:4px"><input type="checkbox" data-aipaid ${pref.aiPaid ? 'checked' : ''}> 결제를 켠(유료) 키예요 <small style="color:var(--muted)">— 자동 검사도 좋은 모델로 해요. 무료 키는 하루 횟수가 적어서 자동 검사는 가벼운 모델로 해요.</small></label>` : ''}
             <div class="ai-test modal-note"></div></div>
             <p class="modal-note">테마는 이 기기에만, 글꼴은 모든 기기에 똑같이 적용돼요. 메뉴 글꼴은 Pretendard로 고정이에요.</p></div>`;
+        wireTypo();
     };
+    const wireTypo = () => { const r = $('[data-typo]', bg); if (r) typoWire(r); };
     render();
     if (focus === 'ai') setTimeout(() => { $('#set-ai', bg)?.scrollIntoView({ block: 'center' }); $('[data-aikey]', bg)?.focus(); }, 0);
     bg.addEventListener('input', e => { if (e.target.dataset && 'aikey' in e.target.dataset) { pref.aiKey = e.target.value.trim(); savePref(); } });

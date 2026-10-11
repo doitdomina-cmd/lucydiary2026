@@ -184,6 +184,18 @@
         body.theme-cozy #library-tabs > button { border-radius: 999px; }
         /* 신규 작품 등록 앞 초록 아이콘 → 코지 갈색 */
         body.theme-cozy #work-form-icon.bg-emerald-600 { background: var(--primary); border-radius: 999px; box-shadow: 0 3px 8px rgba(169,143,103,.3); }
+        /* 스케줄 관리 · 집필 관리 달력을 출간 일정 달력과 똑같은 생김새로 맞춤 (칸 테두리 · 크기 · 오늘 칸 · 지난달 칸 · 패널 여백) */
+        body.theme-cozy :is(#task-calendar-body, #write-calendar-body, #w-calendarBody) > div:not(.border-2) { border: 1px solid #F2ECE1; }
+        body.theme-cozy :is(#task-calendar-body, #write-calendar-body, #w-calendarBody) > div.border-2 { background-color: #FFFEFC !important; box-shadow: 0 1px 2px rgba(60,45,25,.06), 0 4px 16px rgba(169,143,103,.14); }
+        body.theme-cozy :is(#task-calendar-body, #write-calendar-body, #w-calendarBody) > div[class~="bg-slate-50/50"] { background-color: #FFFEFC !important; }
+        body.theme-cozy :is(#task-calendar-body, #write-calendar-body, #w-calendarBody) > div > div.flex.items-center > div.text-sm { font-size: 13px; }
+        @media (min-width: 768px) {
+            body.theme-cozy :is(#task-calendar-body, #write-calendar-body, #w-calendarBody) > div { min-height: 140px; padding: 8px; }
+            body.theme-cozy .glass-card:has(#task-calendar-body), body.theme-cozy .glass-card:has(#write-calendar-body), body.theme-cozy #wc-main-card { padding: 24px !important; }
+        }
+        /* 출간 일정 카드 글자 크기 (팔레트 메뉴 > 글자 크기) */
+        #publish-cal-body[data-fs="1"] [draggable="true"] { font-size: var(--cal-fs) !important; }
+        #publish-cal-body[data-fs="1"] [draggable="true"] [class*="text-[10px]"] { font-size: calc(var(--cal-fs) * .84) !important; }
         /* ── 카드 글씨체 선택 (화면마다) : [data-font] — 디자인 기본 글씨체보다 우선, 아이콘은 제외 ── */
 body.theme-cozy #publish-cal-body[data-font="sans"] [draggable="true"], body.theme-cozy #publish-cal-body[data-font="sans"] [draggable="true"] *:not(i), body.theme-cozy #task-calendar-body[data-font="sans"] .cal-selectable, body.theme-cozy #task-calendar-body[data-font="sans"] .cal-selectable *:not(i), body.theme-cozy #write-calendar-body[data-font="sans"] .cal-selectable, body.theme-cozy #write-calendar-body[data-font="sans"] .cal-selectable *:not(i), body.theme-cozy #year-timeline-content[data-font="sans"], body.theme-cozy #year-timeline-content[data-font="sans"] *:not(i), body.theme-cozy #master-works-by-genre-container[data-font="sans"] > div, body.theme-cozy #master-works-by-genre-container[data-font="sans"] > div *:not(i) { font-family: 'Pretendard','Apple SD Gothic Neo',sans-serif !important; }
 body.theme-cozy #publish-cal-body[data-font="serif"] [draggable="true"], body.theme-cozy #publish-cal-body[data-font="serif"] [draggable="true"] *:not(i), body.theme-cozy #task-calendar-body[data-font="serif"] .cal-selectable, body.theme-cozy #task-calendar-body[data-font="serif"] .cal-selectable *:not(i), body.theme-cozy #write-calendar-body[data-font="serif"] .cal-selectable, body.theme-cozy #write-calendar-body[data-font="serif"] .cal-selectable *:not(i), body.theme-cozy #year-timeline-content[data-font="serif"], body.theme-cozy #year-timeline-content[data-font="serif"] *:not(i), body.theme-cozy #master-works-by-genre-container[data-font="serif"] > div, body.theme-cozy #master-works-by-genre-container[data-font="serif"] > div *:not(i) { font-family: 'Noto Serif KR','Gowun Batang',serif !important; }
@@ -5436,6 +5448,7 @@ body.theme-cozy #month-detail-modal button.text-slate-400 { width: 34px; height:
         let publisherViewMode = { publishers: 'list', studios: 'list' }; // [NEW] 출판사/스튜디오 줄로 보기 · 카드로 보기
         let publisherCardSortOrder = []; // [NEW] 카드 보기 전용 순서 (줄 보기 순서와 별도 저장)
         let taxViewYear = new Date().getFullYear();
+        let calCardSizes = { pub: 12 };   // 출간 일정 카드 글자 크기(px)
         let calCardFonts = { pub: 'auto', task: 'auto', write: 'auto', tl: 'auto', works: 'auto' };   // 달력/목록 카드 글씨체(화면마다): auto | sans | serif | hand | pen | ink
         let calCardDesigns = { pub: 'cozy', task: 'cozy', write: 'cozy', tl: 'cozy', works: 'cozy' };   // 달력 칸 안 카드 디자인(화면마다): cozy(기본) | label | polaroid | postcard | fountain
         let modalDesign = 'cozy';   // 팝업창 디자인(코지 테마): cozy | label | polaroid | postcard | fountain
@@ -5628,7 +5641,7 @@ body.theme-cozy #month-detail-modal button.text-slate-400 { width: 34px; height:
                     const dataToSave = { 
                         masterWorks, monthlyData, years, publisherData, analysisData, 
                         publisherSortOrder, publisherCardSortOrder, publisherViewMode, genreList, genreBadgeOpacity, tableFontSettings, crosshairSettings,
-                        writeSchedules, writeSpans, writeVolumes, writeMergedVolumeWorks, taskSchedules, contacts, penNames, widgetSettingsData, ddayCardDesigns, ddayCardFonts, modalDesign, calCardDesigns, calCardFonts, writeCardSettings, taskCardSettings, taskColors: TASK_COLORS, taskCategoryList, writeColors: WRITE_COLORS, writeCategoryList,
+                        writeSchedules, writeSpans, writeVolumes, writeMergedVolumeWorks, taskSchedules, contacts, penNames, widgetSettingsData, ddayCardDesigns, ddayCardFonts, modalDesign, calCardDesigns, calCardFonts, calCardSizes, writeCardSettings, taskCardSettings, taskColors: TASK_COLORS, taskCategoryList, writeColors: WRITE_COLORS, writeCategoryList,
                         writerWorks, writerDailyData, writerGlobalDailyGoal, writeCounterBase, writeCounterResetDate, submissions, webtoonSubs, webtoonSubOrder, incomeGoals, taxSettings, taxGoalMemos, charGoals, writerLastWorkKey, taxGoalItems, contactSortMode, webtoonManage, webtoonCardSettings, penNameColorOverrides, webtoonViewFilter, webtoonSortMode, workManage, workManageCardSettings, workManageViewFilter, workManageSortMode
                     };
                     const jsonStr = JSON.stringify(dataToSave);
@@ -5716,6 +5729,7 @@ body.theme-cozy #month-detail-modal button.text-slate-400 { width: 34px; height:
             if (parsed.widgetSettingsData) widgetSettingsData = parsed.widgetSettingsData;
             if (parsed.calCardDesigns) Object.assign(calCardDesigns, parsed.calCardDesigns);
             if (parsed.calCardFonts) Object.assign(calCardFonts, parsed.calCardFonts);
+            if (parsed.calCardSizes) Object.assign(calCardSizes, parsed.calCardSizes);
             if (parsed.modalDesign) modalDesign = parsed.modalDesign;
             if (parsed.ddayCardFonts) Object.assign(ddayCardFonts, parsed.ddayCardFonts);
             if (parsed.ddayCardDesigns) Object.assign(ddayCardDesigns, parsed.ddayCardDesigns);
@@ -6327,7 +6341,7 @@ body.theme-cozy #month-detail-modal button.text-slate-400 { width: 34px; height:
             const data = { 
                 masterWorks, monthlyData, years, publisherData, analysisData, publisherSortOrder, publisherCardSortOrder, publisherViewMode, genreList, theme: localStorage.getItem('theme_v6'), customColor: localStorage.getItem('custom_color_v6'), genreBadgeOpacity, bgMain: localStorage.getItem('bg_main_v6'), tableFontSettings, crosshairSettings, 
                 writeSchedules, writeSpans, writeVolumes, writeMergedVolumeWorks, taskSchedules, writeCardSettings, taskCardSettings, taskColors: TASK_COLORS, taskCategoryList, writeColors: WRITE_COLORS, writeCategoryList,
-                contacts, penNames, widgetSettingsData, ddayCardDesigns, ddayCardFonts, modalDesign, calCardDesigns, calCardFonts, submissions, webtoonSubs, webtoonSubOrder, contactSortMode, webtoonViewFilter, webtoonSortMode,
+                contacts, penNames, widgetSettingsData, ddayCardDesigns, ddayCardFonts, modalDesign, calCardDesigns, calCardFonts, calCardSizes, submissions, webtoonSubs, webtoonSubOrder, contactSortMode, webtoonViewFilter, webtoonSortMode,
                 // [FIX] 글자수 관리 탭 데이터가 백업에서 빠져있던 문제 수정 — 아래 항목들이 누락되어 있었음
                 writerWorks, writerDailyData, writerGlobalDailyGoal, writeCounterBase, writeCounterResetDate, writerLastWorkKey,
                 incomeGoals, taxSettings, taxGoalMemos, taxGoalItems, charGoals, webtoonManage, webtoonCardSettings, penNameColorOverrides, workManage, workManageCardSettings, workManageViewFilter, workManageSortMode
@@ -14193,6 +14207,8 @@ body.theme-cozy #month-detail-modal button.text-slate-400 { width: 34px; height:
                 el.setAttribute('data-card', calCardDesigns[k] || 'cozy');
                 el.setAttribute('data-font', calCardFonts[k] || 'auto');
             });
+            const pb = document.getElementById('publish-cal-body');
+            if (pb) { pb.style.setProperty('--cal-fs', (calCardSizes.pub || 12) + 'px'); pb.setAttribute('data-fs', (calCardSizes.pub || 12) === 12 ? '' : '1'); }
         }
         function closeCalDesignMenu() { const m = document.getElementById('cal-design-menu'); if (m) m.remove(); document.removeEventListener('click', closeCalDesignMenu); }
         // 디자인 5종 + 글씨체 선택 UI (팝업 메뉴용 / 설정창 안에 넣는 inline 용 공통)
@@ -14205,8 +14221,15 @@ body.theme-cozy #month-detail-modal button.text-slate-400 { width: 34px; height:
                     `<button type="button" onclick="setCalCardDesign('${which}', '${o.k}')" style="display:flex; align-items:center; gap:10px; width:100%; text-align:left; padding:7px 8px; border-radius:12px; border:1px solid ${o.k === cur ? '#C9AE7C' : 'transparent'}; background:${o.k === cur ? '#F6F0E3' : 'transparent'};"><span class="dday-swatch dday-swatch-${o.sw}"></span><span><b style="display:block; font-size:12.5px; color:#3F3A33;">${o.n}</b><span style="font-size:10.5px; color:#A39A8C;">${o.d}</span></span></button>`).join('');
             const fonts = '<div style="display:flex; flex-wrap:wrap; gap:6px; ' + (inline ? '' : 'padding:0 6px 6px;') + '">' + DDAY_FONTS.map(o =>
                 `<button type="button" onclick="setCalCardFont('${which}', '${o.k}')" style="padding:4px 11px; border-radius:999px; font-size:13px; font-family:${o.f}; border:1px solid ${o.k === curF ? '#C9AE7C' : '#EBE2D1'}; background:${o.k === curF ? '#F6F0E3' : '#FFFEFC'}; color:#3F3A33;">${o.n}</button>`).join('') + '</div>';
+            const sizeRow = which === 'pub'
+                ? '<div style="font-size:11px; font-weight:700; color:#B09A78; padding:10px 8px 6px; border-top:1px dashed #E3D7BC; margin-top:6px;">글자 크기</div>' +
+                  '<div style="display:flex; align-items:center; gap:8px; padding:0 6px 6px;">' +
+                  '<button type="button" onclick="changeCalCardSize(\'pub\', -1)" style="width:28px; height:28px; border-radius:999px; background:#F4EEE2; font-weight:700; color:#7A6A52;">−</button>' +
+                  '<span style="flex:1; text-align:center; font-weight:700; font-size:13px; color:#3F3A33;">' + (calCardSizes.pub || 12) + 'px</span>' +
+                  '<button type="button" onclick="changeCalCardSize(\'pub\', 1)" style="width:28px; height:28px; border-radius:999px; background:#F4EEE2; font-weight:700; color:#7A6A52;">+</button></div>'
+                : '';
             if (inline) return designs + '<label class="text-xs font-bold text-slate-400 uppercase block mt-3 mb-2">카드 글씨체</label>' + fonts;
-            return designs + '<div style="font-size:11px; font-weight:700; color:#B09A78; padding:10px 8px 6px; border-top:1px dashed #E3D7BC; margin-top:6px;">글씨체</div>' + fonts;
+            return designs + '<div style="font-size:11px; font-weight:700; color:#B09A78; padding:10px 8px 6px; border-top:1px dashed #E3D7BC; margin-top:6px;">글씨체</div>' + fonts + sizeRow;
         }
         function fillCalDesignMenu(m, which) {
             const title = { pub: '출간 일정', task: '스케줄 관리', write: '집필 관리', tl: '연간 집필 일정', works: '등록된 작품 목록' }[which] || '';
@@ -14221,6 +14244,7 @@ body.theme-cozy #month-detail-modal button.text-slate-400 { width: 34px; height:
             fillCalDesignInline(which);
         }
         function setCalCardDesign(which, k) { calCardDesigns[which] = k; applyCalCardDesign(); save(true); refreshCalDesignUi(which); }
+        function changeCalCardSize(which, d) { calCardSizes[which] = Math.max(9, Math.min(20, (calCardSizes[which] || 12) + d)); applyCalCardDesign(); save(true); refreshCalDesignUi(which); }
         function setCalCardFont(which, k) { calCardFonts[which] = k; applyCalCardDesign(); save(true); refreshCalDesignUi(which); }
         function toggleCalDesignMenu(btn, ev, which) {
             if (ev) ev.stopPropagation();

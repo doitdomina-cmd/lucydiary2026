@@ -4592,6 +4592,34 @@ window.manualFirebasePush = async function () {
                 wrapper.addEventListener('touchend', endPinch);
                 wrapper.addEventListener('touchcancel', endPinch);
                 wrapper.addEventListener('gesturestart', e => e.preventDefault());
+                // 빈 곳이나 카드 바깥을 한 손가락으로 두 번 탭하면 100%로 복귀 (글 입력칸·버튼 위에서는 동작 안 함)
+                let tap0 = null, lastTap = null;
+                wrapper.addEventListener('touchstart', e => {
+                    tap0 = e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), ok: true } : null;
+                }, { passive: true });
+                wrapper.addEventListener('touchmove', e => {
+                    if (tap0 && e.touches.length === 1 && Math.hypot(e.touches[0].clientX - tap0.x, e.touches[0].clientY - tap0.y) > 10) tap0.ok = false;
+                }, { passive: true });
+                wrapper.addEventListener('touchend', e => {
+                    const t0 = tap0; tap0 = null;
+                    if (!t0 || !t0.ok || e.touches.length || Date.now() - t0.t > 300) { lastTap = null; return; }
+                    if (e.target.closest && e.target.closest('input, textarea, select, button, a, [contenteditable]')) { lastTap = null; return; }
+                    const now = Date.now();
+                    if (lastTap && now - lastTap.t < 350 && Math.hypot(t0.x - lastTap.x, t0.y - lastTap.y) < 40) {
+                        lastTap = null;
+                        const z = window.zoomLevel || 1;
+                        if (Math.abs(z - 1) < 0.005) return;
+                        const r = wrapper.getBoundingClientRect(), cs = getComputedStyle(wrapper);
+                        const padL = parseFloat(cs.paddingLeft) || 0, padT = parseFloat(cs.paddingTop) || 0;
+                        const fx = t0.x - r.left, fy = t0.y - r.top;
+                        const cx = (wrapper.scrollLeft + fx - padL) / z, cy = (wrapper.scrollTop + fy - padT) / z;
+                        window.resetZoom();
+                        wrapper.scrollLeft = cx + padL - fx;
+                        wrapper.scrollTop = cy + padT - fy;
+                    } else {
+                        lastTap = { x: t0.x, y: t0.y, t: now };
+                    }
+                });
             })();
 
             // 팔레트 밖 클릭 시 닫기

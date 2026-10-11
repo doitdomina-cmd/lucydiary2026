@@ -454,6 +454,20 @@ body[data-theme="airmail"] #synop-home .sh-card {
     background: linear-gradient(#FCF8EC, #FCF8EC) padding-box, repeating-linear-gradient(135deg, #E8A8A0 0 13px, #FCF8EC 13px 24px, #A2B9DB 24px 37px, #FCF8EC 37px 48px) border-box;
 }
 body[data-theme="airmail"] #synop-home .sh-title { font-family: var(--th-hand); font-size: 1.35em; color: #4A5878; }
+/* ───────── 작업실 안에서: 작업실의 색 테마를 따라가는 모드 (모양은 기본, 색만 입힘) ───────── */
+body[data-theme="follow"] { color: var(--pf-text, #23261f); }
+body[data-theme="follow"] .theme-canvas { background-color: var(--pf-bg, #f6f7f4) !important; }
+body[data-theme="follow"] .theme-panel { background-color: var(--pf-panel, #ffffff) !important; border-color: var(--pf-line, #e4e6e0) !important; }
+body[data-theme="follow"] .sidebar-left .bg-gray-100 { background-color: var(--pf-soft, #eef6e4) !important; }
+body[data-theme="follow"] #board-list-active .bg-gray-200, body[data-theme="follow"] #board-list-completed .bg-gray-200 { background-color: var(--pf-soft, #eef6e4) !important; color: var(--pf-accent, #6aa12f) !important; }
+body[data-theme="follow"] .main-tab-btn.main-tab-active { background-color: var(--pf-soft, #eef6e4) !important; color: var(--pf-accent, #6aa12f) !important; }
+body[data-theme="follow"] #char-page-tabs, body[data-theme="follow"] #note-page-tabs { background-color: var(--pf-soft, #eef6e4) !important; }
+body[data-theme="follow"] .card-wrapper { background-color: var(--pf-panel, #ffffff) !important; border-color: var(--pf-line, #e4e6e0) !important; border-radius: 14px !important; }
+body[data-theme="follow"] .card-wrapper.active-card { box-shadow: 0 0 0 2px var(--pf-accent, #6aa12f), 0 4px 16px rgba(0,0,0,.08) !important; }
+body[data-theme="follow"] .block-item { background-color: var(--pf-panel2, #fbfbf9) !important; border-color: var(--pf-line, #e4e6e0) !important; border-radius: 9px !important; }
+body[data-theme="follow"] #doc-title { color: var(--pf-text, #23261f) !important; }
+body[data-theme="follow"] #char-profile-box, body[data-theme="follow"] .rounded-2xl[style*="border-top"] { background-color: var(--pf-panel, #ffffff) !important; border-color: var(--pf-line, #e4e6e0) !important; border-top-color: var(--pf-accent, #6aa12f) !important; }
+body[data-theme="follow"] .theme-canvas ::placeholder { color: var(--pf-muted, #8a8f84) !important; opacity: .7; }
 /* ===== 확장 테마 — 끝 ===== */
 
         /* 메모 탭 버튼 스타일 트위크 */
@@ -4897,8 +4911,43 @@ window.manualFirebasePush = async function () {
     window.closeAppSettings = function () { document.getElementById('app-settings-modal').style.display = 'none'; };
     document.addEventListener('keydown', e => { if (e.key === 'Escape') window.closeAppSettings(); });
 
+    // ── 루시의 작업실 안(iframe)에서는 작업실의 화면 테마를 따라간다 ──
+    //  · 작업실이 코지/폴라로이드/견출지/우편이면 같은 이름의 시놉 스타일로
+    //  · 그 밖의 색 테마(새싹·원고지·돌담·민트·벚꽃·하늘·흰 종이·만년필)는 모양은 기본 그대로 두고 색만 입힌다
+    let EMBEDDED = false;
+    try { EMBEDDED = window.self !== window.top; } catch (e) { EMBEDDED = true; }
+    const PF = { '--pf-bg': '--bg', '--pf-panel': '--panel', '--pf-panel2': '--panel2', '--pf-line': '--line', '--pf-text': '--text', '--pf-muted': '--muted', '--pf-accent': '--accent', '--pf-soft': '--accent-soft' };
+    function followParent() {
+        try {
+            const P = window.parent, pd = P.document; if (!pd || !pd.body) return;
+            const cl = pd.body.classList;
+            const shape = cl.contains('cozy') ? 'cozy' : ['polaroid', 'label', 'airmail'].find(s => cl.contains('th-' + s));
+            const root = document.documentElement;
+            if (shape) {
+                Object.keys(PF).forEach(k => root.style.removeProperty(k));
+                document.body.setAttribute('data-theme', shape);
+            } else {
+                const cs = P.getComputedStyle(pd.documentElement);
+                Object.keys(PF).forEach(k => { const v = cs.getPropertyValue(PF[k]).trim(); if (v) root.style.setProperty(k, v); });
+                document.body.setAttribute('data-theme', 'follow');
+            }
+            const ti = document.getElementById('doc-title'); if (ti && window.autoSizeTitleInput) setTimeout(() => window.autoSizeTitleInput(ti), 80);
+        } catch (e) { /* 작업실 밖이거나 접근 불가: 그냥 둔다 */ }
+    }
+    function startFollow() {
+        const gear = document.getElementById('app-settings-btn'); if (gear) gear.style.display = 'none';
+        followParent();
+        try {
+            const pd = window.parent.document; let tm = null;
+            const again = () => { clearTimeout(tm); tm = setTimeout(followParent, 80); };
+            new MutationObserver(again).observe(pd.documentElement, { attributes: true, attributeFilter: ['style', 'class', 'data-theme'] });
+            new MutationObserver(again).observe(pd.body, { attributes: true, attributeFilter: ['class'] });
+        } catch (e) {}
+    }
+
     // 저장된 설정 복원
     function restore() {
+        if (EMBEDDED) { followParent(); return; }
         const th = get(LS.theme); if (th && th !== 'default') document.body.setAttribute('data-theme', th);
         const fv = get(LS.font); if (fv) document.body.style.setProperty('font-family', fv, 'important');
         applyContentFont();
@@ -4906,6 +4955,7 @@ window.manualFirebasePush = async function () {
         try { if (window.lucide) window.lucide.createIcons(); } catch (e) {}
         refit();
     }
+    if (EMBEDDED) { startFollow(); window.addEventListener('load', () => setTimeout(followParent, 900)); }
     window.addEventListener('load', () => { restore(); setTimeout(restore, 900); });
 })();
 </script>

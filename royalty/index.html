@@ -145,6 +145,7 @@
         body.theme-spiral .tab-content h4 { font-size: 1.2rem; line-height: 1.25; word-break: keep-all; }
         body.theme-spiral aside h1 { font-family: 'Jua', 'Single Day', 'Gaegu', cursive !important; font-size: 2.6rem; font-style: normal; font-weight: 400; letter-spacing: 0; filter: url(#sp-crayon); color: var(--sp-ink) !important; }
         body.theme-spiral aside h1 i { display: none; }
+        body.theme-spiral .sp-w { display: inline-block; white-space: nowrap; } body.theme-spiral .sp-ch { display: inline-block; transform: translateY(var(--y, 0)) rotate(var(--r, 0deg)) scale(var(--s, 1)); }
         /* 삐뚤삐뚤: 카드를 살짝 기울이고 제목도 제각각 기울임 */
         body.theme-spiral .sp-c0 { transform: rotate(-.5deg); } body.theme-spiral .sp-c1 { transform: rotate(.4deg); } body.theme-spiral .sp-c2 { transform: rotate(-.3deg); }
         body.theme-spiral .sp-c3 { transform: rotate(.5deg); } body.theme-spiral .sp-c4 { transform: rotate(-.4deg); } body.theme-spiral .sp-c5 { transform: rotate(.3deg); }
@@ -6644,6 +6645,35 @@ body.theme-cozy .daily-side-btn i { color: var(--primary); font-size: 12px !impo
             } else if (theme) document.body.classList.add('theme-' + theme);
             try { spiralDeco(); } catch (e) {}
         }
+        // 스프링노트 테마: 제목 글자를 한 글자씩 감싸서 기울기·높이를 제각각 줘 삐뚤빼뚤 춤추는 느낌을 낸다 (글자 내용은 그대로)
+        function spiralWobble(root) {
+            if (!(document.body.classList.contains('theme-spiral'))) return;
+            const R = [-6, 4, -3, 6, -5, 3, -4], Y = [0, -2, 1, -1, 2, -2, 1], S = [1, 1.07, .96, 1.04, .98, 1.06, .97];
+            (root || document).querySelectorAll('.tab-content h3, .tab-content h4, .modal-content h3, aside h1').forEach(el => {
+                if (el.querySelector('.sp-w') || (el.textContent || '').trim().length > 40) return;
+                const words = (el.textContent || '').trim().split(/\s+/);
+                if (words.some(w => w.length > 14)) return;   // 아주 긴 낱말은 줄이 넘치지 않게 그대로 둔다
+                const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), nodes = [];
+                while (walker.nextNode()) nodes.push(walker.currentNode);
+                let k = 0;
+                nodes.forEach(n => {
+                    const t = n.nodeValue; if (!t.trim()) return;
+                    const frag = document.createDocumentFragment();
+                    t.split(/(\s+)/).forEach(part => {
+                        if (!part) return;
+                        if (/^\s+$/.test(part)) { frag.appendChild(document.createTextNode(part)); return; }
+                        const w = document.createElement('span'); w.className = 'sp-w';
+                        for (const ch of part) {
+                            const c = document.createElement('span'); c.className = 'sp-ch'; c.textContent = ch;
+                            c.style.setProperty('--r', R[k % 7] + 'deg'); c.style.setProperty('--y', Y[(k * 3 + 1) % 7] + 'px'); c.style.setProperty('--s', S[(k * 2 + 3) % 7]);
+                            w.appendChild(c); k++;
+                        }
+                        frag.appendChild(w);
+                    });
+                    n.parentNode.replaceChild(frag, n);
+                });
+            });
+        }
         // 스프링노트 테마: 보이는 카드마다 파스텔 색(sp-c0~5)을 돌아가며 입히고, 3장에 한 번 연필(sp-pen)을 얹는다
         function spiralDeco() {
             if (!document.body.classList.contains('theme-spiral')) return;
@@ -6658,6 +6688,7 @@ body.theme-cozy .daily-side-btn i { color: var(--primary); font-size: 12px !impo
                 if (i % 3 === 0) c.classList.add('sp-pen');
                 i++;
             });
+            try { spiralWobble(); } catch (e) {}
         }
         (function () { let raf = 0; try { new MutationObserver(() => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; try { spiralDeco(); } catch (e) {} }); }).observe(document.body, { childList: true, subtree: true }); } catch (e) {} })();
         function setTheme(theme) { try { applyDdayDesign(); applyModalDesign(); } catch (e) {} const _wasCozy = document.body.classList.contains('theme-cozy'); _cozyLaunchSig = ''; activeTheme = theme; localStorage.setItem('theme_v6', theme); document.querySelectorAll('.theme-dot').forEach(d => { d.classList.remove('active'); if(d.dataset.theme === theme) d.classList.add('active'); }); if (theme === 'custom') { setCustomTheme(localStorage.getItem('custom_color_v6') || '#b07d7d'); } else { applyThemeClass(theme); document.body.style.removeProperty('--primary'); document.body.style.removeProperty('--primary-light'); } if (_wasCozy !== (theme === 'cozy' || String(theme).indexOf('cozy-') === 0)) setTimeout(() => { try { updateUI(); } catch (e) {} }, 0); updateDashboardStats(); }

@@ -524,6 +524,7 @@ body[data-theme="spiral"] #doc-title { font-family: 'Jua', 'Single Day', var(--t
 body[data-theme="spiral"] .card-wrapper:nth-child(3n+1), body[data-theme="spiral"] .rounded-2xl[style*="border-top"]:nth-of-type(3n+1) { transform: rotate(-.5deg); }
 body[data-theme="spiral"] .card-wrapper:nth-child(3n+2), body[data-theme="spiral"] .rounded-2xl[style*="border-top"]:nth-of-type(3n+2) { transform: rotate(.4deg); }
 body[data-theme="spiral"] .card-wrapper:nth-child(3n), body[data-theme="spiral"] .rounded-2xl[style*="border-top"]:nth-of-type(3n) { transform: rotate(-.3deg); }
+body[data-theme="spiral"] .sp-w { display: inline-block; white-space: nowrap; } body[data-theme="spiral"] .sp-ch { display: inline-block; transform: translateY(var(--y, 0)) rotate(var(--r, 0deg)) scale(var(--s, 1)); }
 /* 완결된 시놉시스: 카드를 차분하게 가라앉힌 색으로 */
 #synop-home .sh-card.sh-done { filter: brightness(.91) saturate(.6) contrast(.97); }
 #synop-home .sh-card.sh-done:hover { filter: brightness(.96) saturate(.8); }
@@ -5388,5 +5389,44 @@ body:has(#synop-home.show) #synop-home-btn { display: none; }
 })();
 </script>
 <!-- 웹앱 설치 끝 -->
+<script>
+// 스프링노트 테마: 제목 글자를 한 글자씩 감싸서 기울기·높이를 제각각 줘 삐뚤빼뚤 춤추는 느낌을 낸다 (글자 내용은 그대로)
+function spiralWobble(root) {
+    if (!(document.body.getAttribute('data-theme') === 'spiral')) return;
+    const R = [-6, 4, -3, 6, -5, 3, -4], Y = [0, -2, 1, -1, 2, -2, 1], S = [1, 1.07, .96, 1.04, .98, 1.06, .97];
+    (root || document).querySelectorAll('#synop-home .sh-title, #synop-home .sh-intro h1, #synop-home .sh-group h2').forEach(el => {
+        if (el.querySelector('.sp-w') || (el.textContent || '').trim().length > 40) return;
+        const words = (el.textContent || '').trim().split(/\s+/);
+        if (words.some(w => w.length > 14)) return;   // 아주 긴 낱말은 줄이 넘치지 않게 그대로 둔다
+        const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), nodes = [];
+        while (walker.nextNode()) nodes.push(walker.currentNode);
+        let k = 0;
+        nodes.forEach(n => {
+            const t = n.nodeValue; if (!t.trim()) return;
+            const frag = document.createDocumentFragment();
+            t.split(/(\s+)/).forEach(part => {
+                if (!part) return;
+                if (/^\s+$/.test(part)) { frag.appendChild(document.createTextNode(part)); return; }
+                const w = document.createElement('span'); w.className = 'sp-w';
+                for (const ch of part) {
+                    const c = document.createElement('span'); c.className = 'sp-ch'; c.textContent = ch;
+                    c.style.setProperty('--r', R[k % 7] + 'deg'); c.style.setProperty('--y', Y[(k * 3 + 1) % 7] + 'px'); c.style.setProperty('--s', S[(k * 2 + 3) % 7]);
+                    w.appendChild(c); k++;
+                }
+                frag.appendChild(w);
+            });
+            n.parentNode.replaceChild(frag, n);
+        });
+    });
+}
+(function () {
+    let raf = 0; const run = () => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; try { spiralWobble(); } catch (e) {} }); };
+    try {
+        new MutationObserver(run).observe(document.body, { attributes: true, attributeFilter: ['data-theme'] });
+        const attach = () => { const h = document.getElementById('synop-home'); if (h) new MutationObserver(run).observe(h, { childList: true, subtree: true }); run(); };
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', attach); else attach();
+    } catch (e) {}
+})();
+</script>
 </body>
 </html>

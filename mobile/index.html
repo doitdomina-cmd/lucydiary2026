@@ -10,6 +10,7 @@
 <link rel="icon" href="icon-256.png">
 <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Single+Day&family=Poor+Story&family=Yeon+Sung&family=Kirang+Haerang&family=Gamja+Flower&display=swap">
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
@@ -24,6 +25,13 @@
     padding-top: env(safe-area-inset-top);
   }
   .hidden { display: none !important; }
+  /* 앱 글꼴(Aa 버튼에서 고른 글씨체) */
+  body.app-font-on { font-family: var(--app-font); }
+  body.app-font-on button, body.app-font-on input, body.app-font-on select, body.app-font-on textarea { font-family: inherit; }
+  .fontbtn { border: none; background: #f1f5f9; color: #475569; font-size: 13px; font-weight: 800; height: 30px; padding: 0 10px; border-radius: 10px; margin-right: 6px; }
+  .fontopt { display: block; width: 100%; text-align: left; padding: 12px 14px; margin-bottom: 8px; border-radius: 12px; border: 2px solid #e2e8f0; background: #fff; font-size: 16px; }
+  .fontopt small { display: block; font-size: 12px; color: #94a3b8; margin-top: 2px; }
+  .fontopt.on { border-color: var(--primary); background: var(--primary-light); }
 
   /* 로그인 오버레이 */
   #loginOverlay {
@@ -150,7 +158,7 @@
 
 <div class="topbar">
   <h2 id="tabTitle">출간 일정</h2>
-  <div class="userchip" id="userChip"></div>
+  <div style="display:flex;align-items:center;"><button class="fontbtn" onclick="openFontSheet()" title="글꼴">Aa</button><div class="userchip" id="userChip"></div></div>
 </div>
 
 <div class="cal-nav">
@@ -461,6 +469,27 @@ function toggleDone(kind, id, date) {
 // ════════════════════════════════════════════════════════
 // 편집 바텀시트
 // ════════════════════════════════════════════════════════
+// 앱 글꼴: 고른 글씨체를 화면 전체에 적용 (이 기기에 저장)
+const APP_FONTS = [
+    ['', '기본', "'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif"],
+    ['singleday', '싱글데이', "'Single Day', cursive"],
+    ['poorstory', '푸어스토리', "'Poor Story', cursive"],
+    ['yeonsung', '연성', "'Yeon Sung', cursive"],
+    ['kirang', '기랑해랑', "'Kirang Haerang', cursive"],
+    ['gamja', '감자꽃', "'Gamja Flower', cursive"]
+];
+function applyAppFont() {
+  let id = ''; try { id = localStorage.getItem('mobile_font_v1') || ''; } catch (e) {}
+  const f = APP_FONTS.find(x => x[0] === id) || APP_FONTS[0];
+  document.body.classList.toggle('app-font-on', !!f[0]);
+  document.documentElement.style.setProperty('--app-font', f[0] ? f[2] + ", 'Pretendard', sans-serif" : '');
+}
+function setAppFont(id) { try { localStorage.setItem('mobile_font_v1', id); } catch (e) {} applyAppFont(); openFontSheet(); }
+function openFontSheet() {
+  let id = ''; try { id = localStorage.getItem('mobile_font_v1') || ''; } catch (e) {}
+  openSheet(`<h3>글꼴</h3>` + APP_FONTS.map(x => `<button class="fontopt ${x[0] === id ? 'on' : ''}" style="font-family:${x[2]}" onclick="setAppFont('${x[0]}')">${x[1]}<small>가나다라 마바사 Aa 123</small></button>`).join('') + `<div class="actions"><button class="btn-cancel" onclick="closeSheet()">닫기</button></div>`);
+}
+applyAppFont();
 function openSheet(html) {
   document.getElementById('sheetBody').innerHTML = html;
   document.getElementById('sheetOverlay').classList.add('open');

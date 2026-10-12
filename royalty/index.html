@@ -22,7 +22,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500;600;700&family=Gowun+Batang:wght@400;700&family=Instrument+Serif:ital@0;1&family=Gaegu:wght@400;700&family=Nanum+Pen+Script&family=Hi+Melody&family=Single+Day&family=Jua&family=Gowun+Dodum&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500;600;700&family=Gowun+Batang:wght@400;700&family=Instrument+Serif:ital@0;1&family=Gaegu:wght@400;700&family=Nanum+Pen+Script&family=Hi+Melody&family=Single+Day&family=Jua&family=Poor+Story&family=Yeon+Sung&family=Kirang+Haerang&family=Gamja+Flower&family=Gowun+Dodum&display=swap">
     <style>
         :root {
             /* 테마 색상 변수 */
@@ -139,13 +139,16 @@
         body.theme-spiral #tab-settlements .rounded-2xl.border { background: #FFFFFF !important; border: 1.8px solid var(--sp-ink) !important; border-radius: 14px !important; box-shadow: 2px 3px 0 var(--sp-ink); }
         /* 제목: 크고 통통한 글씨 + 크레파스로 쓴 듯 거친 가장자리 */
         body.theme-spiral .tab-content h2, body.theme-spiral .tab-content h3, body.theme-spiral .tab-content h4, body.theme-spiral .modal-content h2, body.theme-spiral .modal-content h3 {
-            font-family: 'Jua', 'Single Day', 'Gaegu', cursive; font-weight: 400; letter-spacing: 0; color: var(--sp-ink); filter: url(#sp-crayon);
+            font-family: 'Single Day', 'Gaegu', cursive; font-weight: 400; letter-spacing: 0; color: var(--sp-ink); filter: url(#sp-crayon);
         }
         body.theme-spiral .tab-content h3, body.theme-spiral .modal-content h3 { font-size: 1.5rem; line-height: 1.25; word-break: keep-all; }
         body.theme-spiral .tab-content h4 { font-size: 1.2rem; line-height: 1.25; word-break: keep-all; }
-        body.theme-spiral aside h1 { font-family: 'Jua', 'Single Day', 'Gaegu', cursive !important; font-size: 2.6rem; font-style: normal; font-weight: 400; letter-spacing: 0; filter: url(#sp-crayon); color: var(--sp-ink) !important; }
+        body.theme-spiral aside h1 { font-family: 'Single Day', 'Gaegu', cursive !important; font-size: 2.6rem; font-style: normal; font-weight: 400; letter-spacing: 0; filter: url(#sp-crayon); color: var(--sp-ink) !important; }
         body.theme-spiral aside h1 i { display: none; }
         body.theme-spiral .sp-w { display: inline-block; white-space: nowrap; } body.theme-spiral .sp-ch { display: inline-block; transform: translateY(var(--y, 0)) rotate(var(--r, 0deg)) scale(var(--s, 1)); }
+        /* 앱 글꼴(설정에서 고른 글씨체): 입력칸·버튼도 같은 글씨체를 따라가게 */
+        body.app-font-on { font-family: var(--app-font); }
+        body.app-font-on button, body.app-font-on input, body.app-font-on select, body.app-font-on textarea { font-family: inherit; }
         /* 삐뚤삐뚤: 카드를 살짝 기울이고 제목도 제각각 기울임 */
         body.theme-spiral .sp-c0 { transform: rotate(-.5deg); } body.theme-spiral .sp-c1 { transform: rotate(.4deg); } body.theme-spiral .sp-c2 { transform: rotate(-.3deg); }
         body.theme-spiral .sp-c3 { transform: rotate(.5deg); } body.theme-spiral .sp-c4 { transform: rotate(-.4deg); } body.theme-spiral .sp-c5 { transform: rotate(.3deg); }
@@ -3926,6 +3929,11 @@ body.theme-cozy .daily-side-btn i { color: var(--primary); font-size: 12px !impo
                             </div>
                         </div>
                     </div></div>
+                        <div><!-- 앱 글꼴 -->
+                    <div>
+                        <p class="text-xs font-bold text-slate-400 uppercase mb-2">앱 글꼴 <span class="font-normal normal-case text-slate-300">· 화면 전체 글씨체</span></p>
+                        <div id="app-font-picker" class="grid grid-cols-3 gap-2"></div>
+                    </div></div>
                         <div><!-- 팝업창 디자인 -->
                     <div id="modal-design-wrap" class="cozy-only-block">
                         <p class="text-xs font-bold text-slate-400 uppercase mb-2">팝업창 디자인 </p>
@@ -6645,6 +6653,26 @@ body.theme-cozy .daily-side-btn i { color: var(--primary); font-size: 12px !impo
             } else if (theme) document.body.classList.add('theme-' + theme);
             try { spiralDeco(); } catch (e) {}
         }
+        // 앱 글꼴: 설정에서 고른 글씨체를 화면 전체에 적용 (이 기기에 저장)
+        const APP_FONTS = [
+    ['', '기본', "'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif"],
+    ['singleday', '싱글데이', "'Single Day', cursive"],
+    ['poorstory', '푸어스토리', "'Poor Story', cursive"],
+    ['yeonsung', '연성', "'Yeon Sung', cursive"],
+    ['kirang', '기랑해랑', "'Kirang Haerang', cursive"],
+    ['gamja', '감자꽃', "'Gamja Flower', cursive"]
+];
+        function applyAppFont() {
+            let id = ''; try { id = localStorage.getItem('app_font_v1') || ''; } catch (e) {}
+            const f = APP_FONTS.find(x => x[0] === id) || APP_FONTS[0];
+            document.body.classList.toggle('app-font-on', !!f[0]);
+            document.documentElement.style.setProperty('--app-font', f[0] ? f[2] + ", 'Pretendard', sans-serif" : '');
+            const box = document.getElementById('app-font-picker');
+            if (box) box.innerHTML = APP_FONTS.map(x => `<button type="button" onclick="setAppFont('${x[0]}')" class="p-2 rounded-xl border text-sm ${x[0] === f[0] ? 'border-2 bg-slate-50 font-bold' : 'border-slate-200 text-slate-600'}" style="font-family:${x[2]};${x[0] === f[0] ? 'border-color:var(--primary);' : ''}">${x[1]}<span class="block text-[11px] opacity-70">가나다 Aa</span></button>`).join('');
+        }
+        function setAppFont(id) { try { localStorage.setItem('app_font_v1', id); } catch (e) {} applyAppFont(); }
+        document.addEventListener('DOMContentLoaded', applyAppFont);
+        window.addEventListener('load', applyAppFont);
         // 스프링노트 테마: 제목 글자를 한 글자씩 감싸서 기울기·높이를 제각각 줘 삐뚤빼뚤 춤추는 느낌을 낸다 (글자 내용은 그대로)
         function spiralWobble(root) {
             if (!(document.body.classList.contains('theme-spiral'))) return;

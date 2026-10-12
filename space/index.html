@@ -4066,6 +4066,29 @@ function lsDriveNudge(){
   el.querySelector('.later').onclick=function(){el.remove();try{sessionStorage.setItem('lsd_nudge_off','1');}catch(e){}};
   document.body.appendChild(el);
 }
+function lsPhotoMini(){
+  if(!PH.idxDone && typeof phIndex==='function'){ phIndex().then(function(){ PH.idxDone=true; if(page==='settings') render(); }); }
+  var st=phStats(), LIM=5368709120, mb=function(b){ return (b/1048576).toFixed(1); };
+  var pct=Math.min(100,st.bytes/LIM*100), avg=st.n?st.bytes/st.n:133000, left=Math.max(0,Math.floor((LIM-st.bytes)/avg));
+  var level=st.bytes>=600*1048576?'hi':st.bytes>=300*1048576?'mid':'';
+  var note=level==='hi'?'사진이 꽤 많이 쌓였어요. 클라우드 공간(5GB)은 넉넉하지만, 앱을 열 때 사진을 모두 불러와서 폰이 느려질 수 있어요.'
+    :level==='mid'?'사진이 제법 쌓였어요. 클라우드 공간(5GB)은 아직 한참 남았어요.'
+    :'아직 여유가 있어요. 사진은 Firebase Storage 무료 5GB에 보관돼요.';
+  return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.9em">'+
+      '<span>🖼️ 사진 <b>'+st.n+'</b>장 · 약 <b>'+mb(st.bytes)+'</b>MB</span>'+
+      '<span class="lsp-bar'+(level?' '+level:'')+'" style="flex:1;min-width:90px;max-width:220px;margin:0"><i style="width:'+Math.max(st.n?1.5:0,pct).toFixed(1)+'%"></i></span>'+
+      '<span style="color:var(--t3);font-size:.85em">5GB 중 '+pct.toFixed(1)+'%</span></div>'+
+    '<details style="margin-top:4px"><summary style="font-size:.78em;color:var(--t3);cursor:pointer">자세히</summary>'+
+      '<div class="lsp-help'+(level?' '+level:'')+'" style="margin-top:6px">'+note+'<br><small>같은 크기면 최대 약 '+left.toLocaleString('ko-KR')+'장 더 · 클라우드에 올라간 사진 '+st.up+'장'+(st.n-st.up>0?' · 올리는 중 '+(st.n-st.up)+'장':'')+(st.unloaded?' · 불러오는 중 '+st.unloaded+'장':'')+' · 글 데이터(Firestore)는 별도예요.</small></div></details>';
+}
+function lsDriveMini(){
+  var m=lsdMeta();
+  var full=lsDriveCard().replace(/^[\s\S]*?<div class="lsd-help">/,'<div class="lsd-help">').replace(/<button class="btn bp bsm"[\s\S]*$/,'');
+  return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.9em">'+
+      '<span>☁️ '+(m.at?'마지막 백업 <b>'+lsdWhen(m.at)+'</b>':'아직 드라이브 백업이 없어요')+'</span>'+
+      '<button class="btn bp bsm" id="lsd-btn" onclick="lsdBackupClick()">지금 드라이브에 백업</button></div>'+
+    '<details style="margin-top:4px"><summary style="font-size:.78em;color:var(--t3);cursor:pointer">자세히 · 최근 '+LSD_KEEP+'개만 남아요</summary>'+full+'</details>';
+}
 function lsDriveCard(){
   var m=lsdMeta();
   return '<div class="card" style="margin-bottom:14px"><div class="ct" style="margin-bottom:10px">☁️ 구글 드라이브 백업</div>'+
@@ -11000,13 +11023,11 @@ function renderSettings(){
     {id:'allura',name:'Allura',ff:"'Allura',cursive",italic:false,size:'2em'},
     {id:'kaushan',name:'Kaushan Script',ff:"'Kaushan Script',cursive",italic:false,size:'1.5em'}
   ];
-  var logoFontHtml='<div style="display:flex;flex-direction:column;gap:8px">';
+  var logoFontHtml='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:8px">';
   logoFonts.forEach(function(lf){
     var isCur=curLogo===lf.id;
-    logoFontHtml+='<div onclick="setLogoFont(\''+lf.id+'\')" style="display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;border:1.5px solid '+(isCur?'var(--accent)':'var(--border)')+';border-radius:8px;padding:12px 16px;background:'+(isCur?'var(--al)':'var(--surface)')+';transition:all .2s">'+
-      '<span style="font-family:'+lf.ff+';font-size:'+lf.size+';font-style:'+(lf.italic?'italic':'normal')+';font-weight:'+(lf.id==='montserrat'?'800':'400')+';color:var(--text);line-height:1.1">Lucy\'s Space</span>'+
-      '<span style="display:flex;align-items:center;gap:8px;flex-shrink:0"><span style="font-size:0.72em;color:var(--t3)">'+lf.name+'</span>'+(isCur?'<span style="color:var(--accent);font-weight:700">✓</span>':'')+'</span>'+
-    '</div>';
+    logoFontHtml+='<button type="button" title="'+lf.name+'" onclick="setLogoFont(\''+lf.id+'\')" style="display:flex;align-items:center;justify-content:center;min-height:50px;padding:10px 6px;border-radius:12px;border:1.5px solid '+(isCur?'#B58A5A':'transparent')+';background:'+(isCur?'#FAF1E0':'#F8F6F0')+';color:var(--text);cursor:pointer;transition:all .2s">'+
+      '<span style="font-family:'+lf.ff+';font-size:1.15em;font-style:'+(lf.italic?'italic':'normal')+';font-weight:'+(lf.id==='montserrat'?'800':'400')+';line-height:1.1;white-space:nowrap">Lucy\'s Space</span></button>';
   });
   logoFontHtml+='</div>';
 
@@ -11023,13 +11044,12 @@ function renderSettings(){
     }).join('<span style="display:inline-block;width:5px"></span>');
   }
   var mkOpts=[{id:'line',name:'선 아이콘'},{id:'lineColor',name:'선 아이콘 (색상별)'},{id:'heartColor',name:'하트 (색상별)'},{id:'heartTheme',name:'하트 (테마색)'},{id:'star',name:'별 (색상별)'},{id:'flower',name:'꽃 (테마색)'},{id:'dot',name:'동그라미'}];
-  var markerHtml='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px">';
+  var markerHtml='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px">';
   mkOpts.forEach(function(o){
     var isCur=curMk===o.id;
-    markerHtml+='<div onclick="setNavMarker(\''+o.id+'\')" style="display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;border:1.5px solid '+(isCur?'var(--accent)':'var(--border)')+';border-radius:8px;padding:11px 14px;background:'+(isCur?'var(--al)':'var(--surface)')+';transition:all .2s">'+
-      '<span style="display:flex;align-items:center;gap:8px">'+mkSample(o.id)+'<span style="font-size:0.85em;color:var(--text);margin-left:4px">'+o.name+'</span></span>'+
-      (isCur?'<span style="color:var(--accent);font-weight:700">✓</span>':'')+
-    '</div>';
+    markerHtml+='<button type="button" onclick="setNavMarker(\''+o.id+'\')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:11px 6px 9px;border-radius:12px;border:1.5px solid '+(isCur?'#B58A5A':'transparent')+';background:'+(isCur?'#FAF1E0':'#F8F6F0')+';color:var(--text);cursor:pointer;font-family:inherit;transition:all .2s">'+
+      '<span style="display:flex;align-items:center;justify-content:center;min-height:18px">'+mkSample(o.id)+'</span>'+
+      '<span style="font-size:0.78em;font-weight:'+(isCur?'700':'400')+';line-height:1.2;text-align:center">'+o.name+'</span></button>';
   });
   markerHtml+='</div>';
 
@@ -11042,39 +11062,33 @@ function renderSettings(){
       '</div>'+
     '</div>'+
     '<div class="card" style="margin-bottom:14px"><div class="ct" style="margin-bottom:5px">▣ 프로젝트 · My Goals 카드</div><div style="font-size:.78em;color:var(--t3);margin-bottom:12px">색상 테마와 별개로 카드 생김새를 선택할 수 있어요.</div>'+cardStyleHtml+'</div>'+
-    '<div class="g2" style="margin-bottom:14px;align-items:start">'+
-      '<div class="card" style="margin-bottom:0"><div class="ct" style="margin-bottom:14px">✍️ 글씨체 <span style="font-size:0.75em;color:var(--t3);font-weight:400">(본문 · 화면 전체)</span></div>'+fontHtml+'</div>'+
-      '<div class="card" style="margin-bottom:0"><div class="ct" style="margin-bottom:14px">🔠 메뉴 글씨체 <span style="font-size:0.75em;color:var(--t3);font-weight:400">(왼쪽 메뉴 · 위쪽 바)</span></div>'+menuFontHtml+'</div>'+
+    '<div class="card" style="margin-bottom:14px"><div class="ct" style="margin-bottom:14px">✍️ 글씨 · 메뉴</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px 24px">'+
+        '<div><div style="font-size:.82em;font-weight:700;color:var(--t2);margin:0 0 8px">본문 글씨체 <span style="font-weight:400;color:var(--t3)">(화면 전체)</span></div>'+fontHtml+'</div>'+
+        '<div><div style="font-size:.82em;font-weight:700;color:var(--t2);margin:0 0 8px">메뉴 글씨체 <span style="font-weight:400;color:var(--t3)">(왼쪽 메뉴 · 위쪽 바)</span></div>'+menuFontHtml+'</div>'+
+        '<div><div style="font-size:.82em;font-weight:700;color:var(--t2);margin:0 0 8px">로고 글씨체</div>'+logoFontHtml+'</div>'+
+        '<div><div style="font-size:.82em;font-weight:700;color:var(--t2);margin:0 0 8px">메뉴 아이콘</div>'+markerHtml+'</div>'+
+        '<div><div style="font-size:.82em;font-weight:700;color:var(--t2);margin:0 0 8px">글자 크기 <span id="fs-label" style="font-weight:400;color:var(--t3);font-family:var(--mono)">'+(S.fontSize||14)+'px</span></div>'+
+          '<div style="display:flex;align-items:center;gap:8px;max-width:260px"><span style="font-size:0.78em;color:var(--t3)">A</span>'+
+          '<input type="range" min="11" max="20" value="'+(S.fontSize||14)+'" step="1" oninput="updateFontSizeDisplay(this)" style="flex:1;accent-color:var(--accent);cursor:pointer"><span style="font-size:1.1em;color:var(--t3)">A</span></div></div>'+
+        '<div><div style="font-size:.82em;font-weight:700;color:var(--t2);margin:0 0 8px">글자 굵기</div>'+
+          '<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;max-width:320px">'+
+            [['300','가늘게'],['400','보통'],['500','굵게'],['600','더 굵게']].map(function(w){
+              const on=(S.fontWeight||'400')===w[0];
+              return '<button type="button" onclick="setFontWeight(\''+w[0]+'\')" style="padding:10px 2px;border-radius:12px;border:1.5px solid '+(on?'#B58A5A':'transparent')+';background:'+(on?'#FAF1E0':'#F8F6F0')+';color:var(--text);font-size:0.82em;cursor:pointer;font-family:inherit;font-weight:'+w[0]+'">'+w[1]+'</button>';
+            }).join('')+'</div></div>'+
+      '</div></div>'+
+    '<div class="card" style="margin-bottom:14px"><div class="ct" style="margin-bottom:12px">💾 저장 · 백업</div>'+
       '<div style="display:flex;flex-direction:column;gap:14px">'+
-        '<div class="card" style="margin-bottom:0"><div class="ct" style="margin-bottom:14px">🔤 로고 글씨체 <span style="font-size:0.75em;color:var(--t3);font-weight:400">(Lucy\'s Space)</span></div>'+logoFontHtml+'</div>'+
-        '<div class="card" style="margin-bottom:0"><div class="ct" style="margin-bottom:14px">💗 메뉴 아이콘</div>'+markerHtml+'</div>'+
-      '</div>'+
-    '</div>'+
-    '<div class="g2" style="margin-bottom:14px;align-items:start">'+
-    '<div class="card" style="margin-bottom:0"><div class="ct" style="margin-bottom:12px">🔠 글자 크기</div>'+
-      '<div style="display:flex;align-items:center;gap:14px;padding:4px 0">'+
-        '<span style="font-size:0.78em;color:var(--t3)">A</span>'+
-        '<input type="range" min="11" max="20" value="'+(S.fontSize||14)+'" step="1" oninput="updateFontSizeDisplay(this)" style="flex:1;accent-color:var(--accent);cursor:pointer">'+
-        '<span id="fs-label" style="font-size:0.78em;color:var(--t3);font-family:var(--mono);min-width:28px">'+(S.fontSize||14)+'px</span>'+
-        '<span style="font-size:1.1em;color:var(--t3)">A</span>'+
-      '</div></div>'+
-    '<div class="card" style="margin-bottom:0"><div class="ct" style="margin-bottom:12px">🅱️ 글자 굵기</div>'+
-      '<div style="display:flex;gap:6px">'+
-        [['300','가늘게'],['400','보통'],['500','굵게'],['600','더 굵게']].map(function(w){
-          const on=(S.fontWeight||'400')===w[0];
-          return '<button onclick="setFontWeight(\''+w[0]+'\')" style="flex:1;padding:7px 4px;border-radius:8px;border:1.5px solid '+(on?'var(--accent)':'var(--border)')+';background:'+(on?'var(--al)':'var(--surface)')+';color:'+(on?'var(--accent)':'var(--t2)')+';font-size:0.85em;cursor:pointer;font-weight:'+w[0]+'">'+w[1]+'</button>';
-        }).join('')+
-      '</div></div>'+
-    '</div>'+
-    lsPhotoCard()+lsDriveCard()+
-    '<div class="card"><div class="ct" style="margin-bottom:12px">💾 데이터</div>'+
-      '<div style="display:flex;gap:8px">'+
-        '<button class="btn bg bsm" style="flex:1" onclick="exportD()">📤 내보내기</button>'+
-        '<label class="btn bg bsm" style="flex:1;cursor:pointer;justify-content:center">📥 가져오기<input type="file" accept=".json" style="display:none" onchange="importD(this)"></label>'+
-        '<button class="btn bg bsm" style="flex:1;color:var(--red)" onclick="resetD()">🗑️ 초기화</button>'+
-      '</div>'+
-      '<label class="btn bg bsm" style="margin-top:8px;width:100%;cursor:pointer;justify-content:center">🩺 백업에서 건강 기록만 합치기<input type="file" accept=".json" style="display:none" onchange="mergeHealthFromBackup(this)"></label>'+
-      '<div style="font-size:0.8em;color:var(--t3);margin-top:6px">백업 파일에 있는 검진 기록·일정·인바디·영양제·건강 상태 중, 지금 없는 것만 추가해요. 다른 데이터는 그대로예요.</div></div>'
+        '<div>'+lsPhotoMini()+'</div>'+
+        '<div>'+lsDriveMini()+'</div>'+
+        '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px">'+
+          '<button type="button" style="display:flex;align-items:center;justify-content:center;text-align:center;gap:5px;min-height:42px;padding:8px 6px;border-radius:12px;border:1.5px solid transparent;background:#F8F6F0;color:var(--text);cursor:pointer;font-family:inherit;font-size:0.86em" onclick="exportD()">📤 내보내기</button>'+
+          '<label style="display:flex;align-items:center;justify-content:center;text-align:center;gap:5px;min-height:42px;padding:8px 6px;border-radius:12px;border:1.5px solid transparent;background:#F8F6F0;color:var(--text);cursor:pointer;font-family:inherit;font-size:0.86em">📥 가져오기<input type="file" accept=".json" style="display:none" onchange="importD(this)"></label>'+
+          '<label style="display:flex;align-items:center;justify-content:center;text-align:center;gap:5px;min-height:42px;padding:8px 6px;border-radius:12px;border:1.5px solid transparent;background:#F8F6F0;color:var(--text);cursor:pointer;font-family:inherit;font-size:0.86em" title="백업 파일에 있는 검진 기록·일정·인바디·영양제·건강 상태 중, 지금 없는 것만 추가해요">🩺 건강 합치기<input type="file" accept=".json" style="display:none" onchange="mergeHealthFromBackup(this)"></label>'+
+          '<button type="button" style="display:flex;align-items:center;justify-content:center;text-align:center;gap:5px;min-height:42px;padding:8px 6px;border-radius:12px;border:1.5px solid transparent;background:#F8F6F0;color:var(--text);cursor:pointer;font-family:inherit;font-size:0.86em;color:var(--red)" onclick="resetD()">🗑️ 초기화</button>'+
+        '</div>'+
+      '</div></div>'
   );
   return czSettingsWrap(_out);
 }

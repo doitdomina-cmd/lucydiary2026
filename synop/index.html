@@ -4953,7 +4953,7 @@ window.manualFirebasePush = async function () {
       <div style="font-weight:700; margin:10px 0 8px;">테마</div>
       <div id="as-theme-grid" style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px;"></div>
 
-      <div style="font-weight:700; margin:18px 0 2px;">메뉴 글꼴 <span style="font-weight:500; color:#8a7e6c;">(왼쪽 메뉴 · 버튼 · 탭 · 설명 글자)</span></div>
+      <div style="font-weight:700; margin:18px 0 2px;">메뉴 글꼴 <span style="font-weight:500; color:#8a7e6c;">(왼쪽 메뉴 · 버튼 · 탭 · 설명 글자 · 첫 화면의 제목과 글자)</span></div>
       <select id="as-font" onchange="window.setAppFont(this.value)" style="width:100%; padding:8px 10px; border:1px solid #d9d2c3; border-radius:10px; background:#fff; font-size:13px;"></select>
 
       <div style="font-weight:700; margin:14px 0 2px;">내용 글꼴 <span style="font-weight:500; color:#8a7e6c;">(내가 쓰는 글 · 카드 제목 · 캐릭터/메모 칸)</span></div>
@@ -4972,7 +4972,7 @@ window.manualFirebasePush = async function () {
       <input id="as-cscale" type="range" min="80" max="160" step="5" value="100" oninput="window.setContentScale(this.value)" style="width:100%;">
 
       <div style="margin:22px 0 4px; padding-top:14px; border-top:1px dashed #d9d2c3; font-weight:800;">첫 화면 (내 시놉시스 목록)</div>
-      <div style="font-weight:700; margin:8px 0 2px;">첫 화면 글꼴</div>
+      <div style="font-weight:700; margin:8px 0 2px;">첫 화면 글꼴 <span style="font-weight:500; color:#8a7e6c;">(비워 두면 위 메뉴 글꼴)</span></div>
       <select id="as-hfont" onchange="window.setHomeFont(this.value)" style="width:100%; padding:8px 10px; border:1px solid #d9d2c3; border-radius:10px; background:#fff; font-size:13px;"></select>
       <div style="display:flex; align-items:center; justify-content:space-between; margin:14px 0 6px;">
         <div style="font-weight:700;">첫 화면 글자 크기 <span id="as-hscale-val" style="font-weight:500; color:#8a7e6c;"></span></div>
@@ -5057,10 +5057,10 @@ window.manualFirebasePush = async function () {
         }
         // 테마가 굵은 제목에 따로 정해 둔 글꼴보다 내가 고른 글꼴이 우선하도록
         if (menu) css += 'html body[data-theme] .sidebar-left .font-bold { font-family: ' + menu + ' !important; }';
-        // 첫 화면(시놉시스 목록)은 따로 설정: 글꼴을 고르면 그 글꼴, 자동이면 메뉴(버튼)·내용(제목) 글꼴을 따른다
+        // 첫 화면(시놉시스 목록)의 제목·그룹 이름·카드 글자·버튼은 전부 메뉴 글꼴을 따른다 (따로 고른 첫 화면 글꼴이 있으면 그게 우선)
         const hf = get(LS.hfont) || '';
         if (hf || menu) css += 'html body[data-theme] :is(#synop-home, #synop-home *, #synop-pop, #synop-pop *) { font-family: ' + (hf || menu) + ' !important; }';
-        if (hf || content || menu) css += 'html body[data-theme] #synop-home :is(.sh-title, .sh-intro h1, .sh-pen) { font-family: ' + (hf || content || menu) + ' !important; }';
+        if (hf || menu) css += 'html body[data-theme] #synop-home :is(.sh-title, .sh-intro h1, .sh-group h2, .sh-pen) { font-family: ' + (hf || menu) + ' !important; }';
         const cardBold = content || menu;
         if (cardBold) css += 'html body[data-theme] :is(.card-wrapper, .rounded-2xl[style*="border-top"]) .font-bold { font-family: ' + cardBold + ' !important; }';
         const cs = parseInt(get(LS.cscale) || '100', 10) || 100;
@@ -5109,7 +5109,7 @@ window.manualFirebasePush = async function () {
         if (!sel.options.length) sel.innerHTML = FONTS.map(opt).join('');
         if (!csel.options.length) csel.innerHTML = FONTS.map((f, i) => i === 0 ? opt({ v: '', n: '메뉴와 같게 (자동)' }) : opt(f)).join('');
         const hsel = document.getElementById('as-hfont');
-        if (!hsel.options.length) hsel.innerHTML = FONTS.map((f, i) => i === 0 ? opt({ v: '', n: '메뉴·내용 글꼴과 같게 (자동)' }) : opt(f)).join('');
+        if (!hsel.options.length) hsel.innerHTML = FONTS.map((f, i) => i === 0 ? opt({ v: '', n: '메뉴 글꼴과 같게 (자동)' }) : opt(f)).join('');
         hsel.value = get(LS.hfont) || '';
         window.setHomeScale(get(LS.hscale) || 100);
         sel.value = get(LS.font) || '';

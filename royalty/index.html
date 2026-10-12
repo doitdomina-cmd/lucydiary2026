@@ -22,7 +22,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500;600;700&family=Gowun+Batang:wght@400;700&family=Instrument+Serif:ital@0;1&family=Gaegu:wght@400;700&family=Nanum+Pen+Script&family=Hi+Melody&family=Single+Day&family=Jua&family=Poor+Story&family=Yeon+Sung&family=Kirang+Haerang&family=Gamja+Flower&family=Gowun+Dodum&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500;600;700&family=Gowun+Batang:wght@400;700&family=Instrument+Serif:ital@0;1&family=Gaegu:wght@400;700&family=Nanum+Pen+Script&family=Hi+Melody&family=Single+Day&family=Jua&family=Poor+Story&family=Yeon+Sung&family=Kirang+Haerang&family=Gamja+Flower&family=Gowun+Dodum&family=Noto+Sans+KR:wght@400;500;700&family=Nanum+Gothic:wght@400;700&family=Nanum+Myeongjo:wght@400;700&display=swap">
     <style>
         :root {
             /* 테마 색상 변수 */
@@ -149,6 +149,8 @@
         /* 앱 글꼴(설정에서 고른 글씨체): 입력칸·버튼도 같은 글씨체를 따라가게 */
         body.app-font-on { font-family: var(--app-font); }
         body.app-font-on button, body.app-font-on input, body.app-font-on select, body.app-font-on textarea { font-family: inherit; }
+        /* 메뉴 글꼴: 왼쪽 메뉴(아이콘 글꼴은 그대로)만 따로 */
+        body.menu-font-on aside nav, body.menu-font-on aside nav button { font-family: var(--menu-font); }
         /* 삐뚤삐뚤: 카드를 살짝 기울이고 제목도 제각각 기울임 */
         body.theme-spiral .sp-c0 { transform: rotate(-.5deg); } body.theme-spiral .sp-c1 { transform: rotate(.4deg); } body.theme-spiral .sp-c2 { transform: rotate(-.3deg); }
         body.theme-spiral .sp-c3 { transform: rotate(.5deg); } body.theme-spiral .sp-c4 { transform: rotate(-.4deg); } body.theme-spiral .sp-c5 { transform: rotate(.3deg); }
@@ -3929,10 +3931,12 @@ body.theme-cozy .daily-side-btn i { color: var(--primary); font-size: 12px !impo
                             </div>
                         </div>
                     </div></div>
-                        <div><!-- 앱 글꼴 -->
+                        <div><!-- 앱 글꼴 (본문 / 메뉴) -->
                     <div>
-                        <p class="text-xs font-bold text-slate-400 uppercase mb-2">앱 글꼴 <span class="font-normal normal-case text-slate-300">· 화면 전체 글씨체</span></p>
-                        <div id="app-font-picker" class="grid grid-cols-3 gap-2"></div>
+                        <p class="text-xs font-bold text-slate-400 uppercase mb-2">본문 글꼴 <span class="font-normal normal-case text-slate-300">· 화면 전체 글씨체</span></p>
+                        <div id="app-font-picker" class="grid grid-cols-4 gap-1.5"></div>
+                        <p class="text-xs font-bold text-slate-400 uppercase mt-4 mb-2">메뉴 글꼴 <span class="font-normal normal-case text-slate-300">· 왼쪽 메뉴만 따로</span></p>
+                        <div id="menu-font-picker" class="grid grid-cols-4 gap-1.5"></div>
                     </div></div>
                         <div><!-- 팝업창 디자인 -->
                     <div id="modal-design-wrap" class="cozy-only-block">
@@ -6653,24 +6657,47 @@ body.theme-cozy .daily-side-btn i { color: var(--primary); font-size: 12px !impo
             } else if (theme) document.body.classList.add('theme-' + theme);
             try { spiralDeco(); } catch (e) {}
         }
-        // 앱 글꼴: 설정에서 고른 글씨체를 화면 전체에 적용 (이 기기에 저장)
+        // 앱 글꼴: 본문 글꼴 / 메뉴 글꼴을 따로 고를 수 있다 (이 기기에 저장)
         const APP_FONTS = [
-    ['', '기본', "'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif"],
-    ['singleday', '싱글데이', "'Single Day', cursive"],
-    ['poorstory', '푸어스토리', "'Poor Story', cursive"],
-    ['yeonsung', '연성', "'Yeon Sung', cursive"],
-    ['kirang', '기랑해랑', "'Kirang Haerang', cursive"],
-    ['gamja', '감자꽃', "'Gamja Flower', cursive"]
-];
+            ['', '', ''],
+            ['pretendard', '프리텐다드', "'Pretendard', 'Apple SD Gothic Neo', sans-serif"],
+            ['gowundodum', '고운돋움', "'Gowun Dodum', sans-serif"],
+            ['notosans', '노토 산스', "'Noto Sans KR', sans-serif"],
+            ['nanumgothic', '나눔고딕', "'Nanum Gothic', sans-serif"],
+            ['notoserif', '노토 세리프', "'Noto Serif KR', serif"],
+            ['gowunbatang', '고운바탕', "'Gowun Batang', serif"],
+            ['myeongjo', '나눔명조', "'Nanum Myeongjo', serif"],
+            ['gaegu', '개구', "'Gaegu', cursive"],
+            ['himelody', '하이멜로디', "'Hi Melody', cursive"],
+            ['nanumpen', '나눔손글씨 펜', "'Nanum Pen Script', cursive"],
+            ['jua', '주아', "'Jua', sans-serif"],
+            ['singleday', '싱글데이', "'Single Day', cursive"],
+            ['poorstory', '푸어스토리', "'Poor Story', cursive"],
+            ['yeonsung', '연성', "'Yeon Sung', cursive"],
+            ['kirang', '기랑해랑', "'Kirang Haerang', cursive"],
+            ['gamja', '감자꽃', "'Gamja Flower', cursive"]
+        ];
+        function _fontGet(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }
+        function _fontCss(id) { const f = APP_FONTS.find(x => x[0] === id); return f && f[0] ? f[2] : ''; }
+        function _fontPicker(boxId, cur, fn, defLabel) {
+            const box = document.getElementById(boxId); if (!box) return;
+            box.innerHTML = APP_FONTS.map(x => {
+                const on = x[0] === cur, label = x[0] ? x[1] : defLabel;
+                return `<button type="button" onclick="${fn}('${x[0]}')" class="px-1.5 py-1.5 rounded-lg border text-xs leading-tight ${on ? 'border-2 bg-slate-50 font-bold' : 'border-slate-200 text-slate-600'}" style="${x[0] ? 'font-family:' + x[2] + ';' : ''}${on ? 'border-color:var(--primary);' : ''}">${label}</button>`;
+            }).join('');
+        }
         function applyAppFont() {
-            let id = ''; try { id = localStorage.getItem('app_font_v1') || ''; } catch (e) {}
-            const f = APP_FONTS.find(x => x[0] === id) || APP_FONTS[0];
-            document.body.classList.toggle('app-font-on', !!f[0]);
-            document.documentElement.style.setProperty('--app-font', f[0] ? f[2] + ", 'Pretendard', sans-serif" : '');
-            const box = document.getElementById('app-font-picker');
-            if (box) box.innerHTML = APP_FONTS.map(x => `<button type="button" onclick="setAppFont('${x[0]}')" class="p-2 rounded-xl border text-sm ${x[0] === f[0] ? 'border-2 bg-slate-50 font-bold' : 'border-slate-200 text-slate-600'}" style="font-family:${x[2]};${x[0] === f[0] ? 'border-color:var(--primary);' : ''}">${x[1]}<span class="block text-[11px] opacity-70">가나다 Aa</span></button>`).join('');
+            const bodyId = _fontGet('app_font_v1'), menuId = _fontGet('menu_font_v1');
+            const bc = _fontCss(bodyId), mc = _fontCss(menuId), root = document.documentElement.style;
+            document.body.classList.toggle('app-font-on', !!bc);
+            root.setProperty('--app-font', bc ? bc + ", 'Pretendard', sans-serif" : '');
+            document.body.classList.toggle('menu-font-on', !!mc);
+            root.setProperty('--menu-font', mc ? mc + ", 'Pretendard', sans-serif" : '');
+            _fontPicker('app-font-picker', bodyId, 'setAppFont', '테마 기본');
+            _fontPicker('menu-font-picker', menuId, 'setMenuFont', '본문과 같게');
         }
         function setAppFont(id) { try { localStorage.setItem('app_font_v1', id); } catch (e) {} applyAppFont(); }
+        function setMenuFont(id) { try { localStorage.setItem('menu_font_v1', id); } catch (e) {} applyAppFont(); }
         document.addEventListener('DOMContentLoaded', applyAppFont);
         window.addEventListener('load', applyAppFont);
         // 스프링노트 테마: 제목 글자를 한 글자씩 감싸서 기울기·높이를 제각각 줘 삐뚤빼뚤 춤추는 느낌을 낸다 (글자 내용은 그대로)
@@ -7577,6 +7604,7 @@ body.theme-cozy .daily-side-btn i { color: var(--primary); font-size: 12px !impo
                 workManageCardSettings: cp(workManageCardSettings), webtoonCardSettings: cp(webtoonCardSettings),
                 tableFontSettings: cp(tableFontSettings), crosshairSettings: cp(crosshairSettings),
                 genreBadgeOpacity: genreBadgeOpacity,
+                appFont: localStorage.getItem('app_font_v1') || '', menuFont: localStorage.getItem('menu_font_v1') || '',
                 taskColors: cp(TASK_COLORS), writeColors: cp(WRITE_COLORS)
             };
         }
@@ -7609,6 +7637,7 @@ body.theme-cozy .daily-side-btn i { color: var(--primary); font-size: 12px !impo
             });
             step(() => { if (d.bgMain) setPageBackgroundColor(d.bgMain); });
             step(() => { if (d.theme === 'custom' && d.customColor) localStorage.setItem('custom_color_v6', d.customColor); });
+            step(() => { if (typeof d.appFont === 'string') localStorage.setItem('app_font_v1', d.appFont); if (typeof d.menuFont === 'string') localStorage.setItem('menu_font_v1', d.menuFont); applyAppFont(); });
             step(() => { if (d.theme) setTheme(d.theme); });
             step(() => applyCalCardDesign());
             step(() => applyDdayDesign());

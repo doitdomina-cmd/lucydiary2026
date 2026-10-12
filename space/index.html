@@ -11200,19 +11200,20 @@ function phWipeStorage(uid){
   return fbStorage.ref('users/'+uid+'/photos').listAll().then(function(r){ return Promise.all(r.items.map(function(i){ return i.delete().catch(function(){}); })); }).catch(function(){});
 }
 function resetD(){
-  if(!confirm('모든 데이터를 삭제할까요?\n이 작업은 되돌릴 수 없어요.'))return;
-  // localStorage 삭제
-  localStorage.removeItem(KEY);
-  localStorage.removeItem(LEDGER_KEY);
-  try{ indexedDB.deleteDatabase('lucy_photos'); }catch(e){}
-  // Firestore도 삭제 (서랍 + 사진)
+  if(!confirm('가계부와 건강 검진 기록을 뺀 나머지 데이터를 모두 삭제할까요?\n이 작업은 되돌릴 수 없어요.'))return;
+  // 가계부(LD + 가계부 배너 설정)와 건강(S.health)은 남기고 나머지만 초기화
+  var keep={};
+  if(S.health)keep.health=S.health;
+  Object.keys(S).forEach(function(k){ if(/^ledger/i.test(k))keep[k]=S[k]; });
+  try{ localStorage.setItem(KEY,phStringifyLocal(keep)); localStorage.setItem(KEY+'_savedAt',String(Date.now())); }catch(e){ localStorage.removeItem(KEY); }
   if(currentUser){
+    // 클라우드 서랍을 비우고 남길 것만 다시 올린다 (사진 보관소는 가계부·건강 첨부가 쓸 수 있어서 그대로 둔다)
     const wipe=function(coll){ return db.collection('users').doc(currentUser.uid).collection(coll).get().then(function(snap){
       const docs=[];snap.forEach(function(doc){docs.push(doc.ref);});
       let p=Promise.resolve();
       for(let i=0;i<docs.length;i+=400){ const part=docs.slice(i,i+400); p=p.then(function(){ const b=db.batch(); part.forEach(function(r){b.delete(r);}); return b.commit(); }); }
       return p; }); };
-    wipe('data').then(function(){ return wipe('photos'); }).then(function(){ return phWipeStorage(currentUser.uid); }).then(function(){location.reload();}).catch(function(){location.reload();});
+    wipe('data').then(function(){ _cloudBase={}; return saveToCloud({...keep,_ledger:LD}); }).then(function(){location.reload();}).catch(function(){location.reload();});
   } else {
     location.reload();
   }

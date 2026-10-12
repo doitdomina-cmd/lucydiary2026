@@ -11074,7 +11074,9 @@ function renderSettings(){
         '<button class="btn bg bsm" style="flex:1" onclick="exportD()">📤 내보내기</button>'+
         '<label class="btn bg bsm" style="flex:1;cursor:pointer;justify-content:center">📥 가져오기<input type="file" accept=".json" style="display:none" onchange="importD(this)"></label>'+
         '<button class="btn bg bsm" style="flex:1;color:var(--red)" onclick="resetD()">🗑️ 초기화</button>'+
-      '</div></div>'
+      '</div>'+
+      '<label class="btn bg bsm" style="margin-top:8px;width:100%;cursor:pointer;justify-content:center">🩺 백업에서 건강 기록만 합치기<input type="file" accept=".json" style="display:none" onchange="mergeHealthFromBackup(this)"></label>'+
+      '<div style="font-size:0.8em;color:var(--t3);margin-top:6px">백업 파일에 있는 검진 기록·일정·인바디·영양제·건강 상태 중, 지금 없는 것만 추가해요. 다른 데이터는 그대로예요.</div></div>'
   );
   return czSettingsWrap(_out);
 }
@@ -11153,6 +11155,45 @@ function restoreCustomFont(){
   });
 }
 function exportD(){if(!PH.done){alert('사진을 불러오는 중이에요. 잠시 뒤에 다시 눌러 주세요.');return;}var all={app:S,ledger:LD};var a=document.createElement('a');a.href='data:text/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(all,null,2));a.download='lucy_backup_'+todStr()+'.json';a.click();}
+function mergeHealthFromBackup(inp){
+  var file=inp.files[0];if(!file)return;
+  var r=new FileReader();
+  r.onload=function(e){
+    try{
+      var d=JSON.parse(e.target.result),bh=(d.app||d).health;
+      if(!bh||typeof bh!=='object'){alert('이 파일에는 건강 기록이 없어요');return;}
+      if(!S.health||typeof S.health!=='object')S.health={};
+      var H=S.health,added={};
+      ['records','schedules','inbody','conditions','memos'].forEach(function(k){
+        var src=Array.isArray(bh[k])?bh[k]:[];
+        if(!Array.isArray(H[k]))H[k]=[];
+        var have={};H[k].forEach(function(x){if(x&&x.id!=null)have[x.id]=1;});
+        var n=0;
+        src.forEach(function(x){if(x&&x.id!=null&&!have[x.id]){H[k].push(JSON.parse(JSON.stringify(x)));have[x.id]=1;n++;}});
+        added[k]=n;
+      });
+      var bs=bh.supplements;
+      if(bs&&typeof bs==='object'&&!Array.isArray(bs)){
+        if(!H.supplements||typeof H.supplements!=='object'||Array.isArray(H.supplements))H.supplements={};
+        added.supplements=0;
+        Object.keys(bs).forEach(function(slot){
+          var src=Array.isArray(bs[slot])?bs[slot]:[];
+          if(!Array.isArray(H.supplements[slot]))H.supplements[slot]=[];
+          var have={};H.supplements[slot].forEach(function(x){if(x&&x.id!=null)have[x.id]=1;});
+          src.forEach(function(x){if(x&&x.id!=null&&!have[x.id]){H.supplements[slot].push(JSON.parse(JSON.stringify(x)));have[x.id]=1;added.supplements++;}});
+        });
+      }
+      if(!H.height&&bh.height)H.height=bh.height;
+      if(!H.memo&&bh.memo)H.memo=bh.memo;
+      var total=Object.keys(added).reduce(function(a,k){return a+added[k];},0);
+      if(total>0)save();
+      render();
+      alert(total?('건강 기록을 합쳤어요 ✓\n검진 기록 '+added.records+' · 일정 '+added.schedules+' · 인바디 '+added.inbody+' · 영양제 '+added.supplements+' · 건강 상태 '+added.conditions):'추가할 새 기록이 없어요 (이미 모두 있어요)');
+    }catch(err){alert('파일을 읽지 못했어요');}
+    inp.value='';
+  };
+  r.readAsText(file);
+}
 function importD(inp){const file=inp.files[0];if(!file)return;const r=new FileReader();r.onload=e=>{try{var d=JSON.parse(e.target.result);if(d.app){S=Object.assign({},S,d.app);if(d.ledger)LD=Object.assign({},LD,d.ledger);} else {S=Object.assign({},S,d);}save();saveLedger();render();alert('복원 완료!');}catch{alert('파일 오류');}};r.readAsText(file);}
 function phWipeStorage(uid){
   if(!fbStorage) return Promise.resolve();

@@ -10,7 +10,7 @@
 <link rel="icon" href="icon-256.png">
 <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Single+Day&family=Poor+Story&family=Yeon+Sung&family=Kirang+Haerang&family=Gamja+Flower&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Single+Day&family=Poor+Story&family=Yeon+Sung&family=Kirang+Haerang&family=Gamja+Flower&family=Gowun+Dodum&family=Gowun+Batang&family=Noto+Sans+KR:wght@400;500;700&family=Noto+Serif+KR:wght@400;500;700&family=Nanum+Gothic:wght@400;700&family=Nanum+Myeongjo:wght@400;700&family=Gaegu&family=Hi+Melody&family=Nanum+Pen+Script&family=Jua&display=swap">
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
@@ -31,6 +31,8 @@
   .fontbtn { border: none; background: #f1f5f9; color: #475569; font-size: 13px; font-weight: 800; height: 30px; padding: 0 10px; border-radius: 10px; margin-right: 6px; }
   .fontopt { display: block; width: 100%; text-align: left; padding: 12px 14px; margin-bottom: 8px; border-radius: 12px; border: 2px solid #e2e8f0; background: #fff; font-size: 16px; }
   .fontopt small { display: block; font-size: 12px; color: #94a3b8; margin-top: 2px; }
+  .fontnote { font-size: 12px; color: #94a3b8; margin: -8px 0 10px; }
+  body.menu-font-on .bottomnav, body.menu-font-on .bottomnav button, body.menu-font-on .topbar h2 { font-family: var(--menu-font); }
   .fontopt.on { border-color: var(--primary); background: var(--primary-light); }
 
   /* 로그인 오버레이 */
@@ -471,23 +473,40 @@ function toggleDone(kind, id, date) {
 // ════════════════════════════════════════════════════════
 // 앱 글꼴: 고른 글씨체를 화면 전체에 적용 (이 기기에 저장)
 const APP_FONTS = [
-    ['', '기본', "'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif"],
-    ['singleday', '싱글데이', "'Single Day', cursive"],
-    ['poorstory', '푸어스토리', "'Poor Story', cursive"],
-    ['yeonsung', '연성', "'Yeon Sung', cursive"],
-    ['kirang', '기랑해랑', "'Kirang Haerang', cursive"],
-    ['gamja', '감자꽃', "'Gamja Flower', cursive"]
+  ['', '기본', "'Pretendard', 'Apple SD Gothic Neo', sans-serif"],
+  ['pretendard', '프리텐다드', "'Pretendard', 'Apple SD Gothic Neo', sans-serif"],
+  ['gowundodum', '고운돋움', "'Gowun Dodum', sans-serif"],
+  ['notosans', '노토 산스', "'Noto Sans KR', sans-serif"],
+  ['nanumgothic', '나눔고딕', "'Nanum Gothic', sans-serif"],
+  ['notoserif', '노토 세리프', "'Noto Serif KR', serif"],
+  ['gowunbatang', '고운바탕', "'Gowun Batang', serif"],
+  ['myeongjo', '나눔명조', "'Nanum Myeongjo', serif"],
+  ['gaegu', '개구', "'Gaegu', cursive"],
+  ['himelody', '하이멜로디', "'Hi Melody', cursive"],
+  ['nanumpen', '나눔손글씨 펜', "'Nanum Pen Script', cursive"],
+  ['jua', '주아', "'Jua', sans-serif"],
+  ['singleday', '싱글데이', "'Single Day', cursive"],
+  ['poorstory', '푸어스토리', "'Poor Story', cursive"],
+  ['yeonsung', '연성', "'Yeon Sung', cursive"],
+  ['kirang', '기랑해랑', "'Kirang Haerang', cursive"],
+  ['gamja', '감자꽃', "'Gamja Flower', cursive"]
 ];
+const _fget = k => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } };
+const _fcss = id => { const f = APP_FONTS.find(x => x[0] === id); return f && f[0] ? f[2] : ''; };
+// 본문 글꼴(앱 전체)과 메뉴 글꼴(아래 탭 · 위 제목)을 따로 고른다 (이 기기에 저장)
 function applyAppFont() {
-  let id = ''; try { id = localStorage.getItem('mobile_font_v1') || ''; } catch (e) {}
-  const f = APP_FONTS.find(x => x[0] === id) || APP_FONTS[0];
-  document.body.classList.toggle('app-font-on', !!f[0]);
-  document.documentElement.style.setProperty('--app-font', f[0] ? f[2] + ", 'Pretendard', sans-serif" : '');
+  const bc = _fcss(_fget('mobile_font_v1')), mc = _fcss(_fget('mobile_menu_font_v1')), root = document.documentElement.style;
+  document.body.classList.toggle('app-font-on', !!bc);
+  root.setProperty('--app-font', bc ? bc + ", 'Pretendard', sans-serif" : '');
+  document.body.classList.toggle('menu-font-on', !!mc);
+  root.setProperty('--menu-font', mc ? mc + ", 'Pretendard', sans-serif" : '');
 }
 function setAppFont(id) { try { localStorage.setItem('mobile_font_v1', id); } catch (e) {} applyAppFont(); openFontSheet(); }
+function setMenuFont(id) { try { localStorage.setItem('mobile_menu_font_v1', id); } catch (e) {} applyAppFont(); openFontSheet(); }
 function openFontSheet() {
-  let id = ''; try { id = localStorage.getItem('mobile_font_v1') || ''; } catch (e) {}
-  openSheet(`<h3>글꼴</h3>` + APP_FONTS.map(x => `<button class="fontopt ${x[0] === id ? 'on' : ''}" style="font-family:${x[2]}" onclick="setAppFont('${x[0]}')">${x[1]}<small>가나다라 마바사 Aa 123</small></button>`).join('') + `<div class="actions"><button class="btn-cancel" onclick="closeSheet()">닫기</button></div>`);
+  const body = _fget('mobile_font_v1'), menu = _fget('mobile_menu_font_v1');
+  const list = (cur, fn, defLabel) => APP_FONTS.map(x => `<button class="fontopt ${x[0] === cur ? 'on' : ''}" style="${x[0] ? 'font-family:' + x[2] : ''}" onclick="${fn}('${x[0]}')">${x[0] ? x[1] : defLabel}<small>가나다라 마바사 Aa 123</small></button>`).join('');
+  openSheet(`<h3>본문 글꼴</h3><div class="fontnote">앱 전체 글씨체</div>` + list(body, 'setAppFont', '기본') + `<h3 style="margin-top:20px">메뉴 글꼴</h3><div class="fontnote">아래 탭 · 위쪽 제목만 따로</div>` + list(menu, 'setMenuFont', '본문과 같게') + `<div class="actions"><button class="btn-cancel" onclick="closeSheet()">닫기</button></div>`);
 }
 applyAppFont();
 function openSheet(html) {

@@ -1184,6 +1184,7 @@ body.th-spiral .wgrid .wcard:nth-child(6n+1) { transform: rotate(-.7deg); } body
 body.th-spiral .wgrid .wcard:nth-child(6n+3) { transform: rotate(-.4deg); } body.th-spiral .wgrid .wcard:nth-child(6n+4) { transform: rotate(.8deg); }
 body.th-spiral .wgrid .wcard:nth-child(6n+5) { transform: rotate(-.6deg); } body.th-spiral .wgrid .wcard:nth-child(6n) { transform: rotate(.5deg); }
 body.th-spiral .wgrid .wcard:hover, body.th-spiral .wgrid .wcard:focus-visible { transform: rotate(0) translateY(-3px); }
+body.th-spiral .sp-w { display: inline-block; white-space: nowrap; } body.th-spiral .sp-ch { display: inline-block; transform: translateY(var(--y, 0)) rotate(var(--r, 0deg)) scale(var(--s, 1)); }
 @media (max-width: 700px) { body.th-spiral .home-intro h1 { font-size: 26px; } }
 /* ===== 새 화면 테마 — 끝 ===== */
 .genre-pick { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
@@ -5150,7 +5151,45 @@ function applyPalette() {
     if (document.body) document.body.classList.toggle('cozy', !dark && pal && pal.id === 'cozy');
     if (document.body) ['polaroid', 'label', 'airmail', 'spiral', 'fountain'].forEach(k => document.body.classList.toggle('th-' + k, !dark && !!pal && pal.id === k));
     if (document.querySelector('.home') && typeof renderHome === 'function') renderHome();
+    try { spiralWobble(); } catch (e) {}
 }
+// 스프링노트 테마: 제목 글자를 한 글자씩 감싸서 기울기·높이를 제각각 줘 삐뚤빼뚤 춤추는 느낌을 낸다 (글자 내용은 그대로)
+function spiralWobble(root) {
+    if (!(document.body && document.body.classList.contains('th-spiral'))) return;
+    const R = [-6, 4, -3, 6, -5, 3, -4], Y = [0, -2, 1, -1, 2, -2, 1], S = [1, 1.07, .96, 1.04, .98, 1.06, .97];
+    (root || document).querySelectorAll('.home-intro h1, .home-group h2, .wc-title, .modal h3').forEach(el => {
+        if (el.querySelector('.sp-w') || (el.textContent || '').trim().length > 40) return;
+        const words = (el.textContent || '').trim().split(/\s+/);
+        if (words.some(w => w.length > 14)) return;   // 아주 긴 낱말은 줄이 넘치지 않게 그대로 둔다
+        const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), nodes = [];
+        while (walker.nextNode()) nodes.push(walker.currentNode);
+        let k = 0;
+        nodes.forEach(n => {
+            const t = n.nodeValue; if (!t.trim()) return;
+            const frag = document.createDocumentFragment();
+            t.split(/(\s+)/).forEach(part => {
+                if (!part) return;
+                if (/^\s+$/.test(part)) { frag.appendChild(document.createTextNode(part)); return; }
+                const w = document.createElement('span'); w.className = 'sp-w';
+                for (const ch of part) {
+                    const c = document.createElement('span'); c.className = 'sp-ch'; c.textContent = ch;
+                    c.style.setProperty('--r', R[k % 7] + 'deg'); c.style.setProperty('--y', Y[(k * 3 + 1) % 7] + 'px'); c.style.setProperty('--s', S[(k * 2 + 3) % 7]);
+                    w.appendChild(c); k++;
+                }
+                frag.appendChild(w);
+            });
+            n.parentNode.replaceChild(frag, n);
+        });
+    });
+}
+(function () {
+    let raf = 0; const run = () => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; try { spiralWobble(); } catch (e) {} }); };
+    try {
+        const mo = new MutationObserver(run);
+        mo.observe(document.body, { childList: true });
+        const h = document.querySelector('.home'); if (h) mo.observe(h, { childList: true, subtree: true });
+    } catch (e) {}
+})();
 try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyPalette); } catch (e) {}
 /* =====================================================================
    자동 치환: 정해 둔 글자를 입력하면 바로 바꿔 줌 (예: ... → …)

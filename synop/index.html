@@ -500,6 +500,12 @@ body[data-theme="spiral"] #board-container > [data-row-id]:nth-child(7n+4) { --s
 body[data-theme="spiral"] #board-container > [data-row-id]:nth-child(7n+5) { --sp-ring: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='38' height='32' viewBox='0 0 38 32'%3E%3Cpath d='M19 0v15' stroke='%231F2D27' stroke-width='3.2' stroke-linecap='round'/%3E%3Ccircle cx='19' cy='21' r='7' fill='%23BDDFF7' stroke='%231F2D27' stroke-width='2.6'/%3E%3C/svg%3E"); --sp-cell: #E6F3FD; }
 body[data-theme="spiral"] #board-container > [data-row-id]:nth-child(7n+6) { --sp-ring: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='38' height='32' viewBox='0 0 38 32'%3E%3Cpath d='M19 0v15' stroke='%231F2D27' stroke-width='3.2' stroke-linecap='round'/%3E%3Ccircle cx='19' cy='21' r='7' fill='%23D8CBF3' stroke='%231F2D27' stroke-width='2.6'/%3E%3C/svg%3E"); --sp-cell: #F1ECFB; }
 body[data-theme="spiral"] #board-container > [data-row-id]:nth-child(7n+7) { --sp-ring: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='38' height='32' viewBox='0 0 38 32'%3E%3Cpath d='M19 0v15' stroke='%231F2D27' stroke-width='3.2' stroke-linecap='round'/%3E%3Ccircle cx='19' cy='21' r='7' fill='%23B7EAE6' stroke='%231F2D27' stroke-width='2.6'/%3E%3C/svg%3E"); --sp-cell: #E2F8F6; }
+/* 스프링노트: 맨 위 시놉시스 제목도 크레용 글꼴 (내용 글꼴 설정보다 우선) + 한 글자씩 삐뚤빼뚤 (겹쳐 그린 글자) */
+html body[data-theme="spiral"] #doc-title#doc-title { font-family: 'Single Day', var(--th-hand) !important; font-weight: 400 !important; }
+body.sp-title-ok[data-theme="spiral"] #doc-title { color: transparent !important; caret-color: var(--sp-ink); }
+#doc-title-wrap { position: relative; display: inline-flex; flex: none; max-width: 100%; }
+#doc-title-wobble { display: none; position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: hidden; white-space: pre; pointer-events: none; color: var(--sp-ink); filter: url(#sp-crayon); align-items: center; }
+body.sp-title-ok[data-theme="spiral"] #doc-title-wobble { display: flex; }
 body[data-theme="spiral"] .block-item { background-color: #FFFFFF !important; border: 1.6px solid #2C3D35 !important; border-radius: 12px !important; }
 body[data-theme="spiral"] .photo-box { background: var(--sp-cell) !important; border: 2px dashed #7FCBAA !important; border-radius: 14px !important; }
 body[data-theme="spiral"] #char-profile-box { background-color: #FFFFFF !important; border: 2px solid var(--sp-ink) !important; border-radius: 14px !important; }
@@ -5442,6 +5448,48 @@ function spiralWobble(root) {
         new MutationObserver(run).observe(document.body, { attributes: true, attributeFilter: ['data-theme'] });
         const attach = () => { const h = document.getElementById('synop-home'); if (h) new MutationObserver(run).observe(h, { childList: true, subtree: true }); run(); };
         if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', attach); else attach();
+    } catch (e) {}
+})();
+</script>
+<script>
+// 스프링노트 테마: 맨 위 시놉시스 제목(입력칸)을 같은 자리에 겹쳐 그린 글자로 보여줘서, 입력은 그대로 하면서 글자가 한 글자씩 삐뚤빼뚤하게 보이게 한다
+(function () {
+    const R = [-6, 4, -3, 6, -5, 3, -4], Y = [0, -2, 1, -1, 2, -2, 1], S = [1, 1.07, .96, 1.04, .98, 1.06, .97];
+    let wrap = null, ov = null, last = null;
+    function setup() {
+        const inp = document.getElementById('doc-title'); if (!inp) return false;
+        if (!wrap) {
+            wrap = document.createElement('span'); wrap.id = 'doc-title-wrap';
+            inp.parentNode.insertBefore(wrap, inp); wrap.appendChild(inp);
+            ov = document.createElement('div'); ov.id = 'doc-title-wobble'; ov.setAttribute('aria-hidden', 'true'); wrap.appendChild(ov);
+        }
+        return true;
+    }
+    function sync() {
+        const on = document.body.getAttribute('data-theme') === 'spiral';
+        if (!on) { document.body.classList.remove('sp-title-ok'); last = null; return; }
+        if (!setup()) return;
+        const inp = document.getElementById('doc-title'), cs = getComputedStyle(inp);
+        const key = inp.value + '|' + cs.fontSize + '|' + cs.fontFamily + '|' + inp.clientWidth + '|' + inp.scrollLeft;
+        if (key === last) return; last = key;
+        ov.style.font = cs.font; ov.style.letterSpacing = cs.letterSpacing;
+        ov.style.padding = cs.paddingTop + ' ' + cs.paddingRight + ' ' + cs.paddingBottom + ' ' + cs.paddingLeft;
+        ov.style.borderWidth = cs.borderWidth; ov.style.borderStyle = 'solid'; ov.style.borderColor = 'transparent'; ov.style.boxSizing = cs.boxSizing;
+        ov.textContent = '';
+        let k = 0;
+        for (const ch of inp.value) {
+            const c = document.createElement('span');
+            if (ch === ' ') { c.textContent = '\u00a0'; c.style.display = 'inline-block'; }
+            else { c.className = 'sp-ch'; c.textContent = ch; c.style.setProperty('--r', R[k % 7] + 'deg'); c.style.setProperty('--y', Y[(k * 3 + 1) % 7] + 'px'); c.style.setProperty('--s', S[(k * 2 + 3) % 7]); }
+            ov.appendChild(c); k++;
+        }
+        document.body.classList.add('sp-title-ok');
+    }
+    try {
+        document.addEventListener('input', e => { if (e.target && e.target.id === 'doc-title') sync(); });
+        new MutationObserver(sync).observe(document.body, { attributes: true, attributeFilter: ['data-theme'] });
+        setInterval(sync, 400);
+        window.addEventListener('load', () => setTimeout(sync, 300));
     } catch (e) {}
 })();
 </script>

@@ -5213,8 +5213,13 @@ try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', appl
 /* =====================================================================
    자동 치환: 정해 둔 글자를 입력하면 바로 바꿔 줌 (예: ... → …)
    ===================================================================== */
-const REPLACE_PRESETS = [['...', '…'], ['--', '—'], ['<<', '《'], ['>>', '》'], ['->', '→'], ['(c)', '©']];
-function replaceRules() { const S = settings(); S.autoReplace ??= []; return S.autoReplace; }
+const REPLACE_PRESETS = [['...', '···'], ['...', '⋯'], ['...', '…'], ['--', '—'], ['<<', '《'], ['>>', '》'], ['->', '→'], ['(c)', '©']];
+function replaceRules() {
+    const S = settings(); S.autoReplace ??= [];
+    // 처음 한 번: '...' 입력 시 가운데 점 세 개(···)로 자동 치환 (이미 '...' 규칙이 있으면 그대로 둠)
+    if (!S.ellipsisSeeded) { S.ellipsisSeeded = true; if (!S.autoReplace.some(r => r.from === '...')) S.autoReplace.push({ from: '...', to: '···', on: true }); touch(S); }
+    return S.autoReplace;
+}
 let replacing = false;
 /* 굽은 따옴표: 곧은 따옴표(" ')를 “ ” ‘ ’로. 한글에 붙여넣을 때 쓰는 따옴표 */
 const smartOn = () => settings().smartQuotes !== false;

@@ -5576,12 +5576,11 @@ body.menu-font-on #settings-panel-modal .settings-tabbtn, body.menu-font-on #the
                 <h3 class="text-xl font-bold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-gear text-slate-500"></i> 설정</h3>
                 <button onclick="closeSettingsPanel()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-times text-xl"></i></button>
             </div>
-            <!-- 탭: 화면 / 위젯 / 도구 -->
+            <!-- 탭: 테마 / 글꼴·팝업 / 위젯·도구 -->
             <div class="flex gap-2 mb-4 shrink-0">
                 <button type="button" id="settings-tabbtn-look" onclick="switchSettingsTab('look')" class="settings-tabbtn">🎨 테마</button>
                 <button type="button" id="settings-tabbtn-style" onclick="switchSettingsTab('style')" class="settings-tabbtn">✍ 글꼴·팝업</button>
-                <button type="button" id="settings-tabbtn-widget" onclick="switchSettingsTab('widget')" class="settings-tabbtn">🪟 위젯</button>
-                <button type="button" id="settings-tabbtn-tools" onclick="switchSettingsTab('tools')" class="settings-tabbtn">⏱ 도구</button>
+                <button type="button" id="settings-tabbtn-widget" onclick="switchSettingsTab('widget')" class="settings-tabbtn">🪟 위젯·도구</button>
             </div>
             <div class="overflow-y-auto custom-scrollbar flex-1 min-h-0">
 
@@ -5789,10 +5788,9 @@ body.menu-font-on #settings-panel-modal .settings-tabbtn, body.menu-font-on #the
                         </div>
                     </div></div>
                     </div>
-                </div>
 
-                <!-- ── 도구: 미니창 / 뽀모도로 / 오늘의 브리핑 ── -->
-                <div id="settings-tab-tools" class="hidden">
+                <!-- ── 도구: 미니창 / 뽀모도로 / 오늘의 브리핑 (위젯과 같은 화면) ── -->
+                <div id="settings-tab-tools" class="mt-5 pt-4 border-t border-slate-200">
                     <div class="grid grid-cols-3 gap-x-7 gap-y-4 items-start">
                         <div><!-- 미니창 -->
                     <div>
@@ -5914,6 +5912,7 @@ body.menu-font-on #settings-panel-modal .settings-tabbtn, body.menu-font-on #the
                         </div>
                     </div></div>
                     </div>
+                </div>
                 </div>
 
             </div>
@@ -7889,6 +7888,35 @@ body.menu-font-on #settings-panel-modal .settings-tabbtn, body.menu-font-on #the
             const c = getGenreColor(genreName);
             return hexToRgba(c, genreBadgeOpacity || 0.5);
         }
+        // ── 그래프도 테마 따라: 스킨마다 막대 윤곽선·색 농도·격자·글씨 색/체를 달리한다 (코지는 기존 그대로) ──
+        function chartSkin() {
+            const c = document.body.classList;
+            const S = {
+                spiral:   { ink: '#1F2D27', alpha: .9,  bw: 2,   radius: 4, grid: 'rgba(31,45,39,.20)',  dash: [5, 4], track: '#D3EFE0', slice: '#1F2D27', sw: 2 },
+                label:    { ink: '#4a4036', alpha: .85, bw: 1.5, radius: 3, grid: 'rgba(74,64,54,.20)',  dash: [4, 4], track: '#EFE6CF', slice: '#FFFCF4', sw: 2 },
+                polaroid: { ink: '#4a4036', alpha: .92, bw: 3,   radius: 2, grid: '#DDD0B4',             dash: [],     track: '#EDE5D3', slice: '#FFFEFA', sw: 3, bcol: '#FFFEFA' },
+                postcard: { ink: '#3E4660', alpha: .88, bw: 1.5, radius: 0, grid: 'rgba(62,70,96,.22)',  dash: [6, 3], track: '#E2E9F3', slice: '#FCF8EE', sw: 2 },
+                retro:    { ink: '#5B2E1F', alpha: .95, bw: 2,   radius: 6, grid: 'rgba(91,46,31,.30)',  dash: [2, 4], track: '#F9D3DA', slice: '#FFF6E2', sw: 3 }
+            };
+            for (const k in S) if (c.contains('theme-' + k)) return S[k];
+            return null;
+        }
+        let _chartDefaults0 = null;
+        function chartApplyDefaults() {
+            if (typeof Chart === 'undefined') return;
+            if (!_chartDefaults0) _chartDefaults0 = { color: Chart.defaults.color, family: Chart.defaults.font.family };
+            const sk = chartSkin();
+            Chart.defaults.color = sk ? sk.ink : _chartDefaults0.color;
+            Chart.defaults.font.family = sk ? (getComputedStyle(document.body).fontFamily || _chartDefaults0.family) : _chartDefaults0.family;
+        }
+        function chartBarStyle(genreName) {
+            const sk = chartSkin(); if (!sk) return { backgroundColor: getGenrePastelColor(genreName), borderRadius: 4 };
+            return { backgroundColor: hexToRgba(getGenreColor(genreName), sk.alpha), borderColor: sk.bcol || sk.ink, borderWidth: sk.bw, borderRadius: sk.radius, borderSkipped: false };
+        }
+        function chartSliceColor(genreName) { const sk = chartSkin(); return sk ? hexToRgba(getGenreColor(genreName), sk.alpha) : getGenrePastelColor(genreName); }
+        function chartSliceBorder() { const sk = chartSkin(); return sk ? { w: sk.sw, c: sk.slice } : { w: 0, c: undefined }; }
+        function chartGrid() { const sk = chartSkin(); return sk ? { color: sk.grid, borderDash: sk.dash } : { color: '#f3f4f6' }; }
+        function chartTrack(def) { const sk = chartSkin(); return sk ? sk.track : def; }
         function formatCurrency(val) { if(!val && val !== 0) return ""; return Math.round(Number(val)).toLocaleString(); }
         function getYYYYMMDD(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
         // 추정 총매출 공식: 총매출 × 0.7(플랫폼 30% 차감) × (rate/100) = 순수익
@@ -9544,7 +9572,8 @@ body.menu-font-on #settings-panel-modal .settings-tabbtn, body.menu-font-on #the
         }
 
         function switchSettingsTab(t) {
-            ['look', 'style', 'widget', 'tools'].forEach(k => {
+            if (t === 'tools') t = 'widget';   // 예전에 저장된 '도구' 탭은 위젯·도구로
+            ['look', 'style', 'widget'].forEach(k => {
                 const p = document.getElementById('settings-tab-' + k); if (p) p.classList.toggle('hidden', k !== t);
                 const b = document.getElementById('settings-tabbtn-' + k); if (b) b.classList.toggle('active', k === t);
             });
@@ -15181,6 +15210,7 @@ body.menu-font-on #settings-panel-modal .settings-tabbtn, body.menu-font-on #the
             btn.textContent = show ? '접기' : `전체 ${rows.length + 8}개 보기`;
         }
         function drawLifecycleChart(life) {
+            chartApplyDefaults();
             lifecycleChartInstances.forEach(c => c.destroy());
             lifecycleChartInstances = [];
             if (!life || typeof Chart === 'undefined') return;
@@ -15205,7 +15235,7 @@ body.menu-font-on #settings-panel-modal .settings-tabbtn, body.menu-font-on #the
                         plugins: { legend: { display: false },
                             tooltip: { callbacks: { label: c => `${c.dataset.label}: ₩ ${formatCurrency(c.parsed.y)}` } } },
                         scales: { x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 0, autoSkipPadding: 6 } },
-                            y: { beginAtZero: true, grid: { color: '#f3f4f6' }, ticks: { font: { size: 10 }, maxTicksLimit: 5, callback: v => v >= 10000 ? (v / 10000).toLocaleString() + '만' : v } } }
+                            y: { beginAtZero: true, grid: chartGrid(), ticks: { font: { size: 10 }, maxTicksLimit: 5, callback: v => v >= 10000 ? (v / 10000).toLocaleString() + '만' : v } } }
                     }
                 }));
             });
@@ -15660,9 +15690,9 @@ body.menu-font-on #settings-panel-modal .settings-tabbtn, body.menu-font-on #the
                         </div>`).join('');
             }
             const tbody = document.getElementById('dash-genre-body'), thead = document.getElementById('dash-genre-header'); if (thead && tbody) { thead.innerHTML = `<th class="px-4 py-3">장르</th>` + years.map(y => `<th class="px-4 py-3 text-right">${y}</th>`).join('') + `<th class="px-4 py-3 text-right text-emerald-600">누적 합계</th>`; let tbodyHtml = genreList.map(g => { let gTotal = 0; let row = `<tr class="hover:bg-slate-50 transition-colors border-b border-slate-50"><td class="px-4 py-3 font-bold text-slate-600">${g.name}</td>` + years.map(y => { const s = (yearTotals[y] || {})[g.name] || 0; gTotal += s; return `<td class="px-4 py-3 text-right text-slate-500">${formatCurrency(s)}</td>`; }).join('') + `<td class="px-4 py-3 text-right font-bold text-emerald-600">${formatCurrency(gTotal)}</td></tr>`; return row; }).join(''); let grandTotalAll = 0, footerRow = `<tr class="bg-slate-100"><td class="px-4 py-3 font-black text-slate-700">총합</td>` + years.map(y => { let yearSum = 0; genreList.forEach(g => { yearSum += (yearTotals[y] || {})[g.name] || 0; }); grandTotalAll += yearSum; return `<td class="px-4 py-3 text-right font-black text-slate-700">${formatCurrency(yearSum)}</td>`; }).join('') + `<td class="px-4 py-3 text-right font-black text-slate-700">${formatCurrency(grandTotalAll)}</td></tr>`; tbody.innerHTML = tbodyHtml + footerRow; }
-            if(mainChartInstance) mainChartInstance.destroy(); if (document.getElementById('mainChart')) { document.getElementById('chart-year-display').innerText = chartViewYear; mainChartInstance = new Chart(document.getElementById('mainChart'), { type: 'bar', data: { labels: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'], datasets: genreList.map(g => ({ label: g.name, data: Array(12).fill(0).map((_, i) => { let sum = 0; masterWorks.filter(w => w.genre === g.name).forEach(w => sum += (monthlyData[`${chartViewYear}-${String(i+1).padStart(2,'0')}`] || {})[w.id] || 0); return sum; }), backgroundColor: getGenrePastelColor(g.name), borderRadius: 4 })) }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, grid: { color: '#f3f4f6' } } } } }); }
+            chartApplyDefaults(); if(mainChartInstance) mainChartInstance.destroy(); if (document.getElementById('mainChart')) { document.getElementById('chart-year-display').innerText = chartViewYear; mainChartInstance = new Chart(document.getElementById('mainChart'), { type: 'bar', data: { labels: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'], datasets: genreList.map(g => ({ label: g.name, data: Array(12).fill(0).map((_, i) => { let sum = 0; masterWorks.filter(w => w.genre === g.name).forEach(w => sum += (monthlyData[`${chartViewYear}-${String(i+1).padStart(2,'0')}`] || {})[w.id] || 0); return sum; }), ...chartBarStyle(g.name) })) }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, grid: chartGrid() } } } }); }
             try { renderCozyHero(); } catch (e) {}
-            if(genreChartInstance) genreChartInstance.destroy(); if (document.getElementById('genreChart')) { let currentGenreStats = {}; if (genreChartViewYear === 'total') { currentGenreStats = genreStats; document.getElementById('genre-chart-year-display').innerText = '전체'; } else { currentGenreStats = yearTotals[genreChartViewYear] || {}; document.getElementById('genre-chart-year-display').innerText = genreChartViewYear; } const gData = genreList.map(g => currentGenreStats[g.name] || 0), total = gData.reduce((a,b)=>a+b, 0); genreChartInstance = new Chart(document.getElementById('genreChart'), { type: 'doughnut', data: { labels: genreList.map(g => g.name), datasets: [{ data: gData, backgroundColor: genreList.map(g => getGenrePastelColor(g.name)), borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { display: false } } }, plugins: [genreSliceLabelPlugin] }); document.getElementById('genre-legend').innerHTML = genreList.map((g, i) => `<div class="flex justify-between items-center mb-1"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full" style="background:${getGenreColor(g.name)}"></span><span class="text-slate-500 text-xs">${g.name}</span></div><span class="font-bold text-slate-700 text-xs">₩ ${formatCurrency(gData[i])} <span class="font-bold" style="color:var(--primary)">(${total > 0 ? Math.round((gData[i]/total)*100) : 0}%)</span></span></div>`).join(''); }
+            if(genreChartInstance) genreChartInstance.destroy(); if (document.getElementById('genreChart')) { let currentGenreStats = {}; if (genreChartViewYear === 'total') { currentGenreStats = genreStats; document.getElementById('genre-chart-year-display').innerText = '전체'; } else { currentGenreStats = yearTotals[genreChartViewYear] || {}; document.getElementById('genre-chart-year-display').innerText = genreChartViewYear; } const gData = genreList.map(g => currentGenreStats[g.name] || 0), total = gData.reduce((a,b)=>a+b, 0); genreChartInstance = new Chart(document.getElementById('genreChart'), { type: 'doughnut', data: { labels: genreList.map(g => g.name), datasets: [{ data: gData, backgroundColor: genreList.map(g => chartSliceColor(g.name)), borderWidth: chartSliceBorder().w, borderColor: chartSliceBorder().c }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { display: false } } }, plugins: [genreSliceLabelPlugin] }); document.getElementById('genre-legend').innerHTML = genreList.map((g, i) => `<div class="flex justify-between items-center mb-1"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full" style="background:${getGenreColor(g.name)}"></span><span class="text-slate-500 text-xs">${g.name}</span></div><span class="font-bold text-slate-700 text-xs">₩ ${formatCurrency(gData[i])} <span class="font-bold" style="color:var(--primary)">(${total > 0 ? Math.round((gData[i]/total)*100) : 0}%)</span></span></div>`).join(''); }
         }
 
         // 🟢 [NEW] 집필/스케줄 로직 시작
@@ -21561,15 +21591,16 @@ body.menu-font-on #settings-panel-modal .settings-tabbtn, body.menu-font-on #the
             if (breakdown && breakdown.length) {
                 const remaining = remainingChars;
                 data = breakdown.map(b=>b.chars); bg = breakdown.map(b=> b.color || color);
-                if (remaining > 0) { data.push(remaining); bg.push('#e2e8f0'); remainingIndex = data.length - 1; }
+                if (remaining > 0) { data.push(remaining); bg.push(chartTrack('#e2e8f0')); remainingIndex = data.length - 1; }
             } else {
                 const per = Math.min((current/(goal||1))*100, 100);
-                data = [per, 100-per]; bg = [color, '#e2e8f0'];
+                data = [per, 100-per]; bg = [color, chartTrack('#e2e8f0')];
                 if (remainingChars > 0) remainingIndex = 1;
             }
+            chartApplyDefaults();
             new Chart(canvas, {
                 type: 'doughnut',
-                data: { datasets: [{ data, backgroundColor: bg, borderWidth: 0 }] },
+                data: { datasets: [{ data, backgroundColor: bg, borderWidth: chartSkin() ? 1.5 : 0, borderColor: chartSkin() ? chartSkin().ink : undefined }] },
                 options: {
                     cutout: '68%', responsive: true, maintainAspectRatio: false, layout: { padding: 2 },
                     plugins: {

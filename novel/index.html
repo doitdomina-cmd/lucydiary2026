@@ -5344,6 +5344,15 @@ document.addEventListener('compositionend', e => {
     const ed = e.target.closest && e.target.closest('.manuscript[contenteditable="true"]');
     if (ed) setTimeout(() => tryAutoReplace(ed), 0);
 }, true);
+// 입력기(한글 IME)가 마침표를 'insertText'가 아닌 방식으로 넘겨도 자동 치환이 되도록, 키를 뗀 뒤에도 한 번 더 확인
+document.addEventListener('keyup', e => {
+    if (replacing || imeComposing) return;
+    if (e.key !== '.' && e.code !== 'Period' && e.key !== 'Process') return;
+    const ed = e.target.closest && e.target.closest('.manuscript[contenteditable="true"]'); if (!ed) return;
+    const before = ed.innerHTML;
+    tryAutoReplace(ed);
+    if (ed.innerHTML !== before) onEditorInput(ed);
+}, true);
 function openAutoReplace() {
     const bg = document.createElement('div'); bg.className = 'modal-bg';
     document.body.appendChild(bg);

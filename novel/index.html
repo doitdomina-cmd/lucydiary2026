@@ -7628,7 +7628,7 @@ function refreshLeads() {
     const w = typeof synopWin === 'function' ? synopWin() : null; if (!w) return false;
     let changed = false; const map = pref.synopMap || {};
     works().forEach(wk => {
-        const ws = w.workspaces.find(x => x.id === map[wk.id]) || w.workspaces.find(x => normTitle(x.title) === normTitle(wk.title)); if (!ws) return;
+        const ws = w.workspaces.find(x => x.id === map[wk.id]) || findSynopByTitle(w.workspaces, wk.title); if (!ws) return;
         const pf = ws.charProfiles || {}, m = String(pf.mainMale?.name || '').trim(), f = String(pf.mainFemale?.name || '').trim();
         const pl = get('plan_' + wk.id) || ensurePlan(wk.id);
         const nm = m || pl.leadM || '', nf = f || pl.leadF || '';   // 보드에 이름이 있을 때만 덮어씀 (직접 적은 이름은 그대로)
@@ -8077,12 +8077,17 @@ function ensureSynopFrame() {
     const wait = () => { if (synopWin()) { syncSynopBoard(); renderTree(); renderSbViews(); renderChars(true); return; } tries++; setTimeout(wait, tries < 60 ? 500 : 3000); }; // 클라우드 불러오기가 늦어져도 포기하지 않고 계속 확인
     $('iframe', host).addEventListener('load', () => { applySynopFont(); wait(); });
 }
-const normTitle = t => String(t || '').replace(/\s+/g, '').toLowerCase();
+const normTitle = t => String(t || '').replace(/[\s\[\]()（）【】·\-_:]+/g, '').toLowerCase();
+// 이름이 똑같은 시놉을 먼저, 없으면 한쪽 이름이 다른 쪽에 들어 있는 시놉(예: [BL] 권태의 종말)을 찾음
+function findSynopByTitle(list, title) {
+    const t = normTitle(title); if (!t) return null;
+    return list.find(x => normTitle(x.title) === t) || list.find(x => { const n = normTitle(x.title); return n.length >= 2 && (n.includes(t) || t.includes(n)); }) || null;
+}
 function syncSynopBoard() {
     const w = synopWin(); if (!w) return;
     const wid = curWorkId(), work = get(wid), map = pref.synopMap || {};
     let target = map[wid] && w.workspaces.some(x => x.id === map[wid]) ? map[wid] : null;
-    if (!target && work) target = w.workspaces.find(x => normTitle(x.title) === normTitle(work.title))?.id || null;
+    if (!target && work) target = findSynopByTitle(w.workspaces, work.title)?.id || null;
     if (target && w.currentWorkspaceId !== target) { try { w.switchBoard(target); } catch (e) { console.warn(e); } }
     synopFrameWid = wid; synopAutoId = w.currentWorkspaceId;
     synopPicking = false; lockSynopList(); sbPage = '';
@@ -8137,7 +8142,7 @@ const SB_PROFILE = [['name', '이름'], ['age', '나이'], ['job', '직업'], ['
 function sbBoard() {
     const w = synopWin(); if (!w) return null;
     const wid = curWorkId(), work = get(wid), map = pref.synopMap || {};
-    return w.workspaces.find(x => x.id === map[wid]) || (work && w.workspaces.find(x => normTitle(x.title) === normTitle(work.title))) || null;
+    return w.workspaces.find(x => x.id === map[wid]) || (work && findSynopByTitle(w.workspaces, work.title)) || null;
 }
 function sbLabel(tab, fallback) {
     const b = sbBoard();

@@ -4035,6 +4035,10 @@ body.theme-cozy #year-timeline-content[data-card] #year-timeline-body [title][da
 body.theme-cozy #year-timeline-content[data-card] #year-timeline-body [title][data-short="1"][style*="border-left:4px solid"] { padding-top: 4px !important; }
 /* 스프링노트 집필 달력 기간 막대: 날짜 숫자 동그라미를 가리지 않게 조금 아래로 */
 body.theme-cozy #write-calendar-body[data-card="spiral"] .write-span-bar { margin-top: 7px; }
+/* ═══ 무늬가 있는 기간 일정 색: 테마가 단색으로 덮어쓰지 않고 고른 무늬 그대로 ═══
+ */
+body.theme-cozy #write-calendar-body[data-card] .write-span-bar[data-pat="1"][style*="--bgo"] { background: var(--bgo) !important; }
+body.theme-cozy #year-timeline-content[data-card] #year-timeline-body [title][data-pat="1"][data-short][style*="--bgo"][style*="border-left:4px solid"]:not([data-x]) { background: var(--bgo) !important; }
 /* ═══ 집필 카드: 분류(작교·시놉시스·기타·메모) 색은 구분용이라 모든 테마에서 유지 — 그 분류 색을 테마별 색감(바탕·농도)에 섞어서 보여준다 ═══ */
 #write-calendar-body[data-card="label"] { --cat-base: #FFFCF4; --cat-mix: 64%; }
 #write-calendar-body[data-card="polaroid"] { --cat-base: #FFFEFA; --cat-mix: 58%; }
@@ -19476,8 +19480,8 @@ body.theme-cozy #write-calendar-body[data-card="gaming"] .write-span-bar { margi
                     <div onmousedown="startTimelineSpanResize(event, '${it.spanId}', 'end')" ontouchstart="startTimelineSpanResize(event, '${it.spanId}', 'end')" title="종료일 조절" style="position:absolute; right:0; top:0; width:14px; height:100%; cursor:ew-resize;"></div>
                 ` : '';
 
-                track += `<div title="${tip}" ${click} data-short="${((it.endIdx - it.startIdx + 1) <= 16 || it.w < 100) ? 1 : 0}"
-                    style="position:absolute; left:${it.x + 1}px; top:${top}px; width:${Math.max(3, it.w - 2)}px; height:${TL_BAR_H}px; ${isSpan ? '--spc:' + it.color + '; --vc:' + spanColorVivid(it.color) + ';' : ''} --tp:${_tapeColor(it.spanWorkId || it.workId || it.spanId || it.title)};
+                track += `<div title="${tip}" ${click} data-short="${((it.endIdx - it.startIdx + 1) <= 16 || it.w < 100) ? 1 : 0}" ${(isSpan && typeof it.color === 'string' && it.color.indexOf('gradient') > -1) ? 'data-pat="1"' : ''}
+                    style="position:absolute; left:${it.x + 1}px; top:${top}px; width:${Math.max(3, it.w - 2)}px; height:${TL_BAR_H}px; ${isSpan ? '--spc:' + spanColorSolid(it.color) + '; --vc:' + spanColorVivid(it.color) + ';' + ((typeof it.color === 'string' && it.color.indexOf('gradient') > -1) ? ' --bgo:' + it.color.replace(/"/g, "'") + ';' : '') : ''} --tp:${_tapeColor(it.spanWorkId || it.workId || it.spanId || it.title)};
                            background:${isSpan ? it.color : hexToRgba(it.color, 0.35)};
                            border-left:4px solid ${isSpan ? spanColorSolid(it.color) : it.color}; border-radius:8px; box-sizing:border-box;
                            box-shadow:0 1px 3px rgba(0,0,0,.06); cursor:${isSpan ? 'grab' : 'pointer'};
@@ -21499,6 +21503,7 @@ body.theme-cozy #write-calendar-body[data-card="gaming"] .write-span-bar { margi
                         letter-spacing:0.4px; word-spacing:1px;
                         box-shadow:0 1px 2px rgba(0,0,0,0.06);`;
                     bar.title = label + (s.memo ? `\n${s.memo}` : '');
+                    if (typeof s.color === 'string' && s.color.indexOf('gradient') > -1) { bar.dataset.pat = '1'; bar.style.setProperty('--bgo', s.color); }   // 무늬 색은 테마가 단색으로 덮지 않게 표시
                     // 첫 조각에만 전체 정보를 쓰고, 이어지는 조각은 제목만 간단히
                     const lead = startsIn ? '' : '◀ ';
                     // 첫 조각에 다 안 들어가면: 첫 조각은 제목만, 바로 다음 주 조각에 기간·글자수까지 전체 정보를 쓴다

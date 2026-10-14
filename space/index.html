@@ -4856,7 +4856,13 @@ function tdCardIcon(name){
   else d='<path d="M12 3l2 6 6 2-6 2-2 6-2-6-6-2 6-2z"/>';
   return '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+d+'</svg>';
 }
-function tdCardBg(r){return czPick(r.task,r.id);}
+// 카드 사진 = 그 루틴이 속한 프로젝트의 사진(프로젝트 카드와 같은 사진)
+function tdCardBg(r){
+  var pr=r.rzProjectId?(S.projects||[]).find(function(p){return p.id===r.rzProjectId;}):null;
+  if(!pr) return czPick(r.task,r.id);
+  var ar=(S.lifeAreas||[]).find(function(a){return a.id===pr.lifeAreaId;});
+  return czProjectPhoto(pr,ar);
+}
 function tdCardTag(r){var pr=r.rzProjectId?(S.projects||[]).find(function(p){return p.id===r.rzProjectId;}):null;return pr?(pr.name||''):'';}
 var _tdTipOff=false; try{_tdTipOff=localStorage.getItem('lucy_td_tip_off')==='1';}catch(e){}
 function tdTipClose(){_tdTipOff=!_tdTipOff;try{localStorage.setItem('lucy_td_tip_off',_tdTipOff?'1':'0');}catch(e){}render();}
@@ -4869,7 +4875,7 @@ function tdCardTray(ds){
   if(!all.length) h+='<div class="tdr-empty">프로젝트에서 루틴을 만들면 여기에 카드가 쌓여요</div>';
   else if(!pool.length) h+='<div class="tdr-empty">모두 오늘에 담았어요 ✿</div>';
   else h+='<div class="tdt-grid">'+pool.map(function(r){
-    return '<button type="button" class="tdt-tile" style="--wc:'+esc(tdCardColor(r))+';background-image:url(\''+esc(tdCardBg(r))+'\')" onclick="tdAddCard(\''+r.id+'\',\''+ds+'\')" title="오늘에 추가">'+
+    return '<button type="button" class="tdt-tile" style="--wc:'+esc(tdCardColor(r))+';background-image:url(\''+esc(tdCardBg(r)).replace(/'/g,'%27')+'\')" onclick="tdAddCard(\''+r.id+'\',\''+ds+'\')" title="오늘에 추가">'+
       '<span class="tdt-ic">'+tdCardIcon(r.task)+'</span><b>'+esc(r.task)+'</b>'+(tdCardTag(r)?'<em>'+esc(tdCardTag(r))+'</em>':'')+'<i class="tdt-plus">＋</i></button>';
   }).join('')+'</div>';
   h+='<div class="tdt-tip">'+
@@ -4892,7 +4898,7 @@ function tdTimeline(ds){
   h+='<div class="tdtl-list">'+order.map(function(r){
     var on=!!ck[r.id], t=tm[r.id], m=mm[r.id], tag=tdCardTag(r);
     var pill=on?(t?'<span class="tdtl-pill">◷ '+esc(t)+'</span>':'<span class="tdtl-pill chk">✓ 체크만 완료</span>'):'<span class="tdtl-pill todo">눌러서 시간·메모 남기기</span>';
-    return '<div class="tdtl-row"><i class="tdtl-dot"></i><div class="tdtl-card'+(on?'':' pend')+'" style="--wc:'+esc(tdCardColor(r))+';background-image:url(\''+esc(tdCardBg(r))+'\')" onclick="tdPickCard(\''+r.id+'\',\''+ds+'\')">'+
+    return '<div class="tdtl-row"><i class="tdtl-dot"></i><div class="tdtl-card'+(on?'':' pend')+'" style="--wc:'+esc(tdCardColor(r))+';background-image:url(\''+esc(tdCardBg(r)).replace(/'/g,'%27')+'\')" onclick="tdPickCard(\''+r.id+'\',\''+ds+'\')">'+
       '<span class="tdtl-ic">'+tdCardIcon(r.task)+'</span><div class="tdtl-body"><div class="tdtl-t"><b>'+esc(r.task)+'</b>'+(tag?'<em>'+esc(tag)+'</em>':'')+'</div>'+pill+(m?'<p>'+esc(m)+'</p>':'')+'</div></div></div>';
   }).join('')+'</div></div>';
   return h;

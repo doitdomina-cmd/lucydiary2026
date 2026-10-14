@@ -3387,6 +3387,7 @@ function openHealthMo(t,b,f){
   document.getElementById('mo').classList.add('open');
 }
 function closeMo(){
+  if(window._diaryOpenDs){var _dds=window._diaryOpenDs;window._diaryOpenDs=null;diaryAutoFlush(_dds);}
   var mh=document.querySelector('.mh');
   var existBtns=mh&&mh.querySelector('.mo-hbtns');
   if(existBtns) existBtns.remove();
@@ -5623,7 +5624,7 @@ function openDiaryModal(ds){
     '<div style="display:flex;gap:4px;flex-wrap:wrap">'+moodHtml+'</div></div>'+
     '<div style="margin-bottom:9px"><div style="font-size:0.76em;color:var(--t3);margin-bottom:4px">날씨</div>'+
     '<div style="display:flex;gap:4px;flex-wrap:wrap">'+weatherHtml+'</div></div>'+
-    '<div style="margin-bottom:12px"><input id="diary-title-inp" class="inp" placeholder="제목 (선택)" value="'+esc(rawTitle)+'" style="font-family:'+dFF+';font-size:1em;font-weight:500;background:transparent;border-color:transparent;border-bottom:1px solid var(--border);border-radius:0;padding:6px 0"></div>'+
+    '<div style="margin-bottom:12px"><input id="diary-title-inp" class="inp" placeholder="제목 (선택)" value="'+esc(rawTitle)+'" style="font-family:'+dFF+';font-size:1em;font-weight:500;background:transparent;border-color:transparent;border-bottom:1px solid var(--border);border-radius:0;padding:6px 0" oninput="diaryAutoSave()"></div>'+
     '<div class="dnote nt-'+memNoteId(entry.note)+'" id="diary-note">'+
       '<div id="diary-line-nums-clip" style="position:absolute;left:0;top:0;bottom:0;width:38px;overflow:hidden;pointer-events:none;background:var(--s2);border-right:1px solid var(--border)">'+
         '<div id="diary-line-nums" style="padding:8px 6px 8px 0;font-family:var(--mono);font-size:0.9286em;color:var(--t3);line-height:1.8;user-select:none;text-align:right">'+
@@ -5631,15 +5632,15 @@ function openDiaryModal(ds){
         '</div>'+
       '</div>'+
       '<textarea id="diary-ta" style="width:100%;height:34vh;min-height:190px;border:none;border-radius:0;padding:8px 12px 8px 46px;font-size:0.9286em;font-family:'+dFF+';line-height:1.8;resize:none;background:transparent;color:var(--text);outline:none;display:block;box-sizing:border-box" '+
-      'placeholder="오늘 감사한 일을 적어보세요..." oninput="updateLineNums(this)" onscroll="syncLineNums(this)">'+esc(rawText)+'</textarea>'+
+      'placeholder="오늘 감사한 일을 적어보세요..." oninput="updateLineNums(this);diaryAutoSave()" onscroll="syncLineNums(this)">'+esc(rawText)+'</textarea>'+
     '</div>'+
     '<div style="margin:-6px 0 14px"><div style="font-size:0.76em;color:var(--t3);margin-bottom:5px">노트 바탕</div><div class="mem-nts" id="diary-nts" data-n="'+memNoteId(entry.note)+'">'+MEM_NOTES.map(function(n){return '<button type="button" data-n="'+n.id+'" class="'+(memNoteId(entry.note)===n.id?'on':'')+'" onclick="diaryPickNote(\''+n.id+'\')"><span class="mem-note nt-'+n.id+'"></span>'+n.ko+'</button>';}).join('')+'</div></div>'+
     photoHtml,
     '<button class="btn bg" onclick="closeMo()">닫기</button>'+
     (rawText?'<button class="btn bg bsm" style="color:var(--red)" data-ds="'+ds+'" onclick="delDiaryEntry(this.dataset.ds)">삭제</button>':'')+
-    '<button class="btn bp" id="diary-save-btn">저장</button>'
+    '<span style="font-size:.75em;color:var(--t3);align-self:center">자동 저장돼요</span>'
   );
-  document.getElementById('diary-save-btn').onclick=function(){saveDiaryFromModal(ds);};
+  window._diaryOpenDs=ds;
   setTimeout(function(){var ta=document.getElementById('diary-ta');if(ta) updateLineNums(ta);},50);
 }
 
@@ -5690,6 +5691,37 @@ function diaryPickNote(n){
   var box=document.getElementById('diary-note'),nts=document.getElementById('diary-nts');if(!box||!nts)return;
   nts.dataset.n=n;box.className='dnote nt-'+memNoteId(n);
   nts.querySelectorAll('button').forEach(function(b){b.classList.toggle('on',b.dataset.n===n);});
+  diaryAutoSave();
+}
+var _diaryAutoT=null;
+function diaryAutoSave(){
+  var ds=window._diaryOpenDs; if(!ds) return;
+  clearTimeout(_diaryAutoT);
+  _diaryAutoT=setTimeout(function(){diaryAutoWrite(ds);},300);
+}
+function diaryAutoWrite(ds){
+  var ta=document.getElementById('diary-ta'),ti=document.getElementById('diary-title-inp');
+  if(!ta) return false;
+  if(!S.diaryEntries) S.diaryEntries={};
+  var e=S.diaryEntries[ds];
+  var nts=document.getElementById('diary-nts');
+  var note=nts?memNoteId(nts.dataset.n):undefined;
+  var title=ti?ti.value.trim():'';
+  // 빈 새 일기는 만들지 않는다
+  if(!e && !ta.value && !title) return false;
+  if(!e) e=S.diaryEntries[ds]={text:'',mood:'',weather:''};
+  e.text=ta.value;
+  if(ti) e.title=title;
+  if(note) e.note=note;
+  save();
+  return true;
+}
+// 모달을 닫을 때: 대기 중인 입력을 바로 저장하고 화면/사진 반영
+function diaryAutoFlush(ds){
+  clearTimeout(_diaryAutoT);
+  diaryAutoWrite(ds);
+  render();
+  if(pendingDiaryPhoto[ds]) finishDiaryPhotoUpload(ds);
 }
 function saveDiaryFromModal(ds){
   var ta=document.getElementById('diary-ta'),ti=document.getElementById('diary-title-inp');
@@ -5705,6 +5737,7 @@ function saveDiaryFromModal(ds){
 }
 function delDiaryEntry(ds){
   if(!confirm('이 날의 일기를 삭제할까요?')) return;
+  window._diaryOpenDs=null; clearTimeout(_diaryAutoT);
   var oldEntry=S.diaryEntries&&S.diaryEntries[ds]?Object.assign({},S.diaryEntries[ds]):null;
   if(S.diaryEntries&&S.diaryEntries[ds]) delete S.diaryEntries[ds];
   save(); closeMo(); render();

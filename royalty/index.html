@@ -19071,6 +19071,7 @@ body.theme-gaming #genre-sheets-container .sheet-footer-inner td.grand-total-cel
                         spanId: s.id, color: s.color || '#E2D1A0',
                         title: (s.title && s.title !== '(제목 없음)') ? s.title : '',
                         workName: s.workId ? ((resolveWorkItem(s.workId).displayTitle || '') + (getSpanSeqInfo(s.id) ? ` ${getSpanSeqInfo(s.id).n}` : '')) : '',
+                        spanWorkId: s.workId || '', seqBase: s.workId ? (resolveWorkItem(s.workId).displayTitle || '') : '', seqN: (getSpanSeqInfo(s.id) || {}).n || 0,
                         cumChars: (getSpanSeqInfo(s.id) || {}).n > 1 ? getSpanSeqInfo(s.id).cumChars : 0,
                         spanType: sType, noChars: st.noChars,
                         startIdx: Math.max(0, tlDayIndex(s.startDate, y)),
@@ -19093,6 +19094,62 @@ body.theme-gaming #genre-sheets-container .sheet-footer-inner td.grand-total-cel
                     if (i - i0 >= 2) restSegs.push({ startIdx: i0, endIdx: i-1, days: i - i0 });
                     i0 = null;
                 }
+            }
+
+            // ── 4-2) 같은 작품의 집필 기간 일정이 각각 3만자 이상이고 서로 10일 이하로 떨어져 있으면 연간 일정에서는 카드 하나로 합쳐서 보여준다.
+            //        (합쳐진 카드 안의 빈 날은 위에서 구한 '쉬는 구간'(restSegs)에 그대로 남고, 1일짜리 휴식도 맨 아래 줄에 표시한다)
+            const TL_BIG_SPAN = 30000, TL_BIG_GAP = 10;
+            {
+                const out = []; let cur = null, curMembers = [];
+                const flush = () => {
+                    if (!cur) return;
+                    if (curMembers.length > 1) {
+                        const first = curMembers[0], last = curMembers[curMembers.length - 1];
+                        const gaps = [];
+                        for (let k = 1; k < curMembers.length; k++) {
+                            const gs = curMembers[k-1].endIdx + 1, ge = curMembers[k].startIdx - 1;
+                            if (ge >= gs) gaps.push({ startIdx: gs, endIdx: ge });
+                        }
+                        const n1 = first.seqN, nN = last.seqN;
+                        const merged = Object.assign({}, first, {
+                            endIdx: last.endIdx,
+                            days: last.endIdx - first.startIdx + 1,
+                            workDays: curMembers.reduce((n, m) => n + (m.workDays || 0), 0),
+                            restDays: curMembers.reduce((n, m) => n + (m.restDays || 0), 0) + gaps.reduce((n, g) => n + (g.endIdx - g.startIdx + 1), 0),
+                            chars: curMembers.reduce((n, m) => n + (m.chars || 0), 0),
+                            cumChars: last.cumChars || curMembers.reduce((n, m) => n + (m.chars || 0), 0),
+                            workName: first.seqBase ? (first.seqBase + (n1 && nN && n1 !== nN ? ` ${n1}~${nN}` : (n1 ? ` ${n1}` : ''))) : first.workName,
+                            mergedCount: curMembers.length, mergedGaps: gaps
+                        });
+                        out.push(merged);
+                    } else out.push(cur);
+                    cur = null; curMembers = [];
+                };
+                items.forEach(it => {
+                    const big = it.kind === 'span' && it.group === 'spanWrite' && it.spanWorkId && !it.noChars && (it.chars || 0) >= TL_BIG_SPAN;
+                    if (big && cur && cur.spanWorkId === it.spanWorkId && it.startIdx - curMembers[curMembers.length - 1].endIdx - 1 <= TL_BIG_GAP && it.startIdx > curMembers[curMembers.length - 1].endIdx) {
+                        curMembers.push(it);
+                    } else {
+                        flush();
+                        if (big) { cur = it; curMembers = [it]; } else out.push(it);
+                    }
+                });
+                flush();
+                // 합쳐진 카드 안의 비어 있던 날(1일짜리 포함)도 맨 아래 휴식 줄에 빠지지 않게 챙긴다
+                out.forEach(it => (it.mergedGaps || []).forEach(g => {
+                    let s0 = null;
+                    for (let i = g.startIdx; i <= g.endIdx + 1; i++) {
+                        const free = i <= g.endIdx && !busy[i];
+                        if (free && s0 === null) s0 = i;
+                        else if (!free && s0 !== null) {
+                            const seg = { startIdx: s0, endIdx: i - 1, days: i - s0 };
+                            if (!restSegs.some(r => r.startIdx === seg.startIdx && r.endIdx === seg.endIdx)) restSegs.push(seg);
+                            s0 = null;
+                        }
+                    }
+                }));
+                restSegs.sort((a, b) => a.startIdx - b.startIdx);
+                items = out;
             }
 
             // ── 5) 월별 목표 글자수 (집필 카드 기준)

@@ -2008,6 +2008,16 @@ body.cozy .app .dm-head .dm-eye-love{font-family:'Instrument Serif',Georgia,seri
 .tdr-h .ct{margin:0}
 .tdr-c{font-size:11.5px;color:var(--t3);background:var(--s2);border-radius:99px;padding:3px 10px}
 .tdr-empty{font-size:12.5px;color:var(--t3);padding:14px;text-align:center;background:var(--cz-paper);border-radius:14px;line-height:1.6}
+.tdr-clk{flex:none;border:1px solid var(--cz-line,var(--border));background:transparent;border-radius:99px;padding:1px 8px;font-size:11.5px;line-height:1.5;color:var(--t3);cursor:pointer;font-variant-numeric:tabular-nums;font-family:inherit}
+.tdr-clk:hover{border-color:var(--cz-acc);color:var(--cz-deep)}
+.tdr-clk.on{background:var(--cz-soft);border-color:var(--cz-acc);color:var(--cz-deep);font-weight:600}
+.tdl-row .tdr-clk{margin-left:auto;padding:0 7px;font-size:11px}
+.tdm-row{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:13px;position:relative}
+.tdm-t{width:42px;flex:none;color:var(--cz-deep);font-weight:600;font-variant-numeric:tabular-nums;font-size:12px}
+.tdm-row i{width:9px;height:9px;border-radius:50%;background:var(--cz-acc);flex:none}
+.tdm-row:not(:last-of-type)::after{content:'';position:absolute;left:51px;top:calc(50% + 6px);height:100%;border-left:1.5px dashed var(--cz-line,var(--border))}
+.tdm-n{flex:1;min-width:0}
+.tdm-more{margin:8px 0 0;font-size:11.5px;color:var(--t3)}
 .tdr-row{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:12px;cursor:pointer;transition:background .15s}
 .tdr-row:hover{background:var(--cz-paper)}
 .tdr-row.cur{background:var(--cz-soft)}
@@ -3051,7 +3061,7 @@ async function loadFromCloud() {
 
 // 큰 데이터를 필드별로 나눠서 저장 (Firestore 1MB 제한 대응)
 function chunkData(data) {
-  const FIELDS = ['routines','checks','projects','deadlines','savings','notes','calEvents',
+  const FIELDS = ['routines','checks','checkTimes','projects','deadlines','savings','notes','calEvents',
     'lifeGoal','theme','customThemeColor','projectCardStyle','diaryEntries','monthlyGoals','monthlyMemo',
     'weeklyGoals','weeklyMemo','diaryStickers','font','fontSize','fontWeight','customFonts','logoFont','menuFont','navMarker','todayLayout','todayCardVis',
     'lifeAreas','dream','memories','todoList','todoListTmr','timeline','timelineTitle','tlFontScaleBig','tlFontScaleSmall','tlLineLenBig','tlLineLenSmall','tlTextColor','bgIntensity','diaryFont'];
@@ -3165,6 +3175,7 @@ const DEF_ROUTINES = [
 let S = {
   routines: JSON.parse(JSON.stringify(DEF_ROUTINES)),
   checks: {},       // { 'YYYY-MM-DD': { routineId: true } }
+  checkTimes: {},   // { 'YYYY-MM-DD': { routineId: 'HH:MM' } } 실제로 한 시간(선택)
   projects: [],
   deadlines: [],
   savings: {goal:10000000, current:0, entries:[]},
@@ -4397,6 +4408,7 @@ function toggleCheck(rid, ds){
   if(!S.checks[ds]) S.checks[ds]={};
   const nowChecked=!S.checks[ds][rid];
   S.checks[ds][rid]=nowChecked;
+  if(!nowChecked&&S.checkTimes&&S.checkTimes[ds]){delete S.checkTimes[ds][rid];if(!Object.keys(S.checkTimes[ds]).length)delete S.checkTimes[ds];}
 
   // 저축 금액이 있는 루틴이면 저축 목표에 자동 반영
   const r=(S.routines||[]).find(x=>x.id===rid);
@@ -4735,10 +4747,53 @@ function tdNowNext(ds){
   var undone=rs.filter(function(r,i){return i<start&&!ck[r.id];});
   return {all:rs,list:list,cur:ci>=0?rs[ci]:null,ck:ck,missed:undone};
 }
+// 실제로 한 시간이 있으면 그 시간(강조), 없으면 정해 둔 시간
+function tdActT(ds,r,keepEmpty){var a=((S.checkTimes||{})[ds]||{})[r.id];return a||r.time||(keepEmpty?'':'—');}
+function tdClockBtn(rid,ds){
+  var a=((S.checkTimes||{})[ds]||{})[rid];
+  return '<button type="button" class="tdr-clk'+(a?' on':'')+'" title="'+(a?'한 시간 바꾸기':'한 시간과 함께 체크')+'" onclick="event.stopPropagation();tdPickTime(\''+rid+'\',\''+ds+'\')">'+(a?esc(a):'◷')+'</button>';
+}
+function tdPickTime(rid,ds){
+  var r=(S.routines||[]).find(function(x){return x.id===rid;}); if(!r) return;
+  var cur=((S.checkTimes||{})[ds]||{})[rid];
+  var d=new Date(),now=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  openMo('언제 했어요?',
+    '<div style="font-size:.95em;font-weight:600;margin-bottom:10px">'+esc(r.task)+'</div>'+
+    '<input type="time" id="td-pt" class="inp" value="'+(cur||now)+'" style="font-size:1.2em;text-align:center">'+
+    '<div style="font-size:.76em;color:var(--t3);margin-top:8px">고른 시간에 한 것으로 기록돼요. 시간 없이 체크만 하려면 줄을 눌러 주세요.</div>',
+    '<button class="btn bg" onclick="closeMo()">취소</button>'+
+    (cur?'<button class="btn bg bsm" style="color:var(--red)" onclick="tdSetTime(\''+rid+'\',\''+ds+'\',\'\')">시간만 지우기</button>':'')+
+    '<button class="btn bp" onclick="tdSetTime(\''+rid+'\',\''+ds+'\',document.getElementById(\'td-pt\').value)">확인</button>');
+}
+function tdSetTime(rid,ds,t){
+  var wasChecked=!!(S.checks[ds]||{})[rid];
+  if(t){
+    if(!S.checkTimes)S.checkTimes={}; if(!S.checkTimes[ds])S.checkTimes[ds]={};
+    S.checkTimes[ds][rid]=t;
+    closeMo();
+    if(!wasChecked){toggleCheck(rid,ds);S.checkTimes[ds]=S.checkTimes[ds]||{};S.checkTimes[ds][rid]=t;save();render();return;} // toggleCheck가 save+render
+    save();render();
+  } else {
+    if(S.checkTimes&&S.checkTimes[ds]){delete S.checkTimes[ds][rid];if(!Object.keys(S.checkTimes[ds]).length)delete S.checkTimes[ds];}
+    closeMo();save();render();
+  }
+}
+// 나의 하루: 시간과 함께 체크한 루틴이 실제 한 시간 순서로 쌓인다
+function tdMyDayCard(ds){
+  var tm=(S.checkTimes||{})[ds]||{},ck=S.checks[ds]||{};
+  var items=(S.routines||[]).filter(function(r){return ck[r.id]&&tm[r.id];}).map(function(r){return {t:tm[r.id],r:r};});
+  items.sort(function(a,b){return a.t.localeCompare(b.t);});
+  var plain=routinesForDate(ds).filter(function(r){return ck[r.id]&&!tm[r.id];}).length;
+  var h='<div class="card tdm">'+tdHead('my day','나의 하루','<span class="tdr-c">'+items.length+'</span>');
+  if(!items.length) return h+'<div class="tdr-empty">루틴 옆 ◷ 를 눌러 한 시간을 고르면 여기에 오늘 하루가 쌓여요</div></div>';
+  h+=items.map(function(it){return '<div class="tdm-row"><span class="tdm-t">'+esc(it.t)+'</span><i></i><span class="tdm-n">'+esc(it.r.task)+'</span></div>';}).join('');
+  if(plain) h+='<p class="tdm-more">시간 없이 체크한 루틴 '+plain+'개</p>';
+  return h+'</div>';
+}
 function tdRoutineCard(ds){
   var n=tdNowNext(ds),dn=n.all.filter(function(r){return n.ck[r.id];}).length;
   var row=function(r){var on=!!n.ck[r.id],isCur=n.cur&&n.cur.id===r.id;
-    return '<div class="tdr-row'+(on?' done':'')+(isCur?' cur':'')+'" onclick="calRoutineToggle(\''+r.id+'\',\''+ds+'\')"><span class="tdr-cb"></span><span class="tdr-t">'+esc(r.time||'—')+'</span><span class="tdr-n">'+esc(r.task)+(isCur?'<em>NOW</em>':'')+'</span></div>';};
+    return '<div class="tdr-row'+(on?' done':'')+(isCur?' cur':'')+'" onclick="calRoutineToggle(\''+r.id+'\',\''+ds+'\')"><span class="tdr-cb"></span><span class="tdr-t">'+esc(tdActT(ds,r))+'</span><span class="tdr-n">'+esc(r.task)+(isCur?'<em>NOW</em>':'')+'</span>'+tdClockBtn(r.id,ds)+'</div>';};
   var h='<div class="card tdr">'+tdHead('now','지금 루틴','<span class="tdr-c">'+dn+' / '+n.all.length+'</span>');
   if(!n.all.length) h+='<div class="tdr-empty">오늘 루틴이 없어요</div>';
   else{
@@ -4787,7 +4842,7 @@ function tdRoutineList(ds){
   parts.forEach(function(pt){
     var rs=n.all.filter(function(r){return pt[1](r.time);});if(!rs.length)return;
     h+='<div class="tdl-part"><div class="tdl-ph">'+pt[0]+'</div>'+rs.map(function(r){var on=!!n.ck[r.id],cur=n.cur&&n.cur.id===r.id;
-      return '<div class="tdl-row'+(on?' done':'')+(cur?' cur':'')+'" onclick="calRoutineToggle(\''+r.id+'\',\''+ds+'\')" title="눌러서 체크"><span class="tdl-dot">'+(on?'✿':'')+'</span><span class="tdl-t">'+esc(r.time||'')+'</span><span class="tdl-n">'+esc(r.task)+'</span></div>';}).join('')+'</div>';
+      return '<div class="tdl-row'+(on?' done':'')+(cur?' cur':'')+'" onclick="calRoutineToggle(\''+r.id+'\',\''+ds+'\')" title="눌러서 체크"><span class="tdl-dot">'+(on?'✿':'')+'</span><span class="tdl-t">'+esc(tdActT(ds,r,true))+'</span><span class="tdl-n">'+esc(r.task)+'</span>'+tdClockBtn(r.id,ds)+'</div>';}).join('')+'</div>';
   });
   return h+'<button type="button" class="tdl-go" onclick="go(\'routine\')">루틴 설정 →</button></div>';
 }
@@ -4801,6 +4856,7 @@ function tdCozyLayout(t,TCB,tdVis){
   if(night) g+=slot('diary',TCB.diary,2);
   g+=slot('tips',goalTipsCard(),2);
   g+=slot('rt',tdRoutineCard(viewDate));
+  g+=slot('myday',tdMyDayCard(viewDate));
   g+=slot('week',tdWeekCard());
   g+=slot('upcoming',tdUpcomingCard());
   if(!night) g+=slot('diary',TCB.diary,2);

@@ -6269,7 +6269,7 @@ body.theme-gaming :is(.tab-content h3, .tab-content h4, .modal-content h3) .gm-w
             </div>
                     <div><!-- 테마 -->
                         <p class="text-xs font-bold text-slate-400 uppercase mb-2">테마</p>
-                        <div id="theme-card-grid" class="grid grid-cols-7 gap-2">
+                        <div id="theme-card-grid" class="grid gap-2" style="grid-auto-flow:column;grid-auto-columns:minmax(0,1fr)">
                             <div id="theme-card-list" style="display:contents"></div>
                             <div class="theme-card" data-theme="custom" onclick="pickTheme('custom')" title="직접 색 고르기"><div class="theme-dot tc-prev flex items-center justify-center relative cursor-pointer" id="custom-theme-dot" title="커스텀 색상" style="background-color:#b07d7d;"><input type="color" id="custom-color-picker" class="sidebar-color-picker" oninput="setCustomTheme(this.value); document.getElementById('custom-hex-input').value=this.value;" value="#b07d7d"></div><span class="tc-name">직접 고르기</span></div>
                         </div>
@@ -8014,7 +8014,6 @@ body.theme-gaming :is(.tab-content h3, .tab-content h4, .modal-content h3) .gm-w
         //   팝업창·위젯 디자인 선택창에 자동으로 항목이 생긴다. (각 디자인의 CSS 는 [data-card=…] / [data-design=…] / [data-modal=…] 로 작성)
         var THEME_LIST = [
             { id: 'cozy', name: '코지', kind: 'cozy' },
-            { id: 'cozy-mint', name: '코지 민트', kind: 'cozy', variant: { delta: 123, sat: 0.8, primary: '#87ada1', light: '#effcf6' } },
             { id: 'spiral', name: '스프링노트', kind: 'cozy', skin: 'spiral', fonts: { app: 'jua', menu: 'jua' }, designDefaults: { cal: 'spiral', dday: 'spiral', modal: 'spiral', widget: 'spiral' },
               preview: 'background:linear-gradient(#BDEBD6 0 26%,#F7FFF9 26%);border:2px solid #1d2a26;box-shadow:2px 2px 0 #1d2a26',
               designs: {
@@ -8048,7 +8047,7 @@ body.theme-gaming :is(.tab-content h3, .tab-content h4, .modal-content h3) .gm-w
             { id: 'rose', name: '로즈', kind: 'plain', bar: '#d9b4b8', bg: '#fcf3f4' }
         ];
         // 삭제한 테마: 예전에 이걸 쓰던 저장값·프리셋은 코지로 되돌린다
-        var REMOVED_THEMES = ['sky', 'sand', 'paper', 'graystone', 'coral', 'cream', 'lavender', 'lilac', 'peach', 'cozy-rose', 'mint'];
+        var REMOVED_THEMES = ['sky', 'sand', 'paper', 'graystone', 'coral', 'cream', 'lavender', 'lilac', 'peach', 'cozy-rose', 'mint', 'cozy-mint'];
         let activeTheme = localStorage.getItem('theme_v6') || 'cozy';
         if (REMOVED_THEMES.indexOf(activeTheme) >= 0) { activeTheme = 'cozy'; localStorage.setItem('theme_v6', 'cozy'); }
         let chartViewYear = new Date().getFullYear();
@@ -10303,6 +10302,13 @@ body.theme-gaming :is(.tab-content h3, .tab-content h4, .modal-content h3) .gm-w
             restoreWidgetSettingsUI();
         }
         function closeSettingsPanel() { document.getElementById('settings-panel-modal').classList.remove('open'); save(true); }
+        // 설정창 바깥(어두운 배경)을 누르면 닫힘 — 안쪽에서 드래그하다 바깥에서 놓는 경우는 닫지 않는다
+        (function () {
+            const ov = document.getElementById('settings-panel-modal'); if (!ov) return;
+            let downOnOverlay = false;
+            ov.addEventListener('mousedown', e => { downOnOverlay = (e.target === ov); });
+            ov.addEventListener('mouseup', e => { if (downOnOverlay && e.target === ov && ov.classList.contains('open')) closeSettingsPanel(); downOnOverlay = false; });
+        })();
 
         // ════ 위젯 연동 ════
         async function updateWidgetToggleBtn() {

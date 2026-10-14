@@ -2009,6 +2009,12 @@ body.cozy .app .dm-head .dm-eye-love{font-family:'Instrument Serif',Georgia,seri
 .tdr-c{font-size:11.5px;color:var(--t3);background:var(--s2);border-radius:99px;padding:3px 10px}
 .tdr-empty{font-size:12.5px;color:var(--t3);padding:14px;text-align:center;background:var(--cz-paper);border-radius:14px;line-height:1.6}
 
+.tdt-hint{font-size:11.5px;color:var(--t3);margin:-2px 0 10px}
+.tdt-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;max-height:calc(100vh - 220px);overflow:auto;padding:2px}
+.tdt-tile{aspect-ratio:1/1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-align:center;padding:8px;border:1.5px solid var(--wc,var(--cz-acc));border-radius:16px;background:color-mix(in srgb,var(--wc,var(--cz-acc)) 12%,var(--surface));cursor:pointer;font-family:inherit;color:var(--text);min-width:0;transition:transform .12s}
+.tdt-tile:hover{transform:translateY(-2px) scale(1.03)}
+.tdt-tile b{font-size:12.5px;font-weight:600;line-height:1.3;word-break:break-word;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.tdt-tile small{font-size:10px;color:var(--t3);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tdc{cursor:pointer;display:flex;flex-direction:column;gap:6px;min-height:92px;border-top:4px solid var(--wc,var(--cz-acc));transition:transform .12s,box-shadow .15s}
 .tdc:hover{transform:translateY(-2px)}
 .tdc-top{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--t3);min-height:18px}
@@ -2054,7 +2060,7 @@ body.cozy .app .dm-head .dm-eye-love{font-family:'Instrument Serif',Georgia,seri
 .tdu-row b.hot{background:var(--cz-acc);color:#fff}
 
 /* 코지 Today: PC 왼쪽 작은 데일리 루틴 (보기 전용) */
-.td-cz-wrap{display:block}
+.td-cz-wrap{display:grid;grid-template-columns:250px minmax(0,1fr);gap:18px;align-items:start}
 .td-side{position:sticky;top:12px}
 .td-main{min-width:0}
 .td-main .td-cz{margin-top:0}
@@ -2072,7 +2078,7 @@ body.cozy .app .dm-head .dm-eye-love{font-family:'Instrument Serif',Georgia,seri
 .tdl-row.cur .tdl-n,.tdl-row.cur .tdl-t{color:var(--cz-deep)}
 .tdl-go{display:block;margin:10px auto 0;border:0;background:transparent;color:var(--t3);font-size:11.5px;cursor:pointer;font-family:inherit}
 @media(min-width:1101px){.tdr-more,.tdr-full{display:none !important}.td-cz>.pj-slot[data-card="rt"]{display:none !important}}
-@media(max-width:1100px){.td-cz-wrap{display:block}.td-side{display:none}}
+@media(max-width:1100px){.td-cz-wrap{display:block}.td-side{position:static;margin-bottom:14px}.tdt-grid{grid-template-columns:repeat(4,1fr)}}
 /* 코지 Today 꾸미기 */
 .cz-season{margin-left:10px;padding-left:10px;border-left:1px solid rgba(255,255,255,.5);letter-spacing:.5px;opacity:.95}
 .td-cz{gap:20px !important}
@@ -3064,7 +3070,7 @@ async function loadFromCloud() {
 
 // 큰 데이터를 필드별로 나눠서 저장 (Firestore 1MB 제한 대응)
 function chunkData(data) {
-  const FIELDS = ['routines','checks','checkTimes','checkMemos','projects','deadlines','savings','notes','calEvents',
+  const FIELDS = ['routines','checks','checkTimes','checkMemos','dayPicks','projects','deadlines','savings','notes','calEvents',
     'lifeGoal','theme','customThemeColor','projectCardStyle','diaryEntries','monthlyGoals','monthlyMemo',
     'weeklyGoals','weeklyMemo','diaryStickers','font','fontSize','fontWeight','customFonts','logoFont','menuFont','navMarker','todayLayout','todayCardVis',
     'lifeAreas','dream','memories','todoList','todoListTmr','timeline','timelineTitle','tlFontScaleBig','tlFontScaleSmall','tlLineLenBig','tlLineLenSmall','tlTextColor','bgIntensity','diaryFont'];
@@ -3180,6 +3186,7 @@ let S = {
   checks: {},       // { 'YYYY-MM-DD': { routineId: true } }
   checkTimes: {},   // { 'YYYY-MM-DD': { routineId: 'HH:MM' } } 실제로 한 시간(선택)
   checkMemos: {},   // { 'YYYY-MM-DD': { routineId: '메모' } }
+  dayPicks: {},     // { 'YYYY-MM-DD': [routineId,...] } 그날 오늘에 추가한 루틴 카드
   projects: [],
   deadlines: [],
   savings: {goal:10000000, current:0, entries:[]},
@@ -4752,7 +4759,26 @@ function tdNowNext(ds){
   return {all:rs,list:list,cur:ci>=0?rs[ci]:null,ck:ck,missed:undone};
 }
 // ── 오늘 하루 카드: 프로젝트 루틴 카드를 눌러 시간·메모를 남기면 하루가 카드로 채워진다 ──
-function tdDayCards(ds){return routinesForDate(ds).filter(function(r){return r.isRz;});}
+// 프로젝트에서 루틴으로 만든 카드 전부(기간 안인 것). 오늘 요일에 해당하는 것을 앞에 둔다.
+function tdAllCards(ds){
+  var todayIds={}; routinesForDate(ds).forEach(function(r){todayIds[r.id]=1;});
+  return (S.routines||[]).filter(function(r){
+    if(!r.isRz) return false;
+    if(r.startDate&&ds<r.startDate) return false;
+    if(r.until&&ds>r.until) return false;
+    return true;
+  }).sort(function(a,b){return (todayIds[b.id]?1:0)-(todayIds[a.id]?1:0);});
+}
+// 오늘에 추가한 카드(+ 다른 곳에서 이미 체크한 프로젝트 루틴)
+function tdDayCards(ds){
+  var picks=(S.dayPicks||{})[ds]||[], ck=S.checks[ds]||{};
+  return (S.routines||[]).filter(function(r){return r.isRz&&(picks.indexOf(r.id)>=0||ck[r.id]);});
+}
+function tdAddCard(rid,ds){
+  if(!S.dayPicks) S.dayPicks={}; if(!S.dayPicks[ds]) S.dayPicks[ds]=[];
+  if(S.dayPicks[ds].indexOf(rid)<0) S.dayPicks[ds].push(rid);
+  save(); render();
+}
 function tdCardColor(r){var pr=r.rzProjectId?(S.projects||[]).find(function(p){return p.id===r.rzProjectId;}):null;return (pr&&pr.color)||'var(--cz-acc)';}
 function tdPickCard(rid,ds){
   var r=(S.routines||[]).find(function(x){return x.id===rid;}); if(!r) return;
@@ -4766,14 +4792,18 @@ function tdPickCard(rid,ds){
     '<div style="font-size:.76em;color:var(--t3);margin-bottom:4px">작은 메모</div>'+
     '<textarea id="td-cm" class="ta" rows="3" placeholder="한 줄 메모 (선택)" style="width:100%;box-sizing:border-box;resize:none">'+esc(memo)+'</textarea>',
     '<button class="btn bg" onclick="closeMo()">취소</button>'+
-    (done?'<button class="btn bg bsm" style="color:var(--red)" onclick="tdSaveCard(\''+rid+'\',\''+ds+'\',true)">기록 지우기</button>':'')+
+    '<button class="btn bg bsm" style="color:var(--red)" onclick="tdSaveCard(\''+rid+'\',\''+ds+'\',true)">오늘에서 빼기</button>'+
     '<button class="btn bp" onclick="tdSaveCard(\''+rid+'\',\''+ds+'\')">'+(done?'저장':'완료')+'</button>');
 }
 function tdSaveCard(rid,ds,clear){
   var ck=S.checks[ds]||{}, was=!!ck[rid];
   var t=(document.getElementById('td-ct')||{}).value||'', m=((document.getElementById('td-cm')||{}).value||'').trim();
   closeMo();
-  if(clear){ if(was) toggleCheck(rid,ds); return; } // 해제 시 시간·메모도 같이 지워짐
+  if(clear){ // 오늘에서 빼기: 추가 취소 + (체크했다면) 기록도 함께 지움
+    if(S.dayPicks&&S.dayPicks[ds]) S.dayPicks[ds]=S.dayPicks[ds].filter(function(x){return x!==rid;});
+    if(was) toggleCheck(rid,ds); else {save();render();}
+    return;
+  }
   if(!was) toggleCheck(rid,ds);
   if(!S.checkTimes) S.checkTimes={}; if(!S.checkMemos) S.checkMemos={};
   if(!S.checkTimes[ds]) S.checkTimes[ds]={}; if(!S.checkMemos[ds]) S.checkMemos[ds]={};
@@ -4788,6 +4818,17 @@ function tdDayCardList(ds){
   var todo=cards.filter(function(r){return !ck[r.id];});
   var done=cards.filter(function(r){return ck[r.id];}).sort(function(a,b){return (tm[a.id]||'99:99').localeCompare(tm[b.id]||'99:99');});
   return todo.concat(done);
+}
+function tdCardTray(ds){
+  var picks=(S.dayPicks||{})[ds]||[], ck=S.checks[ds]||{};
+  var pool=tdAllCards(ds).filter(function(r){return picks.indexOf(r.id)<0&&!ck[r.id];});
+  var h='<div class="card tdt">'+tdHead('cards','루틴 카드','<span class="tdr-c">'+pool.length+'</span>');
+  if(!pool.length) return h+'<div class="tdr-empty">'+(tdAllCards(ds).length?'모두 오늘에 담았어요 ✿':'프로젝트에서 루틴을 만들면 여기에 카드가 쌓여요')+'</div></div>';
+  h+='<div class="tdt-hint">눌러서 오늘에 추가</div><div class="tdt-grid">'+pool.map(function(r){
+    var pr=r.rzProjectId?(S.projects||[]).find(function(p){return p.id===r.rzProjectId;}):null;
+    return '<button type="button" class="tdt-tile" style="--wc:'+esc(tdCardColor(r))+'" onclick="tdAddCard(\''+r.id+'\',\''+ds+'\')" title="오늘에 추가"><b>'+esc(r.task)+'</b>'+(pr?'<small>'+esc(pr.name||'')+'</small>':'')+'</button>';
+  }).join('')+'</div>';
+  return h+'</div>';
 }
 function tdMyDayCards(ds){
   var ck=S.checks[ds]||{}, tm=(S.checkTimes||{})[ds]||{}, mm=(S.checkMemos||{})[ds]||{};
@@ -4874,7 +4915,7 @@ function tdCozyLayout(t,TCB,tdVis){
   g+=slot('lookback',TCB.lookback,2);
   g+=slot('memLb',memLookbackCard(),2);
   if(tdVis.suppToday===true) g+=slot('suppToday',TCB.suppToday);
-  return '<div class="td-cz-wrap"><div class="td-main"><div class="pj-layout td-cz">'+g+'</div></div></div>';
+  return '<div class="td-cz-wrap"><aside class="td-side">'+tdCardTray(viewDate)+'</aside><div class="td-main"><div class="pj-layout td-cz">'+g+'</div></div></div>';
 }
 
 // ═══════════ TODAY (기존 기능 그대로 + 카드 스타일만 깔끔하게) ═══════════

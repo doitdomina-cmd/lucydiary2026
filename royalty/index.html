@@ -8460,9 +8460,15 @@ body.theme-gaming #genre-sheets-container .sheet-footer-inner td.grand-total-cel
         }
 
         let saveTimeout = null;
+        let _savePendingSilent = null;
         function save(silent = false) { 
             if (saveTimeout) clearTimeout(saveTimeout);
-            saveTimeout = setTimeout(() => {
+            _savePendingSilent = silent;
+            saveTimeout = setTimeout(() => runSave(silent), 600);
+        }
+        function runSave(silent = false) {
+            saveTimeout = null; _savePendingSilent = null;
+            {
                 try {
                     try { localStorage.setItem('lastModified_v6', new Date().toISOString()); } catch(e) {}
                     const dataToSave = { settingsPresets, uiTheme: { theme: activeTheme, customColor: localStorage.getItem('custom_color_v6') || '', bgMain: document.documentElement.style.getPropertyValue('--bg-main').trim() || localStorage.getItem('bg_main_v6') || '', appFont: localStorage.getItem('app_font_v1') || '', menuFont: localStorage.getItem('menu_font_v1') || '' },
@@ -8492,8 +8498,15 @@ body.theme-gaming #genre-sheets-container .sheet-footer-inner td.grand-total-cel
                     if(bgMain) localStorage.setItem('bg_main_v6', bgMain);
 
                 } catch (e) { console.error("Save failed", e); } 
-            }, 1000);
+            }
         }
+        // 창을 닫거나 탭을 숨기는 순간, 아직 저장 대기 중인 변경이 있으면 바로 저장하고 클라우드에도 곧바로 올린다
+        function flushPendingSave() {
+            try { if (saveTimeout) { clearTimeout(saveTimeout); runSave(_savePendingSilent === null ? true : _savePendingSilent); } } catch (e) {}
+            try { if (typeof window.cloudFlush === 'function') window.cloudFlush(); } catch (e) {}
+        }
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushPendingSave(); });
+        window.addEventListener('pagehide', flushPendingSave);
 
         function showSaveIndicator(type) {
             const ind = document.getElementById('save-status');
@@ -23957,7 +23970,14 @@ body.theme-gaming #genre-sheets-container .sheet-footer-inner td.grand-total-cel
             window.cloudSave = function(dataToSave){
                 if (!cloudReady || !window.__cloudDocRef) return;
                 if (cloudTimer) clearTimeout(cloudTimer);
-                cloudTimer = setTimeout(() => cloudSaveNow(dataToSave), 800);
+                window.__cloudPending = dataToSave;
+                cloudTimer = setTimeout(() => { cloudTimer = null; const d = window.__cloudPending; window.__cloudPending = null; cloudSaveNow(d); }, 400);
+            };
+            window.cloudFlush = function(){
+                if (!cloudTimer) return;
+                clearTimeout(cloudTimer); cloudTimer = null;
+                const d = window.__cloudPending; window.__cloudPending = null;
+                if (d) cloudSaveNow(d);
             };
 
             overlay.addEventListener('change', (e) => {

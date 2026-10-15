@@ -5614,9 +5614,10 @@ body.theme-cozy #write-calendar-body[data-card="gaming"] .write-span-bar { margi
   <div class="content">
   <div class="settings">
   <div class="card">
-    <label>작품 제목</label>
-    <div style="display:flex;gap:8px"><input id="rs-title" type="text" placeholder="작품 제목을 입력하세요">
+    <label>작품 (작품 등록에서 불러오기)</label>
+    <div style="display:flex;gap:8px"><select id="rs-workSel"></select>
     <button id="rs-resetAll" class="btn">초기화</button></div>
+    <input id="rs-title" type="text" placeholder="작품 제목을 직접 입력하세요" style="display:none;margin-top:6px">
     <div class="hint" id="rs-saveMsg"></div>
   </div>
 
@@ -24517,6 +24518,30 @@ function offsetsOf(st, n){
   return {out, phases};
 }
 
+// ---- 작품 등록(masterWorks)에서 불러오기 ----
+function fillWorkSel(){
+  const sel = $('workSel'), cur = sel.value;
+  let items = [];
+  try { items = getActiveWorkItems(false, false).filter(it => /BL/i.test(it.genre || '') && (it.genre || '').includes('장편')); } catch (e) {}   // BL 장편 중 아직 완결 안 된 작품만
+  sel.innerHTML = '<option value="">작품을 선택하세요 (BL 장편·미완결)</option>' + items.map(it => `<option value="${esc(it.id)}">[${esc(it.genre || '')}] ${esc(it.displayTitle)}</option>`).join('') + '<option value="__custom">직접 입력</option>';
+  if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
+}
+function syncTitleBox(){ $('title').style.display = $('workSel').value === '__custom' ? '' : 'none'; }
+$('workSel').onchange = () => {
+  const v = $('workSel').value;
+  syncTitleBox();
+  if (!v || v === '__custom') { autoSave(); return; }
+  const had = works.find(w => w.workId === v && w.id !== curId);
+  if (had) { curId = had.id; setState(had); renderWorks(); return; }   // 이미 계산해 둔 작품이면 그걸 연다
+  let it = null; try { it = getActiveWorkItems(true, true).find(i => i.id === v); } catch (e) {}
+  if (!it) return;
+  $('title').value = it._extra ? `${it._work.title} [${it._extra.name}]` : it._work.title;
+  const po = +it.goalWithSpace || 0, mi = +it.goalNoSpace || 0;
+  if (po && mi && mi < po) $('ratio').value = (mi / po).toFixed(3);
+  const r = +$('ratio').value || 0.765;
+  $('total').value = po || (mi ? Math.round(mi / r) : '');
+  adj = []; updateEps(); render(); autoSave();
+};
 function updateMi(){
   const t = +$('total').value, p = +$('per').value, r = +$('ratio').value;
   if (!(t > 0 && r > 0)) { $('miHint').textContent = ''; return; }
@@ -24639,12 +24664,16 @@ const persist = () => { try { if (typeof save === 'function') save(true); return
 const FIELDS = ['total','per','eps','e1','e2','g1','g2','g3','perday1','perday3','date','ratio'];
 
 function getState(){
-  const st = {title: $('title').value.trim() || '제목 없음', mode, adj: adj.slice()};
+  const st = {title: $('title').value.trim() || '제목 없음', workId: $('workSel').value === '__custom' ? '' : $('workSel').value, mode, adj: adj.slice()};
   FIELDS.forEach(f => st[f] = $(f).value);
   return st;
 }
 function setState(st){
   $('title').value = st.title === '제목 없음' ? '' : st.title;
+  fillWorkSel();
+  if (st.workId && ![...$('workSel').options].some(o => o.value === st.workId)) { const o = document.createElement('option'); o.value = st.workId; o.textContent = st.title; $('workSel').insertBefore(o, $('workSel').lastElementChild); }
+  $('workSel').value = st.workId && [...$('workSel').options].some(o => o.value === st.workId) ? st.workId : (st.title && st.title !== '제목 없음' ? '__custom' : '');
+  syncTitleBox();
   FIELDS.forEach(f => $(f).value = st[f] ?? (f === 'ratio' ? '0.765' : f.startsWith('perday') ? (st.perday || 1) : ''));
   mode = st.mode;
   $('tabBack').classList.toggle('on', mode==='back');
@@ -24697,7 +24726,7 @@ $('resetAll').onclick = () => {
   Object.entries({e1:10,g1:2,e2:20,g2:0,g3:2,perday1:1,perday3:1,ratio:0.765}).forEach(([k,v]) => $(k).value = v);
   $('epsHint').textContent = ''; adj = []; updateMi(); render(); autoSave();
 };
-$('newWork').onclick = () => { curId = null; adj = []; $('ratio').value = '0.765'; updateMi(); $('title').value = ''; ['total','per','eps','date'].forEach(f => $(f).value = ''); $('epsHint').textContent = ''; render(); $('saveMsg').textContent = ''; renderWorks(); };
+$('newWork').onclick = () => { curId = null; adj = []; $('ratio').value = '0.765'; updateMi(); $('title').value = ''; fillWorkSel(); $('workSel').value = '__custom'; syncTitleBox(); $('title').focus(); ['total','per','eps','date'].forEach(f => $(f).value = ''); $('epsHint').textContent = ''; render(); $('saveMsg').textContent = ''; renderWorks(); };
 
 // ---- 연재 일정 보기 (표시 전용 달력: 스케줄 관리 달력과 같은 틀·테마) ----
 const VCOL = ['#d99a2b','#d9707a','#5a95c9','#6fae6a','#9a78c9','#d98a4e','#4fb3a2','#c9729f'];
@@ -24797,7 +24826,7 @@ function showPane(v){
 $('mtCalc').onclick = () => showPane(false);
 $('mtView').onclick = () => showPane(true);
 
-window.rsRefresh = () => { works = refSchedWorks; if (curId && !works.find(w => w.id === curId)) curId = null; renderWorks(); render(); renderView(); };
+window.rsRefresh = () => { works = refSchedWorks; fillWorkSel(); syncTitleBox(); if (curId && !works.find(w => w.id === curId)) curId = null; renderWorks(); render(); renderView(); };
 updateEps(); render(); renderWorks();
 
 })();

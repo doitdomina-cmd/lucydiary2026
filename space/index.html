@@ -3793,7 +3793,7 @@ function memWithPhrase(m){
   var h=0,k=String(m.id||'')+ps.join('');for(var i=0;i<k.length;i++)h=(h*31+k.charCodeAt(i))>>>0;
   return P[h%P.length];
 }
-var memFilter='all',memPerson='',_memDraft=null;
+var memFilter='all',memPerson='',_memDraft=null,memTab='mem',rcMonth='';
 function togMemFav(id){var m=(S.memories||[]).find(function(x){return x.id===id;});if(!m)return;m.fav=!m.fav;save();render();openMemView(id);}
 function memPickPerson(i){var n=memPeople()[i]||'';memPerson=memPerson===n?'':n;render();}
 function memKind(k){return MEM_KINDS.find(function(x){return x.id===k;})||MEM_KINDS[5];}
@@ -3824,6 +3824,8 @@ function renderMemories(){
   var yearN=all.filter(function(m){return (m.date||'').slice(0,4)===yr;}).length,people=memPeople();
   var h='<div class="mem">'+ldBanner('memories','dream/dream-6.jpg','MEMORIES · 함께한 순간들',all.length?all.length+'개의 추억':'첫 추억을 남겨요',
     ['올해 <b>'+yearN+'개</b>','함께한 사람 <b>'+people.length+'명</b>'],'<button class="on" onclick="openMemForm()">'+CZI.plus+'추억 남기기</button>','');
+  h+='<div class="rc-tabs"><button class="'+(memTab==='mem'?'on':'')+'" onclick="memTab=\'mem\';render()">추억</button><button class="'+(memTab==='rt'?'on':'')+'" onclick="memTab=\'rt\';render()">루틴 달력</button></div>';
+  if(memTab==='rt') return h+rcView()+'</div>';
   // 올해 12달
   var months={};all.forEach(function(m){if((m.date||'').slice(0,4)===yr){var k=parseInt(m.date.slice(5,7),10);months[k]=(months[k]||0)+1;}});
   var curM=parseInt(t.slice(5,7),10),done=Object.keys(months).length;
@@ -3867,6 +3869,92 @@ function renderMemories(){
   }
   return h+'</div>';
 }
+
+// ═══════════ 메모리즈 · 루틴 달력: 달력에 그날 한 루틴 카드가 들어가고, 이번 달·전체 횟수를 보여 줌 ═══════════
+// 루틴 카드는 그날에 추가한 순간 완료로 친다 (체크 기록 + 오늘에 추가한 카드 모두 포함)
+function rcDoneIds(ds){
+  var ids={},ck=S.checks[ds]||{},pk=(S.dayPicks||{})[ds]||[];
+  Object.keys(ck).forEach(function(id){if(ck[id])ids[id]=1;});
+  pk.forEach(function(id){ids[id]=1;});
+  return Object.keys(ids);
+}
+function rcDoneOn(ds,rmap){
+  var out=rcDoneIds(ds).filter(function(id){return rmap[id];}).map(function(id){return rmap[id];}),tm=(S.checkTimes||{})[ds]||{};
+  out.sort(function(a,b){return (tm[a.id]||a.time||'99').localeCompare(tm[b.id]||b.time||'99');});
+  return out;
+}
+function rcMove(d){
+  var m=rcMonth||todStr().slice(0,7),y=+m.slice(0,4),mo=+m.slice(5,7)+d;
+  while(mo<1){mo+=12;y--;}
+  while(mo>12){mo-=12;y++;}
+  rcMonth=y+'-'+String(mo).padStart(2,'0');render();
+}
+function rcView(){
+  var t=todStr(),ym=rcMonth||t.slice(0,7),y=+ym.slice(0,4),mo=+ym.slice(5,7);
+  var rmap={};(S.routines||[]).forEach(function(r){if(r.isRz)rmap[r.id]=r;});
+  var last=new Date(y,mo,0).getDate(),lead=new Date(y,mo-1,1).getDay();
+  var tot={},cur={},curAll=0,days={};
+  Object.keys(S.checks||{}).forEach(function(ds){days[ds]=1;});
+  Object.keys(S.dayPicks||{}).forEach(function(ds){days[ds]=1;});
+  Object.keys(days).forEach(function(ds){
+    rcDoneIds(ds).forEach(function(rid){
+      if(!rmap[rid])return;
+      tot[rid]=(tot[rid]||0)+1;
+      if(ds.slice(0,7)===ym){cur[rid]=(cur[rid]||0)+1;curAll++;}
+    });
+  });
+  var h='<div class="card rc-cal"><div class="mem-h"><div class="mem-t"><em>routine calendar</em>'+y+'년 '+mo+'월 루틴</div>'
+    +'<span class="rc-nav"><button type="button" onclick="rcMove(-1)" aria-label="이전 달">‹</button><button type="button" onclick="rcMonth=\'\';render()">오늘</button><button type="button" onclick="rcMove(1)" aria-label="다음 달">›</button></span></div>';
+  h+='<div class="rc-sum">이번 달 <b>'+curAll+'번</b> 했어요'+(curAll?' ✿ 잘하고 있어요':'')+'</div>';
+  h+='<div class="rc-grid">'+['일','월','화','수','목','금','토'].map(function(d,i){return '<div class="rc-dow'+(i===0?' sun':'')+'">'+d+'</div>';}).join('');
+  for(var i=0;i<lead;i++)h+='<div class="rc-c emp"></div>';
+  for(var d=1;d<=last;d++){
+    var ds=ym+'-'+String(d).padStart(2,'0'),items=rcDoneOn(ds,rmap);
+    h+='<div class="rc-c'+(ds===t?' today':'')+(items.length?' has':'')+'"'+(items.length?' onclick="rcDay(\''+ds+'\')"':'')+'><span class="rc-d">'+d+'</span>'
+      +items.slice(0,3).map(function(r){return '<i class="rc-chip" style="--c:'+esc(tdCardColor(r))+'" title="'+esc(r.task)+'"><span>'+esc(r.task)+'</span></i>';}).join('')
+      +(items.length>3?'<small class="rc-more">+'+(items.length-3)+'</small>':'')+'</div>';
+  }
+  h+='</div></div>';
+  var rids=Object.keys(rmap).filter(function(id){return tot[id]||cur[id];}).sort(function(a,b){return (tot[b]||0)-(tot[a]||0);});
+  h+='<div class="card rc-tot"><div class="mem-h"><div class="mem-t"><em>total</em>루틴별 횟수</div><span class="mem-c">'+rids.length+'개</span></div>';
+  if(!rids.length)h+='<div class="mem-ynote">아직 한 루틴 카드가 없어요. Today에서 루틴 카드를 추가하면 여기에 쌓여요.</div>';
+  else h+=rids.map(function(id){
+    var r=rmap[id],pr=r.rzProjectId?(S.projects||[]).find(function(p){return p.id===r.rzProjectId;}):null;
+    return '<div class="rc-row" style="--c:'+esc(tdCardColor(r))+'"><i></i><span class="rc-n">'+esc(r.task)+(pr?'<small>'+esc(pr.name||'')+'</small>':'')+'</span><span class="rc-m">이번 달 <b>'+(cur[id]||0)+'</b></span><span class="rc-a">전체 <b>'+(tot[id]||0)+'</b>번</span></div>';
+  }).join('');
+  return h+'</div>';
+}
+function rcDay(ds){
+  var rmap={};(S.routines||[]).forEach(function(r){if(r.isRz)rmap[r.id]=r;});
+  var items=rcDoneOn(ds,rmap),tm=(S.checkTimes||{})[ds]||{},mm=(S.checkMemos||{})[ds]||{};
+  openMo(parseInt(ds.slice(5,7),10)+'월 '+parseInt(ds.slice(8,10),10)+'일 한 루틴',
+    items.length?items.map(function(r){
+      return '<div class="rc-row" style="--c:'+esc(tdCardColor(r))+';padding:9px 0"><i></i><span class="rc-n">'+esc(r.task)+(mm[r.id]?'<small>'+esc(mm[r.id])+'</small>':'')+'</span><span class="rc-m">'+esc(tm[r.id]||r.time||'')+'</span></div>';
+    }).join(''):'<div class="mem-none">이 날 한 루틴이 없어요</div>',
+    '<button class="btn bp" onclick="closeMo()">닫기</button>');
+}
+(function(){
+  var st=document.createElement('style');
+  st.textContent='.rc-tabs{display:flex;gap:6px;margin:16px 0 4px}'
+    +'.rc-tabs button{border:0;background:var(--s2);color:var(--t2);border-radius:99px;padding:7px 16px;font-size:13px;cursor:pointer;font-family:inherit}'
+    +'.rc-tabs button.on{background:var(--cz-acc,var(--accent));color:#fff}'
+    +'.rc-cal,.rc-tot{margin-top:14px}'
+    +'.rc-nav{display:flex;gap:4px}.rc-nav button{border:0;background:var(--s2);color:var(--t2);border-radius:99px;min-width:32px;height:30px;padding:0 11px;font-size:13px;cursor:pointer;font-family:inherit}'
+    +'.rc-sum{font-size:13px;color:var(--t2);margin:6px 0 12px}.rc-sum b{color:var(--text);font-weight:600}'
+    +'.rc-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}'
+    +'.rc-dow{text-align:center;font-size:11px;color:var(--t3);padding:2px 0 4px}.rc-dow.sun{color:#c98b86}'
+    +'.rc-c{min-height:78px;border-radius:12px;background:var(--s2);padding:5px 5px 4px;display:flex;flex-direction:column;gap:3px;min-width:0;overflow:hidden}'
+    +'.rc-c.emp{background:transparent}.rc-c.today{box-shadow:inset 0 0 0 1.5px var(--cz-acc,var(--accent))}.rc-c.has{cursor:pointer}'
+    +'.rc-d{font-size:11.5px;color:var(--t3)}.rc-c.today .rc-d{color:var(--cz-acc,var(--accent));font-weight:700}'
+    +'.rc-chip{display:block;font-style:normal;border-radius:7px;padding:2px 6px;font-size:10.5px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:color-mix(in srgb,var(--c) 22%,var(--surface));color:var(--text);border-left:3px solid var(--c)}'
+    +'.rc-more{font-size:10px;color:var(--t3)}'
+    +'.rc-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--border,#eee)}.rc-row:first-of-type{border-top:0}'
+    +'.rc-row>i{width:10px;height:10px;border-radius:50%;background:var(--c);flex:none}'
+    +'.rc-n{flex:1;min-width:0;font-size:14px;color:var(--text)}.rc-n small{display:block;font-size:11.5px;color:var(--t3);margin-top:1px}'
+    +'.rc-m,.rc-a{font-size:12px;color:var(--t3);white-space:nowrap}.rc-m b,.rc-a b{color:var(--text);font-weight:600;font-size:14px}'
+    +'@media(max-width:600px){.rc-c{min-height:56px;padding:4px 3px}.rc-chip{width:9px;height:9px;padding:0;border:0;border-radius:50%;background:var(--c);display:inline-block;margin-right:2px}.rc-chip span{display:none}.rc-c.has{flex-direction:row;flex-wrap:wrap;align-content:flex-start}.rc-d{flex:0 0 100%}}';
+  document.head.appendChild(st);
+})();
 function openMemView(id){
   var m=(S.memories||[]).find(function(x){return x.id===id;});if(!m)return;
   var pl=(m.photos||[]).map(function(x){return {src:memPhotoSrc(x),drive:x&&x.drive};}).filter(function(x){return x.src;}),ph=pl.map(function(x){return x.src;}),k=memKind(m.kind);
@@ -4798,6 +4886,7 @@ function tdDayCards(ds){
 function tdAddCard(rid,ds){
   if(!S.dayPicks) S.dayPicks={}; if(!S.dayPicks[ds]) S.dayPicks[ds]=[];
   if(S.dayPicks[ds].indexOf(rid)<0) S.dayPicks[ds].push(rid);
+  if(!(S.checks[ds]&&S.checks[ds][rid])){toggleCheck(rid,ds);return;}   // 추가한 순간 완료
   save(); render();
 }
 function tdCardColor(r){var pr=r.rzProjectId?(S.projects||[]).find(function(p){return p.id===r.rzProjectId;}):null;return (pr&&pr.color)||'var(--cz-acc)';}
@@ -5166,18 +5255,19 @@ var TZ_ZONES=[
   {k:'e',en:'evening',ico:'🌙',t:'편안한 저녁',d:'하루를 차분히 마무리하는 시간이에요.\n좋아하는 드라마, 독서, 따뜻한 휴식 등\n나를 위한 시간을 가져보세요.',tag:'Relax Time',ph:'dream/dream-2.jpg',c:'#D4C9F0',pen:'드라마 보면서 편하게 마무리.\n내일도 좋은 하루가 되길 ♡'}
 ];
 function czTodayZones(){
-  var z=(S.todayZones&&S.todayZones[todStr()])||{},P=S.todayZonePhotos||{};
-  return '<div class="tz-wrap">'+TZ_ZONES.map(function(o){
+  var vd=viewDate||todStr(),z=(S.todayZones&&S.todayZones[vd])||{},P=S.todayZonePhotos||{};
+  var past=vd!==todStr()?'<div class="tz-past">'+parseInt(vd.slice(5,7),10)+'월 '+parseInt(vd.slice(8,10),10)+'일의 하루 <button type="button" onclick="resetView()">오늘로</button></div>':'';
+  return past+'<div class="tz-wrap">'+TZ_ZONES.map(function(o){
     var po=P[o.k]||{id:o.k},url=po.photo||o.ph;
-    return '<div class="tz-card" style="--tzc:'+o.c+'">'
+    return '<div class="tz-card" data-d="'+vd+'" style="--tzc:'+o.c+'">'
       +'<div class="tz-pw">'+czPhotoHtml('tzone',po,url)+'<span class="tz-tag">'+o.tag+'</span></div>'
       +'<div class="tz-body"><div class="tz-t"><em>'+o.en+'</em>'+o.t+'</div>'
-      +'<textarea class="tz-ta" rows="2" placeholder="여기에 자유롭게 적어요" oninput="tzSet(\''+o.k+'\',this.value);tzGrow(this)" onblur="tzSet(\''+o.k+'\',this.value,1)">'+esc(z[o.k]||'')+'</textarea></div></div>';
+      +'<textarea class="tz-ta" rows="2" placeholder="여기에 자유롭게 적어요" oninput="tzSet(\''+o.k+'\',this.value,0,\''+vd+'\');tzGrow(this)" onblur="tzSet(\''+o.k+'\',this.value,1,\''+vd+'\')">'+esc(z[o.k]||'')+'</textarea></div></div>';
   }).join('')+'</div>';
 }
 var _tzTimer=null;
-function tzSet(k,v,now){
-  var d=todStr();if(!S.todayZones)S.todayZones={};
+function tzSet(k,v,now,d){
+  d=d||viewDate||todStr();if(!S.todayZones)S.todayZones={};
   var z=S.todayZones[d]||(S.todayZones[d]={});
   if(v)z[k]=v;else delete z[k];
   if(!Object.keys(z).length)delete S.todayZones[d];
@@ -5199,6 +5289,7 @@ function tzGrowAll(){document.querySelectorAll('.tz-ta').forEach(tzGrow);}
     +'.tz-t em{font-style:italic;font-size:14px;color:var(--cz-muted,var(--t3))}'
     +'.tz-ta{display:block;width:100%;box-sizing:border-box;border:0;outline:0;resize:none;flex:1;min-height:96px;padding:0;background:repeating-linear-gradient(transparent 0 31px,color-mix(in srgb,var(--cz-line,#e5ddd0) 85%,transparent) 31px 32px);font:inherit;font-size:.95em;line-height:32px;color:var(--text);overflow:hidden}'
     +'.tz-ta::placeholder{color:var(--t3);opacity:.7}'
+    +'.tz-past{margin:14px 0 -6px;font-size:13px;color:var(--t2);display:flex;align-items:center;gap:8px}.tz-past button{border:0;background:var(--s2);color:var(--t2);border-radius:99px;padding:3px 11px;font-size:12px;cursor:pointer;font-family:inherit}'
     +'@media(hover:none){.tz-card .cz-ph-btns{opacity:1}}'
     +'@media(max-width:900px){.tz-wrap{grid-template-columns:1fr;gap:16px}}'
     +'@media(max-width:600px){.tz-card{flex-direction:column}.tz-pw{flex:0 0 auto;height:170px;min-height:0;margin:0}.tz-body{padding:14px 20px 18px}}';

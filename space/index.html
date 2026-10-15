@@ -3095,7 +3095,7 @@ async function loadFromCloud() {
 function chunkData(data) {
   const FIELDS = ['routines','checks','checkTimes','checkMemos','dayPicks','projects','deadlines','savings','notes','calEvents',
     'lifeGoal','theme','customThemeColor','projectCardStyle','diaryEntries','monthlyGoals','monthlyMemo',
-    'weeklyGoals','weeklyMemo','diaryStickers','font','fontSize','fontWeight','customFonts','logoFont','menuFont','navMarker','todayLayout','todayCardVis',
+    'weeklyGoals','weeklyMemo','diaryStickers','font','fontSize','fontWeight','customFonts','logoFont','menuFont','navMarker','todayLayout','todayCardVis','todayZones',
     'lifeAreas','dream','memories','todoList','todoListTmr','timeline','timelineTitle','tlFontScaleBig','tlFontScaleSmall','tlLineLenBig','tlLineLenSmall','tlTextColor','bgIntensity','diaryFont'];
   const chunks = {};
   FIELDS.forEach(f => { if (data[f] !== undefined) chunks[f] = data[f]; });
@@ -4970,7 +4970,7 @@ function tdCozyLayout(t,TCB,tdVis){
 
 // ═══════════ TODAY (기존 기능 그대로 + 카드 스타일만 깔끔하게) ═══════════
 function renderToday(){
-  return '<div class="today-life">'+czTodayBanner()+'<div class="tl-legacy">'+renderTodayLegacy()+'</div></div>';
+  return '<div class="today-life">'+czTodayBanner()+czTodayZones()+'<div class="tl-legacy">'+renderTodayLegacy()+'</div></div>';
 }
 
 
@@ -5156,6 +5156,44 @@ function czTodayBanner(){
     +'<span class="cz-ph-btns"><button type="button" class="cz-ph-btn" onclick="czPickPhoto(\'today\',\'today\')" title="배너 사진 바꾸기">'+CZI.cam+'</button>'
     +(b.photo?'<button type="button" class="cz-ph-btn" onclick="czResetPhoto(\'today\',\'today\')" title="기본 사진으로 (날마다 바뀜)">'+CZI.reset+'</button>':'')+'</span></div>';
 }
+
+// ═══════════ 투데이 맨 위: 하루 네 구역 (제목만 있고 내용은 그날그날 자유롭게) ═══════════
+var TZ_ZONES=[
+  {k:'m',ico:'☀️',t:'나를 돌보는 아침',ph:'예) 오늘 공기 진짜 좋았다. 기분이 좋다 ♡',c:'#F7C6CF'},
+  {k:'a',ico:'✏️',t:'집중하는 오전',ph:'예) 8,000자 집필 완료! 너무 잘했다',c:'#BBD3F2'},
+  {k:'f',ico:'🍃',t:'자유로운 오후',ph:'예) 그림 그리기 1시간, 힐링됐다',c:'#C6E2C3'},
+  {k:'e',ico:'🌙',t:'편안한 저녁',ph:'예) 드라마 보면서 편하게 마무리',c:'#D4C9F0'}
+];
+function czTodayZones(){
+  var z=(S.todayZones&&S.todayZones[todStr()])||{};
+  return '<div class="tz-wrap">'+TZ_ZONES.map(function(o){
+    return '<div class="tz-card" style="--tzc:'+o.c+'"><div class="tz-t"><span class="tz-i">'+o.ico+'</span>'+o.t+'</div>'
+      +'<textarea class="tz-ta" rows="3" placeholder="'+o.ph+'" oninput="tzSet(\''+o.k+'\',this.value);tzGrow(this)" onblur="tzSet(\''+o.k+'\',this.value,1)">'+esc(z[o.k]||'')+'</textarea></div>';
+  }).join('')+'</div>';
+}
+var _tzTimer=null;
+function tzSet(k,v,now){
+  var d=todStr();if(!S.todayZones)S.todayZones={};
+  var z=S.todayZones[d]||(S.todayZones[d]={});
+  if(v)z[k]=v;else delete z[k];
+  if(!Object.keys(z).length)delete S.todayZones[d];
+  clearTimeout(_tzTimer);
+  if(now)save();else _tzTimer=setTimeout(save,700);
+}
+function tzGrow(el){el.style.height='auto';el.style.height=Math.max(el.scrollHeight,60)+'px';}
+function tzGrowAll(){document.querySelectorAll('.tz-ta').forEach(tzGrow);}
+(function(){var _r=render;render=function(){var v=_r.apply(this,arguments);try{tzGrowAll();}catch(e){}return v;};})();
+(function(){
+  var st=document.createElement('style');
+  st.textContent='.tz-wrap{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin:14px 0 18px}'
+    +'.tz-card{border-radius:18px;padding:13px 14px 12px;background:color-mix(in srgb,var(--tzc) 24%,var(--surface));border:1px solid color-mix(in srgb,var(--tzc) 55%,var(--border));min-width:0}'
+    +'.tz-t{display:flex;align-items:center;gap:7px;font-weight:700;font-size:.98em;color:var(--text);margin-bottom:8px}'
+    +'.tz-i{font-size:1.1em}'
+    +'.tz-ta{display:block;width:100%;box-sizing:border-box;border:0;outline:0;resize:none;background:color-mix(in srgb,var(--tzc) 14%,var(--surface));border-radius:12px;padding:9px 11px;min-height:60px;font:inherit;font-size:.9em;line-height:1.6;color:var(--text);overflow:hidden}'
+    +'.tz-ta::placeholder{color:var(--t3);opacity:.7}'
+    +'.tz-ta:focus{box-shadow:0 0 0 2px color-mix(in srgb,var(--tzc) 70%,transparent)}';
+  document.head.appendChild(st);
+})();
 // ═══════════ DRAG & DROP ═══════════
 // ═══════════ CSS 추가 ═══════════
 (function(){

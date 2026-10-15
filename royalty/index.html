@@ -4788,6 +4788,7 @@ body.theme-cozy #write-calendar-body[data-card="gaming"] .write-span-bar { margi
 #tab-refsched .side #rs-works li[data-id].cur{background:color-mix(in srgb,var(--wc) 42%,#fff);border:1.5px solid var(--acc2);border-left:4px solid var(--wc);transform:rotate(0);box-shadow:0 2px 6px rgba(0,0,0,.2)}
 #tab-refsched .side #rs-works li[data-id] span{font-weight:700;font-size:14px;color:#5b4636}
 #tab-refsched .side #rs-works li[data-id] small{font-weight:400}
+body #tab-refsched #rs-vlist, body #tab-refsched #rs-vlist *:not(i){font-family:var(--app-font, var(--rs-bodyfont, inherit)) !important}
 #tab-refsched .side li input.vchk{width:auto;flex:none;margin:0}
 #tab-refsched .rs-vitem{padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.72);border:1px solid rgba(0,0,0,.06);cursor:pointer;font-size:12px;line-height:1.5;color:#5b4636}
 #tab-refsched .rs-vitem:hover{background:#fff}
@@ -24733,6 +24734,7 @@ const VCOL = ['#d99a2b','#d9707a','#5a95c9','#6fae6a','#9a78c9','#d98a4e','#4fb3
 let vDate = new Date(); vDate.setDate(1);
 const isoOf = ts => new Date(ts).toISOString().slice(0, 10);
 const mute = c => { try { return ddayMute(c); } catch (e) { return c; } };
+const vivid = c => `color-mix(in srgb, ${c} 68%, #000000)`;   // 제목 글씨용: 작품 색을 진하고 선명하게
 function worksDates(w){
   const n = +w.eps; if (!(n > 0) || !w.date) return null;
   const {out} = offsetsOf(w, n);
@@ -24757,7 +24759,7 @@ function renderView(){
     const label = it.lo === it.hi ? `${it.lo+1}화` : `${it.lo+1}~${it.hi+1}화`;
     const memo = [it.tou ? '투도 분량' : '', it.hi === it.n-1 ? '완결' : ''].filter(Boolean).join(' · ');
     return `<div class="cal-selectable border border-slate-200 border-l-4 p-1 rounded-lg relative shadow-sm" style="font-family:'Pretendard','Apple SD Gothic Neo',sans-serif; font-size:${ts.fontSize || 12}px; background:color-mix(in srgb, ${it.col} 30%, #ffffff) !important; border-left-color:${it.col};" title="${esc(it.w.title)} ${label}">
-      <div class="font-bold text-slate-700" style="white-space:normal; word-break:break-word;"><span style="color:${mute(it.col)}">[${esc(it.w.title)}]</span> ${label}</div>
+      <div class="font-bold text-slate-700" style="white-space:normal; word-break:break-word;"><span style="color:${vivid(it.col)} !important; font-weight:800;">[${esc(it.w.title)}]</span> ${label}</div>
       ${memo ? `<div class="text-[10px] text-slate-500">${memo}</div>` : ''}</div>`;
   };
   const body = $('vcal-body');
@@ -24782,26 +24784,27 @@ function renderView(){
 
   // 왼쪽 작품 목록 (스케줄 관리의 D-day 카드와 같은 틀)
   const lst = $('vlist'), tl = document.getElementById('task-dday-list');
+  lst.style.setProperty('--rs-bodyfont', getComputedStyle(document.body).fontFamily);
   ['data-design', 'data-font'].forEach(a => { const v = tl && tl.getAttribute(a); lst.setAttribute(a, v || (a === 'data-design' ? 'heart' : 'auto')); });
   const md = t => { const s = fmt(t); return s.slice(s.indexOf('.') + 1); };
   lst.innerHTML = shown.length ? shown.map(({w, col, ds}) => {
-    if (!ds) return `<div class="flex items-start gap-2 p-2.5 bg-white rounded-xl border border-slate-100 shadow-sm" style="--c:${mute(col)}">
+    if (!ds) return `<div class="flex items-start gap-2 p-2.5 bg-white rounded-xl border border-slate-100 shadow-sm" style="--c:${mute(col)}; background:color-mix(in srgb, ${col} 30%, #ffffff) !important;">
       <div class="shrink-0 w-1 self-stretch rounded-full" style="background:${col}"></div>
-      <div class="flex-1 min-w-0"><div class="text-slate-700 text-[12px]" style="font-weight:600;"><span style="color:${col}">[연재]</span> ${esc(w.title)}</div>
+      <div class="flex-1 min-w-0"><div class="text-[13px]" style="font-weight:800; color:${vivid(col)} !important;"><span style="color:${vivid(col)} !important">[연재]</span> ${esc(w.title)}</div>
       <div class="text-[10px] text-slate-400 mt-0.5">일정 미설정 (계산기에서 입력)</div></div></div>`;
     const n = ds.length, e1 = +w.e1, e2 = +w.e2, from = e1 + 1, to = Math.min(e2, n);
     const st = Math.min(...ds), en = Math.max(...ds);
     let tou = '';
     if (to >= from) { const a = ds[from-1], b = ds[to-1]; tou = `<div class="text-[10px] text-slate-400 mt-0.5">★ 투도 ${from}~${to}화 · ${md(a)}${a !== b ? ' ~ ' + md(b) : ''}</div>`; }
     const chars = +w.total > 0 ? `총 ${(+w.total).toLocaleString()}자 · ` : '';
-    return `<div data-id="${w.id}" class="flex items-start gap-2 p-2.5 bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-all group cursor-pointer" style="--c:${mute(col)}" title="눌러서 시작월로 이동">
+    return `<div data-id="${w.id}" class="flex items-start gap-2 p-2.5 bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-all group cursor-pointer" style="--c:${mute(col)}; background:color-mix(in srgb, ${col} 30%, #ffffff) !important;" title="눌러서 시작월로 이동">
       <div class="shrink-0 w-1 self-stretch rounded-full" style="background:${col}"></div>
       <div class="flex-1 min-w-0">
         <div class="flex items-center justify-between gap-1 mb-0.5">
-          <span class="text-sm font-black" style="color:${mute(col)}">${n}화</span>
+          <span class="text-sm font-black" style="color:${vivid(col)} !important">${n}화</span>
           <span class="text-[12px] font-semibold shrink-0" style="color:var(--primary); filter:saturate(1.9) brightness(0.85);">${md(st)} ~ ${md(en)}</span>
         </div>
-        <div class="text-slate-700 text-[12px]" style="font-weight:600; white-space:normal; word-break:break-word;"><span style="color:${col}">[연재]</span> ${esc(w.title)}</div>
+        <div class="text-[13px]" style="font-weight:800; white-space:normal; word-break:break-word; color:${vivid(col)} !important;"><span style="color:${vivid(col)} !important">[연재]</span> ${esc(w.title)}</div>
         <div class="text-[10px] text-slate-400 mt-0.5">${chars}시작 ${fmt(st)}</div>
         <div class="text-[10px] text-slate-400">완결 ${fmt(en)}</div>${tou}
       </div></div>`;

@@ -4830,8 +4830,8 @@ function renderTodayLegacy(){
   var todoCardHtml=renderTodoList(todayItems,t,'<svg width="17" height="17" viewBox="0 0 24 24" fill="var(--accent)" style="flex-shrink:0"><path d="M5 3h11a2 2 0 0 1 2 2v3.6l-5.3 5.3-2.4-2.4a1 1 0 0 0-1.4 1.4l3.1 3.1a1 1 0 0 0 1.4 0L18 11.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M22.7 4.7a1 1 0 0 0-1.4-1.4L13 11.6l1.4 1.4z"/></svg>오늘 할 일');
   var tomorrowCardHtml=renderTodoList(tomorrowItems,tmr,'<svg width="17" height="17" viewBox="0 0 24 24" fill="var(--t2)" style="flex-shrink:0"><path d="M5 3h11a2 2 0 0 1 2 2v3.6l-5.3 5.3-2.4-2.4a1 1 0 0 0-1.4 1.4l3.1 3.1a1 1 0 0 0 1.4 0L18 11.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M22.7 4.7a1 1 0 0 0-1.4-1.4L13 11.6l1.4 1.4z"/></svg><span style="color:var(--t2)">내일 할 일</span>');
   var TCB={stats:statsCard, deadlines:deadlinesCard, monthlyGoal:monthlyGoalCard, todo:todoCardHtml, todoTmr:tomorrowCardHtml, diary:diaryCard, projects:projectsCard||'', lookback:lookbackCard, suppToday:suppTodayCard};
-  var defTL=[{id:'stats',cols:2},{id:'deadlines',cols:1},{id:'monthlyGoal',cols:1},{id:'suppToday',cols:1},{id:'todo',cols:1},{id:'todoTmr',cols:1},{id:'diary',cols:1},{id:'lookback',cols:2},{id:'projects',cols:2}];
-  var tl=S.todayLayout||defTL;
+  var defTL=[{id:'stats',cols:2},{id:'deadlines',cols:1},{id:'monthlyGoal',cols:1},{id:'suppToday',cols:1},{id:'diary',cols:1},{id:'lookback',cols:2},{id:'projects',cols:2}];
+  var tl=(S.todayLayout||defTL).filter(function(x){return x.id!=='todo'&&x.id!=='todoTmr';});   // 오늘 할 일·내일 할 일 카드는 Today에서 뺌 (To Do 페이지에 있음)
   defTL.forEach(function(d){if(!tl.find(x=>x.id===d.id))tl.push({id:d.id,cols:d.cols});});
   var tdVis=S.todayCardVis||{};
   var isTdEdit=!!window._tdEditMode;
@@ -5049,9 +5049,6 @@ function tdCozyLayout(t,TCB,tdVis){
   var hr=new Date().getHours(),night=hr>=21;
   var slot=function(id,html,span){return html?'<div class="pj-slot" data-card="'+id+'" style="grid-column:span '+(span||1)+'">'+html+'</div>':'';};
   var g='';
-  var tdl=(S.todoList&&S.todoList[t])||[];
-  g+=slot('todo',TCB.todo+(tdl.length&&tdl.every(function(x){return x.done;})?'<div class="td-yay">✿ 오늘 할 일 끝! 오늘도 잘했어요</div>':''));
-  g+=slot('todoTmr',TCB.todoTmr);
   if(night) g+=slot('diary',TCB.diary,2);
   g+=slot('tips',goalTipsCard(),2);
   g+=slot('week',tdWeekCard());

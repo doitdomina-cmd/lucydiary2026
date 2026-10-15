@@ -3908,8 +3908,8 @@ function rcView(){
   h+='<div class="rc-grid">'+['일','월','화','수','목','금','토'].map(function(d,i){return '<div class="rc-dow'+(i===0?' sun':'')+'">'+d+'</div>';}).join('');
   for(var i=0;i<lead;i++)h+='<div class="rc-c emp"></div>';
   for(var d=1;d<=last;d++){
-    var ds=ym+'-'+String(d).padStart(2,'0'),items=rcDoneOn(ds,rmap);
-    h+='<div class="rc-c'+(ds===t?' today':'')+(items.length?' has':'')+'"'+(items.length?' onclick="rcDay(\''+ds+'\')"':'')+'><span class="rc-d">'+d+'</span>'
+    var ds=ym+'-'+String(d).padStart(2,'0'),items=rcDoneOn(ds,rmap),hasMemo=rcZoneMemos(ds).length>0;
+    h+='<div class="rc-c'+(ds===t?' today':'')+(items.length||hasMemo?' has':'')+'"'+(items.length||hasMemo?' onclick="rcDay(\''+ds+'\')"':'')+'><span class="rc-d">'+d+'</span>'
       +items.slice(0,8).map(function(r){return '<i class="rc-chip" style="--c:'+esc(tdCardColor(r))+';background-image:url(\''+esc(tdCardBg(r)).replace(/'/g,'%27')+'\')" title="'+esc(r.task)+'"><span>'+esc(r.task)+'</span></i>';}).join('')
       +(items.length>8?'<small class="rc-more">+'+(items.length-8)+'</small>':'')+'</div>';
   }
@@ -3923,13 +3923,25 @@ function rcView(){
   }).join('');
   return h+'</div>';
 }
+// 그날 Today 맨 위 네 구역(아침·오전·오후·저녁)에 적은 메모
+function rcZoneMemos(ds){
+  var z=(S.todayZones&&S.todayZones[ds])||{};
+  return TZ_ZONES.filter(function(o){return (z[o.k]||'').trim();});
+}
 function rcDay(ds){
   var rmap={};(S.routines||[]).forEach(function(r){if(r.isRz)rmap[r.id]=r;});
   var items=rcDoneOn(ds,rmap),tm=(S.checkTimes||{})[ds]||{},mm=(S.checkMemos||{})[ds]||{};
-  openMo(parseInt(ds.slice(5,7),10)+'월 '+parseInt(ds.slice(8,10),10)+'일 한 루틴',
-    items.length?items.map(function(r){
-      return '<div class="rc-big" style="--wc:'+esc(tdCardColor(r))+';background-image:url(\''+esc(tdCardBg(r)).replace(/'/g,'%27')+'\')"><span class="tdt-ic">'+tdCardIcon(r.task)+'</span><b>'+esc(r.task)+'</b>'+(tdCardTag(r)?'<em>'+esc(tdCardTag(r))+'</em>':'')+'<u>'+esc(tm[r.id]||r.time||'')+'</u>'+(mm[r.id]?'<small>'+esc(mm[r.id])+'</small>':'')+'</div>';
-    }).join(''):'<div class="mem-none">이 날 한 루틴이 없어요</div>',
+  var z=(S.todayZones&&S.todayZones[ds])||{},P=S.todayZonePhotos||{};
+  var memos=rcZoneMemos(ds).map(function(o){
+    var po=P[o.k]||{},url=po.photo||o.ph;
+    return '<div class="rc-zone" style="--tzc:'+o.c+'"><div class="rc-zp" style="background-image:url(\''+esc(url).replace(/'/g,'%27')+'\')"></div><div class="rc-zb"><div class="rc-zt"><em>'+o.en+'</em>'+o.t+'</div><div class="rc-zx">'+esc(z[o.k]).replace(/\n/g,'<br>')+'</div></div></div>';
+  }).join('');
+  var tl=items.map(function(r){
+    return '<div class="rc-big" style="--wc:'+esc(tdCardColor(r))+';background-image:url(\''+esc(tdCardBg(r)).replace(/'/g,'%27')+'\')"><span class="tdt-ic">'+tdCardIcon(r.task)+'</span><b>'+esc(r.task)+'</b>'+(tdCardTag(r)?'<em>'+esc(tdCardTag(r))+'</em>':'')+'<u>'+esc(tm[r.id]||r.time||'')+'</u>'+(mm[r.id]?'<small>'+esc(mm[r.id])+'</small>':'')+'</div>';
+  }).join('');
+  openMo(parseInt(ds.slice(5,7),10)+'월 '+parseInt(ds.slice(8,10),10)+'일의 하루',
+    (memos?'<div class="rc-sec">하루 메모</div>'+memos:'')
+    +'<div class="rc-sec">타임라인</div>'+(tl||'<div class="mem-none">이 날 한 루틴이 없어요</div>'),
     '<button class="btn bp" onclick="closeMo()">닫기</button>');
 }
 (function(){
@@ -3949,7 +3961,12 @@ function rcDay(ds){
     +'.rc-chip::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.04) 25%,rgba(0,0,0,.6))}'
     +'.rc-chip span{display:none}'
     +'.rc-more{flex:0 0 100%;font-size:10px;color:var(--t3)}'
-    +'.rc-big{position:relative;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;gap:3px;min-height:132px;padding:12px;margin-bottom:10px;border-radius:18px;background-color:var(--wc);background-size:cover;background-position:center;overflow:hidden;color:#fff}'
+    +'.rc-sec{font-size:12px;color:var(--t3);letter-spacing:.04em;margin:4px 0 8px}'
+    +'.rc-zone{display:flex;border-radius:16px;background:#fff;box-shadow:0 0 0 1px var(--border,#eee);overflow:hidden;margin-bottom:10px}'
+    +'.rc-zp{flex:0 0 84px;background-size:cover;background-position:center;background-color:var(--tzc)}'
+    +'.rc-zb{flex:1;min-width:0;padding:10px 14px}.rc-zt{font-size:14px;color:var(--text);margin-bottom:4px}.rc-zt em{font-style:italic;font-size:12px;color:var(--t3);margin-right:6px}'
+    +'.rc-zx{font-size:13.5px;line-height:1.6;color:var(--text);white-space:normal;word-break:break-word}'
+    +'.rc-big{position:relative;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;gap:3px;min-height:96px;padding:12px;margin-bottom:10px;border-radius:18px;background-color:var(--wc);background-size:cover;background-position:center;overflow:hidden;color:#fff}'
     +'.rc-big::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.06) 30%,rgba(0,0,0,.55))}.rc-big>*{position:relative}'
     +'.rc-big b{font-size:15px;font-weight:600;text-shadow:0 1px 4px rgba(0,0,0,.4)}.rc-big em{font-style:normal;font-size:10.5px;padding:2px 9px;border-radius:99px;background:rgba(255,255,255,.88);color:var(--wc)}'
     +'.rc-big u{position:absolute;top:12px;right:12px;text-decoration:none;font-size:11px;background:rgba(0,0,0,.35);border-radius:99px;padding:2px 9px}.rc-big small{font-size:11.5px;opacity:.95;text-shadow:0 1px 3px rgba(0,0,0,.5)}'

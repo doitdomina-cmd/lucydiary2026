@@ -4747,6 +4747,17 @@ body.theme-cozy #write-calendar-body[data-card="gaming"] .write-span-bar { margi
 @container rs (max-width:1000px){#tab-refsched .layout{grid-template-columns:1fr}
 #tab-refsched .content{display:block}}
 @container rs (max-width:700px){#tab-refsched .months{grid-template-columns:1fr}}
+#tab-refsched .rs-vlayout{display:grid;grid-template-columns:240px minmax(0,1fr);gap:18px;align-items:start}
+#tab-refsched .rs-vnav{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+#tab-refsched .rs-vnav b{font-family:"Jua",sans-serif;font-weight:400;font-size:22px;color:#a0714a;min-width:130px;text-align:center}
+#tab-refsched .side li.vrow{cursor:default;gap:8px}
+#tab-refsched .side li.vrow input{width:auto;flex:none}
+#tab-refsched .side li.vrow .vdot{width:12px;height:12px;border-radius:50%;flex:none;border:1px solid rgba(0,0,0,.15)}
+#tab-refsched .cal.vcal td{height:auto;min-height:92px}
+#tab-refsched .cal.vcal td span.vb{cursor:default;transform:none;text-align:left;padding:2px 5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:3px 0 0}
+#tab-refsched .cal.vcal td span.vb.end{border:1.5px solid #e05a5a}
+@container rs (max-width:1000px){ #tab-refsched .rs-vlayout{grid-template-columns:1fr} }
+@container rs (max-width:560px){ #tab-refsched .cal.vcal td{min-height:64px} #tab-refsched .cal.vcal td span.vb{font-size:10px;padding:1px 2px} }
 #tab-refsched{container-type:inline-size;container-name:rs;--rs-ink:#4a3b32}
 #tab-refsched .rs-wrap{background:none !important;border-radius:18px;padding:20px 16px 28px;max-width:100%;overflow-x:hidden;color:var(--ink);font-size:15px;line-height:1.55;min-height:60vh}
 #tab-refsched h1{display:inline-block}
@@ -5572,6 +5583,8 @@ body.theme-cozy #write-calendar-body[data-card="gaming"] .write-span-bar { margi
     <path d="M33 38.5c-3-2-4.6-3.6-4.6-5.2a2.4 2.4 0 0 1 4.6-1 2.4 2.4 0 0 1 4.6 1c0 1.6-1.6 3.2-4.6 5.2z" fill="#e6606a" stroke="#fff" stroke-width="1"/>
     <path d="M41 6l1.2 2.6 2.8.4-2 2 .5 2.8-2.5-1.3-2.5 1.3.5-2.8-2-2 2.8-.4z" fill="#f6b800" stroke="#fff" stroke-width=".8"/>
   </svg>연재 일정 계산기</h1>
+  <div class="tabs" id="rs-mainTabs" style="max-width:380px"><button id="rs-mtCalc" class="on">계산기</button><button id="rs-mtView">연재 일정 보기</button></div>
+  <div id="rs-paneCalc">
   <div class="layout">
   <div class="card side">
     <b>내 작품</b>
@@ -5624,6 +5637,26 @@ body.theme-cozy #write-calendar-body[data-card="gaming"] .write-span-bar { margi
         <label style="display:inline;margin-left:8px;color:inherit"><input type="radio" name="rs-mv" value="one" style="width:auto"> 이 칸만</label></span></div>
     <div class="months" id="rs-months"></div></div>
   </div></div></div>
+  </div>
+  <div id="rs-paneView" style="display:none">
+    <div class="rs-vlayout">
+      <div class="card side">
+        <b>표시할 작품</b>
+        <ul id="rs-vWorks"></ul>
+        <div class="hint">체크한 작품만 달력에 나와요. 일정은 <b style="font-size:13px">계산기</b> 탭에서만 고칠 수 있어요.</div>
+      </div>
+      <div class="card" style="background:var(--c-blue)">
+        <div class="rs-vnav">
+          <button class="btn" id="rs-vPrev">‹</button>
+          <b id="rs-vTitle"></b>
+          <button class="btn" id="rs-vNext">›</button>
+          <button class="btn" id="rs-vToday">오늘</button>
+          <button class="btn" id="rs-vStart">일정 시작월로</button>
+        </div>
+        <div class="cal vcal" id="rs-vCal"></div>
+      </div>
+    </div>
+  </div>
 </div>
                 </div>
 
@@ -8430,6 +8463,7 @@ body.theme-cozy #write-calendar-body[data-card="gaming"] .write-span-bar { margi
         let workManageViewFilter = 'all'; // 'all' | 'published' | 'upcoming' | 'genre'
         let workManageSortMode = 'date'; // 'date' | 'genre'
         let refSchedWorks = []; // 참고일정(연재 일정 계산기) 저장 작품
+        let refSchedHidden = []; // 연재 일정 보기에서 끈 작품 id
         let publisherViewMode = { publishers: 'list', studios: 'list' }; // [NEW] 출판사/스튜디오 줄로 보기 · 카드로 보기
         let publisherCardSortOrder = []; // [NEW] 카드 보기 전용 순서 (줄 보기 순서와 별도 저장)
         let taxViewYear = new Date().getFullYear();
@@ -8678,7 +8712,7 @@ body.theme-cozy #write-calendar-body[data-card="gaming"] .write-span-bar { margi
                         masterWorks, monthlyData, years, publisherData, analysisData, 
                         publisherSortOrder, publisherCardSortOrder, publisherViewMode, genreList, genreBadgeOpacity, tableFontSettings, crosshairSettings,
                         writeSchedules, writeSpans, writeVolumes, writeMergedVolumeWorks, taskSchedules, contacts, penNames, widgetSettingsData, ddayCardDesigns, ddayCardFonts, modalDesign, calCardDesigns, calCardFonts, calCardSizes, writeCardSettings, taskCardSettings, taskColors: TASK_COLORS, taskCategoryList, writeColors: WRITE_COLORS, writeCategoryList,
-                        writerWorks, writerDailyData, writerGlobalDailyGoal, writeCounterBase, writeCounterResetDate, submissions, webtoonSubs, webtoonSubOrder, incomeGoals, taxSettings, taxGoalMemos, charGoals, writerLastWorkKey, taxGoalItems, contactSortMode, webtoonManage, webtoonCardSettings, penNameColorOverrides, webtoonViewFilter, webtoonSortMode, workManage, workManageCardSettings, workManageViewFilter, workManageSortMode, refSchedWorks
+                        writerWorks, writerDailyData, writerGlobalDailyGoal, writeCounterBase, writeCounterResetDate, submissions, webtoonSubs, webtoonSubOrder, incomeGoals, taxSettings, taxGoalMemos, charGoals, writerLastWorkKey, taxGoalItems, contactSortMode, webtoonManage, webtoonCardSettings, penNameColorOverrides, webtoonViewFilter, webtoonSortMode, workManage, workManageCardSettings, workManageViewFilter, workManageSortMode, refSchedWorks, refSchedHidden
                     };
                     const jsonStr = JSON.stringify(dataToSave);
 
@@ -8785,6 +8819,7 @@ body.theme-cozy #write-calendar-body[data-card="gaming"] .write-span-bar { margi
             if (parsed.workManageCardSettings) Object.assign(workManageCardSettings, parsed.workManageCardSettings);
             if (parsed.workManageViewFilter) workManageViewFilter = parsed.workManageViewFilter;
             if (parsed.workManageSortMode) workManageSortMode = parsed.workManageSortMode;
+            if (Array.isArray(parsed.refSchedHidden)) { refSchedHidden.length = 0; refSchedHidden.push(...parsed.refSchedHidden); }
             if (Array.isArray(parsed.refSchedWorks)) { refSchedWorks.length = 0; refSchedWorks.push(...parsed.refSchedWorks); try { if (window.rsRefresh) window.rsRefresh(); } catch (e) {} }
             if (parsed.widgetSettingsData) widgetSettingsData = parsed.widgetSettingsData;
             if (parsed.calCardDesigns) Object.assign(calCardDesigns, parsed.calCardDesigns);
@@ -9455,7 +9490,7 @@ body.theme-cozy #write-calendar-body[data-card="gaming"] .write-span-bar { margi
                 contacts, penNames, widgetSettingsData, ddayCardDesigns, ddayCardFonts, modalDesign, calCardDesigns, calCardFonts, calCardSizes, submissions, webtoonSubs, webtoonSubOrder, contactSortMode, webtoonViewFilter, webtoonSortMode,
                 // [FIX] 글자수 관리 탭 데이터가 백업에서 빠져있던 문제 수정 — 아래 항목들이 누락되어 있었음
                 writerWorks, writerDailyData, writerGlobalDailyGoal, writeCounterBase, writeCounterResetDate, writerLastWorkKey,
-                incomeGoals, taxSettings, taxGoalMemos, taxGoalItems, charGoals, webtoonManage, webtoonCardSettings, penNameColorOverrides, workManage, workManageCardSettings, workManageViewFilter, workManageSortMode, refSchedWorks
+                incomeGoals, taxSettings, taxGoalMemos, taxGoalItems, charGoals, webtoonManage, webtoonCardSettings, penNameColorOverrides, workManage, workManageCardSettings, workManageViewFilter, workManageSortMode, refSchedWorks, refSchedHidden
             }; 
             const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'}); 
             const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `royalty_backup_${getYYYYMMDD(new Date())}.json`; a.click(); 
@@ -24418,10 +24453,11 @@ const fmt = t => { const d = new Date(t); return `${d.getUTCFullYear()}.${d.getU
 let mode = 'back';
 
 // 각 화의 시작일 기준 오프셋(일) 계산
-function offsets(n){
-  const e1 = +$('e1').value, e2 = +$('e2').value;
-  const g = [+$('g1').value||1, +$('g2').value||0, +$('g3').value||1];
-  const pd = [Math.max(1, +$('perday1').value||1), 1, Math.max(1, +$('perday3').value||1)];
+function offsets(n){ return offsetsOf(getState(), n); }
+function offsetsOf(st, n){
+  const e1 = +st.e1, e2 = +st.e2;
+  const g = [+st.g1||1, +st.g2||0, +st.g3||1];
+  const pd = [Math.max(1, +st.perday1||1), 1, Math.max(1, +st.perday3||1)];
   const ph = i => i <= e1 ? 0 : i <= e2 ? 1 : 2;
   const out = [0]; const phases = [ph(1)];
   let day = 0, cnt = 1;
@@ -24589,7 +24625,7 @@ $('works').onclick = ev => {
   if (del){
     const w = works.find(x => x.id===del.dataset.del);
     if (!confirm(`"${w.title}" 을(를) 삭제할까요?`)) return;
-    works = works.filter(x => x.id!==w.id); persist();
+    works.splice(works.indexOf(w), 1); const hi = refSchedHidden.indexOf(w.id); if (hi >= 0) refSchedHidden.splice(hi, 1); persist();
     if (curId===w.id) curId = null;
     renderWorks(); return;
   }
@@ -24605,7 +24641,68 @@ $('resetAll').onclick = () => {
 };
 $('newWork').onclick = () => { curId = null; adj = []; $('title').value = ''; ['total','per','eps','date'].forEach(f => $(f).value = ''); $('epsHint').textContent = ''; render(); $('saveMsg').textContent = ''; renderWorks(); };
 
-window.rsRefresh = () => { works = refSchedWorks; if (curId && !works.find(w => w.id === curId)) curId = null; renderWorks(); render(); };
+// ---- 연재 일정 보기 (표시 전용 달력) ----
+const VCOL = ['#f9dc93','#f4b8b8','#b9d6f0','#cfe8c8','#d9c6ee','#f8cfa5','#a9dccf','#e8c0d8'];
+let vY = new Date().getFullYear(), vM = new Date().getMonth();
+function worksDates(w){
+  const n = +w.eps; if (!(n > 0) || !w.date) return null;
+  const {out} = offsetsOf(w, n);
+  const start0 = w.mode === 'back' ? parse(w.date) - out[n-1]*DAY : parse(w.date);
+  return out.map((o,i) => start0 + (o + ((w.adj||[])[i]||0))*DAY);
+}
+function renderView(){
+  const shown = [];
+  $('vWorks').innerHTML = works.length ? works.map((w, k) => {
+    const col = VCOL[k % VCOL.length], ds = worksDates(w), on = !refSchedHidden.includes(w.id);
+    if (ds && on) shown.push({w, ds, col});
+    const range = ds ? `${fmt(Math.min(...ds)).slice(0,-3)} ~ ${fmt(Math.max(...ds)).slice(0,-3)}` : '날짜 없음';
+    return `<li class="vrow"><input type="checkbox" data-vid="${w.id}" ${on?'checked':''}><span class="vdot" style="background:${col}"></span><span>${esc(w.title)}<small>${w.eps}화 · ${range}</small></span></li>`;
+  }).join('') : '<li style="cursor:default;color:var(--mute)">계산기 탭에서 작품을 저장하면 여기에 나와요</li>';
+  const byDay = {};
+  shown.forEach(({w, ds, col}) => {
+    const g = {}; ds.forEach((t,i) => (g[t] ||= []).push(i));
+    Object.entries(g).forEach(([t, idx]) => (byDay[t] ||= []).push({w, col, lo: Math.min(...idx), hi: Math.max(...idx), n: ds.length}));
+  });
+  $('vTitle').textContent = `${vY}년 ${vM+1}월`;
+  const first = new Date(Date.UTC(vY, vM, 1)).getUTCDay(), dim = new Date(Date.UTC(vY, vM+1, 0)).getUTCDate();
+  let t = `<table><tr>${[...'일월화수목금토'].map(d=>`<th>${d}</th>`).join('')}</tr><tr>`;
+  for (let i=0;i<first;i++) t += '<td></td>';
+  for (let d=1; d<=dim; d++){
+    const ts = Date.UTC(vY, vM, d), items = byDay[ts] || [];
+    const badges = items.map(({w, col, lo, hi, n}) => {
+      const label = (lo===hi ? `${lo+1}화` : `${lo+1}~${hi+1}화`) + (hi===n-1 ? ' 완결' : '');
+      return `<span class="vb${hi===n-1?' end':''}" style="background:${col}" title="${esc(w.title)} ${label}">${esc(w.title)} ${label}</span>`;
+    }).join('');
+    t += `<td class="${items.length?'has':''}"><i class="dn${ts===TODAY?' today':''}">${d}</i>${badges}</td>`;
+    if ((first+d)%7===0 && d<dim) t += '</tr><tr>';
+  }
+  $('vCal').innerHTML = t + '</tr></table>';
+  window._rsShown = shown;
+}
+$('vWorks').onchange = ev => {
+  const id = ev.target.dataset.vid; if (!id) return;
+  const i = refSchedHidden.indexOf(id);
+  if (ev.target.checked) { if (i >= 0) refSchedHidden.splice(i, 1); } else if (i < 0) refSchedHidden.push(id);
+  persist(); renderView();
+};
+const vShift = k => { vM += k; if (vM > 11) { vM = 0; vY++; } if (vM < 0) { vM = 11; vY--; } renderView(); };
+$('vPrev').onclick = () => vShift(-1);
+$('vNext').onclick = () => vShift(1);
+$('vToday').onclick = () => { const n = new Date(); vY = n.getFullYear(); vM = n.getMonth(); renderView(); };
+$('vStart').onclick = () => {
+  const sh = window._rsShown || []; if (!sh.length) return;
+  const d = new Date(Math.min(...sh.map(s => Math.min(...s.ds)))); vY = d.getUTCFullYear(); vM = d.getUTCMonth(); renderView();
+};
+function showPane(v){
+  $('paneCalc').style.display = v ? 'none' : '';
+  $('paneView').style.display = v ? '' : 'none';
+  $('mtCalc').classList.toggle('on', !v); $('mtView').classList.toggle('on', v);
+  if (v) renderView();
+}
+$('mtCalc').onclick = () => showPane(false);
+$('mtView').onclick = () => showPane(true);
+
+window.rsRefresh = () => { works = refSchedWorks; if (curId && !works.find(w => w.id === curId)) curId = null; renderWorks(); render(); renderView(); };
 updateEps(); render(); renderWorks();
 
 })();

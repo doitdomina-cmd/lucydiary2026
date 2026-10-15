@@ -18391,12 +18391,28 @@ body.theme-cozy #write-calendar-body[data-card="gaming"] .write-span-bar { margi
 
         // 🟢 [NEW] 집필 목표 모달 왼쪽에 붙는 '작품 정보' 패널 — 선택된 작품의 기본 정보와 목표 글자수를 보여주고,
         // 공포/공미 글자수는 여기서 바로 수정할 수 있게 한다 (extras/외전은 대상이 아니라 원작품 기준).
+        // 집필 카드의 작품 id 가 외전('본편id::외전id')이어도 오른쪽 작품 정보 패널이 뜨게: 패널에 보여줄 값(view)과 저장할 대상(rec)을 돌려준다
+        function wwiTarget(workId) {
+            if (!workId) return null;
+            if (String(workId).includes('::')) {
+                const [wid, eid] = String(workId).split('::');
+                const w = masterWorks.find(x => x.id === wid);
+                const ex = w && (w.extras || []).find(e => e.id === eid);
+                if (!w || !ex) return null;
+                return { w, ex, rec: ex, view: { id: workId, title: `${w.title} [${ex.name}]`, genre: w.genre, publisher: w.publisher, manuscriptDate: ex.manuscriptDate || '', goalWithSpace: ex.goalWithSpace || '', goalNoSpace: ex.goalNoSpace || '', isPending: false, pendingMonth: '', publishDate: ex.publishDate || '' } };
+            }
+            const w = masterWorks.find(x => x.id === workId);
+            return w ? { w, ex: null, rec: w, view: w } : null;
+        }
         function updateWriteWorkInfoPanel() {
             const panel = document.getElementById('write-workinfo-panel');
             if (!panel) return;
             const workId = document.getElementById('write-work-select').value;
-            const w = masterWorks.find(x => x.id === workId);
-            if (!w) { panel.style.visibility = 'hidden'; return; }
+            const wt = wwiTarget(workId);
+            if (!wt) { panel.style.visibility = 'hidden'; return; }
+            const w = wt.view;
+            const pendLbl = document.getElementById('wwi-pending') && document.getElementById('wwi-pending').closest('label');
+            if (pendLbl) pendLbl.style.display = wt.ex ? 'none' : '';
             panel.style.visibility = 'visible';
 
             document.getElementById('wwi-title').textContent = w.title || '(제목 없음)';
@@ -18480,8 +18496,8 @@ body.theme-cozy #write-calendar-body[data-card="gaming"] .write-span-bar { margi
         // 반대쪽 값은 기존 등록 폼과 같은 비율(NOSPACE_TO_WITHSPACE_RATIO)로 같이 채워준다.
         function wwiUpdateGoal(field) {
             const workId = document.getElementById('write-work-select').value;
-            const w = masterWorks.find(x => x.id === workId);
-            if (!w) return;
+            const wt = wwiTarget(workId); if (!wt) return;
+            const w = wt.rec;
             const withSpaceEl = document.getElementById('wwi-goal-withspace');
             const noSpaceEl = document.getElementById('wwi-goal-nospace');
             if (field === 'withspace') {
@@ -18514,8 +18530,9 @@ body.theme-cozy #write-calendar-body[data-card="gaming"] .write-span-bar { margi
         // 출간 예정일/미정 여부를 원작품에 바로 저장 — 작품 등록 폼과 완전히 같은 필드를 씀
         function wwiUpdatePublishDate() {
             const workId = document.getElementById('write-work-select').value;
-            const w = masterWorks.find(x => x.id === workId);
-            if (!w) return;
+            const wt = wwiTarget(workId); if (!wt) return;
+            const w = wt.rec;
+            if (wt.ex) { w.publishDate = document.getElementById('wwi-publish-date').value || ''; save(); updateUI(); return; }
             const isPending = document.getElementById('wwi-pending').checked;
             w.isPending = isPending;
             w.pendingMonth = isPending ? (document.getElementById('wwi-pending-month').value || '') : '';
@@ -18526,12 +18543,12 @@ body.theme-cozy #write-calendar-body[data-card="gaming"] .write-span-bar { margi
         // 완고 입고일을 원작품에 바로 저장하고, 자동 등록된 '완고 입고' 스케줄도 같이 옮겨준다
         function wwiUpdateManuscriptDate() {
             const workId = document.getElementById('write-work-select').value;
-            const w = masterWorks.find(x => x.id === workId);
-            if (!w) return;
+            const wt = wwiTarget(workId); if (!wt) return;
+            const w = wt.rec;
             const oldDate = w.manuscriptDate;
             const newDate = document.getElementById('wwi-manuscript-date').value || '';
             w.manuscriptDate = newDate;
-            syncManuscriptTaskSchedule(w, oldDate, newDate);
+            if (wt.ex) syncExtraManuscriptTask(wt.w, wt.ex, oldDate, newDate); else syncManuscriptTaskSchedule(w, oldDate, newDate);
             save();
             updateUI();
         }

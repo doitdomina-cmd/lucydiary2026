@@ -4789,6 +4789,9 @@ body.theme-cozy #write-calendar-body[data-card="gaming"] .write-span-bar { margi
 #tab-refsched .side #rs-works li[data-id] small{font-weight:600;font-size:12px;color:#7a6a58}
 #tab-refsched .rs-fold{cursor:pointer;font-style:normal;font-size:10px;color:#8a6a3a}
 #tab-refsched .cal em.rs-fold{display:block;text-align:center;margin-top:2px}
+#tab-refsched .rs-sw{width:22px;height:22px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.22);cursor:pointer;padding:0;flex:none}
+#tab-refsched .rs-sw.on{box-shadow:0 0 0 2px #4a3b32}
+#tab-refsched input.rs-swc{width:26px;height:26px;padding:0;border:0;background:none;cursor:pointer;flex:none}
 #tab-refsched .side li input.vchk{width:auto;flex:none;margin:0}
 #tab-refsched .rs-vitem{padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.72);border:1px solid rgba(0,0,0,.06);cursor:pointer;font-size:12px;line-height:1.5;color:#5b4636}
 #tab-refsched .rs-vitem:hover{background:#fff}
@@ -5619,6 +5622,8 @@ body.theme-cozy #write-calendar-body[data-card="gaming"] .write-span-bar { margi
     <div style="display:flex;gap:8px"><select id="rs-workSel"></select>
     <button id="rs-resetAll" class="btn">초기화</button></div>
     <input id="rs-title" type="text" placeholder="작품 제목을 직접 입력하세요" style="display:none;margin-top:6px">
+    <label style="margin-top:10px">연재 일정 보기 달력에 표시할 색</label>
+    <div id="rs-colors" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"></div>
     <div class="hint" id="rs-saveMsg"></div>
   </div>
 
@@ -24519,6 +24524,19 @@ function offsetsOf(st, n){
   return {out, phases};
 }
 
+// ---- 달력 표시 색 고르기 ----
+let curColor = '';
+function renderColors(){
+  const idx = works.findIndex(w => w.id === curId), def = VCOL[(idx >= 0 ? idx : works.length) % VCOL.length];
+  const now = (curColor || def).toLowerCase();
+  const box = $('colors'); if (!box) return;
+  box.innerHTML = [...VCOL, ...VCOL_EXTRA].map(c => `<button type="button" class="rs-sw${c.toLowerCase() === now ? ' on' : ''}" data-c="${c}" style="background:${c}" title="${c}"></button>`).join('')
+    + `<input type="color" class="rs-swc" value="${/^#[0-9a-f]{6}$/i.test(now) ? now : '#d99a2b'}" title="직접 고르기">`;
+}
+$('colors').addEventListener('click', ev => { const b = ev.target.closest('.rs-sw'); if (!b) return; curColor = b.dataset.c; renderColors(); autoSave(); });
+$('colors').addEventListener('input', ev => { if (ev.target.classList.contains('rs-swc')) { curColor = ev.target.value; autoSave(); } });
+$('colors').addEventListener('change', ev => { if (ev.target.classList.contains('rs-swc')) renderColors(); });
+
 // ---- 작품 등록(masterWorks)에서 불러오기 ----
 function fillWorkSel(){
   const sel = $('workSel'), cur = sel.value;
@@ -24674,12 +24692,14 @@ const persist = () => { try { if (typeof save === 'function') save(true); return
 const FIELDS = ['total','per','eps','e1','e2','g1','g2','g3','perday1','perday3','date','ratio'];
 
 function getState(){
-  const st = {title: $('title').value.trim() || '제목 없음', workId: $('workSel').value === '__custom' ? '' : $('workSel').value, mode, adj: adj.slice()};
+  const st = {title: $('title').value.trim() || '제목 없음', color: curColor, workId: $('workSel').value === '__custom' ? '' : $('workSel').value, mode, adj: adj.slice()};
   FIELDS.forEach(f => st[f] = $(f).value);
   return st;
 }
 function setState(st){
   $('title').value = st.title === '제목 없음' ? '' : st.title;
+  curColor = st.color || '';
+  renderColors();
   fillWorkSel();
   if (st.workId && ![...$('workSel').options].some(o => o.value === st.workId)) { const o = document.createElement('option'); o.value = st.workId; o.textContent = st.title; $('workSel').insertBefore(o, $('workSel').lastElementChild); }
   $('workSel').value = st.workId && [...$('workSel').options].some(o => o.value === st.workId) ? st.workId : (st.title && st.title !== '제목 없음' ? '__custom' : '');
@@ -24698,7 +24718,7 @@ function setState(st){
 function endOf(w){ try { const ds = worksDates(w); if (ds) return isoOf(Math.max(...ds)); } catch (e) {} return w.date || ''; }
 function renderWorks(){
   $('works').innerHTML = works.length ? works.map((w, k) =>
-    `<li data-id="${w.id}" class="${w.id===curId?'cur':''}" style="--wc:${VCOL[k % VCOL.length]}"><input type="checkbox" class="vchk" data-vid="${w.id}" title="연재 일정 보기에 표시" ${refSchedHidden.includes(w.id)?'':'checked'}><span>${esc(w.title)}<small>${w.eps}화 · ${endOf(w)}</small></span><i data-del="${w.id}" title="삭제">✕</i></li>`
+    `<li data-id="${w.id}" class="${w.id===curId?'cur':''}" style="--wc:${colorOf(w, k)}"><input type="checkbox" class="vchk" data-vid="${w.id}" title="연재 일정 보기에 표시" ${refSchedHidden.includes(w.id)?'':'checked'}><span>${esc(w.title)}<small>${w.eps}화 · ${endOf(w)}</small></span><i data-del="${w.id}" title="삭제">✕</i></li>`
   ).join('') : '<li style="cursor:default;color:var(--mute)">저장된 작품이 없어요</li>';
 }
 const esc = t => t.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -24738,10 +24758,12 @@ $('resetAll').onclick = () => {
   Object.entries({e1:10,g1:2,e2:20,g2:0,g3:2,perday1:1,perday3:1,ratio:0.765}).forEach(([k,v]) => $(k).value = v);
   $('epsHint').textContent = ''; adj = []; updateMi(); render(); autoSave();
 };
-$('newWork').onclick = () => { curId = null; adj = []; $('ratio').value = '0.765'; updateMi(); $('title').value = ''; fillWorkSel(); $('workSel').value = '__custom'; syncTitleBox(); $('title').focus(); ['total','per','eps','date'].forEach(f => $(f).value = ''); $('epsHint').textContent = ''; render(); $('saveMsg').textContent = ''; renderWorks(); };
+$('newWork').onclick = () => { curId = null; curColor = ''; renderColors(); adj = []; $('ratio').value = '0.765'; updateMi(); $('title').value = ''; fillWorkSel(); $('workSel').value = '__custom'; syncTitleBox(); $('title').focus(); ['total','per','eps','date'].forEach(f => $(f).value = ''); $('epsHint').textContent = ''; render(); $('saveMsg').textContent = ''; renderWorks(); };
 
 // ---- 연재 일정 보기 (표시 전용 달력: 스케줄 관리 달력과 같은 틀·테마) ----
 const VCOL = ['#d99a2b','#d9707a','#5a95c9','#6fae6a','#9a78c9','#d98a4e','#4fb3a2','#c9729f'];
+const VCOL_EXTRA = ['#f2c14e','#e57373','#64b5f6','#81c784','#ba68c8','#ff8a65','#4db6ac','#f06292','#aed581','#7986cb','#a1887f','#90a4ae'];
+const colorOf = (w, k) => w.color || VCOL[k % VCOL.length];
 let vDate = new Date(); vDate.setDate(1);
 const isoOf = ts => new Date(ts).toISOString().slice(0, 10);
 const mute = c => { try { return ddayMute(c); } catch (e) { return c; } };
@@ -24757,7 +24779,7 @@ function renderView(){
   const MN = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   const y = vDate.getFullYear(), m = vDate.getMonth();
   const shown = [];
-  works.forEach((w, k) => { if (!refSchedHidden.includes(w.id)) shown.push({w, k, col: VCOL[k % VCOL.length], ds: worksDates(w)}); });
+  works.forEach((w, k) => { if (!refSchedHidden.includes(w.id)) shown.push({w, k, col: colorOf(w, k), ds: worksDates(w)}); });
   const byDate = {};
   shown.forEach(({w, col, ds}) => {
     if (!ds) return;
@@ -24840,7 +24862,7 @@ function showPane(v){
 $('mtCalc').onclick = () => showPane(false);
 $('mtView').onclick = () => showPane(true);
 
-window.rsRefresh = () => { works = refSchedWorks; fillWorkSel(); syncTitleBox(); if (curId && !works.find(w => w.id === curId)) curId = null; renderWorks(); render(); renderView(); };
+window.rsRefresh = () => { works = refSchedWorks; renderColors(); fillWorkSel(); syncTitleBox(); if (curId && !works.find(w => w.id === curId)) curId = null; renderWorks(); render(); renderView(); };
 updateEps(); render(); renderWorks();
 
 })();

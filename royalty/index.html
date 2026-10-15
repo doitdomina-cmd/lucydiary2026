@@ -4787,6 +4787,8 @@ body.theme-cozy #write-calendar-body[data-card="gaming"] .write-span-bar { margi
 #tab-refsched .side #rs-works li[data-id].cur{background:color-mix(in srgb,var(--wc) 34%,#fffdf7);border-color:color-mix(in srgb,var(--wc) 62%,#8a6a3a)}
 #tab-refsched .side #rs-works li[data-id] span{font-weight:800;font-size:15px;color:#3f3328}
 #tab-refsched .side #rs-works li[data-id] small{font-weight:600;font-size:12px;color:#7a6a58}
+#tab-refsched .rs-fold{cursor:pointer;font-style:normal;font-size:10px;color:#8a6a3a}
+#tab-refsched .cal em.rs-fold{display:block;text-align:center;margin-top:2px}
 #tab-refsched .side li input.vchk{width:auto;flex:none;margin:0}
 #tab-refsched .rs-vitem{padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.72);border:1px solid rgba(0,0,0,.06);cursor:pointer;font-size:12px;line-height:1.5;color:#5b4636}
 #tab-refsched .rs-vitem:hover{background:#fff}
@@ -24558,6 +24560,7 @@ function updateEps(){
 }
 
 let adj = [];   // 드래그로 옮긴 회차별 이동 일수
+const expanded = new Set();   // 합쳐진 칸 중 한 화씩 펼쳐 둔 날짜
 
 function render(){
   const n = +$('eps').value;
@@ -24597,7 +24600,9 @@ function render(){
       let badge = '';
       if (eps){
         const lo = Math.min(...eps), hi = Math.max(...eps);
-        badge = `<span draggable="true" data-first="${lo}" data-ts="${ts}" style="background:${col[phases[lo]]}">${lo===hi ? lo+1 : (lo+1)+'~'+(hi+1)}화</span>`;
+        if (lo === hi) badge = `<span draggable="true" data-first="${lo}" data-ts="${ts}" style="background:${col[phases[lo]]}">${lo+1}화</span>`;
+        else if (expanded.has(ts)) badge = [...eps].sort((a,b)=>a-b).map(k => `<span draggable="true" data-first="${k}" data-single="1" data-ts="${ts}" style="background:${col[phases[k]]}">${k+1}화</span>`).join('') + `<em class="rs-fold" data-collapse="${ts}">▴ 접기</em>`;
+        else badge = `<span draggable="true" data-first="${lo}" data-ts="${ts}" style="background:${col[phases[lo]]}">${(lo+1)+'~'+(hi+1)}화 <b class="rs-fold" data-expand="${ts}" title="펼쳐서 한 화씩 옮기기">▾</b></span>`;
       }
       t += `<td data-ts="${ts}" class="${eps?'has':''}"><i class="dn${ts===TODAY?' today':''}">${d}</i>${eps && eps.some(k => phases[k]===1) ? '<b class="star" title="투도 분량!">★</b>' : ''}${badge}</td>`;
       if ((first+d)%7===0 && d<dim) t += '</tr><tr>';
@@ -24615,7 +24620,7 @@ let dragInfo = null;
 const mon = $('months');
 mon.addEventListener('dragstart', ev => {
   const sp = ev.target.closest('span[data-first]'); if (!sp) return;
-  dragInfo = {first:+sp.dataset.first, ts:+sp.dataset.ts};
+  dragInfo = {first:+sp.dataset.first, ts:+sp.dataset.ts, single: !!sp.dataset.single};
   ev.dataTransfer.effectAllowed = 'move';
   ev.dataTransfer.setData('text/plain', 'ep');
 });
@@ -24629,14 +24634,20 @@ mon.addEventListener('drop', ev => {
   ev.preventDefault();
   const delta = Math.round((+td.dataset.ts - dragInfo.ts)/DAY);
   const dates = window._dates;
-  const group = dates.map((t,i)=>i).filter(i => dates[i] === dragInfo.ts);
-  const mvMode = document.querySelector('input[name=rs-mv]:checked').value;
+  const group = dragInfo.single ? [dragInfo.first] : dates.map((t,i)=>i).filter(i => dates[i] === dragInfo.ts);
+  let mvMode = document.querySelector('input[name=rs-mv]:checked').value;
+  if (dragInfo.single && mvMode === 'all') mvMode = 'one';   // 한 화씩 펼친 칸은 그 화만 옮긴다
   const n = dates.length;
   for (let i=0;i<n;i++){
     if (mvMode==='all' || (mvMode==='after' ? i >= Math.min(...group) : group.includes(i))) adj[i] = (adj[i]||0) + delta;
   }
   dragInfo = null;
   render(); autoSave();
+});
+mon.addEventListener('click', ev => {
+  const ex = ev.target.closest('[data-expand]'), co = ev.target.closest('[data-collapse]');
+  if (ex) { expanded.add(+ex.dataset.expand); render(); }
+  else if (co) { expanded.delete(+co.dataset.collapse); render(); }
 });
 mon.addEventListener('dragend', () => { dragInfo = null; document.querySelectorAll('#tab-refsched .over').forEach(x=>x.classList.remove('over')); });
 

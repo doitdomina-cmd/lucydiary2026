@@ -4789,7 +4789,7 @@ body.theme-cozy #write-calendar-body[data-card="gaming"] .write-span-bar { margi
 #tab-refsched .side #rs-works li[data-id] small{font-weight:600;font-size:12px;color:#7a6a58}
 #tab-refsched .rs-fold{cursor:pointer;font-style:normal;font-size:10px;color:#8a6a3a}
 #tab-refsched .cal em.rs-fold{display:block;text-align:center;margin-top:2px}
-#tab-refsched .rs-sw{width:21px;height:21px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.22);cursor:pointer;padding:0;flex:none}
+#tab-refsched .rs-sw{flex:1 1 0;min-width:14px;max-width:22px;aspect-ratio:1;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.22);cursor:pointer;padding:0;flex:none}
 #tab-refsched .rs-sw.on{box-shadow:0 0 0 2px #4a3b32}
 #tab-refsched input.rs-swc{width:26px;height:26px;padding:0;border:0;background:none;cursor:pointer;flex:none}
 #tab-refsched .side li input.vchk{width:auto;flex:none;margin:0}
@@ -24531,11 +24531,9 @@ function renderColors(){
   const now = (curColor || def).toLowerCase();
   const box = $('colors'); if (!box) return;
   box.innerHTML = [...VCOL, ...VCOL_EXTRA].map(c => `<button type="button" class="rs-sw${c.toLowerCase() === now ? ' on' : ''}" data-c="${c}" style="background:${c}" title="${c}"></button>`).join('')
-    + `<input type="color" class="rs-swc" value="${/^#[0-9a-f]{6}$/i.test(now) ? now : '#d99a2b'}" title="직접 고르기">`;
+   ;
 }
 $('colors').addEventListener('click', ev => { const b = ev.target.closest('.rs-sw'); if (!b) return; curColor = b.dataset.c; renderColors(); autoSave(); });
-$('colors').addEventListener('input', ev => { if (ev.target.classList.contains('rs-swc')) { curColor = ev.target.value; autoSave(); } });
-$('colors').addEventListener('change', ev => { if (ev.target.classList.contains('rs-swc')) renderColors(); });
 
 // ---- 작품 등록(masterWorks)에서 불러오기 ----
 function fillWorkSel(){
@@ -24762,7 +24760,7 @@ $('newWork').onclick = () => { curId = null; curColor = ''; renderColors(); adj 
 
 // ---- 연재 일정 보기 (표시 전용 달력: 스케줄 관리 달력과 같은 틀·테마) ----
 const VCOL = ['#d99a2b','#d9707a','#5a95c9','#6fae6a','#9a78c9','#d98a4e','#4fb3a2','#c9729f'];
-const VCOL_EXTRA = ['#a1887f','#7986cb'];   // 색 고르기 줄에 8가지 기본색 뒤로 더 붙는 색 (한 줄에 맞춤)
+const VCOL_EXTRA = ['#f2c14e','#e57373','#64b5f6','#81c784'];   // 색 고르기 줄에 8가지 기본색 뒤로 더 붙는 색 (한 줄에 맞춤)
 const colorOf = (w, k) => w.color || VCOL[k % VCOL.length];
 let vDate = new Date(); vDate.setDate(1);
 const isoOf = ts => new Date(ts).toISOString().slice(0, 10);
@@ -24842,6 +24840,8 @@ function renderView(){
         <div style="font-size:12px; line-height:1.5; color:#4a3b32;">완결 ${fmt(en)}</div>${tou}
       </div></div>`;
   }).join('') : '<div class="text-xs text-slate-400 text-center py-6">표시할 작품이 없어요. 계산기 탭 작품 목록에서 체크해 주세요.</div>';
+  // 카드 디자인(견출지·폴라로이드 등)이 깔아 둔 손글씨체가 이기지 못하게, 설정의 본문 글꼴을 요소마다 직접 지정한다
+  lst.querySelectorAll('*').forEach(e => { if (e.tagName !== 'I') e.style.setProperty('font-family', 'var(--app-font, var(--rs-bodyfont, inherit))', 'important'); });
 }
 $('vlist').onclick = ev => {
   const it = ev.target.closest('[data-id]'); if (!it) return;

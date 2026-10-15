@@ -5616,17 +5616,18 @@ body.theme-cozy #write-calendar-body[data-card="gaming"] .write-span-bar { margi
   <div class="card">
     <label>작품 제목</label>
     <div style="display:flex;gap:8px"><input id="rs-title" type="text" placeholder="작품 제목을 입력하세요">
-    <button id="rs-save" class="btn pri">저장</button><button id="rs-resetAll" class="btn">초기화</button></div>
+    <button id="rs-resetAll" class="btn">초기화</button></div>
     <div class="hint" id="rs-saveMsg"></div>
   </div>
 
   <div class="card">
     <div class="rs-grid3">
-      <div><label>총 글자 수</label><input id="rs-total" type="number" step="1000" placeholder="예: 320000"></div>
-      <div><label>회당 글자 수</label><input id="rs-per" type="number" step="100" placeholder="예: 4500"></div>
+      <div><label>총 글자 수 (공포)</label><input id="rs-total" type="number" step="1000" placeholder="예: 320000"></div>
+      <div><label>회당 글자 수 (공포)</label><input id="rs-per" type="number" step="100" placeholder="예: 4500"></div>
       <div><label>총 회차</label><input id="rs-eps" type="number" placeholder="자동 계산"></div>
     </div>
     <div class="hint" id="rs-epsHint"></div>
+    <div class="hint" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:4px">공미 환산 비율 <input id="rs-ratio" type="number" step="0.001" value="0.765" style="width:74px;padding:3px 6px;font-size:12px"> <span id="rs-miHint"></span></div>
   </div>
 
   <div class="card">
@@ -24516,7 +24517,13 @@ function offsetsOf(st, n){
   return {out, phases};
 }
 
+function updateMi(){
+  const t = +$('total').value, p = +$('per').value, r = +$('ratio').value;
+  if (!(t > 0 && r > 0)) { $('miHint').textContent = ''; return; }
+  $('miHint').textContent = `→ 공미 약 ${Math.round(t*r).toLocaleString()}자` + (p > 0 ? ` · 회당 약 ${Math.round(p*r).toLocaleString()}자` : '');
+}
 function updateEps(){
+  updateMi();
   const t = +$('total').value, p = +$('per').value;
   if (!(t > 0 && p > 0)) { $('eps').value = ''; $('epsHint').textContent = ''; return; }
   {
@@ -24546,7 +24553,7 @@ function render(){
       ? `<span class="line">완결 <b>${fmt(end)}</b> → 시작 <b>${fmt(start)}</b></span>`
       : `<span class="line">시작 <b>${fmt(start)}</b> → 완결 <b>${fmt(end)}</b></span>`;
   $('result').innerHTML += `<div class="hint">총 ${n}화 · 연재 기간 ${days}일</div>`;
-  if (moved) $('reset').onclick = () => { adj = []; render(); };
+  if (moved) $('reset').onclick = () => { adj = []; render(); autoSave(); };
 
   const col = ['var(--p1)','var(--p2)','var(--p3)'];
   const byDay = {};
@@ -24605,7 +24612,7 @@ mon.addEventListener('drop', ev => {
     if (mvMode==='all' || (mvMode==='after' ? i >= Math.min(...group) : group.includes(i))) adj[i] = (adj[i]||0) + delta;
   }
   dragInfo = null;
-  render();
+  render(); autoSave();
 });
 mon.addEventListener('dragend', () => { dragInfo = null; document.querySelectorAll('#tab-refsched .over').forEach(x=>x.classList.remove('over')); });
 
@@ -24614,12 +24621,12 @@ function setMode(m){
   $('tabBack').classList.toggle('on', m==='back');
   $('tabFwd').classList.toggle('on', m==='fwd');
   $('dateLabel').textContent = m==='back' ? '완결(마지막 화) 업로드일' : '연재 시작일 (1화)';
-  render();
+  render(); autoSave();
 }
 
 $('tabBack').onclick = () => setMode('back');
 $('tabFwd').onclick = () => setMode('fwd');
-const rerender = () => { adj = []; render(); };
+const rerender = () => { adj = []; render(); autoSave(); };
 ['total','per'].forEach(id => $(id).addEventListener('input', () => { updateEps(); rerender(); }));
 ['eps','e1','e2','g1','g2','g3','perday1','perday3','date'].forEach(id => $(id).addEventListener('input', rerender));
 
@@ -24629,7 +24636,7 @@ let works = refSchedWorks, curId = null;
 // 예전에 따로 쓰던 계산기 저장분이 있으면 한 번 가져온다
 try { const old = JSON.parse(localStorage.getItem(KEY) || '[]'); if (old.length && !refSchedWorks.length) { refSchedWorks.push(...old); } } catch(e) {}
 const persist = () => { try { if (typeof save === 'function') save(true); return true; } catch(e) { return false; } };
-const FIELDS = ['total','per','eps','e1','e2','g1','g2','g3','perday1','perday3','date'];
+const FIELDS = ['total','per','eps','e1','e2','g1','g2','g3','perday1','perday3','date','ratio'];
 
 function getState(){
   const st = {title: $('title').value.trim() || '제목 없음', mode, adj: adj.slice()};
@@ -24638,13 +24645,14 @@ function getState(){
 }
 function setState(st){
   $('title').value = st.title === '제목 없음' ? '' : st.title;
-  FIELDS.forEach(f => $(f).value = st[f] ?? (f.startsWith('perday') ? (st.perday || 1) : ''));
+  FIELDS.forEach(f => $(f).value = st[f] ?? (f === 'ratio' ? '0.765' : f.startsWith('perday') ? (st.perday || 1) : ''));
   mode = st.mode;
   $('tabBack').classList.toggle('on', mode==='back');
   $('tabFwd').classList.toggle('on', mode==='fwd');
   $('dateLabel').textContent = mode==='back' ? '완결(마지막 화) 업로드일' : '연재 시작일 (1화)';
   $('epsHint').textContent = '';
   adj = st.adj || [];
+  updateMi();
   render();
 }
 function renderWorks(){
@@ -24654,13 +24662,20 @@ function renderWorks(){
 }
 const esc = t => t.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
-$('save').onclick = () => {
+let _autoT = 0;
+function autoSave(){ clearTimeout(_autoT); _autoT = setTimeout(doSave, 350); }
+function doSave(){
   const st = getState();
-  if (curId){ const i = works.findIndex(w => w.id===curId); works[i] = {...st, id: curId}; }
-  else { curId = 'w' + Date.now(); works.push({...st, id: curId}); }
-  $('saveMsg').textContent = persist() ? `"${st.title}" 저장했어요 (${new Date().toLocaleTimeString()})` : '저장에 실패했어요 (브라우저 저장소를 쓸 수 없는 상태)';
+  if (curId){ const i = works.findIndex(w => w.id === curId); if (i < 0) return; works[i] = {...st, id: curId}; }
+  else {
+    if (!($('title').value.trim() || +$('eps').value)) return;   // 아직 아무것도 안 적었으면 만들지 않는다
+    curId = 'w' + Date.now(); works.push({...st, id: curId});
+  }
+  $('saveMsg').textContent = persist() ? '✓ 자동 저장됨' : '저장에 실패했어요 (브라우저 저장소를 쓸 수 없는 상태)';
   renderWorks();
-};
+}
+$('title').addEventListener('input', autoSave);
+$('ratio').addEventListener('input', () => { updateMi(); autoSave(); });
 $('works').onclick = ev => {
   const chk = ev.target.closest('[data-vid]');
   if (chk){ const i = refSchedHidden.indexOf(chk.dataset.vid); if (chk.checked){ if (i >= 0) refSchedHidden.splice(i, 1); } else if (i < 0) refSchedHidden.push(chk.dataset.vid); persist(); return; }
@@ -24679,10 +24694,10 @@ $('works').onclick = ev => {
 $('resetAll').onclick = () => {
   if (!confirm('입력한 내용과 달력에서 옮긴 일정을 모두 초기화할까요? (저장된 작품은 그대로예요)')) return;
   ['total','per','eps','date'].forEach(f => $(f).value = '');
-  Object.entries({e1:10,g1:2,e2:20,g2:0,g3:2,perday1:1,perday3:1}).forEach(([k,v]) => $(k).value = v);
-  $('epsHint').textContent = ''; adj = []; render();
+  Object.entries({e1:10,g1:2,e2:20,g2:0,g3:2,perday1:1,perday3:1,ratio:0.765}).forEach(([k,v]) => $(k).value = v);
+  $('epsHint').textContent = ''; adj = []; updateMi(); render(); autoSave();
 };
-$('newWork').onclick = () => { curId = null; adj = []; $('title').value = ''; ['total','per','eps','date'].forEach(f => $(f).value = ''); $('epsHint').textContent = ''; render(); $('saveMsg').textContent = ''; renderWorks(); };
+$('newWork').onclick = () => { curId = null; adj = []; $('ratio').value = '0.765'; updateMi(); $('title').value = ''; ['total','per','eps','date'].forEach(f => $(f).value = ''); $('epsHint').textContent = ''; render(); $('saveMsg').textContent = ''; renderWorks(); };
 
 // ---- 연재 일정 보기 (표시 전용 달력: 스케줄 관리 달력과 같은 틀·테마) ----
 const VCOL = ['#d99a2b','#d9707a','#5a95c9','#6fae6a','#9a78c9','#d98a4e','#4fb3a2','#c9729f'];

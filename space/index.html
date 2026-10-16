@@ -6165,9 +6165,28 @@ function diarySearchGo(ds){
 }
 
 // ═══════════ LIFE ═══════════
+var lifeDreamF='';
+function setLifeDreamF(id){lifeDreamF=id;render();}
+// My Goals 위: 이 목표가 어느 드림보드 꿈에 속했는지 (프로젝트 위 동그라미와 같은 모양)
+function lifeDreamStory(all){
+  var D=dreamData();
+  var item=function(on,click,ph,label,pc,cnt,cls){return '<button type="button" class="pjs-item'+(on?' on':'')+(cls||'')+'" onclick="'+click+'" title="'+esc(label)+'">'+
+    '<span class="pjs-ring" style="--p:'+(pc||0)+'"><span class="pjs-ph"'+(ph?' style="background-image:url(\''+esc(ph).replace(/'/g,'%27')+'\')"':'')+'>'+(ph?'':'✿')+'</span></span>'+
+    '<span class="pjs-n">'+esc(label)+'</span>'+(cnt!=null?'<span class="pjs-c">'+cnt+'</span>':'')+'</button>';};
+  return '<div class="pjs"><div class="pjs-row">'+item(lifeDreamF==='',"setLifeDreamF('')",'','전체',0,all.length)+
+    DREAM_AREAS.map(function(d,i){
+      var x=D.areas[d.id]||{},ws=x.wants||[],dn=ws.filter(function(w){return w.done;}).length;
+      var n=all.filter(function(a){return lifeDreamArea(a)===d.id;}).length;
+      return item(lifeDreamF===d.id,"setLifeDreamF('"+d.id+"')",dreamPhotoUrl(d,i),dreamAreaTitle(d.id),ws.length?Math.round(dn/ws.length*100):0,n);
+    }).join('')+
+    '<button type="button" class="pjs-item pjs-add" onclick="openAreaModal()" title="새 목표"><span class="pjs-ring"><span class="pjs-ph">+</span></span><span class="pjs-n">새 목표</span></button>'+
+    '</div></div>';
+}
 function renderLife(){
-  const areas=S.lifeAreas||[];
+  const allAreas=S.lifeAreas||[];
+  const areas=lifeDreamF?allAreas.filter(function(a){return lifeDreamArea(a)===lifeDreamF;}):allAreas;
   let html='';
+  if(document.body.classList.contains('cozy')) html+=lifeDreamStory(allAreas);
   html+=renderGoalSection();
   html+='<div class="la-grid" id="la-grid">';
   areas.forEach(function(a){

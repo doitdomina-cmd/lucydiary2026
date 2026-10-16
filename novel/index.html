@@ -49,6 +49,12 @@ header .spacer { flex: 1; }
 .today-chip b { color: var(--accent); }
 .cur-chip { font-size: 13px; color: var(--text); white-space: nowrap; height: 28px; display: inline-flex; align-items: center; gap: 5px; padding: 0 12px; border-radius: 8px; background: var(--panel2); border: 1px solid var(--line); font-variant-numeric: tabular-nums; max-width: 46vw; overflow: hidden; }
 .cur-chip.hidden { display: none; }
+.sel-chip { font-size: 13px; color: var(--text); white-space: nowrap; height: 28px; display: inline-flex; align-items: center; gap: 5px; padding: 0 12px; border-radius: 8px; background: color-mix(in srgb, #8fb8e8 30%, var(--panel)); border: 1px solid color-mix(in srgb, #8fb8e8 55%, var(--line)); font-variant-numeric: tabular-nums; }
+.sel-chip.hidden, .sel-foot.hidden { display: none; }
+.sel-chip b { color: #2f6aa8; font-size: 14px; }
+.sel-chip small { color: var(--muted); font-size: 11.5px; }
+.sel-foot { padding: 1px 9px; border-radius: 6px; background: color-mix(in srgb, #8fb8e8 30%, var(--panel)); color: var(--text); }
+.sel-foot b { color: #2f6aa8; }
 .pomo-top { margin-right: 14px; display: inline-flex; align-items: center; gap: 10px; height: 28px; padding: 0 6px 0 10px; border-radius: 8px; background: var(--panel2); border: 1px solid var(--line); font-size: 12px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .pomo-top .pt-st b { color: var(--accent); font-size: 13px; }
 .pomo-top .pt-g { display: inline-flex; align-items: center; gap: 7px; }
@@ -1333,6 +1339,7 @@ nav.mtabs { display: none; }
     <select class="work-select" id="work-select" title="작품 선택"></select>
     <span class="today-chip" id="today-chip" title="오늘 늘어난 원고 글자 수 (공백 제외)">오늘 <b>0</b>자</span>
     <span class="cur-chip hidden" id="cur-chip" title="지금 쓰는 회차의 글자 수 (공포 = 공백 포함, 공미 = 공백 제외)"></span>
+    <span class="sel-chip hidden" id="sel-chip" title="드래그해서 고른 부분의 글자 수"></span>
     <span class="spacer"></span>
     <span class="pomo-top" id="pomo-top"></span>
     <span class="sync-badge" id="sync-badge">로컬 저장</span>
@@ -2149,7 +2156,7 @@ function renderFoot(it) {
         const pct = goal ? Math.min(100, Math.round(c.all / goal * 100)) : 0;   // 목표는 공포(공백 포함) 기준
         { const W = WL(), act = W.panes[W.activeEditor] && W.panes[W.activeEditor].active, chip = $('#cur-chip');   // 위쪽 바에 지금 회차 글자 수를 크게
           if (chip && (it.id === act || !act)) { if (isRefDoc(it)) chip.classList.add('hidden'); else { chip.classList.remove('hidden'); chip.innerHTML = `<span class="cc-t">${esc(it.title || '이 회차')}</span>공포 <b>${fmt(c.all)}</b>자 <small>공미 ${fmt(c.noSpace)}</small>`; } } }
-        el.innerHTML = `<span>공백 포함 <b>${fmt(c.all)}</b></span><span>공백 제외 <b>${fmt(c.noSpace)}</b></span>
+        el.innerHTML = `<span>공백 포함 <b>${fmt(c.all)}</b></span><span>공백 제외 <b>${fmt(c.noSpace)}</b></span><span class="sel-foot hidden" data-selfoot></span>
             <span style="flex:1"></span>
             <span title="목표는 공백 포함(공포) 기준">목표(공포)</span><input class="goal-input" type="number" min="0" step="500" data-goal="${it.id}" value="${goal || ''}" placeholder="글자">
             ${goal ? `<span class="goal-bar"><i style="width:${pct}%"></i></span><span>${pct}%</span>` : ''}
@@ -2161,6 +2168,7 @@ function renderFoot(it) {
             <button class="mini hide-phone" data-a="pages" title="폰·책 크기로 쪽 나눠 보기"><i class="ic ic-book-open-text"></i> 쪽 보기</button>`;
     });
     renderSavedAt();
+    updateSelCount();
 }
 
 function renderNotes() {
@@ -2437,6 +2445,21 @@ function updateSelbar() {
     bar.style.top = Math.max(4, top) + 'px';
     bar.style.left = Math.max(4, Math.min(innerWidth - bw - 4, r.left + r.width / 2 - bw / 2)) + 'px';
 }
+// 드래그해서 고른 부분만의 글자 수: 위쪽 바(1화 옆)와 원고 창 아래 줄에, 고른 동안에만
+function updateSelCount() {
+    const sel = getSelection(), chip = $('#sel-chip');
+    let ed = null, c = null;
+    if (sel && sel.rangeCount && !sel.isCollapsed) {
+        const el = n => n && (n.nodeType === 1 ? n : n.parentElement);
+        const a = el(sel.anchorNode)?.closest?.('.manuscript'), f = el(sel.focusNode)?.closest?.('.manuscript');
+        if (a && a === f) { c = countChars(sel.toString()); if (c.all > 0) ed = a; else c = null; }
+    }
+    const html = c ? `선택 <b>${fmt(c.all)}</b>자 <small>공미 ${fmt(c.noSpace)}</small>` : '';
+    if (chip) { chip.classList.toggle('hidden', !c); chip.innerHTML = html; }
+    $$('[data-selfoot]').forEach(f => { const mine = c && f.parentElement && f.parentElement.dataset.foot === ed.dataset.id; f.classList.toggle('hidden', !mine); f.innerHTML = mine ? html : ''; });
+}
+let selCountTimer = null;
+document.addEventListener('selectionchange', () => { clearTimeout(selCountTimer); selCountTimer = setTimeout(updateSelCount, 60); });
 let selTimer = null;
 document.addEventListener('selectionchange', () => { clearTimeout(selTimer); selTimer = setTimeout(updateSelbar, 120); });
 document.addEventListener('scroll', () => $('#selbar').classList.add('hidden'), true);

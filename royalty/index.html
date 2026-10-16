@@ -17861,7 +17861,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                 const titlePart = work ? ' ' + resolved.displayTitle : '';
 
                 let content = `
-                    <div class="font-bold text-slate-700 ${opacity}" style="white-space:normal; word-break:break-word;"><span style="color:${catColor}">[${t.category}]</span>${titlePart}</div>
+                    <div class="font-bold text-slate-700 ${opacity}" style="white-space:normal; word-break:break-word;"><span style="color:${catTextColor(TASK_COLORS[t.category] || '#64748b', catColor)}">[${t.category}]</span>${titlePart}</div>
                     ${t.memo ? `<div class="text-[10px] text-slate-500 ${opacity}" style="white-space:normal; word-break:break-word;">${t.memo}</div>` : ''}
                 `;
 
@@ -17919,6 +17919,18 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             const cl = document.body.classList;
             if (cl.contains('theme-label')) return chartWarmPastel(c);   // 견출지: 회색빛 대신 따뜻한 파스텔
             return cl.contains('theme-cozy') ? cozyMuteColor(c) : c; } catch (e) { return c; } }
+        // 견출지: 카테고리 글씨는 파스텔 카드 위에서도 잘 보이게 같은 색상으로 진하게 (다른 테마는 기존 색 그대로)
+        function catTextColor(raw, fallback) {
+            try {
+                if (!document.body.classList.contains('theme-label')) return fallback;
+                const m = /^#?([0-9a-f]{6})$/i.exec(raw || ''); if (!m) return fallback;
+                const r = parseInt(m[1].slice(0, 2), 16) / 255, g = parseInt(m[1].slice(2, 4), 16) / 255, bl = parseInt(m[1].slice(4, 6), 16) / 255;
+                const mx = Math.max(r, g, bl), mn = Math.min(r, g, bl), d = mx - mn;
+                let h = 0;
+                if (d) { h = mx === r ? ((g - bl) / d) % 6 : mx === g ? (bl - r) / d + 2 : (r - g) / d + 4; h *= 60; if (h < 0) h += 360; }
+                return d < 0.08 ? '#5a4f44' : 'hsl(' + Math.round(h) + ', 62%, 36%)';
+            } catch (e) { return fallback; }
+        }
         function chartWarmPastel(hex) {
             const m = /^#?([0-9a-f]{6})$/i.exec(hex || ''); if (!m) return '#F3D9A0';
             const r = parseInt(m[1].slice(0, 2), 16) / 255, g = parseInt(m[1].slice(2, 4), 16) / 255, b = parseInt(m[1].slice(4, 6), 16) / 255;
@@ -18123,7 +18135,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                             <span class="text-sm font-black" style="color:${dColor}">${dLabel}</span>
                             <span class="text-[12px] font-semibold shrink-0" style="color:var(--primary); filter:saturate(1.9) brightness(0.85);">${t.date.slice(5)}</span>
                         </div>
-                        <div class="text-slate-700 text-[12px]" style="font-weight:600; white-space:normal; word-break:break-word;"><span style="color:${catColor}">[${t.category}]</span>${titlePart}</div>
+                        <div class="text-slate-700 text-[12px]" style="font-weight:600; white-space:normal; word-break:break-word;"><span style="color:${catTextColor(TASK_COLORS[t.category] || '#64748b', catColor)}">[${t.category}]</span>${titlePart}</div>
                         ${t.memo ? `<div class="text-[10px] text-slate-400 mt-0.5" style="white-space:normal; word-break:break-word;">${t.memo}</div>` : ''}
                     </div>
                 </div>`;

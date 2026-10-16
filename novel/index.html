@@ -49,6 +49,15 @@ header .spacer { flex: 1; }
 .today-chip b { color: var(--accent); }
 .cur-chip { font-size: 13px; color: var(--text); white-space: nowrap; height: 28px; display: inline-flex; align-items: center; gap: 5px; padding: 0 12px; border-radius: 8px; background: var(--panel2); border: 1px solid var(--line); font-variant-numeric: tabular-nums; max-width: 46vw; overflow: hidden; }
 .cur-chip.hidden { display: none; }
+.pomo-top { display: inline-flex; align-items: center; gap: 10px; height: 28px; padding: 0 6px 0 10px; border-radius: 8px; background: var(--panel2); border: 1px solid var(--line); font-size: 12px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pomo-top .pt-st b { color: var(--accent); font-size: 13px; }
+.pomo-top .pt-g { display: inline-flex; align-items: center; gap: 7px; }
+.pomo-top .pt-g .po-gbar { width: 64px; height: 5px; margin: 0; }
+.pomo-top .pt-g b { color: var(--accent); }
+@media (max-width: 1100px) { .pomo-top .pt-g .po-gbar { display: none; } }
+@media (max-width: 760px) { .pomo-top { display: none; } }
+.pomo-ask { position: fixed; bottom: 64px; right: 16px; z-index: 300; display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 6px 24px rgba(0,0,0,.14); font-size: 13px; }
+.pomo-ask small { color: var(--muted); }
 .cur-chip b { color: var(--accent); font-size: 14px; }
 .cur-chip small { color: var(--muted); font-size: 11.5px; }
 .cur-chip .cc-t { max-width: 140px; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
@@ -1323,6 +1332,7 @@ nav.mtabs { display: none; }
     <button class="brand" id="btn-home" title="작품 목록 (메인 화면)"><i class="ic ic-feather"></i> 루시의 작업실</button>
     <select class="work-select" id="work-select" title="작품 선택"></select>
     <span class="today-chip" id="today-chip" title="오늘 늘어난 원고 글자 수 (공백 제외)">오늘 <b>0</b>자</span>
+    <span class="pomo-top" id="pomo-top"></span>
     <span class="cur-chip hidden" id="cur-chip" title="지금 쓰는 회차의 글자 수 (공포 = 공백 포함, 공미 = 공백 제외)"></span>
     <span class="spacer"></span>
     <span class="sync-badge" id="sync-badge">로컬 저장</span>
@@ -2274,6 +2284,7 @@ function onEditorInput(ed) {
         const S = stats(); const k = todayKey();
         S.days[k] = (S.days[k] || 0) + (now - before);
         pruneStats(S); touch(S); renderToday();
+        pomoMaybeAsk();
     }
     // 같은 문서가 다른 분할 창/참고창에도 열려 있으면 함께 갱신
     $$(`.manuscript[data-id="${it.id}"]`).forEach(o => { if (o !== ed) { o.innerHTML = it.body; fillImages(o); decorateFolds(o); } });
@@ -8347,6 +8358,8 @@ function pomoStart() {
     setPomoRun({ phase: 'work', n, dk, start: Date.now(), base: grandAll(), target: classTarget(d, n) });
     toast(`${n}교시 시작! 목표 ${fmt(classTarget(d, n))}자`);
 }
+function pomoPause() { const r = pomoRun(); if (r.phase !== 'work' || r.paused) return; setPomoRun({ ...r, paused: true, pausedAt: Date.now() }); }
+function pomoResume() { const r = pomoRun(); if (r.phase !== 'work' || !r.paused) return; const n = { ...r, start: r.start + (Date.now() - r.pausedAt) }; delete n.paused; delete n.pausedAt; setPomoRun(n); }
 function pomoEndClass(auto) {
     const r = pomoRun(); if (r.phase !== 'work') return;
     const d = pomoDay(r.dk, true), S = pomoSet();
@@ -8371,7 +8384,7 @@ function pomoBeep() {
 // 1초마다: 교시가 끝났는지, 휴식이 끝났는지 보고 화면 숫자만 바꿈
 setInterval(() => {
     const r = pomoRun(), S = pomoSet();
-    if (r.phase === 'work' && Date.now() >= r.start + S.pomoWork * 60000) pomoEndClass(true);
+    if (r.phase === 'work' && !r.paused && Date.now() >= r.start + S.pomoWork * 60000) pomoEndClass(true);
     if (r.phase === 'rest' && !r.restDone && Date.now() >= r.restStart + S.pomoRest * 60000) { r.restDone = true; savePref(); pomoBeep(); toast('휴식 끝! 다음 교시를 시작해 볼까요? 🍅'); renderPomoAll(); }
     pomoTick();
 }, 1000);
@@ -8411,9 +8424,9 @@ function pomoDockHtml() {
     const r = pomoRun(), S = pomoSet(), today = pomoDay(dayKeyOf(Date.now()), false), sm = daySummary(today, true);
     const goal = today ? today.goal : S.pomoGoal, p = pct1(sm.total, goal), nextN = (today ? today.classes.length : 0) + 1;
     let line;
-    if (r.phase === 'work') line = `<span class="pk-state"><i class="ic ic-timer"></i> ${r.n}교시 <b data-live="time">${mmss(r.start + S.pomoWork * 60000 - Date.now())}</b></span>
+    if (r.phase === 'work') line = `<span class="pk-state"><i class="ic ic-timer"></i> ${r.n}교시 <b data-live="time">${mmss(r.start + S.pomoWork * 60000 - (r.paused ? r.pausedAt : Date.now()))}</b>${r.paused ? ' <small>(일시정지)</small>' : ''}</span>
         <span class="pk-now">+<b data-live="w">${fmt(Math.max(0, grandAll() - r.base))}</b><small>/${fmt(r.target)}</small></span><span style="flex:1"></span>
-        <button class="mini" data-po="end" title="이 교시 끝내기">■</button>`;
+        <button class="mini" data-po="${r.paused ? 'resume' : 'pause'}" title="${r.paused ? '이어서 하기' : '일시정지'}">${r.paused ? '▶' : '⏸'}</button><button class="mini" data-po="end" title="이 교시 끝내기">■</button>`;
     else if (r.phase === 'rest') line = `<span class="pk-state"><i class="ic ic-coffee"></i> ${r.restDone ? '휴식 끝' : `휴식 <b data-live="time">${mmss(r.restStart + S.pomoRest * 60000 - Date.now())}</b>`}</span><span style="flex:1"></span>
         <button class="mini pk-go" data-po="start" title="${nextN}교시 시작">▶ ${nextN}교시</button><button class="mini" data-po="stop" title="오늘 마치기">마치기</button>`;
     else line = `<span class="pk-state"><i class="ic ic-timer"></i> 뽀모</span><small class="pk-sub">${S.pomoWork}분 · 휴식 ${S.pomoRest}분</small><span style="flex:1"></span>
@@ -8422,7 +8435,36 @@ function pomoDockHtml() {
         <button class="pk-goal" data-po="today" title="오늘 집필 기록 자세히"><span class="po-goal-row"><span><span data-live="cum">${fmt(sm.total)}</span> / ${fmt(goal)}자</span><b class="po-pct" data-live="pct">${Math.floor(p)}%</b></span>
             <span class="po-gbar"><i data-live="gbar" style="width:${Math.min(100, p)}%"></i></span></button>`;
 }
+function pomoTopHtml() {
+    const r = pomoRun(), S = pomoSet(), today = pomoDay(dayKeyOf(Date.now()), false), sm = daySummary(today, true);
+    const goal = today ? today.goal : S.pomoGoal, p = pct1(sm.total, goal), nextN = (today ? today.classes.length : 0) + 1;
+    let ctl;
+    if (r.phase === 'work') ctl = `<span class="pt-st">${r.n}교시 <b data-live="time">${mmss(r.start + S.pomoWork * 60000 - (r.paused ? r.pausedAt : Date.now()))}</b></span><button class="mini pk-go" data-po="${r.paused ? 'resume' : 'pause'}">${r.paused ? '▶ 이어하기' : '⏸ 일시정지'}</button>`;
+    else if (r.phase === 'rest') ctl = `<span class="pt-st">휴식 ${r.restDone ? '끝' : `<b data-live="time">${mmss(r.restStart + S.pomoRest * 60000 - Date.now())}</b>`}</span><button class="mini pk-go" data-po="start">▶ ${nextN}교시</button>`;
+    else ctl = `<button class="mini pk-go" data-po="start" title="뽀모 시작 (${S.pomoWork}분 집필)">▶ ${nextN}교시</button>`;
+    return `${ctl}<span class="pt-g" data-po="today" style="cursor:pointer" title="오늘 집필 기록 자세히"><span><span data-live="cum">${fmt(sm.total)}</span> / ${fmt(goal)}자</span><span class="po-gbar"><i data-live="gbar" style="width:${Math.min(100, p)}%"></i></span><b data-live="pct">${Math.floor(p)}%</b></span>`;
+}
+$('#pomo-top').addEventListener('click', e => {
+    const t = e.target.closest('[data-po]'); if (!t) return;
+    const a = t.dataset.po;
+    if (a === 'start') pomoStart(); if (a === 'pause') pomoPause(); if (a === 'resume') pomoResume(); if (a === 'today') openPomoDay(dayKeyOf(Date.now()));
+});
+// 뽀모 없이 글을 쓰기 시작하면 하루에 한 번만 켤지 물어봄 (글 쓰는 손을 막지 않게 구석에 작게)
+let pomoAskShown = false;
+function pomoMaybeAsk() {
+    if (pomoAskShown || pomoRun().phase !== 'idle') return;
+    const dk = dayKeyOf(Date.now()); if (pref.pomoAskDay === dk) return;
+    const d = pomoDay(dk, false); if (d && d.classes.length) return;
+    pomoAskShown = true; pref.pomoAskDay = dk; savePref();
+    const box = document.createElement('div'); box.className = 'pomo-ask';
+    box.innerHTML = '<span>뽀모 켤까요? <small>지금부터 쓰는 글자를 교시로 기록해요</small></span><button class="btn primary" data-a="y">시작</button><button class="btn" data-a="n">오늘은 안 해요</button>';
+    document.body.appendChild(box);
+    const off = setTimeout(() => box.remove(), 25000);
+    box.addEventListener('mousedown', e => e.preventDefault());   // 글 쓰던 자리 그대로
+    box.addEventListener('click', e => { const a = e.target.dataset.a; if (!a) return; clearTimeout(off); box.remove(); if (a === 'y') pomoStart(); });
+}
 function renderPomoAll() {
+    const tp = $('#pomo-top'); if (tp) tp.innerHTML = pomoTopHtml();
     const k = $('#pomo-dock'); if (k) { k.innerHTML = pomoDockHtml(); k.classList.toggle('on', pomoRun().phase !== 'idle'); }
     const dm = $('.pomo-day-modal'); if (dm && dm.dataset.dk === dayKeyOf(Date.now())) dm._render?.();
 }
@@ -8431,7 +8473,7 @@ function pomoTick() {
     if (r.phase === 'idle') return;
     const set = (sel, v, prop = 'textContent') => $$(`[data-live="${sel}"]`).forEach(e => { if (prop === 'width') e.style.width = v; else e[prop] = v; });
     if (r.phase === 'work') {
-        const left = r.start + S.pomoWork * 60000 - Date.now(), w = Math.max(0, grandAll() - r.base);
+        const left = r.start + S.pomoWork * 60000 - (r.paused ? r.pausedAt : Date.now()), w = Math.max(0, grandAll() - r.base);
         set('time', mmss(left)); set('w', fmt(w));
         const today = pomoDay(r.dk, false), tot = dayCum(today) + w, g = today ? today.goal : S.pomoGoal, p = pct1(tot, g);
         set('cum', fmt(tot)); set('pct', Math.floor(p) + '%'); set('gbar', Math.min(100, p) + '%', 'width');
@@ -8441,6 +8483,8 @@ $('#pomo-dock').addEventListener('click', e => {
     const t = e.target.closest('[data-po]'); if (!t) return;
     const a = t.dataset.po;
     if (a === 'start') pomoStart();
+    if (a === 'pause') pomoPause();
+    if (a === 'resume') pomoResume();
     if (a === 'end') pomoEndClass(false);
     if (a === 'stop') pomoStopDay();
     if (a === 'set') openPomoSettings();

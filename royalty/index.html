@@ -5120,6 +5120,9 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                         <button type="button" onclick="openWithholdingCalc()" class="w-9 h-9 rounded-xl flex items-center justify-center transition-all shrink-0 hover:opacity-80" style="background:var(--primary-light); color:var(--primary);" title="3.3% 공제 계산기">
                             <i class="fa-solid fa-calculator"></i>
                         </button>
+                        <button type="button" id="settle-import-btn" onclick="openSettleImport()" class="w-9 h-9 rounded-xl items-center justify-center transition-all shrink-0 hover:opacity-80" style="display:none; background:var(--primary-light); color:var(--primary);" title="정산서 사진 붙여넣기 — 캡처한 정산서를 읽어 작품별 금액을 넣어요">
+                            <i class="fa-solid fa-file-import"></i>
+                        </button>
                     </div>
                     <div id="genre-sheets-container"></div>
                 </div>
@@ -8496,6 +8499,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                 hideMiniWindow: () => ipcRenderer.send('mini-window-hide'),
                 miniWindowIsVisible: () => ipcRenderer.invoke('mini-window-is-visible'),
                 openCalcWidget: () => ipcRenderer.send('calc-widget-open'),
+                openSettleImport: () => ipcRenderer.send('settle-import-open'),
                 hideCalcWidget: () => ipcRenderer.send('calc-widget-hide'),
                 calcWidgetIsVisible: () => ipcRenderer.invoke('calc-widget-is-visible'),
                 openBriefWindow: () => ipcRenderer.send('brief-window-open'),
@@ -11545,6 +11549,45 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             try {
                 if (typeof require !== 'undefined') {
                     const { ipcRenderer } = require('electron');
+                    const siBtn = document.getElementById('settle-import-btn');
+                    if (siBtn) siBtn.style.display = 'flex';
+                    // 정산서 붙여넣기 창의 요청: 작품 목록·그 달 금액 주기 / 금액 넣기 / 되돌리기
+                    ipcRenderer.on('settle-import-request', (e, msg) => {
+                        let data = null;
+                        try {
+                            const month = String(msg.month || '');
+                            const okMonth = /^\d{4}-\d{2}$/.test(month);
+                            const monthValues = () => ({ ...(monthlyData[month] || {}) });
+                            if (msg.type === 'get') {
+                                data = {
+                                    works: masterWorks.map(w => ({ id: w.id, title: w.title, publisher: w.publisher, settlementPublisher: w.settlementPublisher, genre: w.genre })),
+                                    publishers: [...new Set(masterWorks.map(w => w.settlementPublisher || w.publisher).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko')),
+                                    monthValues: okMonth ? monthValues() : {}
+                                };
+                            } else if (msg.type === 'apply' && okMonth) {
+                                const before = {};
+                                if (!monthlyData[month]) monthlyData[month] = {};
+                                (msg.entries || []).forEach(en => {
+                                    if (!masterWorks.some(w => w.id === en.workId)) return;
+                                    const old = Number(monthlyData[month][en.workId]) || 0;
+                                    before[en.workId] = old;
+                                    monthlyData[month][en.workId] = Math.round((en.mode === 'add' ? old : 0) + (Number(en.amount) || 0));
+                                });
+                                const y = Number(month.slice(0, 4));
+                                if (!years.includes(y)) { years.push(y); years.sort((a, b) => a - b); }
+                                save(); try { updateUI(); } catch (err) {}
+                                data = { ok: true, before, monthValues: monthValues() };
+                            } else if (msg.type === 'restore' && okMonth) {
+                                if (!monthlyData[month]) monthlyData[month] = {};
+                                Object.entries(msg.before || {}).forEach(([id, v]) => {
+                                    if (Number(v)) monthlyData[month][id] = Number(v); else delete monthlyData[month][id];
+                                });
+                                save(); try { updateUI(); } catch (err) {}
+                                data = { ok: true, monthValues: monthValues() };
+                            }
+                        } catch (err) { console.log('settle-import error:', err); data = null; }
+                        ipcRenderer.send('settle-import-response', { id: msg.id, data });
+                    });
                     ipcRenderer.on('get-widget-data', () => {
                         ipcRenderer.send('widget-data-response', {
                             taskSchedules: taskSchedules || {},
@@ -18965,6 +19008,11 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             } else {
                 openWithholdingCalcModal();
             }
+        }
+
+        // 정산서 사진 붙여넣기 창 (PC 앱 전용 — settle-import.html)
+        function openSettleImport() {
+            if (window.electronAPI && window.electronAPI.openSettleImport) window.electronAPI.openSettleImport();
         }
 
         function openWithholdingCalcModal() {

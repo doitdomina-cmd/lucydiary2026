@@ -10089,6 +10089,13 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(c || ''); if (m) return '#' + [m[1], m[2], m[3]].map(x => Number(x).toString(16).padStart(2, '0')).join('');
             const h = /#[0-9a-f]{6}/ig.exec(c || ''); return h ? h[0] : null;
         }
+        // 테마 파스텔 4색(분홍·노랑·연두·하늘)에 보라가 없어서, 장르 색이 보라면 쓸 연보라를 테마별로 둔다
+        const _LILAC = { cozy: '#EFE9F5', label: '#EFE8F7', spiral: '#EDE7FA', retro: '#EBDDF3', polaroid: '#F0E8F6', postcard: '#EDE8F5', gaming: '#EBDFFF' };
+        function _withLilac(ents) {
+            const sk = ['label', 'spiral', 'polaroid', 'postcard', 'retro', 'gaming'].find(k => document.body.classList.contains('theme-' + k)) || 'cozy';
+            if (ents.some(e => e.hue !== null && _hueDist(e.hue, 285) < 40) || /gradient/.test(ents[0].css)) return ents;
+            return ents.concat([{ css: 'background-color: ' + _LILAC[sk] + ' !important;', hue: 285 }]);
+        }
         let _wkSig = '';
         function genWorkColorRules(force) {
             try {
@@ -10112,7 +10119,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                 const out = [];
                 const gl = genreList || [];
                 Object.keys(groups).forEach(key => {
-                    const [prefix] = key.split('|'); const ents = groups[key];
+                    const [prefix] = key.split('|'); const ents = _withLilac(groups[key]);
                     // 장르×색 후보를 색상 차이가 작은 순으로 훑으며, 안 쓴 색부터 한 장르에 하나씩 배정
                     const pairs = [];
                     gl.forEach((g, gi) => { const gh = _hueOf(g.color); ents.forEach((e, ei) => pairs.push({ gi, ei, d: (gh === null || e.hue === null) ? 999 : _hueDist(gh, e.hue) })); });
@@ -10141,7 +10148,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                     } };
                     for (const sh of document.styleSheets) { if (sh.ownerNode && sh.ownerNode.id === 'wk-color-rules') continue; try { walkIs(sh.cssRules); } catch (e) {} }
                     Object.keys(grp).forEach(key => {
-                        const [pre, list] = key.split('||'); const ents = grp[key];
+                        const [pre, list] = key.split('||'); const ents = _withLilac(grp[key]);
                         const targets = [];
                         if (list.indexOf('#master-works-by-genre-container > div.bg-white') >= 0) targets.push('#master-works-by-genre-container > div.bg-white');
                         if (list.indexOf('#workmanage-list [onclick^="openWorkManageModal"]') >= 0) targets.push('#workmanage-list div[onclick^="openWorkManageModal"]');

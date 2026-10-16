@@ -2047,6 +2047,7 @@ body.cozy .app .dm-head .dm-eye-love{font-family:'Instrument Serif',Georgia,seri
 .tdtl-pill{display:inline-block;margin-left:auto;padding:2px 10px;border-radius:99px;background:#fff;font-size:12px;color:var(--text);font-variant-numeric:tabular-nums;box-shadow:0 1px 4px rgba(0,0,0,.06)}
 .tdtl-pill.chk{color:#3d8a5f}
 .tdtl-pill.todo{color:var(--t2);background:rgba(255,255,255,.85)}
+.tdtl-ph{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap}.tdtl-ph i{width:46px;height:46px;border-radius:9px;background:#fff center/cover no-repeat;box-shadow:0 0 0 1.5px rgba(255,255,255,.85),0 2px 6px rgba(0,0,0,.25);cursor:zoom-in}.rc-ph i{width:58px;height:58px}
 .tdtl-body p{margin:2px 0 0;font-size:12.5px;line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.45);word-break:break-word}
 .tdtl-empty{padding:34px 10px !important}
 
@@ -2271,6 +2272,7 @@ body.cozy .td-cz-wrap [data-card="diary"] textarea{background-color:transparent 
 .pjx-dv{position:absolute;right:6px;bottom:6px;font-style:normal;font-size:10px;background:rgba(255,255,255,.9);color:var(--cz-deep,#8a5a44);border-radius:99px;padding:1px 7px}
 .pjx-log-b{padding:8px 10px 10px}
 .pjx-log-d{font-size:11px;color:var(--cz-muted,var(--t3))}
+.pjx-rt{cursor:pointer}.pjx-log-n{font-size:13px;font-weight:600;color:var(--text);margin-top:2px}
 .pjx-log-t{font-size:12.5px;color:var(--text);line-height:1.45;margin-top:2px;word-break:break-all}
 .pjx-log .pjx-x{position:absolute;top:4px;right:4px;background:rgba(255,255,255,.85);border-radius:50%;width:22px;height:22px;display:grid;place-items:center;font-size:13px;padding:0}
 .pjx-more{display:block;margin:10px auto 0;border:0;background:transparent;color:var(--cz-deep,var(--accent));font-size:12.5px;cursor:pointer;font-family:inherit}
@@ -2694,6 +2696,8 @@ body.cozy .app .spz-chip,body.cozy .app .spz-gh{font-weight:500 !important}
 .jr-it .jr-pol{margin:12px 0 4px 4px;max-width:300px;--rot:-1deg}
 .jr-it.diary .jr-pol{--rot:1.2deg}
 .jr-it .jr-pol img{max-height:260px}
+.jr-rph{display:flex;flex-wrap:wrap;gap:0 12px}.jr-rph .jr-pol{max-width:190px}.jr-rph .jr-pol:nth-child(even){--rot:1.3deg}
+.jr-tag u.jr-tm{font-size:11px;letter-spacing:0;opacity:.8}
 .jr-chip{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--t2);background:var(--cz-paper,#fff);border:1px solid var(--cz-line,var(--border));border-radius:99px;padding:6px 14px;align-self:flex-start;max-width:100%;line-height:1.5}
 .jr-chip b{color:var(--cz-deep,var(--accent));font-weight:600}
 .jr-chip i{width:8px;height:8px;border-radius:50%;flex:none}
@@ -3091,7 +3095,7 @@ async function loadFromCloud() {
 
 // 큰 데이터를 필드별로 나눠서 저장 (Firestore 1MB 제한 대응)
 function chunkData(data) {
-  const FIELDS = ['routines','checks','checkTimes','checkMemos','dayPicks','projects','deadlines','savings','notes','calEvents',
+  const FIELDS = ['routines','checks','checkTimes','checkMemos','checkPhotos','dayPicks','projects','deadlines','savings','notes','calEvents',
     'lifeGoal','theme','customThemeColor','projectCardStyle','diaryEntries','monthlyGoals','monthlyMemo',
     'weeklyGoals','weeklyMemo','diaryStickers','font','fontSize','fontWeight','customFonts','logoFont','menuFont','navMarker','todayLayout','todayCardVis','todayZones','todayZonePhotos',
     'lifeAreas','dream','memories','todoList','todoListTmr','timeline','timelineTitle','tlFontScaleBig','tlFontScaleSmall','tlLineLenBig','tlLineLenSmall','tlTextColor','bgIntensity','diaryFont'];
@@ -3207,6 +3211,7 @@ let S = {
   checks: {},       // { 'YYYY-MM-DD': { routineId: true } }
   checkTimes: {},   // { 'YYYY-MM-DD': { routineId: 'HH:MM' } } 실제로 한 시간(선택)
   checkMemos: {},   // { 'YYYY-MM-DD': { routineId: '메모' } }
+  checkPhotos: {},  // { 'YYYY-MM-DD': { routineId: [사진 dataURL,...] } } 루틴 카드에 붙인 사진(최대 4장)
   dayPicks: {},     // { 'YYYY-MM-DD': [routineId,...] } 그날 오늘에 추가한 루틴 카드
   projects: [],
   deadlines: [],
@@ -3951,7 +3956,7 @@ function rcDay(ds){
     return '<div class="rc-zone" style="--tzc:'+o.c+'"><div class="rc-zp" style="background-image:url(\''+esc(url).replace(/'/g,'%27')+'\')"></div><div class="rc-zb"><div class="rc-zt"><em>'+o.en+'</em>'+o.t+'</div><div class="rc-zx">'+esc(z[o.k]).replace(/\n/g,'<br>')+'</div></div></div>';
   }).join('');
   var tl=items.map(function(r){
-    return '<div class="rc-big" style="--wc:'+esc(tdCardColor(r))+';background-image:url(\''+esc(tdCardBg(r)).replace(/'/g,'%27')+'\')"><span class="tdt-ic">'+tdCardIcon(r.task)+'</span><b>'+esc(r.task)+'</b>'+(tdCardTag(r)?'<em>'+esc(tdCardTag(r))+'</em>':'')+'<u>'+esc(tm[r.id]||r.time||'')+'</u>'+(mm[r.id]?'<small>'+esc(mm[r.id])+'</small>':'')+'</div>';
+    return '<div class="rc-big" style="--wc:'+esc(tdCardColor(r))+';background-image:url(\''+esc(tdCardBg(r)).replace(/'/g,'%27')+'\')"><span class="tdt-ic">'+tdCardIcon(r.task)+'</span><b>'+esc(r.task)+'</b>'+(tdCardTag(r)?'<em>'+esc(tdCardTag(r))+'</em>':'')+'<u>'+esc(tm[r.id]||r.time||'')+'</u>'+(mm[r.id]?'<small>'+esc(mm[r.id])+'</small>':'')+tdPhThumbs(r.id,ds,'tdtl-ph rc-ph')+'</div>';
   }).join('');
   openMo(parseInt(ds.slice(5,7),10)+'월 '+parseInt(ds.slice(8,10),10)+'일의 하루',
     (memos?'<div class="rc-sec"><em>Memo</em>하루 메모</div>'+memos:'')
@@ -4586,7 +4591,7 @@ function toggleCheck(rid, ds){
   if(!S.checks[ds]) S.checks[ds]={};
   const nowChecked=!S.checks[ds][rid];
   S.checks[ds][rid]=nowChecked;
-  if(!nowChecked){['checkTimes','checkMemos'].forEach(function(k){if(S[k]&&S[k][ds]){delete S[k][ds][rid];if(!Object.keys(S[k][ds]).length)delete S[k][ds];}});}
+  if(!nowChecked){['checkTimes','checkMemos','checkPhotos'].forEach(function(k){if(S[k]&&S[k][ds]){delete S[k][ds][rid];if(!Object.keys(S[k][ds]).length)delete S[k][ds];}});}
 
   // 저축 금액이 있는 루틴이면 저축 목표에 자동 반영
   const r=(S.routines||[]).find(x=>x.id===rid);
@@ -4950,16 +4955,38 @@ function tdPickCard(rid,ds){
   var r=(S.routines||[]).find(function(x){return x.id===rid;}); if(!r) return;
   var done=!!(S.checks[ds]||{})[rid];
   var cur=((S.checkTimes||{})[ds]||{})[rid]||'', memo=((S.checkMemos||{})[ds]||{})[rid]||'';
+  _tdPh=(((S.checkPhotos||{})[ds]||{})[rid]||[]).slice();
   var d=new Date(),now=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
   openMo(r.task,
     '<div style="font-size:.76em;color:var(--t3);margin-bottom:4px">언제 했어요? <span style="opacity:.8">(비워두면 시간 없이 체크만)</span></div>'+
     '<div style="display:flex;gap:6px;align-items:center;margin-bottom:12px"><input type="time" id="td-ct" class="inp" value="'+(done?cur:now)+'" style="font-size:1.15em;width:auto">'+
     '<button type="button" class="btn bg bsm" onclick="document.getElementById(\'td-ct\').value=\'\'">시간 없이</button></div>'+
     '<div style="font-size:.76em;color:var(--t3);margin-bottom:4px">작은 메모</div>'+
-    '<textarea id="td-cm" class="ta" rows="3" placeholder="한 줄 메모 (선택)" style="width:100%;box-sizing:border-box;resize:none">'+esc(memo)+'</textarea>',
+    '<textarea id="td-cm" class="ta" rows="3" placeholder="한 줄 메모 (선택)" style="width:100%;box-sizing:border-box;resize:none">'+esc(memo)+'</textarea>'+
+    '<div style="font-size:.76em;color:var(--t3);margin:12px 0 4px">사진 <span style="opacity:.8">(최대 '+TD_PH_MAX+'장 · 저널에도 나와요)</span></div><div class="mem-fph" id="td-cph"></div>',
     '<button class="btn bg" onclick="closeMo()">취소</button>'+
     '<button class="btn bg bsm" style="color:var(--red)" onclick="tdSaveCard(\''+rid+'\',\''+ds+'\',true)">오늘에서 빼기</button>'+
     '<button class="btn bp" onclick="tdSaveCard(\''+rid+'\',\''+ds+'\')">'+(done?'저장':'완료')+'</button>');
+  tdDrawPh();
+}
+// 루틴 카드 사진: 창에서 고르는 동안은 _tdPh에 두었다가 저장할 때 S.checkPhotos로
+var _tdPh=[],TD_PH_MAX=4;
+function tdDrawPh(){
+  var el=document.getElementById('td-cph');if(!el)return;
+  el.innerHTML=_tdPh.map(function(ph,i){return '<div class="mem-th" style="background-image:url(\''+esc(ph).replace(/'/g,'%27')+'\')"><button type="button" onclick="tdDelPh('+i+')" title="빼기">×</button></div>';}).join('')+
+    (_tdPh.length<TD_PH_MAX?'<label class="mem-th add">'+CZI.cam+'<span>사진 추가</span><input type="file" accept="image/*" multiple hidden onchange="tdAddPh(this)"></label>':'');
+}
+async function tdAddPh(input){
+  var fs=[].slice.call(input.files||[]);input.value='';
+  for(var i=0;i<fs.length&&_tdPh.length<TD_PH_MAX;i++){try{_tdPh.push(await memCompress(fs[i],1600,0.72));}catch(e){alert(e.message||'사진을 읽지 못했어요.');}}
+  tdDrawPh();
+}
+function tdDelPh(i){_tdPh.splice(i,1);tdDrawPh();}
+// 타임라인·루틴 달력에서 사진을 누르면 크게 보기
+function tdPhBox(rid,ds,i){var l=(((S.checkPhotos||{})[ds]||{})[rid]||[]).map(function(x){return {src:x};});return photoBox(l,i);}
+function tdPhThumbs(rid,ds,cls){
+  var l=((S.checkPhotos||{})[ds]||{})[rid]||[];if(!l.length)return '';
+  return '<span class="'+cls+'">'+l.map(function(x,i){return '<i style="background-image:url(\''+esc(x).replace(/'/g,'%27')+'\')" onclick="event.stopPropagation();tdPhBox(\''+rid+'\',\''+ds+'\','+i+')"></i>';}).join('')+'</span>';
 }
 function tdSaveCard(rid,ds,clear){
   var ck=S.checks[ds]||{}, was=!!ck[rid];
@@ -4975,6 +5002,9 @@ function tdSaveCard(rid,ds,clear){
   if(!S.checkTimes[ds]) S.checkTimes[ds]={}; if(!S.checkMemos[ds]) S.checkMemos[ds]={};
   if(t) S.checkTimes[ds][rid]=t; else delete S.checkTimes[ds][rid];
   if(m) S.checkMemos[ds][rid]=m; else delete S.checkMemos[ds][rid];
+  if(!S.checkPhotos) S.checkPhotos={}; if(!S.checkPhotos[ds]) S.checkPhotos[ds]={};
+  if(_tdPh.length) S.checkPhotos[ds][rid]=_tdPh.slice(); else delete S.checkPhotos[ds][rid];
+  ['checkTimes','checkMemos','checkPhotos'].forEach(function(k){if(S[k][ds]&&!Object.keys(S[k][ds]).length)delete S[k][ds];});
   save(); render();
 }
 // 프로젝트 루틴 하나 = 오늘 화면의 카드 하나. 안 한 카드가 앞, 한 카드는 한 시간 순서로 뒤에 채워진다.
@@ -5034,7 +5064,7 @@ function tdTimeline(ds){
     var on=!!ck[r.id], t=tm[r.id], m=mm[r.id], tag=tdCardTag(r);
     var pill=on?(t?'<span class="tdtl-pill">◷ '+esc(t)+'</span>':'<span class="tdtl-pill chk">✓ 체크만 완료</span>'):'<span class="tdtl-pill todo">눌러서 시간·메모 남기기</span>';
     return '<div class="tdtl-row"><i class="tdtl-dot"></i><div class="tdtl-card'+(on?'':' pend')+'" style="--wc:'+esc(tdCardColor(r))+';background-image:url(\''+esc(tdCardBg(r)).replace(/'/g,'%27')+'\')" onclick="tdPickCard(\''+r.id+'\',\''+ds+'\')">'+
-      '<span class="tdtl-ic">'+tdCardIcon(r.task)+'</span><div class="tdtl-body"><div class="tdtl-t"><b>'+esc(r.task)+'</b>'+(tag?'<em>'+esc(tag)+'</em>':'')+pill+'</div>'+(m?'<p>'+esc(m)+'</p>':'')+'</div></div></div>';
+      '<span class="tdtl-ic">'+tdCardIcon(r.task)+'</span><div class="tdtl-body"><div class="tdtl-t"><b>'+esc(r.task)+'</b>'+(tag?'<em>'+esc(tag)+'</em>':'')+pill+'</div>'+(m?'<p>'+esc(m)+'</p>':'')+tdPhThumbs(r.id,ds,'tdtl-ph')+'</div></div></div>';
   }).join('')+'</div></div>';
   return h;
 }
@@ -6543,23 +6573,34 @@ function savePjMetric(pid){var p=S.projects.find(function(x){return x.id===pid;}
 function delPjMetric(pid){var p=S.projects.find(function(x){return x.id===pid;});if(!p)return;delete p.metric;save();closeMo();render();}
 function addPjMetric(pid){var p=S.projects.find(function(x){return x.id===pid;});if(!p||!p.metric)return;var el=document.getElementById('pjm-v-'+pid),v=parseFloat(el&&el.value);if(isNaN(v))return;var t=todStr();p.metric.entries=(p.metric.entries||[]).filter(function(e){return e.date!==t;});p.metric.entries.push({date:t,val:v});save();render();}
 
-// 기록 · 사진 일지
-var _pjLogPhoto={},_pjLogFile={};
-function pjLogCard(p){
-  var logs=(p.logs||[]).slice().sort(function(a,b){return b.date.localeCompare(a.date);}),show=window['_pjLogAll_'+p.id]?logs:logs.slice(0,6);
-  var h='<div class="card" style="margin-bottom:0">'+pjCardHead('log','기록 · 사진 일지','<span class="pjx-c">'+logs.length+'개</span>');
-  h+='<div class="pjx-logadd"><label class="pjx-ph" id="pjl-ph-'+p.id+'" title="사진 넣기">'+(_pjLogPhoto[p.id]?'<img src="'+_pjLogPhoto[p.id]+'">':'+ 사진')+'<input type="file" accept="image/*" hidden onchange="pjLogPick(\''+p.id+'\',this)"></label>'+
-    '<input class="inp" id="pjl-t-'+p.id+'" placeholder="오늘 한 것 한 줄 (예: 필라테스 50분)" onkeydown="if(event.key===\'Enter\'&&!event.isComposing)addPjLog(\''+p.id+'\')"><button class="btn bp bsm" onclick="addPjLog(\''+p.id+'\')">남기기</button></div>';
-  if(!logs.length) return h+'<div class="pjx-empty">운동 인증, 연습, 공부한 것을 날짜별로 쌓아 보세요</div></div>';
-  h+='<div class="pjx-logs">'+show.map(function(l){return '<div class="pjx-log">'+(l.photo?'<a class="pjx-log-ph" href="'+esc(l.photo)+'" target="_blank" rel="noopener" onclick="return pjBox(\''+p.id+'\',\''+l.id+'\')" title="크게 보기" style=""background-image:url(\''+esc(l.photo).replace(/'/g,'%27')+'\')">'+(l.drive?'<i class="pjx-dv">☁ 선명</i>':'')+'</a>':'')+'<div class="pjx-log-b"><div class="pjx-log-d">'+esc(l.date.slice(5).replace('-','.'))+'</div><div class="pjx-log-t">'+esc(l.text||'')+'</div></div><button type="button" class="pjx-x" onclick="delPjLog(\''+p.id+'\',\''+l.id+'\')">×</button></div>';}).join('')+'</div>';
-  if(logs.length>6) h+='<button type="button" class="pjx-more" onclick="window[\'_pjLogAll_'+p.id+'\']=!window[\'_pjLogAll_'+p.id+'\'];render()">'+(window['_pjLogAll_'+p.id]?'접기':'전체 '+logs.length+'개 보기')+'</button>';
-  return h+'</div>';
+// 루틴 기록: Today에서 이 프로젝트의 루틴 카드를 담은 날(시간·메모·사진). 예전 기록·사진 일지(p.logs)는 있으면 같이 보여 준다
+function pjRtRecords(p){
+  var rmap={};(S.routines||[]).forEach(function(r){if(r.isRz&&r.rzProjectId===p.id)rmap[r.id]=r;});
+  if(!Object.keys(rmap).length)return [];
+  var days={},out=[];
+  Object.keys(S.checks||{}).forEach(function(ds){days[ds]=1;});
+  Object.keys(S.dayPicks||{}).forEach(function(ds){days[ds]=1;});
+  Object.keys(days).forEach(function(ds){
+    var tm=(S.checkTimes||{})[ds]||{},mm=(S.checkMemos||{})[ds]||{},pp=(S.checkPhotos||{})[ds]||{};
+    rcDoneIds(ds).forEach(function(id){if(rmap[id])out.push({r:rmap[id],ds:ds,t:tm[id]||'',m:mm[id]||'',ph:pp[id]||[]});});
+  });
+  return out;
 }
-async function pjLogPick(pid,input){var f=input.files&&input.files[0];input.value='';if(!f)return;try{_pjLogPhoto[pid]=await memCompress(f,2000,0.72);_pjLogFile[pid]=f;render();}catch(e){alert(e.message||'사진을 읽지 못했어요.');}}
-async function addPjLog(pid){
-  var p=S.projects.find(function(x){return x.id===pid;});if(!p)return;var el=document.getElementById('pjl-t-'+pid),tx=(el&&el.value||'').trim(),ph=_pjLogPhoto[pid]||null;if(!tx&&!ph)return;
-  var file=_pjLogFile[pid]||null,loggedIn=typeof currentUser!=='undefined'&&currentUser;
-  var l={id:gid(),date:todStr(),text:tx,photo:ph};if(!p.logs)p.logs=[];p.logs.push(l);delete _pjLogPhoto[pid];delete _pjLogFile[pid];save();render();
+function pjLogCard(p){
+  var recs=pjRtRecords(p).map(function(x){return {k:x.ds+' '+(x.t||'99:99'),rt:x};});
+  (p.logs||[]).forEach(function(l){recs.push({k:(l.date||'')+' 99:99',lg:l});});
+  recs.sort(function(a,b){return b.k.localeCompare(a.k);});
+  var all=window['_pjLogAll_'+p.id],show=all?recs:recs.slice(0,8);
+  var h='<div class="card" style="margin-bottom:0">'+pjCardHead('log','루틴 기록','<span class="pjx-c">'+recs.length+'개</span>');
+  if(!recs.length) return h+'<div class="pjx-empty">Today에서 이 프로젝트의 루틴 카드를 담으면 여기에 쌓여요</div></div>';
+  h+='<div class="pjx-logs">'+show.map(function(x){
+    if(x.lg){var l=x.lg;return '<div class="pjx-log">'+(l.photo?'<a class="pjx-log-ph" href="'+esc(l.photo)+'" target="_blank" rel="noopener" onclick="return pjBox(\''+p.id+'\',\''+l.id+'\')" title="크게 보기" style="background-image:url(\''+esc(l.photo).replace(/'/g,'%27')+'\')">'+(l.drive?'<i class="pjx-dv">☁ 선명</i>':'')+'</a>':'')+'<div class="pjx-log-b"><div class="pjx-log-d">'+esc((l.date||'').slice(5).replace('-','.'))+'</div><div class="pjx-log-t">'+esc(l.text||'')+'</div></div><button type="button" class="pjx-x" onclick="delPjLog(\''+p.id+'\',\''+l.id+'\')">×</button></div>';}
+    var r=x.rt,ph=r.ph[0];
+    return '<div class="pjx-log pjx-rt" onclick="tdPickCard(\''+r.r.id+'\',\''+r.ds+'\')" title="눌러서 시간·메모·사진 고치기">'+(ph?'<span class="pjx-log-ph" onclick="event.stopPropagation();tdPhBox(\''+r.r.id+'\',\''+r.ds+'\',0)" style="background-image:url(\''+esc(ph).replace(/'/g,'%27')+'\')">'+(r.ph.length>1?'<i class="pjx-dv">+'+(r.ph.length-1)+'</i>':'')+'</span>':'')+
+      '<div class="pjx-log-b"><div class="pjx-log-d">'+esc(r.ds.slice(5).replace('-','.'))+(r.t?' · ◷ '+esc(r.t):'')+'</div><div class="pjx-log-n">'+esc(r.r.task||'루틴')+'</div>'+(r.m?'<div class="pjx-log-t">'+esc(r.m)+'</div>':'')+'</div></div>';
+  }).join('')+'</div>';
+  if(recs.length>8) h+='<button type="button" class="pjx-more" onclick="window[\'_pjLogAll_'+p.id+'\']=!window[\'_pjLogAll_'+p.id+'\'];render()">'+(all?'접기':'전체 '+recs.length+'개 보기')+'</button>';
+  return h+'</div>';
 }
 function delPjLog(pid,lid){var p=S.projects.find(function(x){return x.id===pid;});if(!p)return;var l=(p.logs||[]).find(function(x){return x.id===lid;});if(l&&l.photoPath){try{storage.ref().child(l.photoPath).delete().catch(function(){});}catch(_){}}p.logs=(p.logs||[]).filter(function(x){return x.id!==lid;});save();render();}
 
@@ -6584,8 +6625,8 @@ function jrPhotoTag(src,drive){var i=_jrPh.push({src:src,drive:drive})-1;return 
 function renderJournal(){
   var ym=jrMonth(),EN=['January','February','March','April','May','June','July','August','September','October','November','December'],WD=['일','월','화','수','목','금','토'];
   var y=parseInt(ym.slice(0,4),10),mo=parseInt(ym.slice(5),10);
-  var days={};function D(ds){return days[ds]||(days[ds]={diary:null,logs:[],metrics:[],finished:[],todos:[]});}
-  var diaryDays=0,logCnt=0,todoCnt=0,thumbs=[];
+  var days={};function D(ds){return days[ds]||(days[ds]={diary:null,logs:[],routines:[],metrics:[],finished:[],todos:[]});}
+  var diaryDays=0,logCnt=0,rtCnt=0,todoCnt=0,thumbs=[];
   _jrPh=[];
   var de=S.diaryEntries||{};
   Object.keys(de).forEach(function(ds){if(ds.slice(0,7)!==ym)return;var e=de[ds];if(!e||!(e.text||e.title||e.mood||e.photoUrl))return;D(ds).diary=e;diaryDays++;});
@@ -6593,6 +6634,14 @@ function renderJournal(){
     (p.logs||[]).forEach(function(l){if(!l.date||l.date.slice(0,7)!==ym)return;D(l.date).logs.push({p:p,l:l});logCnt++;});
     var m=p.metric;if(m&&(!m.source||m.source==='manual'))(m.entries||[]).forEach(function(e){if(e.date&&e.date.slice(0,7)===ym)D(e.date).metrics.push({p:p,m:m,v:e.val});});
     if(p.completed&&p.completedAt&&p.completedAt.slice(0,7)===ym)D(p.completedAt).finished.push(p);
+  });
+  // Today 루틴 카드에 남긴 메모·사진 (메모나 사진이 있는 것만)
+  var rmap={};(S.routines||[]).forEach(function(r){rmap[r.id]=r;});
+  var rds={};[S.checkMemos||{},S.checkPhotos||{}].forEach(function(o){Object.keys(o).forEach(function(ds){if(ds.slice(0,7)===ym)rds[ds]=1;});});
+  Object.keys(rds).forEach(function(ds){
+    var mm=(S.checkMemos||{})[ds]||{},pp=(S.checkPhotos||{})[ds]||{},tm=(S.checkTimes||{})[ds]||{},ids={};
+    Object.keys(mm).concat(Object.keys(pp)).forEach(function(id){if(rmap[id]&&((mm[id]||'').trim()||(pp[id]||[]).length))ids[id]=1;});
+    Object.keys(ids).sort(function(a,b){return (tm[a]||'99').localeCompare(tm[b]||'99');}).forEach(function(id){D(ds).routines.push({r:rmap[id],m:(mm[id]||'').trim(),ph:pp[id]||[],t:tm[id]||''});rtCnt++;});
   });
   var tl=S.todoList||{};
   Object.keys(tl).forEach(function(ds){if(ds.slice(0,7)!==ym)return;var dn=(tl[ds]||[]).filter(function(t){return t&&t.done&&t.text;});if(!dn.length)return;D(ds).todos=dn;todoCnt+=dn.length;});
@@ -6603,6 +6652,9 @@ function renderJournal(){
       h+='<div class="jr-it diary"><div class="jr-tag"><em>Thanks Diary</em>'+((e.mood||e.weather)?'<u>'+esc(e.mood||'')+esc(e.weather||'')+'</u>':'')+'</div>'+(e.title?'<div class="jr-ti">'+esc(e.title)+'</div>':'')+(e.text?'<div class="jr-tx">'+esc(e.text)+'</div>':'')+(ph?ph.html:'')+'</div>';}
     d.logs.forEach(function(x){var l=x.l,ph=l.photo?jrPhotoTag(l.photo,l.drive):null;if(ph)thumbs.push({i:ph.i,src:l.photo});
       h+='<div class="jr-it"><div class="jr-tag"><i style="background:'+esc(x.p.color||'#bbb')+'"></i><em>'+esc(x.p.name||'프로젝트')+'</em></div>'+(l.text?'<div class="jr-tx">'+esc(l.text)+'</div>':'')+(ph?ph.html:'')+'</div>';});
+    d.routines.forEach(function(x){
+      var phs=x.ph.map(function(src){var ph=jrPhotoTag(src,false);thumbs.push({i:ph.i,src:src});return ph.html;}).join('');
+      h+='<div class="jr-it"><div class="jr-tag"><i style="background:'+esc(tdCardColor(x.r))+'"></i><em>'+esc(x.r.task||'루틴')+'</em>'+(x.t?'<u class="jr-tm">◷ '+esc(x.t)+'</u>':'')+'</div>'+(x.m?'<div class="jr-tx">'+esc(x.m)+'</div>':'')+(phs?(x.ph.length>1?'<div class="jr-rph">'+phs+'</div>':phs):'')+'</div>';});
     d.metrics.forEach(function(x){h+='<div class="jr-chip"><i style="background:'+esc(x.p.color||'#bbb')+'"></i>'+esc(x.m.label||x.p.name||'기록')+' <b>'+esc((Math.round(Number(x.v)*10)/10).toLocaleString())+esc(x.m.unit||'')+'</b></div>';});
     d.finished.forEach(function(p){h+='<div class="jr-chip done">🎉 <b>'+esc(p.name||'프로젝트')+'</b> 프로젝트 완료</div>';});
     if(d.todos.length){var t=d.todos.slice(0,4).map(function(x){return esc(x.text);}).join(' · ');h+='<div class="jr-chip">✓ 완료 <b>'+d.todos.length+'</b>개 · '+t+(d.todos.length>4?' 외 '+(d.todos.length-4)+'개':'')+'</div>';}
@@ -6614,13 +6666,13 @@ function renderJournal(){
       (thumbs.length>MAXT+1?'<a class="jr-pol" href="'+esc(thumbs[MAXT].src)+'" target="_blank" rel="noopener" onclick="return jrBox('+thumbs[MAXT].i+')"><img src="'+esc(thumbs[MAXT].src)+'" loading="lazy" alt=""><i>+'+(thumbs.length-MAXT)+'</i></a>':'')+'</div>';}
   var rvs=(S.projects||[]).filter(function(p){var r=(p.reviews||{})[ym];return r&&(r.good||r.bad||r.next);}).map(function(p){var r=p.reviews[ym];
     return '<div class="jr-rv"><h4><i style="background:'+esc(p.color||'#bbb')+'"></i>'+esc(p.name||'프로젝트')+'</h4>'+(r.good?'<div><b>✿ 잘 된 것</b>'+esc(r.good)+'</div>':'')+(r.bad?'<div><b>☁︎ 아쉬운 것</b>'+esc(r.bad)+'</div>':'')+(r.next?'<div><b>→ 다음 달</b>'+esc(r.next)+'</div>':'')+'</div>';}).join('');
-  var empty='<div class="jr-empty"><b>🌿</b>이 달에는 아직 모인 기록이 없어요.<br>프로젝트의 기록·사진 일지, 감사 일기, 숫자 기록을 남기면<br>여기에 저널로 모여요.</div>';
+  var empty='<div class="jr-empty"><b>🌿</b>이 달에는 아직 모인 기록이 없어요.<br>Today 루틴 카드의 메모·사진, 감사 일기, 숫자 기록을 남기면<br>여기에 저널로 모여요.</div>';
   var body=strip+(dayHtml?'<div class="jr-sec"><em>Daily</em><span>하루하루의 기록</span></div><div class="jr-days">'+dayHtml+'</div>':'')+(rvs?'<div class="jr-sec"><em>Monthly review</em><span>'+mo+'월 회고</span></div><div class="jr-rvs">'+rvs+'</div>':'')+(!strip&&!dayHtml&&!rvs?empty:'');
   var jb=czObj('journal','journal'),jurl=jb.photo||'dream/dream-5.jpg',isNow=ym===todStr().slice(0,7);
   var hero='<div class="jr-hero" style="background-image:url(\''+esc(jurl).replace(/'/g,'%27')+'\')"><div class="jr-hero-in">'+
     '<div class="jr-kick">MY JOURNAL · '+y+'</div>'+
     '<div class="jr-trow"><h1><small>'+EN[mo-1]+'</small>'+mo+'월의 저널</h1><div class="jr-nav"><button type="button" class="jr-nb" onclick="jrShift(-1)" title="이전 달">‹</button>'+(isNow?'':'<button type="button" class="jr-now" onclick="jrNow()">이번 달</button>')+'<button type="button" class="jr-nb" onclick="jrShift(1)" title="다음 달">›</button></div></div>'+
-    '<div class="jr-nums"><div><b>'+logCnt+'<small>개</small></b><span>프로젝트 기록</span></div><div><b>'+thumbs.length+'<small>장</small></b><span>사진</span></div><div><b>'+diaryDays+'<small>일</small></b><span>감사 일기</span></div><div><b>'+todoCnt+'<small>개</small></b><span>완료한 할 일</span></div></div>'+
+    '<div class="jr-nums"><div><b>'+(logCnt+rtCnt)+'<small>개</small></b><span>프로젝트·루틴 기록</span></div><div><b>'+thumbs.length+'<small>장</small></b><span>사진</span></div><div><b>'+diaryDays+'<small>일</small></b><span>감사 일기</span></div><div><b>'+todoCnt+'<small>개</small></b><span>완료한 할 일</span></div></div>'+
     '</div><span class="cz-ph-btns"><button type="button" class="cz-ph-btn" onclick="czPickPhoto(\'journal\',\'journal\')" title="사진 바꾸기">'+CZI.cam+'</button>'+(jb.photo?'<button type="button" class="cz-ph-btn" onclick="czResetPhoto(\'journal\',\'journal\')" title="기본 사진으로">'+CZI.reset+'</button>':'')+'</span></div>';
   return '<div class="jr">'+hero+body+'</div>';
 }

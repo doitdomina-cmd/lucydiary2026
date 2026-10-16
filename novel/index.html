@@ -47,6 +47,11 @@ header .work-select { font-weight: 700; max-width: 220px; height: 28px; padding:
 header .spacer { flex: 1; }
 .today-chip { font-size: 12px; color: var(--muted); white-space: nowrap; height: 28px; display: inline-flex; align-items: center; gap: 3px; padding: 0 10px; border-radius: 8px; background: var(--panel2); border: 1px solid var(--line); }
 .today-chip b { color: var(--accent); }
+.cur-chip { font-size: 13px; color: var(--text); white-space: nowrap; height: 28px; display: inline-flex; align-items: center; gap: 5px; padding: 0 12px; border-radius: 8px; background: var(--panel2); border: 1px solid var(--line); font-variant-numeric: tabular-nums; max-width: 46vw; overflow: hidden; }
+.cur-chip.hidden { display: none; }
+.cur-chip b { color: var(--accent); font-size: 14px; }
+.cur-chip small { color: var(--muted); font-size: 11.5px; }
+.cur-chip .cc-t { max-width: 140px; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
 .sync-badge { cursor: pointer; font-size: 11px; padding: 4px 8px; border-radius: 999px; border: 1px solid var(--line); white-space: nowrap; color: var(--muted); }
 .sync-badge.ok { color: var(--accent); border-color: var(--accent); }
 .sync-badge.warn { color: #d08a1a; border-color: #d08a1a; }
@@ -1318,6 +1323,7 @@ nav.mtabs { display: none; }
     <button class="brand" id="btn-home" title="작품 목록 (메인 화면)"><i class="ic ic-feather"></i> 루시의 작업실</button>
     <select class="work-select" id="work-select" title="작품 선택"></select>
     <span class="today-chip" id="today-chip" title="오늘 늘어난 원고 글자 수 (공백 제외)">오늘 <b>0</b>자</span>
+    <span class="cur-chip hidden" id="cur-chip" title="지금 쓰는 회차의 글자 수 (공포 = 공백 포함, 공미 = 공백 제외)"></span>
     <span class="spacer"></span>
     <span class="sync-badge" id="sync-badge">로컬 저장</span>
     <button class="icon-btn" id="btn-menu" title="메뉴">⋯</button>
@@ -2130,10 +2136,12 @@ function renderFoot(it) {
         const edEl = $(`.manuscript[data-id="${it.id}"]`);
         const c = edEl ? countChars(editorText(edEl)) : docCount(it);
         const goal = it.goal || 0;
-        const pct = goal ? Math.min(100, Math.round(c.noSpace / goal * 100)) : 0;
+        const pct = goal ? Math.min(100, Math.round(c.all / goal * 100)) : 0;   // 목표는 공포(공백 포함) 기준
+        { const W = WL(), act = W.panes[W.activeEditor] && W.panes[W.activeEditor].active, chip = $('#cur-chip');   // 위쪽 바에 지금 회차 글자 수를 크게
+          if (chip && (it.id === act || !act)) { if (isRefDoc(it)) chip.classList.add('hidden'); else { chip.classList.remove('hidden'); chip.innerHTML = `<span class="cc-t">${esc(it.title || '이 회차')}</span>공포 <b>${fmt(c.all)}</b>자 <small>공미 ${fmt(c.noSpace)}</small>`; } } }
         el.innerHTML = `<span>공백 포함 <b>${fmt(c.all)}</b></span><span>공백 제외 <b>${fmt(c.noSpace)}</b></span>
             <span style="flex:1"></span>
-            <span>목표</span><input class="goal-input" type="number" min="0" step="500" data-goal="${it.id}" value="${goal || ''}" placeholder="글자">
+            <span title="목표는 공백 포함(공포) 기준">목표(공포)</span><input class="goal-input" type="number" min="0" step="500" data-goal="${it.id}" value="${goal || ''}" placeholder="글자">
             ${goal ? `<span class="goal-bar"><i style="width:${pct}%"></i></span><span>${pct}%</span>` : ''}
             <span class="saved-at"></span>
             <span class="zoom-ctl hide-phone"><button class="mini" data-zoom="-10" title="축소 (Ctrl+-)">－</button><button class="mini zoom-v" data-zoom="menu" title="보기 배율"><i class="ic ic-search"></i> ${pref.zoom || 100}%</button><button class="mini" data-zoom="10" title="확대 (Ctrl++)">＋</button></span>
@@ -2717,10 +2725,10 @@ function pickIcon(anchor, it, at) {
     const pop = showPop(anchor, `<div class="icon-pick">${ICONS.map(c => `<button data-ic="${c}" class="${it.icon === c ? 'on' : ''}">${c}</button>`).join('')}<button data-ic="" class="none" title="아이콘 없애기">✕</button></div>`, at);
     pop.addEventListener('click', e => { const b = e.target.closest('[data-ic]'); if (!b) return; it.icon = b.dataset.ic; touch(it); closePop(); renderAll(); });
 }
-// 회차 목표 글자 수(공백 제외)를 바인더에 작은 동그라미로
+// 회차 목표 글자 수(공백 포함, 공포)를 바인더에 작은 동그라미로
 function goalRing(it) {
     if (!it.goal) return '';
-    const p = Math.min(100, Math.round(docCount(it).noSpace / it.goal * 100));
+    const p = Math.min(100, Math.round(docCount(it).all / it.goal * 100));
     return `<span class="goal-ring ${p >= 100 ? 'done' : ''}" style="--p:${p}" title="목표 ${fmt(it.goal)}자 중 ${p}%"></span>`;
 }
 function rowMenu(anchor, it, at) {
@@ -2747,7 +2755,7 @@ function rowMenu(anchor, it, at) {
         if (m === 'ref') openDoc(it.id, 'ref');
         if (m === 'open-synop') openSynop(it.id);
         if (m === 'rename') { const t = await ask('이름 바꾸기', it.title); if (t != null) { it.title = t.trim() || '제목 없음'; touch(it); renderAll(); } }
-        if (m === 'goal') { const t = await ask('목표 글자 수 (공백 제외)', it.goal || 5000, 'number'); if (t != null) { it.goal = Math.max(0, parseInt(t, 10) || 0); touch(it); renderAll(); } }
+        if (m === 'goal') { const t = await ask('목표 글자 수 (공백 포함, 공포)', it.goal || 5000, 'number'); if (t != null) { it.goal = Math.max(0, parseInt(t, 10) || 0); touch(it); renderAll(); } }
         if (m === 'history') openHistory(it.id);
         if (m === 'icon') pickIcon(anchor, it, at);
         if (m === 'lock') { it.locked = !it.locked; touch(it); renderAll(); }

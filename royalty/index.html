@@ -10076,6 +10076,33 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             }
             const st = document.createElement('style'); st.id = 'skin-style'; st.textContent = out.join('\n'); document.head.appendChild(st);
         }
+        // 집필 관리 달력 카드: 같은 작품은 어떤 날에 있어도 같은 색(작품 id 로 색 칸을 정한다). 디자인마다 '칸 순서대로 돌려 쓰는 색' 규칙을 작품별 규칙으로 바꿔 복사한다
+        function workColorIdx(workId, n) {
+            const id = String(workId || '').split('::')[0]; let h = 0;
+            for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+            return h % n;
+        }
+        function genWorkColorRules() {
+            try {
+                const out = [];
+                const nthRe = /^(.*#write-calendar-body\[data-card="[^"]+"\]) > div:nth-child\((\d)n(?:\+(\d))?\) \.cal-selectable$/;
+                const walk = rules => { for (const r of rules) {
+                    if (r.cssRules && !r.selectorText) { walk(r.cssRules); continue; }
+                    if (!r.selectorText || r.selectorText.indexOf('#write-calendar-body') < 0 || r.selectorText.indexOf('nth-child') < 0) continue;
+                    const sels = [];
+                    r.selectorText.split(/,(?![^()]*\))/).forEach(part => {
+                        const m = nthRe.exec(part.trim()); if (!m) return;
+                        const N = Number(m[2]), k = m[3] === undefined ? 0 : Number(m[3]);   // 4n → 0번째, 4n+1 → 1번째 …
+                        sels.push(m[1] + ' div.cal-selectable[data-w' + N + '="' + (k === 0 ? N - 1 : k - 1) + '"]');
+                    });
+                    if (sels.length) out.push(sels.join(', ') + ' { ' + r.style.cssText + ' }');
+                } };
+                for (const sh of document.styleSheets) { if (sh.ownerNode && sh.ownerNode.id === 'wk-color-rules') continue; try { walk(sh.cssRules); } catch (e) {} }
+                let st = document.getElementById('wk-color-rules');
+                if (!st) { st = document.createElement('style'); st.id = 'wk-color-rules'; document.head.appendChild(st); }
+                st.textContent = out.join(' ');
+            } catch (e) { console.error(e); }
+        }
         function applyThemeClass(theme) {
             [...document.body.classList].filter(c => c.startsWith('theme-') || c.startsWith('cozyv-')).forEach(c => document.body.classList.remove(c));
             ['cozy-variant-style', 'skin-style'].forEach(id => { const o = document.getElementById(id); if (o) o.remove(); });
@@ -10092,7 +10119,9 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             } else if (theme) document.body.classList.add('theme-' + theme);
             try { spiralDeco(); } catch (e) {}
             try { markThemeCards(); } catch (e) {}
+            try { genWorkColorRules(); } catch (e) {}
         }
+        window.addEventListener('load', () => setTimeout(genWorkColorRules, 300));
         // 앱 글꼴: 본문 글꼴 / 메뉴 글꼴을 따로 고를 수 있다 (이 기기에 저장)
         const APP_FONTS = [
             ['', '', ''],
@@ -18024,7 +18053,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                 // 같은 동작을 하는 복사 버튼을 눈에 보이게 추가 — 탭 한 번이면 되니 터치/마우스 둘 다 동일하게 동작
                 let copyBtn = `<button type="button" onclick="event.stopPropagation(); duplicateWriteSchedule(event, '${s.id}', '${s.date}')" class="cal-copy-btn absolute top-1 right-6 opacity-0 group-hover/block:opacity-100 text-slate-300 hover:text-indigo-500 transition-opacity shrink-0 px-1" title="이 일정 복사"><i class="fa-regular fa-copy"></i></button>`;
 
-                return `<div class="cal-selectable border border-slate-200 border-l-4 p-1 rounded-lg relative group/block shadow-sm hover:shadow-md transition-all cursor-move" data-cal="write" data-block-id="${s.id}" data-block-date="${s.date}" style="border-left-color: ${color}; ${cardBg} ${s.category ? '--cat: ' + (WRITE_COLORS[s.category] || '#94a3b8') + ';' : ''} ${cardFontStyle}" draggable="true" ondragstart="handleWriteDragStart(event, '${s.id}', '${s.date}')" ondragover="handleCardDragOver(event, this)" ondragleave="handleCardDragLeave(event, this)" ondrop="handleWriteCardDrop(event, this, '${s.id}', '${s.date}')" onclick="event.stopPropagation(); openWriteEditModal('${s.id}', '${s.date}')" oncontextmenu="duplicateWriteSchedule(event, '${s.id}', '${s.date}')">
+                return `<div class="cal-selectable border border-slate-200 border-l-4 p-1 rounded-lg relative group/block shadow-sm hover:shadow-md transition-all cursor-move" data-cal="write" data-w4="${workColorIdx(s.workId, 4)}" data-w3="${workColorIdx(s.workId, 3)}" data-block-id="${s.id}" data-block-date="${s.date}" style="border-left-color: ${color}; ${cardBg} ${s.category ? '--cat: ' + (WRITE_COLORS[s.category] || '#94a3b8') + ';' : ''} ${cardFontStyle}" draggable="true" ondragstart="handleWriteDragStart(event, '${s.id}', '${s.date}')" ondragover="handleCardDragOver(event, this)" ondragleave="handleCardDragLeave(event, this)" ondrop="handleWriteCardDrop(event, this, '${s.id}', '${s.date}')" onclick="event.stopPropagation(); openWriteEditModal('${s.id}', '${s.date}')" oncontextmenu="duplicateWriteSchedule(event, '${s.id}', '${s.date}')">
                     <div class="flex items-start">
                         <div class="flex-1 min-w-0">
                             ${content}

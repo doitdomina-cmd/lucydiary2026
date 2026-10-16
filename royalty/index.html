@@ -352,7 +352,7 @@
         body.theme-spiral :is(#publish-cal-body, :is(#task-calendar-body, #rs-vcal-body), #write-calendar-body, #w-calendarBody) > div.border-2:hover { box-shadow: 2px 3px 0 var(--sp-ink) !important; }
         body.theme-spiral :is(#publish-cal-body, :is(#task-calendar-body, #rs-vcal-body), #write-calendar-body, #w-calendarBody) .pc-today { background: #2FA67F !important; color: #FFFFFF !important; box-shadow: 0 2px 0 var(--sp-ink); }
         /* 그래프(막대·도넛): 크레파스로 칠한 듯 거친 가장자리 + 왁스 결, 색은 진하게 */
-        body.theme-spiral canvas { filter: url(#sp-crayon-chart) saturate(2.1) contrast(1.12) brightness(.97); }
+        body.theme-spiral canvas { filter: url(#sp-crayon-chart) saturate(1.1) contrast(1.04); }
         /* 카드 안의 표(대시보드 연도별 장르 수익 요약 등): 흰 도화지 + 크레파스 윤곽선 + 점선 줄 */
         body.theme-spiral .tab-content .glass-card > .overflow-x-auto { position: relative; background: #FFFFFF !important; border: 0 !important; border-radius: 2px !important; box-shadow: 4px 5px 0 #BDEBD6 !important; }
         body.theme-spiral .tab-content .glass-card > .overflow-x-auto::before { content: ''; position: absolute; inset: 0; border: 2.6px solid var(--sp-ink); border-radius: 2px; filter: url(#sp-crayon); pointer-events: none; z-index: 8; }
@@ -9251,10 +9251,14 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.font = "700 16px 'Pretendard','Apple SD Gothic Neo',sans-serif";
-                    ctx.fillStyle = '#64748b';
+                    const _sk = chartSkin();   // 테마 그래프: 진한 조각 위에서도 읽히게 흰 테두리(헤일로) + 테마 잉크색 글씨
+                    ctx.lineJoin = 'round'; ctx.lineWidth = 4; ctx.strokeStyle = '#FFFFFF';
+                    ctx.fillStyle = _sk ? _sk.ink : '#64748b';
+                    if (_sk) ctx.strokeText(`${Math.round(pct)}%`, x, y - 10);
                     ctx.fillText(`${Math.round(pct)}%`, x, y - 10);
                     ctx.font = "400 12px 'Pretendard','Apple SD Gothic Neo',sans-serif";
-                    ctx.fillStyle = '#000000';
+                    ctx.fillStyle = _sk ? _sk.ink : '#000000';
+                    if (_sk) ctx.strokeText(`₩${formatCurrency(value)}`, x, y + 10);
                     ctx.fillText(`₩${formatCurrency(value)}`, x, y + 10);
                 });
                 ctx.restore();
@@ -9375,7 +9379,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
         // 견출지 그래프: 장르 색의 색상(hue)은 그대로, 견출지처럼 연한 파스텔로
         const LABEL_FILLS = ['#F8C8CC', '#FCE5A0', '#BEDAF0', '#C3E5CF', '#DCCDF0', '#FBD1B3', '#F5C6E0', '#CFE8E4'];
         // 스프링노트: 로고·제목에 쓰는 크레파스 포인트 색(파랑·분홍·주황·초록·보라·빨강·청록)을 장르 순서대로
-        const SPIRAL_CRAYONS = ['#2468B8', '#CF3C86', '#E8A317', '#23904F', '#6D43BE', '#D13B33', '#0E8C94'];
+        const SPIRAL_CRAYONS = ['#6FA8DC', '#E88CB4', '#F2BC52', '#79C494', '#A98FD8', '#F09383', '#62BAB4'];
         function chartCrayonFill(genreName) { const i = genreList.findIndex(g => g.name === genreName); return SPIRAL_CRAYONS[(i < 0 ? 0 : i) % SPIRAL_CRAYONS.length]; }
         function chartLabelFill(genreName) { const i = genreList.findIndex(g => g.name === genreName); return LABEL_FILLS[(i < 0 ? 0 : i) % LABEL_FILLS.length]; }
         function chartPastelFill(hex) {

@@ -9167,7 +9167,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             const c = document.body.classList;
             const S = {
                 spiral:   { ink: '#1F2D27', alpha: .9,  bw: 2,   radius: 4, grid: 'rgba(31,45,39,.20)',  dash: [5, 4], track: '#D3EFE0', slice: '#1F2D27', sw: 2 },
-                label:    { ink: '#4a4036', pastel: true, bdash: [5, 3], alpha: 1, bw: 1.4, radius: 3, bcol: 'rgba(74,64,54,.62)', grid: 'rgba(74,64,54,.20)',  dash: [4, 4], track: '#EFE6CF', slice: 'rgba(74,64,54,.55)', sw: 1.4 },
+                label:    { ink: '#4a4036', pastel: true, bdash: [5, 3], alpha: 1, bw: 1.6, radius: 3, bcol: 'rgba(74,64,54,.75)', grid: 'rgba(74,64,54,.20)',  dash: [4, 4], track: '#EFE6CF', slice: 'rgba(74,64,54,.7)', sw: 1.6 },
                 polaroid: { ink: '#4a4036', alpha: .92, bw: 3,   radius: 2, grid: '#DDD0B4',             dash: [],     track: '#EDE5D3', slice: '#FFFEFA', sw: 3, bcol: '#FFFEFA' },
                 postcard: { ink: '#3E4660', alpha: .88, bw: 1.5, radius: 0, grid: 'rgba(62,70,96,.22)',  dash: [6, 3], track: '#E2E9F3', slice: '#FCF8EE', sw: 2 },
                 gaming:   { ink: '#2F3A5C', candy: true, alpha: .92, bw: 2.5, radius: 9, grid: 'rgba(47,58,92,.18)', dash: [3, 3], track: '#FFE3EB', slice: '#2F3A5C', sw: 2.5 },
@@ -9180,15 +9180,34 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
         function chartApplyDefaults() {
             if (typeof Chart === 'undefined') return;
             if (!_chartDefaults0) _chartDefaults0 = { color: Chart.defaults.color, family: Chart.defaults.font.family };
+            if (!Chart._skinDashReg) {   // 견출지: 막대 요소는 점선 윤곽을 못 그려서 위에 점선을 덧그린다
+                Chart._skinDashReg = true;
+                Chart.register({ id: 'skinDash', afterDatasetsDraw(ch) {
+                    const sk = chartSkin(); if (!sk || !sk.bdash || ch.config.type !== 'bar') return;
+                    const ctx = ch.ctx;
+                    ch.data.datasets.forEach((ds, di) => {
+                        if (!ds._dashEdge || !ch.isDatasetVisible(di)) return;
+                        ch.getDatasetMeta(di).data.forEach(bar => {
+                            const p = bar.getProps(['x', 'y', 'base', 'width'], true);
+                            const top = Math.min(p.y, p.base), h = Math.abs(p.base - p.y);
+                            if (!(h > 0.5) || !(p.width > 0)) return;
+                            ctx.save(); ctx.setLineDash(sk.bdash); ctx.lineWidth = sk.bw; ctx.strokeStyle = sk.bcol;
+                            ctx.beginPath();
+                            if (ctx.roundRect) ctx.roundRect(p.x - p.width / 2, top, p.width, h, sk.radius); else ctx.rect(p.x - p.width / 2, top, p.width, h);
+                            ctx.stroke(); ctx.restore();
+                        });
+                    });
+                } });
+            }
             const sk = chartSkin();
             Chart.defaults.color = sk ? sk.ink : _chartDefaults0.color;
             Chart.defaults.font.family = sk ? (getComputedStyle(document.body).fontFamily || _chartDefaults0.family) : _chartDefaults0.family;
         }
         function chartBarStyle(genreName) {
             const sk = chartSkin(); if (!sk) return { backgroundColor: getGenrePastelColor(genreName), borderRadius: 4 };
-            return { backgroundColor: sk.pastel ? chartPastelFill(getGenreColor(genreName)) : sk.candy ? chartCandyFill(getGenreColor(genreName)) : hexToRgba(getGenreColor(genreName), sk.alpha), borderColor: sk.bcol || sk.ink, borderWidth: sk.bw, borderRadius: sk.radius, borderSkipped: false, borderDash: sk.bdash || [] };
+            return { backgroundColor: sk.pastel ? chartLabelFill(genreName) : sk.candy ? chartCandyFill(getGenreColor(genreName)) : hexToRgba(getGenreColor(genreName), sk.alpha), borderColor: sk.bcol || sk.ink, borderWidth: sk.bw, borderRadius: sk.radius, borderSkipped: false, ...(sk.bdash ? { borderWidth: 0, _dashEdge: true } : {}) };
         }
-        function chartSliceColor(genreName) { const sk = chartSkin(); return sk ? (sk.pastel ? chartPastelFill(getGenreColor(genreName)) : sk.candy ? chartCandyFill(getGenreColor(genreName)) : hexToRgba(getGenreColor(genreName), sk.alpha)) : getGenrePastelColor(genreName); }
+        function chartSliceColor(genreName) { const sk = chartSkin(); return sk ? (sk.pastel ? chartLabelFill(genreName) : sk.candy ? chartCandyFill(getGenreColor(genreName)) : hexToRgba(getGenreColor(genreName), sk.alpha)) : getGenrePastelColor(genreName); }
         // 게이밍 그래프: 장르 색의 색상(hue)은 그대로, 밝고 선명한 사탕 파스텔로 바꾸고 하얀 사선 줄무늬를 넣는다
         const _candyCache = {};
         function chartCandyFill(hex) {
@@ -9211,6 +9230,8 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             } catch (e) { return col; }
         }
         // 견출지 그래프: 장르 색의 색상(hue)은 그대로, 견출지처럼 연한 파스텔로
+        const LABEL_FILLS = ['#F8C8CC', '#FCE5A0', '#BEDAF0', '#C3E5CF', '#DCCDF0', '#FBD1B3', '#F5C6E0', '#CFE8E4'];
+        function chartLabelFill(genreName) { const i = genreList.findIndex(g => g.name === genreName); return LABEL_FILLS[(i < 0 ? 0 : i) % LABEL_FILLS.length]; }
         function chartPastelFill(hex) {
             const m = /^#?([0-9a-f]{6})$/i.exec(hex || ''); if (!m) return hex || '#F5E3B8';
             const r = parseInt(m[1].slice(0, 2), 16) / 255, g = parseInt(m[1].slice(2, 4), 16) / 255, b = parseInt(m[1].slice(4, 6), 16) / 255;

@@ -7190,6 +7190,11 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                             <button type="button" data-design="fountain" onclick="setWidgetDesign('fountain')" class="widget-design-btn p-1.5 rounded-lg border text-xs font-bold text-slate-600 bg-white border-slate-200 hover:border-slate-300 transition-all"><span class="block h-5 mb-0.5 rounded relative" style="background:#FBF7EC;border:1px solid rgba(27,42,92,.3);box-shadow:inset 0 0 0 2px #FBF7EC,inset 0 0 0 3px rgba(166,134,64,.5)"><i class="absolute rounded-full" style="left:7px;top:9px;width:22px;height:2px;background:linear-gradient(90deg,#1B2A5C,transparent)"></i><i class="absolute rounded-full" style="right:8px;bottom:5px;width:6px;height:6px;background:#1B2A5C"></i></span>만년필</button>
                         </div>
                     </div></div>
+                                <div><!-- 위젯 글꼴 -->
+                    <div>
+                        <p class="text-xs font-bold text-slate-400 uppercase mb-1">위젯 글꼴 <span class="font-normal normal-case text-slate-300">(위젯 · 미니창 · 브리핑 · 뽀모도로 · 계산기 한꺼번에)</span></p>
+                        <div id="widget-font-picker" class="flex flex-wrap gap-1.5"></div>
+                    </div></div>
                                 <div style="display:none"><!-- 배경/글자 색상 (화면에서 숨김: 다른 코드가 입력칸을 참조) -->
                     <div>
                         <p class="text-xs font-bold text-slate-400 uppercase mb-1">위젯 색상 <span class="font-normal normal-case text-slate-300">(기본 디자인에서만 적용)</span></p>
@@ -9960,6 +9965,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             });
             try { applyModalDesign(); } catch (e) {}
             try { markWidgetDesignButtons(widgetSettingsData.widgetDesign); } catch (e) {}
+            try { renderWidgetFontPicker(); } catch (e) {}
         }
         // 설정 창의 테마 카드 (THEME_LIST 로 자동 생성)
         function themePreviewStyle(t) {
@@ -11677,6 +11683,40 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                 b.style.boxShadow = on ? '0 0 0 2px rgba(16,185,129,.25)' : '';
             });
         }
+        // 위젯 글꼴: 위젯·미니창·브리핑·뽀모도로·계산기가 모두 이 글꼴을 쓴다 ('' = 디자인 기본)
+        const WIDGET_FONTS = [
+            ['', '디자인 기본', ''],
+            ['gowundodum', '고운돋움', "'Gowun Dodum', sans-serif"],
+            ['serif', '세리프', "'Noto Serif KR', serif"],
+            ['gaegu', '개구', "'Gaegu', cursive"],
+            ['himelody', '하이멜로디', "'Hi Melody', cursive"],
+            ['jua', '주아', "'Jua', sans-serif"],
+            ['singleday', '싱글데이', "'Single Day', cursive"],
+            ['poorstory', '푸어스토리', "'Poor Story', cursive"],
+            ['yeonsung', '연성', "'Yeon Sung', cursive"],
+            ['gamja', '감자꽃', "'Gamja Flower', cursive"]
+        ];
+        function renderWidgetFontPicker() {
+            const box = document.getElementById('widget-font-picker'); if (!box) return;
+            const cur = (widgetSettingsData && widgetSettingsData.widgetFont) || '';
+            box.innerHTML = WIDGET_FONTS.map(([id, name, css]) => {
+                const on = id === cur;
+                return `<button type="button" onclick="setWidgetFont('${id}')" class="px-3 py-1.5 rounded-lg border text-[13px] ${on ? 'font-bold' : 'text-slate-600'}" style="${css ? 'font-family:' + css + ';' : ''}${on ? 'border-color:#10b981; box-shadow:0 0 0 2px rgba(16,185,129,.25); background:#ecfdf5;' : 'border-color:#e2e8f0; background:#fff;'}">${name}</button>`;
+            }).join('');
+        }
+        function setWidgetFont(id) {
+            const f = WIDGET_FONTS.find(x => x[0] === id) || WIDGET_FONTS[0];
+            widgetSettingsData.widgetFont = f[0];
+            widgetSettingsData.widgetFontCss = f[2] ? f[2] + ", 'Pretendard', sans-serif" : '';
+            save(true);
+            renderWidgetFontPicker();
+            try {
+                if (typeof require !== 'undefined') {
+                    const { ipcRenderer } = require('electron');
+                    ipcRenderer.send('widget-update-settings', { widgetFont: widgetSettingsData.widgetFont, widgetFontCss: widgetSettingsData.widgetFontCss });
+                }
+            } catch (e) {}
+        }
         function setWidgetDesign(d) {
             widgetSettingsData.widgetDesign = d;
             save(true);
@@ -11778,6 +11818,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             if (!s) return;
             const set = (id, val) => { const el = document.getElementById(id); if (el && val !== undefined) el.value = val; };
             markWidgetDesignButtons(s.widgetDesign);
+            renderWidgetFontPicker();
             set('widget-bg-color', s.bgHex);
             set('widget-opacity', Math.round((s.opacity||0.92)*100));
             set('widget-text-color', s.textHex);

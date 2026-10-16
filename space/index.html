@@ -2767,11 +2767,11 @@ body.menu-font-on .sb .nav,body.menu-font-on .sb .sb-lbl,body.menu-font-on .sb-p
       <div class="sb-lbl">My Dream</div>
       <button class="nav" title="드림보드" id="nav-dream" onclick="go('dream')"><span class="nav-ic" data-color="#EF805E"></span>Dream Board</button>
       <button class="nav" title="추억 앨범" id="nav-memories" onclick="go('memories')"><span class="nav-ic" data-color="#7E91B0"></span>Memories</button>
+      <button class="nav" title="루틴 달력" id="nav-routinecal" onclick="go('routinecal')"><span class="nav-ic" data-color="#C9A0C8"></span>루틴 달력</button>
     </div>
     <div class="sb-sec">
       <div class="sb-lbl">Schedule</div>
       <button class="nav" id="nav-today" onclick="go('today')"><span class="nav-ic" data-color="#F5C842"></span>Today<span class="nav-bd" id="today-bd" style="display:none"></span></button>
-      <button class="nav" title="로드맵" id="nav-timeline" onclick="go('timeline')"><span class="nav-ic" data-color="#8FA8D9"></span>Roadmap</button>
       <button class="nav" title="월간" id="nav-calendar" onclick="go('calendar')"><span class="nav-ic" data-color="#61C0BF"></span>Monthly</button>
       <button class="nav" title="감사 일기" id="nav-diary" onclick="go('diary')"><span class="nav-ic" data-color="#B2B0E8"></span>Thanks Diary</button>
     </div>
@@ -3328,7 +3328,7 @@ let activePid = null;
 let pjFilter = '';
 let viewDate = todStr();
 
-const titles = {memories:'Memories',dream:'Dream Board',dreamArea:'Dream Board',today:'Today',diary:'Thanks Diary',calendar:'Monthly',todocal:'To Do',routine:'루틴 설정',life:'My Goals',overview:'Goals 요약',projects:'프로젝트',deadlines:'마감 관리',savings:'저축 관리',health:'건강 관리',settings:'설정',ledger:'가계부',insights:'회고 & 통계',journal:'Journal',timeline:'Roadmap',ledgerYear:'가계부'};
+const titles = {routinecal:'루틴 달력',memories:'Memories',dream:'Dream Board',dreamArea:'Dream Board',today:'Today',diary:'Thanks Diary',calendar:'Monthly',todocal:'To Do',routine:'루틴 설정',life:'My Goals',overview:'Goals 요약',projects:'프로젝트',deadlines:'마감 관리',savings:'저축 관리',health:'건강 관리',settings:'설정',ledger:'가계부',insights:'회고 & 통계',journal:'Journal',timeline:'Roadmap',ledgerYear:'가계부'};
 
 function go(p, pid, _fromPopstate){
   page=p; activePid=pid||null; if(p!=='projects') pjFilter='';
@@ -3340,12 +3340,12 @@ function go(p, pid, _fromPopstate){
     history.pushState(state,'',(p==='today'&&!pid)?window.location.pathname:url);
   }
   document.querySelectorAll('.nav').forEach(e=>e.classList.remove('on'));
-  const n=document.getElementById('nav-'+(p==='dreamArea'?'dream':p==='ledgerYear'?'ledger':p));
+  const n=document.getElementById('nav-'+((p==='dreamArea'||p==='timeline')?'dream':p==='ledgerYear'?'ledger':p));
   if(n) n.classList.add('on');
   const tbTitle=document.getElementById('tb-title');
   const topbar=document.querySelector('.topbar');
   const isMobile=window.innerWidth<=768;
-  const hideTopbarPages=['memories','settings','dream','dreamArea','ledger','today','calendar','todocal','diary','deadlines','health','savings','routine','insights','journal'];
+  const hideTopbarPages=['routinecal','memories','settings','dream','dreamArea','ledger','today','calendar','todocal','diary','deadlines','health','savings','routine','insights','journal'];
 
   // 모바일에서는 항상 탑바 표시, 데스크탑에서만 hideTopbarPages 적용
   if(!isMobile && hideTopbarPages.includes(p)){
@@ -3495,6 +3495,10 @@ function dreamData(){
 }
 function dreamPhotoUrl(a,i){var x=dreamData().areas[a.id];return (x&&x.photo)||('dream/dream-'+(i+1)+'.jpg');}
 function updateDreamYear(){var el=document.getElementById('sb-year');if(el)el.innerHTML='<span>A YEAR OF MY OWN</span>';}
+// 드림보드 위 탭: Dream Board / Roadmap (로드맵은 드림보드 안에서 탭으로 연다)
+function dmTabs(){
+  return '<div class="rc-tabs dm-tabs"><button class="'+(page==='dream'?'on':'')+'" onclick="go(\'dream\')">Dream Board</button><button class="'+(page==='timeline'?'on':'')+'" onclick="go(\'timeline\')">Roadmap</button></div>';
+}
 function renderDream(){
   var D=dreamData();
   var cards=DREAM_AREAS.map(function(a,i){
@@ -3792,7 +3796,7 @@ function memWithPhrase(m){
   var h=0,k=String(m.id||'')+ps.join('');for(var i=0;i<k.length;i++)h=(h*31+k.charCodeAt(i))>>>0;
   return P[h%P.length];
 }
-var memFilter='all',memPerson='',_memDraft=null,memTab='mem',rcMonth='';
+var memFilter='all',memPerson='',_memDraft=null,rcMonth='';
 function togMemFav(id){var m=(S.memories||[]).find(function(x){return x.id===id;});if(!m)return;m.fav=!m.fav;save();render();openMemView(id);}
 function memPickPerson(i){var n=memPeople()[i]||'';memPerson=memPerson===n?'':n;render();}
 function memKind(k){return MEM_KINDS.find(function(x){return x.id===k;})||MEM_KINDS[5];}
@@ -3823,8 +3827,6 @@ function renderMemories(){
   var yearN=all.filter(function(m){return (m.date||'').slice(0,4)===yr;}).length,people=memPeople();
   var h='<div class="mem">'+ldBanner('memories','dream/dream-6.jpg','MEMORIES · 함께한 순간들',all.length?all.length+'개의 추억':'첫 추억을 남겨요',
     ['올해 <b>'+yearN+'개</b>','함께한 사람 <b>'+people.length+'명</b>'],'<button class="on" onclick="openMemForm()">'+CZI.plus+'추억 남기기</button>','');
-  h+='<div class="rc-tabs"><button class="'+(memTab==='mem'?'on':'')+'" onclick="memTab=\'mem\';render()">추억</button><button class="'+(memTab==='rt'?'on':'')+'" onclick="memTab=\'rt\';render()">루틴 달력</button></div>';
-  if(memTab==='rt') return h+rcView()+'</div>';
   // 올해 12달
   var months={};all.forEach(function(m){if((m.date||'').slice(0,4)===yr){var k=parseInt(m.date.slice(5,7),10);months[k]=(months[k]||0)+1;}});
   var curM=parseInt(t.slice(5,7),10),done=Object.keys(months).length;
@@ -3946,7 +3948,7 @@ function rcDay(ds){
 }
 (function(){
   var st=document.createElement('style');
-  st.textContent='.rc-tabs{display:flex;gap:6px;margin:16px 0 4px}'
+  st.textContent='.rc-tabs{display:flex;gap:6px;margin:16px 0 4px}.rc-tabs.dm-tabs{margin:0 0 14px}'
     +'.rc-tabs button{border:0;background:var(--s2);color:var(--t2);border-radius:99px;padding:7px 16px;font-size:13px;cursor:pointer;font-family:inherit}'
     +'.rc-tabs button.on{background:var(--cz-acc,var(--accent));color:#fff}'
     +'.rc-cal,.rc-tot{margin-top:14px}'
@@ -4332,7 +4334,8 @@ function render(){
   document.body.className=document.body.className.replace(/\bpage-\S+/g,'').trim()+' page-'+page+((page==='projects'&&activePid)?' pj-detail':'');
   const div=document.createElement('div');
   div.className='pc'+(page==='timeline'?' pc-wide':'');
-  if(page==='dream') div.innerHTML=renderDream();
+  if(page==='dream') div.innerHTML=dmTabs()+renderDream();
+  else if(page==='routinecal') div.innerHTML='<div class="mem">'+rcView()+'</div>';
   else if(page==='dreamArea') div.innerHTML=renderDreamArea();
   else if(page==='memories') div.innerHTML=renderMemories();
   else if(page==='today') div.innerHTML=renderToday();
@@ -4351,7 +4354,7 @@ function render(){
   else if(page==='ledgerYear') div.innerHTML=renderLedgerYear();
   else if(page==='insights') div.innerHTML=renderInsights();
   else if(page==='journal') div.innerHTML=renderJournal();
-  else if(page==='timeline') div.innerHTML=renderTimeline();
+  else if(page==='timeline') div.innerHTML=dmTabs()+renderTimeline();
   el.innerHTML=''; el.appendChild(div);
   if(document.body.classList.contains('theme-spiral')){spiralDeco();try{spiralWobble();}catch(e){}}
   updateSB();
@@ -11657,7 +11660,7 @@ function setCustomThemeVars(hex){
 // 사이드바 메뉴 마커 (동그라미 / 색하트 / 테마하트)
 // 메뉴 선 아이콘
 var NAV_SHAPES={flower:'<circle cx="12" cy="6" r="4.3"/><circle cx="18" cy="11" r="4.3"/><circle cx="15.6" cy="18" r="4.3"/><circle cx="8.4" cy="18" r="4.3"/><circle cx="6" cy="11" r="4.3"/><circle cx="12" cy="12.5" r="2.6" fill="#fff"/>'};
-var NAV_LINE={memories:'<rect x="4" y="3.5" width="16" height="17" rx="2.5"/><path d="M4 15.5h16"/><circle cx="12" cy="9.5" r="2.6"/>',dream:'<path d="M12 20s-7-4.4-8.6-8.6C2.2 8.2 4 5 7.2 5c2 0 3.3 1.1 4.8 2.9C13.5 6.1 14.8 5 16.8 5 20 5 21.8 8.2 20.6 11.4 19 15.6 12 20 12 20z"/>',
+var NAV_LINE={routinecal:'<rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17M8 3v4M16 3v4M9 14.5l2 2 4-4"/>',memories:'<rect x="4" y="3.5" width="16" height="17" rx="2.5"/><path d="M4 15.5h16"/><circle cx="12" cy="9.5" r="2.6"/>',dream:'<path d="M12 20s-7-4.4-8.6-8.6C2.2 8.2 4 5 7.2 5c2 0 3.3 1.1 4.8 2.9C13.5 6.1 14.8 5 16.8 5 20 5 21.8 8.2 20.6 11.4 19 15.6 12 20 12 20z"/>',
       today:'<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
       timeline:'<path d="M4 18c3 0 3-6 6-6s3 4 6 4 3-8 4-10"/><circle cx="4" cy="18" r="1.4"/><circle cx="20" cy="6" r="1.4"/>',
       calendar:'<rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',

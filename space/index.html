@@ -3916,6 +3916,7 @@ function rcView(){
     +'<div class="jr-trow"><h1><small>'+EN[mo-1]+'</small>'+mo+'월의 루틴</h1><div class="jr-nav"><button type="button" class="jr-nb" onclick="rcMove(-1)" title="이전 달">‹</button>'+(isNow?'':'<button type="button" class="jr-now" onclick="rcMonth=\'\';render()">이번 달</button>')+'<button type="button" class="jr-nb" onclick="rcMove(1)" title="다음 달">›</button></div></div>'
     +'<div class="jr-nums"><div><b>'+curAll+'<small>번</small></b><span>이번 달 한 루틴</span></div><div><b>'+doneDays+'<small>일</small></b><span>루틴 한 날</span></div><div><b>'+kinds+'<small>개</small></b><span>루틴 종류</span></div></div>'
     +'</div><span class="cz-ph-btns"><button type="button" class="cz-ph-btn" onclick="czPickPhoto(\'routinecal\',\'routinecal\')" title="사진 바꾸기">'+CZI.cam+'</button>'+(rb.photo?'<button type="button" class="cz-ph-btn" onclick="czResetPhoto(\'routinecal\',\'routinecal\')" title="기본 사진으로">'+CZI.reset+'</button>':'')+'</span></div>';
+  h+='<div class="rc-split"><div class="rc-main">';
   h+='<div class="jr-sec"><em>Calendar</em><span>'+(curAll?'날짜를 누르면 그날의 하루가 보여요 ✿':'Today에서 루틴 카드를 추가하면 여기에 쌓여요')+'</span></div>';
   h+='<div class="rc-cal">';
   h+='<div class="rc-grid">'+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(function(d,i){return '<div class="rc-dow'+(i===0?' sun':i===6?' sat':'')+'">'+d+'</div>';}).join('');
@@ -3926,15 +3927,15 @@ function rcView(){
       +items.slice(0,8).map(function(r){return '<i class="rc-chip" style="--c:'+esc(tdCardColor(r))+';background-image:url(\''+esc(tdCardBg(r)).replace(/'/g,'%27')+'\')" title="'+esc(r.task)+'"><span>'+esc(r.task)+'</span></i>';}).join('')
       +(items.length>8?'<small class="rc-more">+'+(items.length-8)+'</small>':'')+'</div>';
   }
-  h+='</div></div>';
+  h+='</div></div></div>';
   var rids=Object.keys(rmap).filter(function(id){return tot[id]||cur[id];}).sort(function(a,b){return (tot[b]||0)-(tot[a]||0);});
-  h+='<div class="jr-sec"><em>Total</em><span>루틴별 횟수 · '+rids.length+'개</span></div><div class="rc-tot">';
+  h+='<div class="rc-side"><div class="jr-sec"><em>Total</em><span>루틴별 횟수 · '+rids.length+'개</span></div><div class="rc-tot">';
   if(!rids.length)h+='<div class="mem-ynote">아직 한 루틴 카드가 없어요. Today에서 루틴 카드를 추가하면 여기에 쌓여요.</div>';
   else h+=rids.map(function(id){
     var r=rmap[id],pr=r.rzProjectId?(S.projects||[]).find(function(p){return p.id===r.rzProjectId;}):null;
     return '<div class="rc-row" style="--c:'+esc(tdCardColor(r))+'"><i style="background-image:url(\''+esc(tdCardBg(r)).replace(/'/g,'%27')+'\')"></i><span class="rc-n">'+esc(r.task)+(pr?'<small>'+esc(pr.name||'')+'</small>':'')+'</span><span class="rc-m">이번 달 <b>'+(cur[id]||0)+'</b></span><span class="rc-a">전체 <b>'+(tot[id]||0)+'</b>번</span></div>';
   }).join('');
-  return h+'</div></div>';
+  return h+'</div></div></div></div>';
 }
 // 그날 Today 맨 위 네 구역(아침·오전·오후·저녁)에 적은 메모
 function rcZoneMemos(ds){
@@ -4000,6 +4001,10 @@ function rcDay(ds){
     +'.rc-pg .rc-d{font-family:"Instrument Serif","Noto Serif KR",Georgia,serif;font-size:14px;color:var(--cz-ink,var(--t2))}.rc-pg .rc-c.today .rc-d{color:var(--cz-acc,var(--accent))}'
     +'.rc-pg .rc-chip{border-radius:6px;box-shadow:0 1px 3px rgba(80,50,40,.18)}.rc-pg .rc-chip::before{background:none}'
     +'.rc-pg .rc-tot{background:var(--cz-paper,#fff);border-radius:22px;padding:6px 18px;box-shadow:0 4px 18px rgba(120,80,60,.07),0 0 0 1px var(--cz-line,#eee)}'
+    // 넓은 화면: 달력 왼쪽, Total은 오른쪽 세로 칸 / 좁은 화면: 달력 아래로
+    +'.rc-split{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:22px;align-items:start}.rc-side .rc-tot{margin-top:0}'
+    +'.rc-side .rc-row{flex-wrap:wrap;row-gap:2px}.rc-side .rc-n{flex:1 1 calc(100% - 44px)}.rc-side .rc-m{margin-left:44px}'
+    +'@media(max-width:1000px){.rc-split{grid-template-columns:minmax(0,1fr)}.rc-side .rc-row{flex-wrap:nowrap}.rc-side .rc-n{flex:1}.rc-side .rc-m{margin-left:0}}'
     +'.rc-pg .rc-row{border-color:var(--cz-line,#eee)}.rc-pg .rc-row>i{width:34px;height:34px;border-radius:10px;background-color:var(--c);background-size:cover;background-position:center}'
     +'.rc-pg .rc-m b,.rc-pg .rc-a b{color:var(--cz-deep,var(--text))}'
     +'@media(max-width:600px){.rc-c{min-height:64px;padding:2px;gap:2px}.rc-chip{width:calc(25% - 1.5px);border-radius:2px}}';

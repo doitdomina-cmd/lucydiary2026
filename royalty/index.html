@@ -9673,7 +9673,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                         const dragId = w._isExtra ? w.id : w.id;
                         return `<div class="mt-1.5 px-2 py-1.5 rounded-xl text-[12px] leading-snug cursor-move group/card relative" 
                                      style="background:${hexToRgba(gc, 0.15)}; border-left: 4px solid ${gc};"
-                                     draggable="true"
+                                     draggable="true" data-gi="${Math.max(0, genreList.findIndex(g => g.name === w.genre))}"
                                      ondragstart="event.dataTransfer.setData('text/plain','${dragId}'); event.currentTarget.style.opacity='0.5';"
                                      ondragend="event.currentTarget.style.opacity='1';">
                             <button onclick="event.stopPropagation(); ${delAction}" class="absolute top-1 right-1 opacity-0 group-hover/card:opacity-100 text-slate-300 hover:text-rose-500 text-[10px] transition-all" title="삭제"><i class="fa-solid fa-xmark"></i></button>
@@ -10104,13 +10104,14 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                 _wkSig = sig;
                 const groups = {};   // 선택자 앞부분+N → [{k, css, hue}]
                 const nthRe = /^(.*#write-calendar-body\[data-card="[^"]+"\]) > div:nth-child\((\d)n(?:\+(\d))?\) \.cal-selectable$/;
+                const nthRe3 = /^(.*#publish-cal-body\[data-card="[^"]+"\]) > div:nth-child\((\d)n(?:\+(\d))?\) \[draggable="true"\]$/;
                 const nthRe2 = /^(.*#master-works-by-genre-container\[data-card="[^"]+"\]) > div\.bg-white:nth-child\((\d)n(?:\+(\d))?\)$/;
                 const walk = rules => { for (const r of rules) {
                     if (r.cssRules && !r.selectorText) { walk(r.cssRules); continue; }
-                    if (!r.selectorText || (r.selectorText.indexOf('#write-calendar-body') < 0 && r.selectorText.indexOf('#master-works-by-genre-container') < 0) || r.selectorText.indexOf('nth-child') < 0) continue;
+                    if (!r.selectorText || (r.selectorText.indexOf('#write-calendar-body') < 0 && r.selectorText.indexOf('#publish-cal-body') < 0 && r.selectorText.indexOf('#master-works-by-genre-container') < 0) || r.selectorText.indexOf('nth-child') < 0) continue;
                     const css = r.style.cssText, hex = _colorToHex(r.style.backgroundColor) || (() => { const a = css.match(/#[0-9a-f]{6}/ig); return a ? a[a.length - 1] : null; })();
                     r.selectorText.split(/,(?![^()]*\))/).forEach(part => {
-                        const t = part.trim(); let m = nthRe.exec(t), sfx = ' div.cal-selectable'; if (!m) { m = nthRe2.exec(t); sfx = ' > div.bg-white'; } if (!m) return;
+                        const t = part.trim(); let m = nthRe.exec(t), sfx = ' div.cal-selectable'; if (!m) { m = nthRe3.exec(t); sfx = ' div[draggable="true"]'; } if (!m) { m = nthRe2.exec(t); sfx = ' > div.bg-white'; } if (!m) return;
                         const key = m[1] + sfx + '|' + m[2];
                         (groups[key] = groups[key] || []).push({ k: m[3] === undefined ? 0 : Number(m[3]), css, hue: _hueOf(hex) });
                     });
@@ -10132,7 +10133,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                 // 게이밍: 집필 달력 카드 맨 위 '창 제목줄'도 작품 장르 색으로
                 if (document.body.classList.contains('theme-gaming')) {
                     gl.forEach((g, gi) => { const h = _hueOf(g.color); if (h === null) return;
-                        out.push('body #write-calendar-body[data-card="gaming"] .cal-selectable[data-gi="' + gi + '"] { --gtb1: hsl(' + Math.round(h) + ', 85%, 72%); --gtb2: hsl(' + Math.round(h) + ', 92%, 84%); }'); });
+                        out.push('body #publish-cal-body[data-card="gaming"] [draggable="true"][data-gi="' + gi + '"], body #write-calendar-body[data-card="gaming"] .cal-selectable[data-gi="' + gi + '"] { --gtb1: hsl(' + Math.round(h) + ', 85%, 72%); --gtb2: hsl(' + Math.round(h) + ', 92%, 84%); }'); });
                 }
                 // 등록된 작품 목록·작품 관리·웹툰 관리 카드 바탕색: 테마가 :is(...):nth-child(4n+K) 로 돌려 칠하는 색(!important)을 장르별로 고정
                 {

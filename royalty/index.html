@@ -749,6 +749,8 @@ body.theme-spiral .grid.grid-cols-7:has(+ :is(#publish-cal-body, :is(#task-calen
        
         body.theme-label #write-calendar-body .write-span-bar:not([data-pat]) { background: var(--lbs, #FCEFC4) !important; }
         body.theme-label #write-calendar-body .write-span-bar:not([data-pat]) * { color: var(--lb-ink) !important; }
+        /* 집필 관리 맨 위 '이번 달 목표' 칩: 연분홍 배경 */
+        body.theme-label #write-cozy-hero .chips .chip:first-child { background: #FDE4E8 !important; }
         /* 달력 날짜 숫자 동그라미: 달력마다 한 가지 파스텔 견출 스티커 — 출간 일정=노랑, 스케줄=분홍, 집필·글자수=노랑 */
         body.theme-label :is(#publish-cal-body, :is(#task-calendar-body, #rs-vcal-body), #write-calendar-body, #w-calendarBody) .pc-num:not(.pc-today) { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding: 0 4px; border-radius: 999px; background: #FCE5A0 !important; color: var(--lb-ink) !important; outline: 1.2px dashed rgba(74,64,54,.5); outline-offset: -2px; box-shadow: 0 1px 2px rgba(60,45,25,.15); }
         body.theme-label :is(#task-calendar-body, #rs-vcal-body) .pc-num:not(.pc-today) { background: #F8C8CC !important; }
@@ -17720,7 +17722,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
         }
 
         // 코지 테마: 큰 영문 월 이름 + 이번 달 목표 합계 + 다음 집필 일정 D-day (출간 일정·스케줄 관리와 같은 분위기)
-        function renderWriteCozyHero(monthGoalSum) {
+        function renderWriteCozyHero(monthGoalSum, pendingSum) {
             const box = document.getElementById('write-cozy-hero');
             if (!box) return;
             if (!document.body.classList.contains('theme-cozy')) { box.innerHTML = ''; return; }
@@ -17744,7 +17746,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             }
             box.innerHTML = `<div class="left"><div class="eyebrow">writing plan</div>
                 <div class="row"><span class="mname">${MN[m]}</span><span class="yr">${y}</span></div></div>
-                <div class="chips"><span class="chip">♥ 이번 달 목표 ${(monthGoalSum || 0).toLocaleString()}자</span>${nx ? `<span class="chip">다음 집필 · ${escapeHtml(nxLabel)} <b>${diff === 0 ? 'D-Day' : 'D-' + diff}</b></span>` : ''}</div>`;
+                <div class="chips"><span class="chip">♥ 이번 달 목표 ${(monthGoalSum || 0).toLocaleString()}자</span><span class="chip" title="이번 달 목표 + 아직 카드로 확정 안 된 기간 일정 예상 글자수">✎ 예상 목표 ${((monthGoalSum || 0) + (pendingSum || 0)).toLocaleString()}자</span>${nx ? `<span class="chip">다음 집필 · ${escapeHtml(nxLabel)} <b>${diff === 0 ? 'D-Day' : 'D-' + diff}</b></span>` : ''}</div>`;
         }
 
         function renderWriteCalendar() {
@@ -18004,6 +18006,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                     });
                     const pendingEl = document.getElementById('write-month-pending-sum');
                     if (pendingEl) pendingEl.textContent = pendingSum > 0 ? `(예정 ${pendingSum.toLocaleString()}자)` : '';
+                    try { renderWriteCozyHero(monthGoalSum, pendingSum); } catch (e) {}
                 } catch (e) {}
 
                 // [NEW] 스케줄이 아예 없는 날 * 6000자 예상 가용 글자수 표시

@@ -2767,7 +2767,7 @@ body.menu-font-on .sb .nav,body.menu-font-on .sb .sb-lbl,body.menu-font-on .sb-p
       <div class="sb-lbl">My Dream</div>
       <button class="nav" title="드림보드" id="nav-dream" onclick="go('dream')"><span class="nav-ic" data-color="#EF805E"></span>Dream Board</button>
       <button class="nav" title="추억 앨범" id="nav-memories" onclick="go('memories')"><span class="nav-ic" data-color="#7E91B0"></span>Memories</button>
-      <button class="nav" title="루틴 달력" id="nav-routinecal" onclick="go('routinecal')"><span class="nav-ic" data-color="#C9A0C8"></span>Routine Calendar</button>
+      <button class="nav" title="저널" id="nav-journal" onclick="go('journal')"><span class="nav-ic" data-color="#D9A5B3"></span>Journal</button>
     </div>
     <div class="sb-sec">
       <div class="sb-lbl">Schedule</div>
@@ -2778,8 +2778,7 @@ body.menu-font-on .sb .nav,body.menu-font-on .sb .sb-lbl,body.menu-font-on .sb-p
     <div class="sb-sec">
       <div class="sb-lbl">Goals</div>
       <button class="nav" title="My Goals" id="nav-life" onclick="go('life')"><span class="nav-ic" data-color="#8BBF88"></span>My Goals</button>
-      <button class="nav" title="프로젝트" id="nav-projects" onclick="go('projects')"><span class="nav-ic" data-color="#F5C490"></span>프로젝트</button>
-      <button class="nav" title="저널" id="nav-journal" onclick="go('journal')"><span class="nav-ic" data-color="#D9A5B3"></span>Journal</button>
+      <button class="nav" title="프로젝트" id="nav-projects" onclick="go('projects')"><span class="nav-ic" data-color="#F5C490"></span>Projects</button>
       <button class="nav" title="가계부" id="nav-ledger" onclick="go('ledger')"><span class="nav-ic" data-color="#7CB9A8"></span>가계부</button>
     </div>
     <div class="sb-sec">
@@ -3328,7 +3327,7 @@ let activePid = null;
 let pjFilter = '';
 let viewDate = todStr();
 
-const titles = {routinecal:'Routine Calendar',memories:'Memories',dream:'Dream Board',dreamArea:'Dream Board',today:'Today',diary:'Thanks Diary',calendar:'Monthly',todocal:'To Do',routine:'루틴 설정',life:'My Goals',overview:'Goals 요약',projects:'프로젝트',deadlines:'마감 관리',savings:'저축 관리',health:'건강 관리',settings:'설정',ledger:'가계부',insights:'회고 & 통계',journal:'Journal',timeline:'Roadmap',ledgerYear:'가계부'};
+const titles = {routinecal:'Routine Calendar',memories:'Memories',dream:'Dream Board',dreamArea:'Dream Board',today:'Today',diary:'Thanks Diary',calendar:'Monthly',todocal:'To Do',routine:'루틴 설정',life:'My Goals',overview:'Goals 요약',projects:'Projects',deadlines:'마감 관리',savings:'저축 관리',health:'건강 관리',settings:'설정',ledger:'가계부',insights:'회고 & 통계',journal:'Journal',timeline:'Roadmap',ledgerYear:'가계부'};
 
 function go(p, pid, _fromPopstate){
   page=p; activePid=pid||null; if(p!=='projects') pjFilter='';
@@ -3340,7 +3339,7 @@ function go(p, pid, _fromPopstate){
     history.pushState(state,'',(p==='today'&&!pid)?window.location.pathname:url);
   }
   document.querySelectorAll('.nav').forEach(e=>e.classList.remove('on'));
-  const n=document.getElementById('nav-'+((p==='dreamArea'||p==='timeline')?'dream':p==='ledgerYear'?'ledger':p));
+  const n=document.getElementById('nav-'+((p==='dreamArea'||p==='timeline')?'dream':p==='routinecal'?'journal':p==='ledgerYear'?'ledger':p));
   if(n) n.classList.add('on');
   const tbTitle=document.getElementById('tb-title');
   const topbar=document.querySelector('.topbar');
@@ -3496,6 +3495,10 @@ function dreamData(){
 function dreamPhotoUrl(a,i){var x=dreamData().areas[a.id];return (x&&x.photo)||('dream/dream-'+(i+1)+'.jpg');}
 function updateDreamYear(){var el=document.getElementById('sb-year');if(el)el.innerHTML='<span>A YEAR OF MY OWN</span>';}
 // 드림보드 위 탭: Dream Board / Roadmap (로드맵은 드림보드 안에서 탭으로 연다)
+// 저널 위 탭: Journal / Routine Calendar
+function jrTabs(){
+  return '<div class="rc-tabs dm-tabs"><button class="'+(page==='journal'?'on':'')+'" onclick="go(\'journal\')">Journal</button><button class="'+(page==='routinecal'?'on':'')+'" onclick="go(\'routinecal\')">Routine Calendar</button></div>';
+}
 function dmTabs(){
   return '<div class="rc-tabs dm-tabs"><button class="'+(page==='dream'?'on':'')+'" onclick="go(\'dream\')">Dream Board</button><button class="'+(page==='timeline'?'on':'')+'" onclick="go(\'timeline\')">Roadmap</button></div>';
 }
@@ -3904,10 +3907,18 @@ function rcView(){
       if(ds.slice(0,7)===ym){cur[rid]=(cur[rid]||0)+1;curAll++;}
     });
   });
-  var h='<div class="card rc-cal"><div class="mem-h"><div class="mem-t"><em>routine calendar</em>'+y+'년 '+mo+'월 루틴</div>'
-    +'<span class="rc-nav"><button type="button" onclick="rcMove(-1)" aria-label="이전 달">‹</button><button type="button" onclick="rcMonth=\'\';render()">오늘</button><button type="button" onclick="rcMove(1)" aria-label="다음 달">›</button></span></div>';
-  h+='<div class="rc-sum">이번 달 <b>'+curAll+'번</b> 했어요'+(curAll?' ✿ 잘하고 있어요':'')+'</div>';
-  h+='<div class="rc-grid">'+['일','월','화','수','목','금','토'].map(function(d,i){return '<div class="rc-dow'+(i===0?' sun':'')+'">'+d+'</div>';}).join('');
+  var EN=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var doneDays=Object.keys(days).filter(function(ds){return ds.slice(0,7)===ym&&rcDoneIds(ds).some(function(id){return rmap[id];});}).length;
+  var kinds=Object.keys(cur).length,isNow=ym===t.slice(0,7);
+  var rb=czObj('routinecal','routinecal'),rurl=rb.photo||'dream/dream-3.jpg';
+  var h='<div class="jr rc-pg"><div class="jr-hero" style="background-image:url(\''+esc(rurl).replace(/'/g,'%27')+'\')"><div class="jr-hero-in">'
+    +'<div class="jr-kick">ROUTINE CALENDAR · '+y+'</div>'
+    +'<div class="jr-trow"><h1><small>'+EN[mo-1]+'</small>'+mo+'월의 루틴</h1><div class="jr-nav"><button type="button" class="jr-nb" onclick="rcMove(-1)" title="이전 달">‹</button>'+(isNow?'':'<button type="button" class="jr-now" onclick="rcMonth=\'\';render()">이번 달</button>')+'<button type="button" class="jr-nb" onclick="rcMove(1)" title="다음 달">›</button></div></div>'
+    +'<div class="jr-nums"><div><b>'+curAll+'<small>번</small></b><span>이번 달 한 루틴</span></div><div><b>'+doneDays+'<small>일</small></b><span>루틴 한 날</span></div><div><b>'+kinds+'<small>개</small></b><span>루틴 종류</span></div></div>'
+    +'</div><span class="cz-ph-btns"><button type="button" class="cz-ph-btn" onclick="czPickPhoto(\'routinecal\',\'routinecal\')" title="사진 바꾸기">'+CZI.cam+'</button>'+(rb.photo?'<button type="button" class="cz-ph-btn" onclick="czResetPhoto(\'routinecal\',\'routinecal\')" title="기본 사진으로">'+CZI.reset+'</button>':'')+'</span></div>';
+  h+='<div class="jr-sec"><em>Calendar</em><span>'+(curAll?'날짜를 누르면 그날의 하루가 보여요 ✿':'Today에서 루틴 카드를 추가하면 여기에 쌓여요')+'</span></div>';
+  h+='<div class="rc-cal">';
+  h+='<div class="rc-grid">'+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(function(d,i){return '<div class="rc-dow'+(i===0?' sun':i===6?' sat':'')+'">'+d+'</div>';}).join('');
   for(var i=0;i<lead;i++)h+='<div class="rc-c emp"></div>';
   for(var d=1;d<=last;d++){
     var ds=ym+'-'+String(d).padStart(2,'0'),items=rcDoneOn(ds,rmap),hasMemo=rcZoneMemos(ds).length>0;
@@ -3917,13 +3928,13 @@ function rcView(){
   }
   h+='</div></div>';
   var rids=Object.keys(rmap).filter(function(id){return tot[id]||cur[id];}).sort(function(a,b){return (tot[b]||0)-(tot[a]||0);});
-  h+='<div class="card rc-tot"><div class="mem-h"><div class="mem-t"><em>total</em>루틴별 횟수</div><span class="mem-c">'+rids.length+'개</span></div>';
+  h+='<div class="jr-sec"><em>Total</em><span>루틴별 횟수 · '+rids.length+'개</span></div><div class="rc-tot">';
   if(!rids.length)h+='<div class="mem-ynote">아직 한 루틴 카드가 없어요. Today에서 루틴 카드를 추가하면 여기에 쌓여요.</div>';
   else h+=rids.map(function(id){
     var r=rmap[id],pr=r.rzProjectId?(S.projects||[]).find(function(p){return p.id===r.rzProjectId;}):null;
-    return '<div class="rc-row" style="--c:'+esc(tdCardColor(r))+'"><i></i><span class="rc-n">'+esc(r.task)+(pr?'<small>'+esc(pr.name||'')+'</small>':'')+'</span><span class="rc-m">이번 달 <b>'+(cur[id]||0)+'</b></span><span class="rc-a">전체 <b>'+(tot[id]||0)+'</b>번</span></div>';
+    return '<div class="rc-row" style="--c:'+esc(tdCardColor(r))+'"><i style="background-image:url(\''+esc(tdCardBg(r)).replace(/'/g,'%27')+'\')"></i><span class="rc-n">'+esc(r.task)+(pr?'<small>'+esc(pr.name||'')+'</small>':'')+'</span><span class="rc-m">이번 달 <b>'+(cur[id]||0)+'</b></span><span class="rc-a">전체 <b>'+(tot[id]||0)+'</b>번</span></div>';
   }).join('');
-  return h+'</div>';
+  return h+'</div></div>';
 }
 // 그날 Today 맨 위 네 구역(아침·오전·오후·저녁)에 적은 메모
 function rcZoneMemos(ds){
@@ -3942,8 +3953,8 @@ function rcDay(ds){
     return '<div class="rc-big" style="--wc:'+esc(tdCardColor(r))+';background-image:url(\''+esc(tdCardBg(r)).replace(/'/g,'%27')+'\')"><span class="tdt-ic">'+tdCardIcon(r.task)+'</span><b>'+esc(r.task)+'</b>'+(tdCardTag(r)?'<em>'+esc(tdCardTag(r))+'</em>':'')+'<u>'+esc(tm[r.id]||r.time||'')+'</u>'+(mm[r.id]?'<small>'+esc(mm[r.id])+'</small>':'')+'</div>';
   }).join('');
   openMo(parseInt(ds.slice(5,7),10)+'월 '+parseInt(ds.slice(8,10),10)+'일의 하루',
-    (memos?'<div class="rc-sec">하루 메모</div>'+memos:'')
-    +'<div class="rc-sec">타임라인</div>'+(tl||'<div class="mem-none">이 날 한 루틴이 없어요</div>'),
+    (memos?'<div class="rc-sec"><em>Memo</em>하루 메모</div>'+memos:'')
+    +'<div class="rc-sec"><em>Timeline</em>타임라인</div>'+(tl||'<div class="mem-none">이 날 한 루틴이 없어요</div>'),
     '<button class="btn bp" onclick="closeMo()">닫기</button>');
 }
 (function(){
@@ -3963,10 +3974,10 @@ function rcDay(ds){
     +'.rc-chip::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.04) 25%,rgba(0,0,0,.6))}'
     +'.rc-chip span{display:none}'
     +'.rc-more{flex:0 0 100%;font-size:10px;color:var(--t3)}'
-    +'.rc-sec{font-size:12px;color:var(--t3);letter-spacing:.04em;margin:4px 0 8px}'
-    +'.rc-zone{display:flex;border-radius:16px;background:#fff;box-shadow:0 0 0 1px var(--border,#eee);overflow:hidden;margin-bottom:10px}'
+    +'.rc-sec{font-size:12px;color:var(--cz-muted,var(--t3));margin:6px 0 10px;display:flex;align-items:baseline;gap:8px}.rc-sec em{font-family:"Instrument Serif","Noto Serif KR",Georgia,serif;font-style:italic;font-size:20px;color:var(--cz-deep,var(--text))}'
+    +'.rc-zone{display:flex;border-radius:16px;background:var(--cz-paper,#fff);box-shadow:0 0 0 1px var(--cz-line,#eee);overflow:hidden;margin-bottom:10px}'
     +'.rc-zp{flex:0 0 84px;background-size:cover;background-position:center;background-color:var(--tzc)}'
-    +'.rc-zb{flex:1;min-width:0;padding:10px 14px}.rc-zt{font-size:14px;color:var(--text);margin-bottom:4px}.rc-zt em{font-style:italic;font-size:12px;color:var(--t3);margin-right:6px}'
+    +'.rc-zb{flex:1;min-width:0;padding:10px 14px}.rc-zt{font-size:14px;color:var(--text);margin-bottom:4px}.rc-zt em{font-family:"Instrument Serif","Noto Serif KR",Georgia,serif;font-style:italic;font-size:14px;color:var(--cz-muted,var(--t3));margin-right:6px}'
     +'.rc-zx{font-size:13.5px;line-height:1.6;color:var(--text);white-space:normal;word-break:break-word}'
     +'.rc-big{position:relative;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;gap:3px;min-height:96px;padding:12px;margin-bottom:10px;border-radius:18px;background-color:var(--wc);background-size:cover;background-position:center;overflow:hidden;color:#fff}'
     +'.rc-big::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.06) 30%,rgba(0,0,0,.55))}.rc-big>*{position:relative}'
@@ -3976,6 +3987,21 @@ function rcDay(ds){
     +'.rc-row>i{width:10px;height:10px;border-radius:50%;background:var(--c);flex:none}'
     +'.rc-n{flex:1;min-width:0;font-size:14px;color:var(--text)}.rc-n small{display:block;font-size:11.5px;color:var(--t3);margin-top:1px}'
     +'.rc-m,.rc-a{font-size:12px;color:var(--t3);white-space:nowrap}.rc-m b,.rc-a b{color:var(--text);font-weight:600;font-size:14px}'
+    // 코지 색감: 저널과 같은 폭·배너, 달력은 따뜻한 종이색과 연한 선
+    +'.rc-tabs.dm-tabs{max-width:880px;margin:0 auto 14px}.page-dream .rc-tabs.dm-tabs,.page-timeline .rc-tabs.dm-tabs{max-width:none}'
+    +'.rc-tabs button{background:var(--cz-soft,var(--s2));color:var(--cz-muted,var(--t2))}.rc-tabs button.on{background:var(--cz-acc,var(--accent));color:#fff}'
+    +'.rc-pg .rc-cal{margin-top:0;background:var(--cz-paper,#fff);border-radius:22px;padding:14px;box-shadow:0 4px 18px rgba(120,80,60,.07),0 0 0 1px var(--cz-line,#eee)}'
+    +'.rc-pg .rc-grid{border-color:var(--cz-line,#eee);background:transparent;border-radius:12px;overflow:hidden}'
+    +'.rc-pg .rc-dow{font-family:"Instrument Serif","Noto Serif KR",Georgia,serif;font-style:italic;font-size:13px;color:var(--cz-muted,var(--t3));border-color:var(--cz-line,#eee);background:var(--cz-soft,#faf6f3)}'
+    +'.rc-pg .rc-dow.sun{color:var(--cz-acc,#c98b86)}.rc-pg .rc-dow.sat{color:#8FA3C4}'
+    +'.rc-pg .rc-c{border-color:var(--cz-line,#eee);background:#fff}.rc-pg .rc-c.emp{background:color-mix(in srgb,var(--cz-soft,#faf6f3) 55%,#fff)}'
+    +'.rc-pg .rc-c.has:hover{background:var(--cz-soft,#faf6f3)}'
+    +'.rc-pg .rc-c.today{background:var(--cz-soft,#faf6f3);box-shadow:inset 0 0 0 1.5px var(--cz-mid,var(--cz-acc))}'
+    +'.rc-pg .rc-d{font-family:"Instrument Serif","Noto Serif KR",Georgia,serif;font-size:14px;color:var(--cz-ink,var(--t2))}.rc-pg .rc-c.today .rc-d{color:var(--cz-acc,var(--accent))}'
+    +'.rc-pg .rc-chip{border-radius:6px;box-shadow:0 1px 3px rgba(80,50,40,.18)}.rc-pg .rc-chip::before{background:none}'
+    +'.rc-pg .rc-tot{background:var(--cz-paper,#fff);border-radius:22px;padding:6px 18px;box-shadow:0 4px 18px rgba(120,80,60,.07),0 0 0 1px var(--cz-line,#eee)}'
+    +'.rc-pg .rc-row{border-color:var(--cz-line,#eee)}.rc-pg .rc-row>i{width:34px;height:34px;border-radius:10px;background-color:var(--c);background-size:cover;background-position:center}'
+    +'.rc-pg .rc-m b,.rc-pg .rc-a b{color:var(--cz-deep,var(--text))}'
     +'@media(max-width:600px){.rc-c{min-height:64px;padding:2px;gap:2px}.rc-chip{width:calc(25% - 1.5px);border-radius:2px}}';
   document.head.appendChild(st);
 })();
@@ -4335,7 +4361,7 @@ function render(){
   const div=document.createElement('div');
   div.className='pc'+(page==='timeline'?' pc-wide':'');
   if(page==='dream') div.innerHTML=dmTabs()+renderDream();
-  else if(page==='routinecal') div.innerHTML='<div class="mem">'+rcView()+'</div>';
+  else if(page==='routinecal') div.innerHTML=jrTabs()+'<div class="mem">'+rcView()+'</div>';
   else if(page==='dreamArea') div.innerHTML=renderDreamArea();
   else if(page==='memories') div.innerHTML=renderMemories();
   else if(page==='today') div.innerHTML=renderToday();
@@ -4353,7 +4379,7 @@ function render(){
   else if(page==='ledger') div.innerHTML=renderLedger();
   else if(page==='ledgerYear') div.innerHTML=renderLedgerYear();
   else if(page==='insights') div.innerHTML=renderInsights();
-  else if(page==='journal') div.innerHTML=renderJournal();
+  else if(page==='journal') div.innerHTML=jrTabs()+renderJournal();
   else if(page==='timeline') div.innerHTML=dmTabs()+renderTimeline();
   el.innerHTML=''; el.appendChild(div);
   if(document.body.classList.contains('theme-spiral')){spiralDeco();try{spiralWobble();}catch(e){}}
@@ -5112,7 +5138,7 @@ function czObj(kind,id){
   if(kind==='dreamArea') return dreamData().areas[id]||null;
   if(kind==='wish'){ var ps=String(id).split('~'),ar=dreamData().areas[ps[0]]; return ar?(ar.wants||[]).find(function(w){return w.id===ps[1];})||null:null; }
   if(kind==='ledger'){ if(!S.ledgerBanner||typeof S.ledgerBanner!=='object')S.ledgerBanner={id:'ledger'}; return S.ledgerBanner; }
-  if(kind==='ledgerCal'||kind==='memories'||kind==='ledgerSet'||kind==='settingsPage'||kind==='ledgerAssets'||kind==='roadmap'||kind==='overview'||kind==='savings'||kind==='routine'||kind==='deadlines'||kind==='insights'||kind==='journal'||kind==='monthly'||kind==='todoMonth'||kind==='diaryMonth'){ if(!S.banners||typeof S.banners!=='object')S.banners={}; if(!S.banners[kind])S.banners[kind]={id:kind}; return S.banners[kind]; }
+  if(kind==='ledgerCal'||kind==='memories'||kind==='ledgerSet'||kind==='settingsPage'||kind==='ledgerAssets'||kind==='roadmap'||kind==='overview'||kind==='savings'||kind==='routine'||kind==='deadlines'||kind==='insights'||kind==='journal'||kind==='routinecal'||kind==='monthly'||kind==='todoMonth'||kind==='diaryMonth'){ if(!S.banners||typeof S.banners!=='object')S.banners={}; if(!S.banners[kind])S.banners[kind]={id:kind}; return S.banners[kind]; }
   return null;
 }
 var _czTarget=null;

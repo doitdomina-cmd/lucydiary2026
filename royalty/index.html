@@ -10097,13 +10097,14 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                 _wkSig = sig;
                 const groups = {};   // 선택자 앞부분+N → [{k, css, hue}]
                 const nthRe = /^(.*#write-calendar-body\[data-card="[^"]+"\]) > div:nth-child\((\d)n(?:\+(\d))?\) \.cal-selectable$/;
+                const nthRe2 = /^(.*#master-works-by-genre-container\[data-card="[^"]+"\]) > div\.bg-white:nth-child\((\d)n(?:\+(\d))?\)$/;
                 const walk = rules => { for (const r of rules) {
                     if (r.cssRules && !r.selectorText) { walk(r.cssRules); continue; }
-                    if (!r.selectorText || r.selectorText.indexOf('#write-calendar-body') < 0 || r.selectorText.indexOf('nth-child') < 0) continue;
+                    if (!r.selectorText || (r.selectorText.indexOf('#write-calendar-body') < 0 && r.selectorText.indexOf('#master-works-by-genre-container') < 0) || r.selectorText.indexOf('nth-child') < 0) continue;
                     const css = r.style.cssText, hex = _colorToHex(r.style.backgroundColor) || (() => { const a = css.match(/#[0-9a-f]{6}/ig); return a ? a[a.length - 1] : null; })();
                     r.selectorText.split(/,(?![^()]*\))/).forEach(part => {
-                        const m = nthRe.exec(part.trim()); if (!m) return;
-                        const key = m[1] + '|' + m[2];
+                        const t = part.trim(); let m = nthRe.exec(t), sfx = ' div.cal-selectable'; if (!m) { m = nthRe2.exec(t); sfx = ' > div.bg-white'; } if (!m) return;
+                        const key = m[1] + sfx + '|' + m[2];
                         (groups[key] = groups[key] || []).push({ k: m[3] === undefined ? 0 : Number(m[3]), css, hue: _hueOf(hex) });
                     });
                 } };
@@ -10119,11 +10120,72 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                     const gAssign = {}, used = new Set();
                     pairs.forEach(p => { if (gAssign[p.gi] === undefined && !used.has(p.ei)) { gAssign[p.gi] = p.ei; used.add(p.ei); } });
                     pairs.forEach(p => { if (gAssign[p.gi] === undefined) gAssign[p.gi] = p.ei; });   // 색이 모자라면 가장 가까운 색을 같이 쓴다
-                    gl.forEach((g, gi) => { const e = ents[gAssign[gi]]; if (e) out.push(prefix + ' div.cal-selectable[data-gi="' + gi + '"] { ' + e.css + ' }'); });
+                    gl.forEach((g, gi) => { const e = ents[gAssign[gi]]; if (e) out.push(prefix + '[data-gi="' + gi + '"] { ' + e.css + ' }'); });
                 });
+                // 등록된 작품 목록·작품 관리·웹툰 관리 카드 바탕색: 테마가 :is(...):nth-child(4n+K) 로 돌려 칠하는 색(!important)을 장르별로 고정
+                {
+                    const isRe = /^(body\.theme-[\w.-]+) :is\((.*)\):nth-child\((?:\d)n(?:\+\d)?\)$/;
+                    const grp = {};
+                    const walkIs = rules => { for (const r of rules) {
+                        if (r.cssRules && !r.selectorText) { walkIs(r.cssRules); continue; }
+                        if (!r.selectorText || !r.style || r.selectorText.indexOf('#master-works-by-genre-container') < 0 || r.selectorText.indexOf(':is(') < 0) continue;
+                        if (r.style.getPropertyPriority('background-color') !== 'important' && r.style.getPropertyPriority('background') !== 'important') continue;
+                        const css = r.style.cssText;
+                        const bgc = _colorToHex(r.style.backgroundColor) || (css.match(/#[0-9a-f]{6}/ig) || []).pop() || _colorToHex((css.match(/rgb\([^)]*\)/g) || []).pop());
+                        r.selectorText.split(/,(?![^()]*\))(?= *body)/).forEach(part => {
+                            const m = isRe.exec(part.trim()); if (!m) return;
+                            const nth = /\((?:\d)n(?:\+(\d))?\)$/.exec(part.trim());
+                            const key = m[1] + '||' + m[2];
+                            (grp[key] = grp[key] || []).push({ css, hue: _hueOf(bgc) });
+                        });
+                    } };
+                    for (const sh of document.styleSheets) { if (sh.ownerNode && sh.ownerNode.id === 'wk-color-rules') continue; try { walkIs(sh.cssRules); } catch (e) {} }
+                    Object.keys(grp).forEach(key => {
+                        const [pre, list] = key.split('||'); const ents = grp[key];
+                        const targets = [];
+                        if (list.indexOf('#master-works-by-genre-container > div.bg-white') >= 0) targets.push('#master-works-by-genre-container > div.bg-white');
+                        if (list.indexOf('#workmanage-list [onclick^="openWorkManageModal"]') >= 0) targets.push('#workmanage-list div[onclick^="openWorkManageModal"]');
+                        if (list.indexOf('#webtoon-manage-list [onclick^="openWebtoonManageModal"]') >= 0) targets.push('#webtoon-manage-list div[onclick^="openWebtoonManageModal"]');
+                        if (!targets.length || ents.length < 3) return;
+                        const pairs = [];
+                        gl.forEach((g, gi) => { const gh = _hueOf(g.color); ents.forEach((e, ei) => pairs.push({ gi, ei, d: (gh === null || e.hue === null) ? 999 : _hueDist(gh, e.hue) })); });
+                        pairs.sort((a, b) => a.d - b.d);
+                        const asg = {}, used = new Set();
+                        pairs.forEach(p => { if (asg[p.gi] === undefined && !used.has(p.ei)) { asg[p.gi] = p.ei; used.add(p.ei); } });
+                        pairs.forEach(p => { if (asg[p.gi] === undefined) asg[p.gi] = p.ei; });
+                        gl.forEach((g, gi) => { const e = ents[asg[gi]]; if (e) out.push(targets.map(t => pre + ' ' + t + '[data-gi="' + gi + '"]').join(', ') + ' { ' + e.css + ' }'); });
+                    });
+                }
+                // 등록된 작품 목록·작품 관리·웹툰 관리 카드: 테마가 5색을 돌려 칠하는 '--cr' 색도 장르 색(색상이 가까운 파스텔)으로 고정
+                const skinT = ['label', 'spiral', 'polaroid', 'postcard', 'retro', 'gaming'].find(k => document.body.classList.contains('theme-' + k));
+                if (skinT) {
+                    const pal = {};
+                    const scan = rules => { for (const r of rules) {
+                        if (r.cssRules && !r.selectorText) { scan(r.cssRules); continue; }
+                        if (!r.selectorText || !r.style || r.selectorText.indexOf('theme-' + skinT + ' .cozy-polaroid') < 0) continue;
+                        const v = r.style.getPropertyValue('--cr').trim(); if (!v) continue;
+                        r.selectorText.split(/,(?![^()]*\))/).forEach(part => {
+                            const t = part.trim(), m = /\.cozy-polaroid(?::nth-child\(5n(?:\+(\d))?\))?$/.exec(t), ok = t.indexOf('body.theme-' + skinT + ' ') === 0 || t.indexOf('body.theme-cozy.theme-' + skinT + ' ') === 0;
+                            if (m && ok) pal[m[0].indexOf('nth-child') < 0 ? 'base' : (m[1] === undefined ? '0' : m[1])] = v;   // 5n+1 에 해당하는 기본색 / 5n+K / 5n 을 구분
+                        });
+                    } };
+                    for (const sh of document.styleSheets) { if (sh.ownerNode && sh.ownerNode.id === 'wk-color-rules') continue; try { scan(sh.cssRules); } catch (e) {} }
+                    const ents = Object.values(pal).map(c => ({ c, hue: _hueOf(c) }));
+                    if (ents.length >= 3) {
+                        const pairs = [];
+                        gl.forEach((g, gi) => { const gh = _hueOf(g.color); ents.forEach((e, ei) => pairs.push({ gi, ei, d: (gh === null || e.hue === null) ? 999 : _hueDist(gh, e.hue) })); });
+                        pairs.sort((a, b) => a.d - b.d);
+                        const asg = {}, used = new Set();
+                        pairs.forEach(p => { if (asg[p.gi] === undefined && !used.has(p.ei)) { asg[p.gi] = p.ei; used.add(p.ei); } });
+                        pairs.forEach(p => { if (asg[p.gi] === undefined) asg[p.gi] = p.ei; });
+                        const P = 'body.theme-cozy.theme-' + skinT;
+                        gl.forEach((g, gi) => { const e = ents[asg[gi]]; if (e) out.push(P + ' #master-works-by-genre-container > div[data-gi="' + gi + '"], ' + P + ' #workmanage-list [onclick^="openWorkManageModal"][data-gi="' + gi + '"], ' + P + ' #webtoon-manage-list [onclick^="openWebtoonManageModal"][data-gi="' + gi + '"] { --cr: ' + e.c + '; }'); });
+                    }
+                }
                 let st = document.getElementById('wk-color-rules');
                 if (!st) { st = document.createElement('style'); st.id = 'wk-color-rules'; document.head.appendChild(st); }
                 st.textContent = out.join(' ');
+                document.head.appendChild(st);   // 같은 우선순위에서는 나중 규칙이 이기므로, 테마 스타일이 새로 깔린 뒤에도 항상 맨 끝에 둔다
             } catch (e) { console.error(e); }
         }
         function applyThemeClass(theme) {
@@ -13007,7 +13069,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                     : '';
                 const extrasRow = `<div class="text-[12px] font-normal text-slate-500 truncate min-h-[16px]" title="${extrasNames}">${extrasNames}</div>`;
                 const editingBorder = cardClass;
-                container.innerHTML += `<div class="rounded-xl p-3.5 transition-all group flex flex-col gap-2 relative overflow-hidden cursor-pointer ${cardClass}" ${cardBgStyle} onclick="viewWork('${w.id}')">
+                container.innerHTML += `<div class="rounded-xl p-3.5 transition-all group flex flex-col gap-2 relative overflow-hidden cursor-pointer ${cardClass}" data-gi="${Math.max(0, genreList.findIndex(g => g.name === w.genre))}" ${cardBgStyle} onclick="viewWork('${w.id}')">
                     ${isSelected ? '<div class="absolute top-0 left-0 w-full h-0.5" style="background:var(--primary)"></div>' : ''}
                     <div class="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2 bg-white/90 backdrop-blur-sm rounded-bl-xl z-10">
                         <button onclick="event.stopPropagation();deleteWork('${w.id}')" class="text-slate-400 hover:text-red-600 text-xs" title="삭제"><i class="fa-solid fa-trash"></i></button>
@@ -13280,7 +13342,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                 ? (pubName ? `${studioName} (${pubName})` : studioName)
                 : (pubName ? `(${pubName})` : '');
 
-            return `<div onclick="openWebtoonManageModal('${w.id}')" style="background-color:#ffffff; --pen:${penColor || '#E3D5B5'}" class="rounded-xl border border-slate-200 p-4 cursor-pointer hover:shadow-md hover:border-emerald-300 transition-all relative group overflow-hidden">
+            return `<div onclick="openWebtoonManageModal('${w.id}')" data-gi="${Math.max(0, genreList.findIndex(g => g.name === w.genre))}" style="background-color:#ffffff; --pen:${penColor || '#E3D5B5'}" class="rounded-xl border border-slate-200 p-4 cursor-pointer hover:shadow-md hover:border-emerald-300 transition-all relative group overflow-hidden">
                     ${headerBlock}
                     <div style="background-color:${bodyBg}" class="-mx-4 -mb-4 px-4 pb-4 pt-2.5 mt-1.5 rounded-b-xl">
                     <div class="space-y-1.5 text-[13px]">
@@ -14023,7 +14085,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                         ${penDateRow}
                     </div>`;
             }
-            return `<div onclick="openWorkManageModal('${w.id}')" style="background-color:#ffffff; --pen:${genreColor || '#E3D5B5'}" class="rounded-xl border border-slate-200 p-4 cursor-pointer hover:shadow-md hover:border-emerald-300 transition-all relative group overflow-hidden">
+            return `<div onclick="openWorkManageModal('${w.id}')" data-gi="${Math.max(0, genreList.findIndex(g => g.name === w.genre))}" style="background-color:#ffffff; --pen:${genreColor || '#E3D5B5'}" class="rounded-xl border border-slate-200 p-4 cursor-pointer hover:shadow-md hover:border-emerald-300 transition-all relative group overflow-hidden">
                     ${headerBlock}
                     <div style="background-color:${bodyBg}" class="-mx-4 -mb-4 px-4 pb-4 pt-2.5 mt-1.5 rounded-b-xl">
                     <div class="space-y-1.5 text-[13px]">

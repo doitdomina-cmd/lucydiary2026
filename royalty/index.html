@@ -674,6 +674,8 @@ body.theme-spiral .grid.grid-cols-7:has(+ :is(#publish-cal-body, :is(#task-calen
         @media (max-width: 767px) { body.theme-label .cozy-hero .left { flex: 1 1 100%; max-width: 100%; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; } body.theme-label .cozy-hero .title { font-size: 44px; max-width: 100%; } body.theme-label .cozy-hero .eyebrow { max-width: 100%; } }
         /* 스프링노트 기준 누락분: h2 제목, 달력 오늘 숫자, 카드 안 표 초록 글자, 사이드바 흰 글자, 인사이트 안쪽 카드, 🎨 디자인 버튼 */
         body.theme-label .tab-content h2, body.theme-label .modal-content h2 { font-family: 'Gaegu', 'Gowun Dodum', cursive !important; font-style: normal !important; font-weight: 700 !important; letter-spacing: 0 !important; color: var(--lb-ink) !important; font-size: 1.6rem; line-height: 1.25; word-break: keep-all; }
+        /* 출간 일정 달력 날짜 동그라미: 스케줄 관리 달력과 같은 모양, 색은 노랑 계열 (모든 테마. 견출지는 아래 규칙이 파스텔 노랑으로 덮는다) */
+        body.theme-cozy #publish-cal-body .pc-num:not(.pc-today) { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding: 0 4px; border-radius: 999px; background: color-mix(in srgb, #F2B134 78%, #ffffff); color: #FFFFFF !important; }
         /* 달력 날짜 숫자 동그라미: 달력마다 한 가지 파스텔 견출 스티커 — 출간 일정=노랑, 스케줄=분홍, 집필·글자수=노랑 */
         body.theme-label :is(#publish-cal-body, :is(#task-calendar-body, #rs-vcal-body), #write-calendar-body, #w-calendarBody) .pc-num:not(.pc-today) { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding: 0 4px; border-radius: 999px; background: #FCE5A0 !important; color: var(--lb-ink) !important; outline: 1.2px dashed rgba(74,64,54,.5); outline-offset: -2px; box-shadow: 0 1px 2px rgba(60,45,25,.15); }
         body.theme-label :is(#task-calendar-body, #rs-vcal-body) .pc-num:not(.pc-today) { background: #F8C8CC !important; }
@@ -17937,8 +17939,32 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             { k: 'pen', n: '펜글씨', f: "'Nanum Pen Script',sans-serif" },
             { k: 'ink', n: '하이멜로디', f: "'Hi Melody',sans-serif" },
             { k: 'single', n: '싱글데이', f: "'Single Day',sans-serif" },
-            { k: 'dodum', n: '고운돋움', f: "'Gowun Dodum',sans-serif" }
+            { k: 'dodum', n: '고운돋움', f: "'Gowun Dodum',sans-serif" },
+            // 설정 > 본문 글꼴 목록(APP_FONTS)에 있는 나머지 글씨체도 전부 고를 수 있게 (이미 위에 있는 건 제외)
+            { k: 'notosans', n: '노토 산스', f: "'Noto Sans KR',sans-serif" },
+            { k: 'nanumgothic', n: '나눔고딕', f: "'Nanum Gothic',sans-serif" },
+            { k: 'gowunbatang', n: '고운바탕', f: "'Gowun Batang',serif" },
+            { k: 'myeongjo', n: '나눔명조', f: "'Nanum Myeongjo',serif" },
+            { k: 'jua', n: '주아', f: "'Jua',sans-serif" },
+            { k: 'poorstory', n: '푸어스토리', f: "'Poor Story',cursive" },
+            { k: 'yeonsung', n: '연성', f: "'Yeon Sung',cursive" },
+            { k: 'kirang', n: '기랑해랑', f: "'Kirang Haerang',cursive" },
+            { k: 'gamja', n: '감자꽃', f: "'Gamja Flower',cursive" }
         ];
+        // 카드 글씨체 규칙: 모든 테마에서 같은 방식으로 먹도록 한 번에 만들어 넣는다 (디자인이 깐 손글씨체보다 우선)
+        (function () {
+            const css = DDAY_FONTS.filter(o => o.k !== 'auto').map(o => {
+                const k = o.k, f = o.f, d = `[data-font="${k}"][data-font="${k}"]`;
+                return `body #publish-cal-body${d} [draggable="true"], body #publish-cal-body${d} [draggable="true"] *:not(i),` +
+                    `body :is(#task-calendar-body, #rs-vcal-body)${d} .cal-selectable, body :is(#task-calendar-body, #rs-vcal-body)${d} .cal-selectable *:not(i),` +
+                    `body #write-calendar-body${d} .cal-selectable, body #write-calendar-body${d} .cal-selectable *:not(i),` +
+                    `body #write-calendar-body${d} .write-span-bar, body #write-calendar-body${d} .write-span-bar *:not(i),` +
+                    `body #year-timeline-content${d}, body #year-timeline-content${d} *:not(i),` +
+                    `body #master-works-by-genre-container${d} > div, body #master-works-by-genre-container${d} > div *:not(i),` +
+                    `body :is(#publish-dday-list, #task-dday-list, #rs-vlist)${d} > div, body :is(#publish-dday-list, #task-dday-list, #rs-vlist)${d} > div *:not(i) { font-family: ${f} !important; font-style: normal !important; }`;
+            }).join(' ');
+            const st = document.createElement('style'); st.id = 'dday-font-rules'; st.textContent = css; document.head.appendChild(st);
+        })();
         function ddayMute(c) { try {
             const cl = document.body.classList;
             if (cl.contains('theme-label')) return chartWarmPastel(c);   // 견출지: 회색빛 대신 따뜻한 파스텔

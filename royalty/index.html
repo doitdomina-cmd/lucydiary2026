@@ -745,8 +745,9 @@ body.theme-spiral .grid.grid-cols-7:has(+ :is(#publish-cal-body, :is(#task-calen
         body.theme-cozy #publish-cal-body .pc-num:not(.pc-today) { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding: 0 4px; border-radius: 999px; background: color-mix(in srgb, #F2B134 78%, #ffffff); color: #FFFFFF !important; }
         /* 집필 달력 기간 일정 막대: 누런 칙칙한 색 대신 카드와 같은 분홍·노랑·연두·하늘 파스텔 견출지 띠 */
         body.theme-label #write-calendar-body .write-span-bar:not([data-pat]) { outline: 1.4px dashed rgba(74,64,54,.45); outline-offset: -3px; color: var(--lb-ink) !important; box-shadow: 0 1px 3px rgba(60,45,25,.14) !important; }
-        body.theme-label #write-calendar-body .write-span-bar:not([data-pat])[data-ri="0"] { background: #F9D3D3 !important; } body.theme-label #write-calendar-body .write-span-bar:not([data-pat])[data-ri="1"] { background: #FCEBB4 !important; }
-        body.theme-label #write-calendar-body .write-span-bar:not([data-pat])[data-ri="2"] { background: #CDE8D6 !important; } body.theme-label #write-calendar-body .write-span-bar:not([data-pat])[data-ri="3"] { background: #CBE3F4 !important; }
+       
+       
+        body.theme-label #write-calendar-body .write-span-bar:not([data-pat]) { background: var(--lbs, #FCEFC4) !important; }
         body.theme-label #write-calendar-body .write-span-bar:not([data-pat]) * { color: var(--lb-ink) !important; }
         /* 달력 날짜 숫자 동그라미: 달력마다 한 가지 파스텔 견출 스티커 — 출간 일정=노랑, 스케줄=분홍, 집필·글자수=노랑 */
         body.theme-label :is(#publish-cal-body, :is(#task-calendar-body, #rs-vcal-body), #write-calendar-body, #w-calendarBody) .pc-num:not(.pc-today) { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding: 0 4px; border-radius: 999px; background: #FCE5A0 !important; color: var(--lb-ink) !important; outline: 1.2px dashed rgba(74,64,54,.5); outline-offset: -2px; box-shadow: 0 1px 2px rgba(60,45,25,.15); }
@@ -21788,6 +21789,15 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             const S = Math.min(0.78, Math.max(0.62, sat * 1.8)), L = Math.min(0.80, Math.max(0.72, l * 0.92));
             return 'hsl(' + Math.round(h) + ', ' + Math.round(S * 100) + '%, ' + Math.round(L * 100) + '%)';
         }
+        // 견출지: 고른 막대 색을 같은 색상의 견출지 파스텔(분홍·노랑·연두·하늘…)로. 회색 계열은 버터색
+        function labelSpanPastel(hex) {
+            const m = /^#?([0-9a-f]{6})$/i.exec(hex || ''); if (!m) return '#FCEFC4';
+            const r = parseInt(m[1].slice(0, 2), 16) / 255, g = parseInt(m[1].slice(2, 4), 16) / 255, b = parseInt(m[1].slice(4, 6), 16) / 255;
+            const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; let h = 0;
+            if (d) { h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h *= 60; if (h < 0) h += 360; }
+            if (d < 0.07) return '#EFE6D2';
+            return 'hsl(' + Math.round(h) + ', 62%, 87%)';
+        }
         function spanColorSolid(color) {
             if (typeof color === 'string' && color.indexOf('gradient') > -1) {
                 const m = color.match(/#[0-9a-fA-F]{6}/);
@@ -22131,6 +22141,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                         font-family:'Pretendard','Apple SD Gothic Neo',sans-serif; font-size:11px; font-weight:600; color:#475569;
                         letter-spacing:0.4px; word-spacing:1px;
                         box-shadow:0 1px 2px rgba(0,0,0,0.06);`;
+                    bar.style.setProperty('--lbs', labelSpanPastel(spanColorSolid(s.color)));
                     bar.title = label + (s.memo ? `\n${s.memo}` : '');
                     if (typeof s.color === 'string' && s.color.indexOf('gradient') > -1) { bar.dataset.pat = '1'; bar.style.setProperty('--bgo', s.color); }   // 무늬 색은 테마가 단색으로 덮지 않게 표시
                     // 첫 조각에만 전체 정보를 쓰고, 이어지는 조각은 제목만 간단히

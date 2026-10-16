@@ -1289,6 +1289,30 @@ nav.mtabs { display: none; }
     nav.mtabs button span { font-size: 18px; line-height: 1; }
     nav.mtabs button.on { color: var(--accent); font-weight: 700; }
     body.focus-mode main { height: calc(100% - 54px); }
+    /* 키보드가 올라와도 화면 높이를 '보이는 영역'에 맞춰서 원고가 키보드/아래 막대에 가려지지 않고 스크롤되게 */
+    html, body { height: var(--vvh, 100%); }
+    body { position: fixed; left: 0; right: 0; top: 0; width: 100%; }
+    main, .col, #col-editor { overflow: hidden; }
+    body.kb-open nav.mtabs { display: none; }
+    body.kb-open main { height: calc(var(--vvh, 100%) - 82px); }
+    body.focus-mode.kb-open main { height: var(--vvh, 100%); }
+    .ed-wrap { -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; }
+
+    /* 집필모드(폰): 흰 원고 화면 + 맨 위 회차 이름 + 글자 수만 */
+    body.focus-mode header, body.focus-mode .toolbar, body.focus-mode nav.mtabs, body.focus-mode .reveal-zone,
+    body.focus-mode .fstrip, body.focus-mode .crumb, body.focus-mode .outline { display: none !important; }
+    body.focus-mode main { height: 100%; }
+    body.focus-mode.kb-open main { height: 100%; }
+    body.focus-mode .pane-head { padding: 6px 44px 6px 14px; min-height: 36px; background: var(--paper); border-bottom: 0; }
+    body.focus-mode .pane-head .mini, body.focus-mode .pane-head .tab .x, body.focus-mode .pane-head .tab:not(.on) { display: none !important; }
+    body.focus-mode .pane-head .tabs { overflow: hidden; }
+    body.focus-mode .pane-head .tab { border: 0; background: transparent; padding: 0; max-width: none; }
+    body.focus-mode .pane-head select { font-size: 13px; color: var(--muted); -webkit-appearance: none; appearance: none; padding: 0; pointer-events: none; }
+    body.focus-mode .epane-foot { justify-content: center; gap: 14px; padding: 6px 10px; background: var(--paper); border-top: 0; }
+    body.focus-mode .epane-foot > *:nth-child(n+3) { display: none !important; }
+    body.focus-mode .focus-dock { top: calc(4px + env(safe-area-inset-top)); right: 6px; bottom: auto; }
+    body.focus-mode .focus-dock [data-fv] { display: none; }
+    body.focus-mode .focus-exit { opacity: .7; font-size: 14px; padding: 4px 10px; }
 }
 </style>
 </head>
@@ -2953,6 +2977,18 @@ $('#mtabs').addEventListener('click', e => {
     pref.mtab = b.dataset.tab; savePref(); renderHeader(); navSync();
 });
 
+/* 폰: 키보드가 올라오면 '보이는 화면 높이'에 앱 높이를 맞춤 (원고가 가려지거나 스크롤 안 되는 문제 방지) */
+(function () {
+    const vv = window.visualViewport; if (!vv) return; let full = 0;
+    const fit = () => {
+        document.documentElement.style.setProperty('--vvh', Math.round(vv.height) + 'px');
+        full = Math.max(full, innerHeight, vv.height); document.body.classList.toggle('kb-open', isPhone() && vv.height < full - 120);
+        if (window.scrollY || vv.offsetTop) window.scrollTo(0, 0);
+        ['main', '#col-editor'].forEach(q => { const e = document.querySelector(q); if (e && e.scrollTop) e.scrollTop = 0; });
+        const m = document.activeElement; if (m && m.classList && m.classList.contains('manuscript')) { try { const r = getSelection().getRangeAt(0).getBoundingClientRect(), w = m.closest('.ed-wrap'); if (w && r.height) { const wr = w.getBoundingClientRect(); if (r.bottom > wr.bottom - 24) w.scrollTop += r.bottom - wr.bottom + 60; } } catch (_) {} }
+    };
+    vv.addEventListener('resize', fit); vv.addEventListener('scroll', fit); addEventListener('orientationchange', () => setTimeout(fit, 300)); fit();
+})();
 /* 원고만 보기 */
 function toggleFocus(on) {
     const want = on ?? !document.body.classList.contains('focus-mode');

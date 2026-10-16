@@ -5578,7 +5578,7 @@ function openSpell(docId) {
         if (t.dataset.x === 'ai') {
             t.disabled = true; t.innerHTML = '<i class="ic ic-sparkles"></i> AI가 읽는 중… (몇 초~수십 초)';
             aiSpellCheck(ed).then(n => { render(); refreshLiveSpell(); const m = $('.spell-ai-msg', bg); if (m) m.textContent = n ? `AI가 ${n}군데를 더 찾았어요.` : 'AI도 더 찾은 곳이 없어요.'; })
-                .catch(err => { render(); const m = $('.spell-ai-msg', bg); if (m) { m.textContent = (AI_ERR_MSG[err.code] || 'AI 검사를 하지 못했어요.'); m.style.color = 'var(--danger)'; } });
+                .catch(err => { render(); const m = $('.spell-ai-msg', bg); if (m) { m.textContent = (err.code === 'quota' ? aiQuotaMsg(err) : AI_ERR_MSG[err.code] || 'AI 검사를 하지 못했어요.'); m.style.color = 'var(--danger)'; } });
             return;
         }
         const fs = bg._fs;
@@ -6715,7 +6715,7 @@ async function aiJson(prompt, tier = 'best') {
         // 하루 무료 횟수를 다 쓰면(429) 그 모델은 풀릴 때까지 건너뛰고 다음 모델로
         const models = tier === 'lite' ? ['gemini-flash-lite-latest', 'gemini-3.5-flash-lite', 'gemini-3.8-flash']
             : ['gemini-3.8-flash', 'gemini-flash-lite-latest', 'gemini-3.5-flash-lite'];
-        let busy = false, quota = false;
+        let busy = false, quota = false, freeTier = false;
         for (let round = 0; round < 2; round++) {
             if (round) await new Promise(res => setTimeout(res, 2500));
             for (const model of models) {
@@ -6728,6 +6728,7 @@ async function aiJson(prompt, tier = 'best') {
                 if (r.status === 503 || r.status === 500) { busy = true; continue; }
                 if (r.status === 429) {
                     const t = await r.text();
+                    if (/free_?tier/i.test(t)) freeTier = true;   // 구글이 이 키를 '무료 등급'으로 보고 있다는 뜻 (결제 연결이 안 된 키)
                     if (/per ?day|PerDay|free_tier_requests|retry in \d+h/i.test(t)) { markGeminiExhausted(model, t); quota = true; } else busy = true;
                     continue;
                 }
@@ -6737,7 +6738,7 @@ async function aiJson(prompt, tier = 'best') {
             }
             if (!busy) break;
         }
-        throw busy ? aiErr('busy') : quota ? aiErr('quota') : aiErr('http', '쓸 수 있는 Gemini 모델을 찾지 못했어요.');
+        throw busy ? aiErr('busy') : quota ? aiErr('quota', freeTier ? 'free' : '') : aiErr('http', '쓸 수 있는 Gemini 모델을 찾지 못했어요.');
     }
     const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -6748,7 +6749,11 @@ async function aiJson(prompt, tier = 'best') {
     const j = await r.json();
     return parseJsonLoose((j.content || []).map(c => c.text || '').join(''));
 }
-const AI_ERR_MSG = { not_granted: 'AI 추천을 허용하지 않아서 내장 사전만 보여 드려요.', rate_limited: '잠깐 뒤에 다시 눌러 주세요.', bad_key: 'AI 키가 맞지 않아요. 설정에서 키를 확인해 주세요.', credit: 'AI 키의 사용 한도(크레딧)가 남아 있지 않아요.', no_key: '설정에서 AI 키를 넣어 주세요.', busy: '지금 Gemini 쪽이 붐벼요. 잠깐 뒤에 다시 눌러 주세요.', quota: '오늘 Gemini 무료 사용량을 다 썼어요. 내일 다시 돼요.' };
+const AI_ERR_MSG = { not_granted: 'AI 추천을 허용하지 않아서 내장 사전만 보여 드려요.', rate_limited: '잠깐 뒤에 다시 눌러 주세요.', bad_key: 'AI 키가 맞지 않아요. 설정에서 키를 확인해 주세요.', credit: 'AI 키의 사용 한도(크레딧)가 남아 있지 않아요.', no_key: '설정에서 AI 키를 넣어 주세요.', busy: '지금 Gemini 쪽이 붐벼요. 잠깐 뒤에 다시 눌러 주세요.', quota: '오늘 Gemini 사용량을 다 썼어요. 내일 다시 돼요.' };
+// 한도 안내: 구글이 '무료 키'로 본 경우엔 이유와 해결법까지 (Gemini 앱 구독 ≠ API 결제)
+const aiQuotaMsg = err => err && err.message === 'free'
+    ? '구글이 이 키를 무료 키로 보고 있어서 하루 횟수가 적어요. Gemini 앱(Google AI Pro) 구독과 API 결제는 따로예요. AI Studio → 키 옆 "결제 설정"에서 이 키의 프로젝트에 결제를 연결해야 유료 한도가 돼요.'
+    : AI_ERR_MSG.quota;
 async function synAskAI(context, phrase, avoid) {
     if (!aiReady()) return null;
     const prompt = `너는 한국 웹소설 작가의 문장 다듬기 도우미야. 아래 문단에서 [[ ]]로 표시한 표현 대신 쓸 수 있는 표현을 5개 제안해.
@@ -6793,7 +6798,7 @@ function openSynPop(ed, range, match) {
             aiBox.innerHTML = list && list.length ? `<div class="syn-head"><i class="ic ic-sparkles"></i> AI 추천</div>${list.map(opt).join('')}` : '<div class="syn-none">추천을 받지 못했어요.</div>';
         } catch (e) {
             if (!pop.isConnected) return;
-            aiBox.innerHTML = `<div class="syn-none">${(e && AI_ERR_MSG[e.code]) || 'AI 추천을 받지 못했어요.'}</div>`;
+            aiBox.innerHTML = `<div class="syn-none">${(e && (e.code === 'quota' ? aiQuotaMsg(e) : AI_ERR_MSG[e.code])) || 'AI 추천을 받지 못했어요.'}</div>`;
         }
     };
     synSampleReady.then(s => {
@@ -7459,7 +7464,7 @@ ${fresh.join('\n')}`, pref.aiPaid ? 'best' : 'lite');
         if (err.code === 'rate_limited' || err.code === 'busy') aiAutoPauseUntil = Date.now() + 60000;
         else if (err.code === 'quota') {
             aiAutoPauseUntil = Math.min(...Object.values(pref.aiExhausted || {}).filter(t => t > Date.now()), Date.now() + 6 * 3600000);
-            if (!aiAutoWarned) { aiAutoWarned = true; toast('오늘 Gemini 무료 사용량을 다 써서 AI 맞춤법 자동 검사를 쉬어요. 내일 다시 이어서 해요.'); }
+            if (!aiAutoWarned) { aiAutoWarned = true; toast(err.message === 'free' ? aiQuotaMsg(err) : '오늘 Gemini 사용량을 다 써서 AI 맞춤법 자동 검사를 쉬어요. 내일 다시 이어서 해요.'); }
         }
         else if (err.code === 'credit' || err.code === 'bad_key' || err.code === 'not_granted') {
             aiAutoPauseUntil = Date.now() + 30 * 60000;
@@ -7544,7 +7549,7 @@ async function onSpellPanelClick(e) {
         if (!ed || spellAiBusy) return;
         spellAiBusy = true; spellAiMsg = ''; renderSpellPanel();
         try { const n = await aiSpellCheck(ed); spellAiMsg = n ? `AI가 ${n}군데를 더 찾았어요.` : 'AI도 더 찾은 곳이 없어요.'; }
-        catch (err) { spellAiMsg = AI_ERR_MSG[err.code] || 'AI 검사를 하지 못했어요.'; }
+        catch (err) { spellAiMsg = err.code === 'quota' ? aiQuotaMsg(err) : AI_ERR_MSG[err.code] || 'AI 검사를 하지 못했어요.'; }
         spellAiBusy = false; refreshLiveSpell(); renderSpellPanel(); return;
     }
     if (t.dataset.spAll != null) {
@@ -7934,7 +7939,7 @@ function openSettings(focus) {
     const wireTypo = () => { const r = $('[data-typo]', bg); if (r) typoWire(r); };
     render();
     if (focus === 'ai') setTimeout(() => { $('#set-ai', bg)?.scrollIntoView({ block: 'center' }); $('[data-aikey]', bg)?.focus(); }, 0);
-    bg.addEventListener('input', e => { if (e.target.dataset && 'aikey' in e.target.dataset) { pref.aiKey = e.target.value.trim(); savePref(); } });
+    bg.addEventListener('input', e => { if (e.target.dataset && 'aikey' in e.target.dataset) { pref.aiKey = e.target.value.trim(); delete pref.aiExhausted; savePref(); } });
     bg.addEventListener('change', e => { if (e.target.dataset && 'aipaid' in e.target.dataset) { pref.aiPaid = e.target.checked; if (pref.aiPaid) delete pref.aiExhausted; savePref(); } });
     bg.addEventListener('change', e => {
         const o = e.target.dataset && e.target.dataset.opt; if (!o) return;
@@ -7956,11 +7961,12 @@ function openSettings(focus) {
             const out = $('.ai-test', bg); out.textContent = '확인하는 중…'; out.className = 'ai-test modal-note';
             try {
                 if (!aiKey()) throw aiErr('no_key');
+                delete pref.aiExhausted; savePref(); // 예전에 '다 썼다'고 기억한 것도 지우고 진짜로 물어봄
                 const keep = synSample; synSample = null; // 키 자체를 확인
                 let list; try { list = await aiJson('다음 표현과 비슷한 한국어 표현 2개를 JSON 문자열 배열로만 답해: "미간을 찌푸렸다"', 'lite'); } finally { synSample = keep; }
                 out.textContent = '연결됐어요 ✓ 예: ' + (Array.isArray(list) ? list.slice(0, 2).join(', ') : '');
                 out.className = 'ai-test modal-note ok';
-            } catch (err) { out.textContent = (AI_ERR_MSG[err.code] || 'AI에 연결하지 못했어요.') + (err.code === 'http' ? ' ' + (err.message || '') : ''); out.className = 'ai-test modal-note err'; }
+            } catch (err) { out.textContent = (err.code === 'quota' ? aiQuotaMsg(err) : AI_ERR_MSG[err.code] || 'AI에 연결하지 못했어요.') + (err.code === 'http' ? ' ' + (err.message || '') : ''); out.className = 'ai-test modal-note err'; }
             return;
         }
         if (t.dataset.pal) {

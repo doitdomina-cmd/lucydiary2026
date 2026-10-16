@@ -715,7 +715,16 @@ body.theme-spiral .grid.grid-cols-7:has(+ :is(#publish-cal-body, :is(#task-calen
         body.theme-label .tab-content .glass-card > .overflow-x-auto tbody tr:last-child td { background: #FDF5D6 !important; font-weight: 800; }
         body.theme-label .tab-content .glass-card > .overflow-x-auto tbody tr:hover td { background: #FDF5D6 !important; }
         /* 그래프(막대·도넛): 색을 조금 또렷하게 하고 스티커를 붙인 듯 살짝 띄운 그림자 */
-        body.theme-label canvas { filter: saturate(1.3) contrast(1.04) drop-shadow(1.5px 2px 0 rgba(74,64,54,.22)); }
+        body.theme-label canvas { filter: none; }
+        /* 인사이트 '신작 의존도': 파스텔 견출지 띠 + 점선 윤곽 */
+        body.theme-label .no-bar { background: #FFFCF4 !important; border-radius: 5px !important; outline: 1.4px dashed rgba(74,64,54,.55); outline-offset: 0; gap: 0; box-shadow: 0 2px 4px rgba(60,45,25,.12); }
+        body.theme-label .no-seg { background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.45) 0 4px, rgba(255,255,255,0) 4px 8px) !important; outline: 1.2px dashed rgba(74,64,54,.5); outline-offset: -2px; }
+        body.theme-label .no-seg > span { color: var(--lb-ink) !important; font-weight: 800; }
+        body.theme-label :is(.no-seg, .no-sw)[data-k="신작"] { background-color: #F9DE8E !important; }
+        body.theme-label :is(.no-seg, .no-sw)[data-k="구작"] { background-color: #BFD6EA !important; }
+        body.theme-label :is(.no-seg, .no-sw)[data-k="선인세"] { background-color: #F9C3CF !important; }
+        body.theme-label :is(.no-seg, .no-sw)[data-k^="출간일"] { background-color: #CFE6D6 !important; }
+        body.theme-label .no-sw { border-radius: 2px !important; outline: 1.2px dashed rgba(74,64,54,.55); outline-offset: 1px; }
         /* 인사이트 '집필 활동': 월별 막대는 마스킹 테이프 줄무늬 막대, 아래 숫자 칩은 견출지 스티커 */
         body.theme-label #tab-tax .glass-card:has(> h4[data-eyebrow="writing"]) [onmousemove^="showInsightMonthTip"] > div > div { border-radius: 3px 3px 0 0 !important; outline: 1.2px dashed rgba(74,64,54,.4); outline-offset: -2px; background: repeating-linear-gradient(135deg, rgba(255,255,255,.5) 0 4px, rgba(255,255,255,0) 4px 8px), #D9E3EC !important; box-shadow: 0 1px 3px rgba(60,45,25,.2); }
         body.theme-label #tab-tax .glass-card:has(> h4[data-eyebrow="writing"]) [onmousemove^="showInsightMonthTip"] > div > div[style*="--primary"] { background: repeating-linear-gradient(135deg, rgba(255,255,255,.5) 0 4px, rgba(255,255,255,0) 4px 8px), #F5D77A !important; }
@@ -9158,7 +9167,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             const c = document.body.classList;
             const S = {
                 spiral:   { ink: '#1F2D27', alpha: .9,  bw: 2,   radius: 4, grid: 'rgba(31,45,39,.20)',  dash: [5, 4], track: '#D3EFE0', slice: '#1F2D27', sw: 2 },
-                label:    { ink: '#4a4036', alpha: .85, bw: 1.5, radius: 3, grid: 'rgba(74,64,54,.20)',  dash: [4, 4], track: '#EFE6CF', slice: '#FFFCF4', sw: 2 },
+                label:    { ink: '#4a4036', pastel: true, bdash: [5, 3], alpha: 1, bw: 1.4, radius: 3, bcol: 'rgba(74,64,54,.62)', grid: 'rgba(74,64,54,.20)',  dash: [4, 4], track: '#EFE6CF', slice: 'rgba(74,64,54,.55)', sw: 1.4 },
                 polaroid: { ink: '#4a4036', alpha: .92, bw: 3,   radius: 2, grid: '#DDD0B4',             dash: [],     track: '#EDE5D3', slice: '#FFFEFA', sw: 3, bcol: '#FFFEFA' },
                 postcard: { ink: '#3E4660', alpha: .88, bw: 1.5, radius: 0, grid: 'rgba(62,70,96,.22)',  dash: [6, 3], track: '#E2E9F3', slice: '#FCF8EE', sw: 2 },
                 gaming:   { ink: '#2F3A5C', candy: true, alpha: .92, bw: 2.5, radius: 9, grid: 'rgba(47,58,92,.18)', dash: [3, 3], track: '#FFE3EB', slice: '#2F3A5C', sw: 2.5 },
@@ -9177,9 +9186,9 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
         }
         function chartBarStyle(genreName) {
             const sk = chartSkin(); if (!sk) return { backgroundColor: getGenrePastelColor(genreName), borderRadius: 4 };
-            return { backgroundColor: sk.candy ? chartCandyFill(getGenreColor(genreName)) : hexToRgba(getGenreColor(genreName), sk.alpha), borderColor: sk.bcol || sk.ink, borderWidth: sk.bw, borderRadius: sk.radius, borderSkipped: false };
+            return { backgroundColor: sk.pastel ? chartPastelFill(getGenreColor(genreName)) : sk.candy ? chartCandyFill(getGenreColor(genreName)) : hexToRgba(getGenreColor(genreName), sk.alpha), borderColor: sk.bcol || sk.ink, borderWidth: sk.bw, borderRadius: sk.radius, borderSkipped: false, borderDash: sk.bdash || [] };
         }
-        function chartSliceColor(genreName) { const sk = chartSkin(); return sk ? (sk.candy ? chartCandyFill(getGenreColor(genreName)) : hexToRgba(getGenreColor(genreName), sk.alpha)) : getGenrePastelColor(genreName); }
+        function chartSliceColor(genreName) { const sk = chartSkin(); return sk ? (sk.pastel ? chartPastelFill(getGenreColor(genreName)) : sk.candy ? chartCandyFill(getGenreColor(genreName)) : hexToRgba(getGenreColor(genreName), sk.alpha)) : getGenrePastelColor(genreName); }
         // 게이밍 그래프: 장르 색의 색상(hue)은 그대로, 밝고 선명한 사탕 파스텔로 바꾸고 하얀 사선 줄무늬를 넣는다
         const _candyCache = {};
         function chartCandyFill(hex) {
@@ -9201,7 +9210,16 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                 const pat = x.createPattern(c, 'repeat'); _candyCache[_key] = pat || col; return _candyCache[_key];
             } catch (e) { return col; }
         }
-        function chartSliceBorder() { const sk = chartSkin(); return sk ? { w: sk.sw, c: sk.slice } : { w: 0, c: undefined }; }
+        // 견출지 그래프: 장르 색의 색상(hue)은 그대로, 견출지처럼 연한 파스텔로
+        function chartPastelFill(hex) {
+            const m = /^#?([0-9a-f]{6})$/i.exec(hex || ''); if (!m) return hex || '#F5E3B8';
+            const r = parseInt(m[1].slice(0, 2), 16) / 255, g = parseInt(m[1].slice(2, 4), 16) / 255, b = parseInt(m[1].slice(4, 6), 16) / 255;
+            const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; let h = 0;
+            if (d) { h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h *= 60; if (h < 0) h += 360; }
+            const gray = d < 0.08;
+            return 'hsl(' + Math.round(h) + ', ' + (gray ? 10 : 52) + '%, 84%)';
+        }
+        function chartSliceBorder() { const sk = chartSkin(); return sk ? { w: sk.sw, c: sk.slice, dash: sk.bdash } : { w: 0, c: undefined }; }
         function chartGrid() { const sk = chartSkin(); return sk ? { color: sk.grid, borderDash: sk.dash } : { color: '#f3f4f6' }; }
         function chartTrack(def) { const sk = chartSkin(); return sk ? sk.track : def; }
         function formatCurrency(val) { if(!val && val !== 0) return ""; return Math.round(Number(val)).toLocaleString(); }
@@ -16514,13 +16532,13 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                 : dvRows + `<p class="text-[11px] text-slate-400 mt-3">※ 집필 기록은 ${dayVal.firstDate || '-'}부터 있어요. 수익은 지금까지 들어온 금액(선인세 포함)이라 최근 출간작은 앞으로 더 올라가요.${dayVal.writtenNoIncome ? ` 아직 수입이 없는 집필작 ${dayVal.writtenNoIncome}개는 빠졌어요.` : ''}</p>`;
 
             // ── 3) 신작 의존도 ──
-            const seg = (v, total, color, label) => v > 0 ? `<div style="width:${v / total * 100}%;background:${color}" class="h-full flex items-center justify-center overflow-hidden" title="${label} ${won(v)} (${Math.round(v / total * 100)}%)">${v / total >= 0.09 ? `<span class="text-[10px] font-bold text-white px-1 whitespace-nowrap">${Math.round(v / total * 100)}%</span>` : ''}</div>` : '';
+            const seg = (v, total, color, label) => v > 0 ? `<div data-k="${label}" style="width:${v / total * 100}%;background:${color}" class="no-seg h-full flex items-center justify-center overflow-hidden" title="${label} ${won(v)} (${Math.round(v / total * 100)}%)">${v / total >= 0.09 ? `<span class="text-[10px] font-bold text-white px-1 whitespace-nowrap">${Math.round(v / total * 100)}%</span>` : ''}</div>` : '';
             const C_OLD = '#94a3b8', C_ADV = '#f59e0b', C_UNK = '#cbd5e1';
             const nowY = String(new Date().getFullYear());
             const noRows = newOld.map(r => `
                 <div class="flex items-center gap-3 py-1.5">
                     <span class="w-20 shrink-0 text-xs font-bold text-slate-600">${r.year}년${r.year === nowY ? `<span class="block text-[10px] font-normal text-slate-400">${r.lastMonth}월까지</span>` : ''}</span>
-                    <div class="flex-1 h-6 rounded-lg overflow-hidden flex bg-slate-100">
+                    <div class="no-bar flex-1 h-6 rounded-lg overflow-hidden flex bg-slate-100">
                         ${seg(r.fresh, r.total, 'var(--primary)', '신작')}${seg(r.old, r.total, C_OLD, '구작')}${seg(r.adv, r.total, C_ADV, '선인세')}${seg(r.unknown, r.total, C_UNK, '출간일 없음')}
                     </div>
                     <span class="w-24 shrink-0 text-right text-xs font-bold text-slate-700">${man(r.total)}원</span>
@@ -16534,7 +16552,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                     + (cp < 30 ? '대부분 최근 1년 안에 낸 작품이 벌고 있어서, 신작 출간이 멈추면 수입이 빠르게 줄 수 있어요.' : cp >= 50 ? '구작이 수입의 절반 이상을 받쳐주고 있어서 비교적 안정적인 편이에요.' : '신작과 구작이 고르게 섞여 있어요.');
             }
             const legend = [['var(--primary)', '신작 (출간 12개월 미만)'], [C_OLD, '구작 (12개월 이상)'], [C_ADV, '선인세'], [C_UNK, '출간일 없음']]
-                .map(([c, t]) => `<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm" style="background:${c}"></span>${t}</span>`).join('');
+                .map(([c, t]) => `<span class="flex items-center gap-1.5"><span class="no-sw w-2.5 h-2.5 rounded-sm" data-k="${t.split(' ')[0]}" style="background:${c}"></span>${t}</span>`).join('');
             const noHtml = newOld.length === 0 ? `<p class="text-xs text-slate-400">정산 데이터가 없어요.</p>`
                 : `<div class="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500 mb-3">${legend}</div>${noRows}
                    ${noTip ? `<p class="text-xs text-slate-600 mt-3 flex gap-2"><i class="fa-solid fa-lightbulb text-amber-400 mt-0.5 shrink-0"></i><span>${noTip}</span></p>` : ''}`;
@@ -17066,7 +17084,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             const tbody = document.getElementById('dash-genre-body'), thead = document.getElementById('dash-genre-header'); if (thead && tbody) { thead.innerHTML = `<th class="px-4 py-3">장르</th>` + years.map(y => `<th class="px-4 py-3 text-right">${y}</th>`).join('') + `<th class="px-4 py-3 text-right text-emerald-600">누적 합계</th>`; let tbodyHtml = genreList.map(g => { let gTotal = 0; let row = `<tr class="hover:bg-slate-50 transition-colors border-b border-slate-50"><td class="px-4 py-3 font-bold text-slate-600">${g.name}</td>` + years.map(y => { const s = (yearTotals[y] || {})[g.name] || 0; gTotal += s; return `<td class="px-4 py-3 text-right text-slate-500">${formatCurrency(s)}</td>`; }).join('') + `<td class="px-4 py-3 text-right font-bold text-emerald-600">${formatCurrency(gTotal)}</td></tr>`; return row; }).join(''); let grandTotalAll = 0, footerRow = `<tr class="bg-slate-100"><td class="px-4 py-3 font-black text-slate-700">총합</td>` + years.map(y => { let yearSum = 0; genreList.forEach(g => { yearSum += (yearTotals[y] || {})[g.name] || 0; }); grandTotalAll += yearSum; return `<td class="px-4 py-3 text-right font-black text-slate-700">${formatCurrency(yearSum)}</td>`; }).join('') + `<td class="px-4 py-3 text-right font-black text-slate-700">${formatCurrency(grandTotalAll)}</td></tr>`; tbody.innerHTML = tbodyHtml + footerRow; }
             chartApplyDefaults(); if(mainChartInstance) mainChartInstance.destroy(); if (document.getElementById('mainChart')) { document.getElementById('chart-year-display').innerText = chartViewYear; mainChartInstance = new Chart(document.getElementById('mainChart'), { type: 'bar', data: { labels: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'], datasets: genreList.map(g => ({ label: g.name, data: Array(12).fill(0).map((_, i) => { let sum = 0; masterWorks.filter(w => w.genre === g.name).forEach(w => sum += (monthlyData[`${chartViewYear}-${String(i+1).padStart(2,'0')}`] || {})[w.id] || 0); return sum; }), ...chartBarStyle(g.name) })) }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, grid: chartGrid() } } } }); }
             try { renderCozyHero(); } catch (e) {}
-            if(genreChartInstance) genreChartInstance.destroy(); if (document.getElementById('genreChart')) { let currentGenreStats = {}; if (genreChartViewYear === 'total') { currentGenreStats = genreStats; document.getElementById('genre-chart-year-display').innerText = '전체'; } else { currentGenreStats = yearTotals[genreChartViewYear] || {}; document.getElementById('genre-chart-year-display').innerText = genreChartViewYear; } const gData = genreList.map(g => currentGenreStats[g.name] || 0), total = gData.reduce((a,b)=>a+b, 0); genreChartInstance = new Chart(document.getElementById('genreChart'), { type: 'doughnut', data: { labels: genreList.map(g => g.name), datasets: [{ data: gData, backgroundColor: genreList.map(g => chartSliceColor(g.name)), borderWidth: chartSliceBorder().w, borderColor: chartSliceBorder().c }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { display: false } } }, plugins: [genreSliceLabelPlugin] }); document.getElementById('genre-legend').innerHTML = genreList.map((g, i) => `<div class="flex justify-between items-center mb-1"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full" style="background:${getGenreColor(g.name)}"></span><span class="text-slate-500 text-xs">${g.name}</span></div><span class="font-bold text-slate-700 text-xs">₩ ${formatCurrency(gData[i])} <span class="font-bold" style="color:var(--primary)">(${total > 0 ? Math.round((gData[i]/total)*100) : 0}%)</span></span></div>`).join(''); }
+            if(genreChartInstance) genreChartInstance.destroy(); if (document.getElementById('genreChart')) { let currentGenreStats = {}; if (genreChartViewYear === 'total') { currentGenreStats = genreStats; document.getElementById('genre-chart-year-display').innerText = '전체'; } else { currentGenreStats = yearTotals[genreChartViewYear] || {}; document.getElementById('genre-chart-year-display').innerText = genreChartViewYear; } const gData = genreList.map(g => currentGenreStats[g.name] || 0), total = gData.reduce((a,b)=>a+b, 0); genreChartInstance = new Chart(document.getElementById('genreChart'), { type: 'doughnut', data: { labels: genreList.map(g => g.name), datasets: [{ data: gData, backgroundColor: genreList.map(g => chartSliceColor(g.name)), borderWidth: chartSliceBorder().w, borderColor: chartSliceBorder().c, borderDash: chartSliceBorder().dash }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { display: false } } }, plugins: [genreSliceLabelPlugin] }); document.getElementById('genre-legend').innerHTML = genreList.map((g, i) => `<div class="flex justify-between items-center mb-1"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full" style="background:${getGenreColor(g.name)}"></span><span class="text-slate-500 text-xs">${g.name}</span></div><span class="font-bold text-slate-700 text-xs">₩ ${formatCurrency(gData[i])} <span class="font-bold" style="color:var(--primary)">(${total > 0 ? Math.round((gData[i]/total)*100) : 0}%)</span></span></div>`).join(''); }
         }
 
         // 🟢 [NEW] 집필/스케줄 로직 시작
@@ -17897,7 +17915,19 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             { k: 'single', n: '싱글데이', f: "'Single Day',sans-serif" },
             { k: 'dodum', n: '고운돋움', f: "'Gowun Dodum',sans-serif" }
         ];
-        function ddayMute(c) { try { return document.body.classList.contains('theme-cozy') ? cozyMuteColor(c) : c; } catch (e) { return c; } }
+        function ddayMute(c) { try {
+            const cl = document.body.classList;
+            if (cl.contains('theme-label')) return chartWarmPastel(c);   // 견출지: 회색빛 대신 따뜻한 파스텔
+            return cl.contains('theme-cozy') ? cozyMuteColor(c) : c; } catch (e) { return c; } }
+        function chartWarmPastel(hex) {
+            const m = /^#?([0-9a-f]{6})$/i.exec(hex || ''); if (!m) return '#F3D9A0';
+            const r = parseInt(m[1].slice(0, 2), 16) / 255, g = parseInt(m[1].slice(2, 4), 16) / 255, b = parseInt(m[1].slice(4, 6), 16) / 255;
+            const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; let h = 0;
+            if (d) { h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h *= 60; if (h < 0) h += 360; }
+            if (d < 0.14 || (h > 195 && h < 235 && d < 0.4)) return '#F3D9A0';          // 회색·슬레이트 계열 → 따뜻한 버터색
+            if (h > 195 && h < 260) h = 205;                                           // 칙칙한 파랑 → 맑은 하늘색
+            return 'hsl(' + Math.round(h) + ', 78%, 80%)';
+        }
         // ── 팝업창(모달) 디자인: 코지 테마에서 모든 팝업의 겉모양을 한 번에 바꾼다 ──
         function applyModalDesign() {
             document.body.setAttribute('data-modal', modalDesign || 'cozy');

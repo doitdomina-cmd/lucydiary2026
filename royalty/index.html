@@ -10076,28 +10076,51 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             }
             const st = document.createElement('style'); st.id = 'skin-style'; st.textContent = out.join('\n'); document.head.appendChild(st);
         }
-        // 집필 관리 달력 카드: 같은 작품은 어떤 날에 있어도 같은 색(작품 id 로 색 칸을 정한다). 디자인마다 '칸 순서대로 돌려 쓰는 색' 규칙을 작품별 규칙으로 바꿔 복사한다
-        function workColorIdx(workId, n) {
-            const id = String(workId || '').split('::')[0]; let h = 0;
-            for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-            return h % n;
+        // 집필 관리 달력 카드: 카드 색은 '작품의 장르 색'을 따라간다(예: 현로 장편=분홍). 디자인마다 정해진 파스텔 4색 중
+        // 장르 색과 색상(hue)이 가장 가까운 것을 장르별로 골라 규칙을 만들어 둔다 (색을 서로 최대한 안 겹치게 배정)
+        function _hueOf(hex) {
+            const m = /^#?([0-9a-f]{6})$/i.exec(hex || ''); if (!m) return null;
+            const r = parseInt(m[1].slice(0, 2), 16) / 255, g = parseInt(m[1].slice(2, 4), 16) / 255, b = parseInt(m[1].slice(4, 6), 16) / 255;
+            const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; if (d < 0.02) return null;
+            let h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h *= 60; return h < 0 ? h + 360 : h;
         }
-        function genWorkColorRules() {
+        function _hueDist(a, b) { const d = Math.abs(a - b) % 360; return d > 180 ? 360 - d : d; }
+        function _colorToHex(c) {
+            const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(c || ''); if (m) return '#' + [m[1], m[2], m[3]].map(x => Number(x).toString(16).padStart(2, '0')).join('');
+            const h = /#[0-9a-f]{6}/ig.exec(c || ''); return h ? h[0] : null;
+        }
+        let _wkSig = '';
+        function genWorkColorRules(force) {
             try {
-                const out = [];
+                const sig = document.body.className + '|' + (calCardDesigns && calCardDesigns.write) + '|' + (genreList || []).map(g => g.name + g.color).join(',');
+                if (!force && sig === _wkSig && document.getElementById('wk-color-rules')) return;
+                _wkSig = sig;
+                const groups = {};   // 선택자 앞부분+N → [{k, css, hue}]
                 const nthRe = /^(.*#write-calendar-body\[data-card="[^"]+"\]) > div:nth-child\((\d)n(?:\+(\d))?\) \.cal-selectable$/;
                 const walk = rules => { for (const r of rules) {
                     if (r.cssRules && !r.selectorText) { walk(r.cssRules); continue; }
                     if (!r.selectorText || r.selectorText.indexOf('#write-calendar-body') < 0 || r.selectorText.indexOf('nth-child') < 0) continue;
-                    const sels = [];
+                    const css = r.style.cssText, hex = _colorToHex(r.style.backgroundColor) || (() => { const a = css.match(/#[0-9a-f]{6}/ig); return a ? a[a.length - 1] : null; })();
                     r.selectorText.split(/,(?![^()]*\))/).forEach(part => {
                         const m = nthRe.exec(part.trim()); if (!m) return;
-                        const N = Number(m[2]), k = m[3] === undefined ? 0 : Number(m[3]);   // 4n → 0번째, 4n+1 → 1번째 …
-                        sels.push(m[1] + ' div.cal-selectable[data-w' + N + '="' + (k === 0 ? N - 1 : k - 1) + '"]');
+                        const key = m[1] + '|' + m[2];
+                        (groups[key] = groups[key] || []).push({ k: m[3] === undefined ? 0 : Number(m[3]), css, hue: _hueOf(hex) });
                     });
-                    if (sels.length) out.push(sels.join(', ') + ' { ' + r.style.cssText + ' }');
                 } };
                 for (const sh of document.styleSheets) { if (sh.ownerNode && sh.ownerNode.id === 'wk-color-rules') continue; try { walk(sh.cssRules); } catch (e) {} }
+                const out = [];
+                const gl = genreList || [];
+                Object.keys(groups).forEach(key => {
+                    const [prefix] = key.split('|'); const ents = groups[key];
+                    // 장르×색 후보를 색상 차이가 작은 순으로 훑으며, 안 쓴 색부터 한 장르에 하나씩 배정
+                    const pairs = [];
+                    gl.forEach((g, gi) => { const gh = _hueOf(g.color); ents.forEach((e, ei) => pairs.push({ gi, ei, d: (gh === null || e.hue === null) ? 999 : _hueDist(gh, e.hue) })); });
+                    pairs.sort((a, b) => a.d - b.d);
+                    const gAssign = {}, used = new Set();
+                    pairs.forEach(p => { if (gAssign[p.gi] === undefined && !used.has(p.ei)) { gAssign[p.gi] = p.ei; used.add(p.ei); } });
+                    pairs.forEach(p => { if (gAssign[p.gi] === undefined) gAssign[p.gi] = p.ei; });   // 색이 모자라면 가장 가까운 색을 같이 쓴다
+                    gl.forEach((g, gi) => { const e = ents[gAssign[gi]]; if (e) out.push(prefix + ' div.cal-selectable[data-gi="' + gi + '"] { ' + e.css + ' }'); });
+                });
                 let st = document.getElementById('wk-color-rules');
                 if (!st) { st = document.createElement('style'); st.id = 'wk-color-rules'; document.head.appendChild(st); }
                 st.textContent = out.join(' ');
@@ -10119,9 +10142,9 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             } else if (theme) document.body.classList.add('theme-' + theme);
             try { spiralDeco(); } catch (e) {}
             try { markThemeCards(); } catch (e) {}
-            try { genWorkColorRules(); } catch (e) {}
+            try { genWorkColorRules(true); } catch (e) {}
         }
-        window.addEventListener('load', () => setTimeout(genWorkColorRules, 300));
+        window.addEventListener('load', () => setTimeout(() => genWorkColorRules(true), 300));
         // 앱 글꼴: 본문 글꼴 / 메뉴 글꼴을 따로 고를 수 있다 (이 기기에 저장)
         const APP_FONTS = [
             ['', '', ''],
@@ -18053,7 +18076,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                 // 같은 동작을 하는 복사 버튼을 눈에 보이게 추가 — 탭 한 번이면 되니 터치/마우스 둘 다 동일하게 동작
                 let copyBtn = `<button type="button" onclick="event.stopPropagation(); duplicateWriteSchedule(event, '${s.id}', '${s.date}')" class="cal-copy-btn absolute top-1 right-6 opacity-0 group-hover/block:opacity-100 text-slate-300 hover:text-indigo-500 transition-opacity shrink-0 px-1" title="이 일정 복사"><i class="fa-regular fa-copy"></i></button>`;
 
-                return `<div class="cal-selectable border border-slate-200 border-l-4 p-1 rounded-lg relative group/block shadow-sm hover:shadow-md transition-all cursor-move" data-cal="write" data-w4="${workColorIdx(s.workId, 4)}" data-w3="${workColorIdx(s.workId, 3)}" data-block-id="${s.id}" data-block-date="${s.date}" style="border-left-color: ${color}; ${cardBg} ${s.category ? '--cat: ' + (WRITE_COLORS[s.category] || '#94a3b8') + ';' : ''} ${cardFontStyle}" draggable="true" ondragstart="handleWriteDragStart(event, '${s.id}', '${s.date}')" ondragover="handleCardDragOver(event, this)" ondragleave="handleCardDragLeave(event, this)" ondrop="handleWriteCardDrop(event, this, '${s.id}', '${s.date}')" onclick="event.stopPropagation(); openWriteEditModal('${s.id}', '${s.date}')" oncontextmenu="duplicateWriteSchedule(event, '${s.id}', '${s.date}')">
+                return `<div class="cal-selectable border border-slate-200 border-l-4 p-1 rounded-lg relative group/block shadow-sm hover:shadow-md transition-all cursor-move" data-cal="write" data-gi="${Math.max(0, genreList.findIndex(g => g.name === work.genre))}" data-block-id="${s.id}" data-block-date="${s.date}" style="border-left-color: ${color}; ${cardBg} ${s.category ? '--cat: ' + (WRITE_COLORS[s.category] || '#94a3b8') + ';' : ''} ${cardFontStyle}" draggable="true" ondragstart="handleWriteDragStart(event, '${s.id}', '${s.date}')" ondragover="handleCardDragOver(event, this)" ondragleave="handleCardDragLeave(event, this)" ondrop="handleWriteCardDrop(event, this, '${s.id}', '${s.date}')" onclick="event.stopPropagation(); openWriteEditModal('${s.id}', '${s.date}')" oncontextmenu="duplicateWriteSchedule(event, '${s.id}', '${s.date}')">
                     <div class="flex items-start">
                         <div class="flex-1 min-w-0">
                             ${content}

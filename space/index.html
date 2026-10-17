@@ -2795,7 +2795,7 @@ body.menu-font-on .sb .nav,body.menu-font-on .sb .sb-lbl,body.menu-font-on .sb-p
       <div class="sb-lbl">Goals</div>
       <button class="nav" title="My Goals" id="nav-life" onclick="go('life')"><span class="nav-ic" data-color="#8BBF88"></span>My Goals</button>
       <button class="nav" title="프로젝트" id="nav-projects" onclick="go('projects')"><span class="nav-ic" data-color="#F5C490"></span>Projects</button>
-      <button class="nav" title="머니" id="nav-money" onclick="go('ledger')"><span class="nav-ic" data-color="#7CB9A8"></span>Money</button>
+      <button class="nav" title="가계부" id="nav-money" onclick="ledgerTab='dashboard';go('ledger')"><span class="nav-ic" data-color="#7CB9A8"></span>가계부</button>
     </div>
     <div class="sb-sec">
       <div class="sb-lbl sb-fold" id="mg-hd" onclick="toggleManage()"><span>Manage</span><span class="sb-chev" id="mg-chev">▾</span></div>
@@ -3352,6 +3352,7 @@ function applyManage(closed){var b=document.getElementById('mg-body'),h=document
 function toggleManage(){var b=document.getElementById('mg-body');var c=!(b&&b.classList.contains('closed'));applyManage(c);try{localStorage.setItem('lucy_mg_closed',c?'1':'0');}catch(e){}}
 (function(){var c=false;try{c=localStorage.getItem('lucy_mg_closed')==='1';}catch(e){}applyManage(c);})();
 function go(p, pid, _fromPopstate){
+  if(p==='savings'){ledgerTab='savings';p='ledger';}
   page=p; activePid=pid||null; if(p!=='projects') pjFilter='';
   if(p==='health'&&S.health) S.health.tab='summary';
   // 브라우저 히스토리에 상태 추가 (popstate로 인한 호출이 아닐 때만)
@@ -3521,9 +3522,6 @@ function updateDreamYear(){var el=document.getElementById('sb-year');if(el)el.in
 // 저널 위 탭: Journal / Routine Calendar
 function jrTabs(){
   return '<div class="rc-tabs dm-tabs"><button class="'+(page==='journal'?'on':'')+'" onclick="go(\'journal\')">Journal</button><button class="'+(page==='routinecal'?'on':'')+'" onclick="go(\'routinecal\')">Routine Calendar</button></div>';
-}
-function moneyTabs(){
-  return '<div class="rc-tabs dm-tabs"><button class="'+(page==='ledger'||page==='ledgerYear'?'on':'')+'" onclick="go(\'ledger\')">가계부</button><button class="'+(page==='savings'?'on':'')+'" onclick="go(\'savings\')">저축 관리</button></div>';
 }
 function dmTabs(){
   return '<div class="rc-tabs dm-tabs"><button class="'+(page==='dream'?'on':'')+'" onclick="go(\'dream\')">Dream Board</button><button class="'+(page==='timeline'?'on':'')+'" onclick="go(\'timeline\')">Roadmap</button></div>';
@@ -4403,12 +4401,12 @@ function render(){
   else if(page==='life') div.innerHTML=renderLife();
   else if(page==='projects') div.innerHTML=activePid?renderPjDetail(activePid):renderProjects();
   else if(page==='deadlines') div.innerHTML=renderDeadlines();
-  else if(page==='savings') div.innerHTML=moneyTabs()+renderSavings();
+  else if(page==='savings') div.innerHTML=renderSavings();
   else if(page==='health') div.innerHTML=renderHealth();
   else if(page==='overview') div.innerHTML=renderOverview();
   else if(page==='settings') div.innerHTML=renderSettings();
-  else if(page==='ledger') div.innerHTML=moneyTabs()+renderLedger();
-  else if(page==='ledgerYear') div.innerHTML=moneyTabs()+renderLedgerYear();
+  else if(page==='ledger') div.innerHTML=renderLedger();
+  else if(page==='ledgerYear') div.innerHTML=renderLedgerYear();
   else if(page==='insights') div.innerHTML=renderInsights();
   else if(page==='journal') div.innerHTML=jrTabs()+renderJournal();
   else if(page==='timeline') div.innerHTML=dmTabs()+renderTimeline();
@@ -5185,7 +5183,7 @@ function czPhotoHtml(kind,obj,url){
     +'<span class="cz-ph-btns"><button type="button" class="cz-ph-btn" onclick="event.stopPropagation();czPickPhoto(\''+kind+'\',\''+obj.id+'\')" title="사진 바꾸기">'+CZI.cam+'</button>'
     +(obj.photo?'<button type="button" class="cz-ph-btn" onclick="event.stopPropagation();czResetPhoto(\''+kind+'\',\''+obj.id+'\')" title="기본 사진으로">'+CZI.reset+'</button>':'')+'</span></div>';
 }
-var CZI={dashboard:'<svg class="czi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/></svg>',calendar:'<svg class="czi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',assets:'<svg class="czi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5 12 4l8 4.5M5 10v8M9.7 10v8M14.3 10v8M19 10v8M3.5 20h17"/></svg>',settings:'<svg class="czi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/></svg>',cam:'<svg class="czi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.8l1.4-2h4.6l1.4 2h1.8A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.5" r="3.3"/></svg>',reset:'<svg class="czi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4.5h4.5"/></svg>',pen:'<svg class="czi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/></svg>',report:'<svg class="czi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3.5h7l4 4V19a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 6 19V5A1.5 1.5 0 0 1 7.5 3.5z"/><path d="M14 3.5V8h4M9 12.5h6M9 16h4"/></svg>',year:'<svg class="czi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/></svg>',plus:'<svg class="czi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>'};
+var CZI={savings:'<svg class="czi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 11a7 6 0 0 1 14 0c0 2-1 3.5-2.5 4.5V18h-3v-1.5h-3V18h-3v-2.5C6 14.5 5 13 5 11z"/><circle cx="15" cy="10" r=".6"/><path d="M9 6.5c0-1.2.8-2 2-2"/></svg>',dashboard:'<svg class="czi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/></svg>',calendar:'<svg class="czi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',assets:'<svg class="czi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5 12 4l8 4.5M5 10v8M9.7 10v8M14.3 10v8M19 10v8M3.5 20h17"/></svg>',settings:'<svg class="czi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/></svg>',cam:'<svg class="czi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.8l1.4-2h4.6l1.4 2h1.8A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.5" r="3.3"/></svg>',reset:'<svg class="czi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4.5h4.5"/></svg>',pen:'<svg class="czi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/></svg>',report:'<svg class="czi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3.5h7l4 4V19a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 6 19V5A1.5 1.5 0 0 1 7.5 3.5z"/><path d="M14 3.5V8h4M9 12.5h6M9 16h4"/></svg>',year:'<svg class="czi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/></svg>',plus:'<svg class="czi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>'};
 function czObj(kind,id){
   if(kind==='area') return (S.lifeAreas||[]).find(function(a){return a.id===id;});
   if(kind==='project') return (S.projects||[]).find(function(p){return p.id===id;});
@@ -11998,7 +11996,7 @@ function syncRzToRoutines(){
 
 // ═══════════ LEDGER (가계부) ═══════════
 const LEDGER_KEY = 'lucy_ledger_v1';
-let ledgerTab = 'dashboard'; // dashboard | calendar | assets | settings
+let ledgerTab = 'dashboard'; // dashboard | calendar | savings | assets | settings
 
 const defaultLedgerCategories = {
   income: {
@@ -12054,6 +12052,7 @@ function renderLedger(){
   const tabs=[
     {id:'dashboard',label:'대시보드',ic:'📊'},
     {id:'calendar',label:'캘린더',ic:'📅'},
+    {id:'savings',label:'저축 현황',ic:'🐷'},
     {id:'assets',label:'자산 현황',ic:'🏦'},
     {id:'settings',label:'설정',ic:'⚙️'},
   ];
@@ -12071,6 +12070,7 @@ function renderLedger(){
   html+='</div></div>';
   if(ledgerTab==='dashboard') html+=renderLedgerDashboard();
   else if(ledgerTab==='calendar') html+=renderLedgerCalendar();
+  else if(ledgerTab==='savings') html+=renderSavings();
   else if(ledgerTab==='assets') html+=renderLedgerAssets();
   else if(ledgerTab==='settings') html+=renderLedgerSettings();
   return html;

@@ -4641,11 +4641,13 @@ function toggleCheck(rid, ds){
       if(existIdx<0){
         S.savings.entries.push({id:svId,amount:r.saveAmount,note:r.task+' (루틴 달성)',date:ds,projectId:r.rzProjectId||'',projectName:proj?proj.name:''});
         S.savings.current+=r.saveAmount;
+        svLedgerAdd(svId,r.saveAmount,ds,r.task+' (루틴 달성)');
       }
     } else {
       // 체크 해제 → 저축 회수
       if(existIdx>=0){
         S.savings.current-=S.savings.entries[existIdx].amount;
+        svLedgerDel(svId);
         S.savings.entries.splice(existIdx,1);
       }
     }
@@ -8218,9 +8220,16 @@ function openSvGoal(){openMo('목표 수정',
   '<div class="fg"><label class="fl">목표 금액</label><div style="display:flex;align-items:center;gap:8px"><input type="number" class="inp" id="sv-g" value="'+(S.savings.goal/10000)+'" step="1" style="flex:1"><span style="color:var(--t2);white-space:nowrap;font-size:0.95em">만원</span></div></div>'+
   '<div class="fg"><label class="fl">목표 날짜 (선택)</label><input type="date" class="inp" id="sv-date" value="'+(S.savings.goalDate||'')+'"></div>',
   '<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="saveSvG()">저장</button>');}
-function saveSv(){const manwon=parseFloat(document.getElementById('sv-a').value),note=document.getElementById('sv-n').value,date=document.getElementById('sv-d').value;if(!manwon||isNaN(manwon))return;const amt=Math.round(manwon*10000);if(!S.savings.entries)S.savings.entries=[];S.savings.entries.push({id:gid(),amount:amt,note,date});S.savings.current+=amt;save();closeMo();render();}
+// 저축 현황에 넣은 금액은 가계부에도 '저축/투자' 지출로 같이 기록 (수입·지출 계산이 맞도록)
+function svLedgerAdd(key,amt,date,label){
+  try{if(!(amt>0))return;loadLedger();if(!LD.transactions)LD.transactions=[];var id='svtx~'+key;if(LD.transactions.some(function(t){return t.id===id;}))return;
+    LD.transactions.push({id:id,type:'expense',date:date||todStr(),account:'',majorCategory:'저축/투자',minorCategory:'저축 현황',amount:amt,memo:label||'',_sv:true});
+    LD.transactions.sort(function(a,b){return b.date.localeCompare(a.date);});saveLedger();}catch(e){}
+}
+function svLedgerDel(key){try{loadLedger();var id='svtx~'+key;if((LD.transactions||[]).some(function(t){return t.id===id;})){LD.transactions=LD.transactions.filter(function(t){return t.id!==id;});saveLedger();}}catch(e){}}
+function saveSv(){const manwon=parseFloat(document.getElementById('sv-a').value),note=document.getElementById('sv-n').value,date=document.getElementById('sv-d').value;if(!manwon||isNaN(manwon))return;const amt=Math.round(manwon*10000);if(!S.savings.entries)S.savings.entries=[];var _eid=gid();S.savings.entries.push({id:_eid,amount:amt,note,date});S.savings.current+=amt;svLedgerAdd(_eid,amt,date,note||'저축');save();closeMo();render();}
 function saveSvG(){const g=parseFloat(document.getElementById('sv-g').value);if(!g||isNaN(g))return;S.savings.goal=Math.round(g*10000);S.savings.goalName=document.getElementById('sv-name').value.trim();S.savings.goalDate=document.getElementById('sv-date').value;save();closeMo();render();}
-function delSv(id){const e=S.savings.entries.find(x=>x.id===id);if(!e)return;S.savings.current-=e.amount;S.savings.entries=S.savings.entries.filter(x=>x.id!==id);save();render();}
+function delSv(id){const e=S.savings.entries.find(x=>x.id===id);if(!e)return;svLedgerDel(id);S.savings.current-=e.amount;S.savings.entries=S.savings.entries.filter(x=>x.id!==id);save();render();}
 
 // ═══════════ 회고 & 통계 ═══════════
 function saveWeeklyMemo(wkOrVal,val2){
@@ -12155,7 +12164,7 @@ function addWishSave(areaId,wid){
   var x=dreamData().areas[areaId],w=x&&(x.wants||[]).find(function(y){return y.id===wid;});if(!w)return;
   var v=prompt('"'+w.text+'"에 얼마를 모았나요? (원 단위, 뺄 땐 -)','');if(v===null)return;
   var n=Math.round(parseFloat(String(v).replace(/[^0-9.\-]/g,'')));if(!n)return;
-  if(!w.saveEntries)w.saveEntries=[];w.saveEntries.push({id:gid(),amount:n,date:todStr()});w.saveCur=(w.saveCur||0)+n;
+  if(!w.saveEntries)w.saveEntries=[];var _id=gid();w.saveEntries.push({id:_id,amount:n,date:todStr()});w.saveCur=(w.saveCur||0)+n;svLedgerAdd('w'+_id,n,todStr(),w.text);
   save();render();
 }
 function fmtMoney(n){if(!n&&n!==0)return '0원';return new Intl.NumberFormat('ko-KR').format(Math.round(n))+'원';}
@@ -13741,6 +13750,7 @@ function _ltxSave(editId){
 
 // 저축/투자성 지출을 자산에 자동 반영
 function syncTxToAsset(type,major,minor,amt,memo){
+  return; // 저축은 가계부 > 저축 현황에서만 관리 (자산 현황에는 저축 현황이 자동으로 들어옴)
   if(type!=='expense')return;
   // 저축/투자성 카테고리 키워드
   const savingKeywords=['저축','예금','적금','예적금','투자','ISA','isa','펀드','연금','청약','공제'];

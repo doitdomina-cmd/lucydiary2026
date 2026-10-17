@@ -3767,6 +3767,8 @@ function openWishForm(wid){
     +'<label class="dmd-lbl" for="wf-name">이름</label><input class="dmd-f" id="wf-name" maxlength="80" placeholder="'+wishKindInfo(curK).ph+'" value="'+esc(_wishDraft.text)+'">'
     +'<label class="dmd-lbl" for="wf-desc">설명</label><textarea class="dmd-f" id="wf-desc" maxlength="400" placeholder="왜 이루고 싶은지, 어떤 모습인지 적어 보세요">'+esc(_wishDraft.desc||'')+'</textarea>'
     +'<label class="dmd-lbl" for="wf-dday">디데이 <small>이루고 싶은 날</small></label><input class="dmd-f" id="wf-dday" type="date" value="'+esc(_wishDraft.dday||'')+'">'
+    +'<label class="wf-done"><input type="checkbox" id="wf-sv" '+(_wishDraft.saveGoal?'checked':'')+' onchange="document.getElementById(\'wf-svrow\').style.display=this.checked?\'\':\'none\'"> 저축 목표로 만들기 <small>가계부 > 저축 현황에 카드가 생겨요</small></label>'
+    +'<div id="wf-svrow" style="'+(_wishDraft.saveGoal?'':'display:none;')+'margin:6px 0 2px"><label class="dmd-lbl" for="wf-svt">목표 금액 <small>만원 단위 (3억 = 30000)</small></label><input class="dmd-f" id="wf-svt" type="number" min="0" step="100" inputmode="numeric" placeholder="예: 30000" value="'+(_wishDraft.saveTarget?Math.round(_wishDraft.saveTarget/10000):'')+'"></div>'
     +(w?'<label class="wf-done"><input type="checkbox" id="wf-done" '+(w.done?'checked':'')+'> 이뤘어요</label>':'')
     +(w?(function(){var la=lifeForWish(dreamAreaId,w.id);return la
         ?'<button type="button" class="wf-goal on" onclick="closeDreamDlg();goToArea(\''+la.id+'\')"><b>▶ My Goals에서 진행 중 · '+lifeProgress(la)+'%</b><span>프로젝트 보러 가기 →</span></button>'
@@ -3791,6 +3793,8 @@ function saveWish(){
   if(!name){document.getElementById('wf-name').focus();return;}
   var w=_wishDraft,isNew=w._new,newPhoto=w._newPhoto;delete w._new;delete w._newPhoto;
   w.kind=wishKind(w);w.text=name;w.desc=(document.getElementById('wf-desc').value||'').trim();w.dday=document.getElementById('wf-dday').value||'';
+  var svc=document.getElementById('wf-sv'),svt=Math.round((parseFloat((document.getElementById('wf-svt')||{}).value)||0)*10000);
+  if(svc&&svc.checked&&svt>0){w.saveGoal=true;w.saveTarget=svt;if(!w.saveEntries)w.saveEntries=[];w.saveCur=w.saveCur||0;}else if(svc){w.saveGoal=false;}
   var dc=document.getElementById('wf-done');if(dc){if(dc.checked&&!w.done)w.doneAt=todStr();w.done=dc.checked;if(!w.done)delete w.doneAt;}
   var old=isNew?null:(x.wants||[]).find(function(y){return y.id===w.id;});
   if(newPhoto&&old&&old.photoPath){try{storage.ref().child(old.photoPath).delete().catch(function(){});}catch(_){}w.photoPath=undefined;}
@@ -12090,12 +12094,40 @@ function renderLedger(){
   html+='</div></div>';
   if(ledgerTab==='dashboard') html+=renderLedgerDashboard();
   else if(ledgerTab==='calendar') html+=renderLedgerCalendar();
-  else if(ledgerTab==='savings') html+=renderSavings();
+  else if(ledgerTab==='savings') html+=savingsWishGoalsHtml()+renderSavings();
   else if(ledgerTab==='assets') html+=renderLedgerAssets();
   else if(ledgerTab==='settings') html+=renderLedgerSettings();
   return html;
 }
 
+// 드림보드 꿈에서 '저축 목표로 만들기'를 체크한 것들 → 가계부 > 저축 현황의 카드
+function wishSaveGoals(){
+  var out=[];
+  try{DREAM_AREAS.forEach(function(a){var x=dreamData().areas[a.id];((x&&x.wants)||[]).forEach(function(w){if(w.saveGoal&&w.saveTarget>0)out.push({area:a.id,w:w});});});}catch(e){}
+  return out;
+}
+function savingsWishGoalsHtml(){
+  var gs=wishSaveGoals();if(!gs.length)return '';
+  var h='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;margin-bottom:22px">';
+  gs.forEach(function(g){
+    var w=g.w,cur=w.saveCur||0,pc=Math.min(100,Math.round(cur/w.saveTarget*100)),rem=Math.max(0,w.saveTarget-cur);
+    var ph=w.photo?'<div style="height:84px;border-radius:12px;background:url(\''+String(w.photo).replace(/'/g,'%27')+'\') center/cover;margin-bottom:10px"></div>':'';
+    h+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:14px 16px;box-shadow:var(--sh)">'+ph
+      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b style="font-size:1em">'+esc(w.text)+'</b><span style="color:var(--accent);font-weight:600">'+pc+'%</span></div>'
+      +'<div style="font-size:1.35em;font-weight:600;margin:6px 0 8px">'+money(cur)+'<small style="font-size:.6em;font-weight:400;color:var(--t3)"> / '+money(w.saveTarget)+'</small></div>'
+      +'<div style="height:8px;border-radius:99px;background:var(--s2);overflow:hidden"><i style="display:block;height:100%;width:'+pc+'%;background:var(--accent);border-radius:99px"></i></div>'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:.85em;color:var(--t3)"><span>남은 금액 '+money(rem)+'</span>'
+      +'<button type="button" class="btn bp bsm" onclick="addWishSave(\''+g.area+'\',\''+w.id+'\')">+ 금액 추가</button></div></div>';
+  });
+  return h+'</div>';
+}
+function addWishSave(areaId,wid){
+  var x=dreamData().areas[areaId],w=x&&(x.wants||[]).find(function(y){return y.id===wid;});if(!w)return;
+  var v=prompt('"'+w.text+'"에 얼마를 모았나요? (원 단위, 뺄 땐 -)','');if(v===null)return;
+  var n=Math.round(parseFloat(String(v).replace(/[^0-9.\-]/g,'')));if(!n)return;
+  if(!w.saveEntries)w.saveEntries=[];w.saveEntries.push({id:gid(),amount:n,date:todStr()});w.saveCur=(w.saveCur||0)+n;
+  save();render();
+}
 function fmtMoney(n){if(!n&&n!==0)return '0원';return new Intl.NumberFormat('ko-KR').format(Math.round(n))+'원';}
 
 // ═══════════ 월간 리포트 ═══════════

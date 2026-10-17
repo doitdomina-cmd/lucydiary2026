@@ -5362,8 +5362,46 @@ function curlyAtCaret(root) {
     const r = document.createRange(); r.setStart(node, off - 1); r.setEnd(node, off);
     sel.removeAllRanges(); sel.addRange(r);
     replacing = true;
-    try { document.execCommand('insertText', false, curlyChar(ch, prev)); } finally { replacing = false; }
+    let cc = curlyChar(ch, prev);
+    try { document.execCommand('insertText', false, cc); } finally { replacing = false; }
+    autoCloseQuote(cc, root);
 }
+/* 여는 따옴표를 치면 닫는 따옴표를 옆에 같이 만들고 커서는 그 사이에 둠 (뒤에 글자가 이어져 있으면 만들지 않음) */
+const CLOSE_OF = { '“': '”', '‘': '’' };
+function autoCloseQuote(cc, root) {
+    const close = CLOSE_OF[cc]; if (!close) return;
+    const sel = getSelection(); if (!sel.rangeCount || !sel.isCollapsed) return;
+    const node = sel.anchorNode, off = sel.anchorOffset;
+    const next = node && node.nodeType === 3 ? (node.data[off] || '') : '';
+    if (next && !/[\s)\]}>”’」』.,!?…]/.test(next)) return;
+    replacing = true;
+    try { document.execCommand('insertText', false, close); } finally { replacing = false; }
+    const s2 = getSelection();
+    if (s2.rangeCount && s2.anchorNode && s2.anchorNode.nodeType === 3 && s2.anchorOffset > 0) s2.collapse(s2.anchorNode, s2.anchorOffset - 1);
+    else { try { s2.modify('move', 'backward', 'character'); } catch (_) {} }
+}
+/* 닫는 따옴표 바로 앞에서 같은 따옴표를 치면 새로 만들지 않고 커서만 넘김 */
+document.addEventListener('beforeinput', e => {
+    if (e.inputType !== 'insertText' || e.isComposing || (e.data !== '"' && e.data !== "'")) return;
+    const ed = e.target.closest && e.target.closest('.manuscript[contenteditable="true"]'); if (!ed || !smartOn()) return;
+    const sel = getSelection(); if (!sel.rangeCount || !sel.isCollapsed) return;
+    const node = sel.anchorNode, off = sel.anchorOffset;
+    if (!node || node.nodeType !== 3) return;
+    const want = e.data === '"' ? '”' : '’';
+    if (node.data[off] === want && node.data[off - 1] !== undefined && /["“‘'’”]|[^\s]/.test(node.data[off - 1])) {
+        e.preventDefault(); sel.collapse(node, off + 1);
+    }
+}, true);
+/* 엔터: 커서 바로 뒤가 줄 끝의 닫는 따옴표면, 그 따옴표는 원래 줄에 남기고 새 줄은 비어서 시작 */
+document.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' || e.isComposing || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    const ed = e.target.closest && e.target.closest('.manuscript[contenteditable="true"]'); if (!ed || !smartOn()) return;
+    const sel = getSelection(); if (!sel.rangeCount || !sel.isCollapsed) return;
+    const node = sel.anchorNode, off = sel.anchorOffset;
+    if (!node || node.nodeType !== 3) return;
+    const rest = node.data.slice(off);
+    if (/^[”’]+$/.test(rest) && (!node.nextSibling || node.nextSibling.nodeName === 'BR')) sel.collapse(node, node.data.length);
+}, true);
 // 커서가 있는 문단의 곧은 따옴표를 모두 굽은 따옴표로 (글자 수가 같아서 커서 자리는 그대로)
 function fixQuotesNearCaret(root) {
     if (!smartOn()) return false;
@@ -8113,12 +8151,18 @@ function navSync() {
     if (!navReady || navApplying) return;
     const st = navState();
     if (sameNav(st, curNav)) return;
+    // 작품 안에서 회차·탭만 바뀔 때는 기록을 덧붙이지 않고 현재 칸을 갈아 끼움 → 뒤로가기는 '작품 안 이전 화면'이 아니라 메인(작품 목록)으로
+    const sameWork = curNav && !curNav.home && !st.home && curNav.wid === st.wid;
     curNav = st;
-    try { history.pushState({ nav: st }, ''); } catch (e) {}
+    try { if (sameWork) history.replaceState({ nav: st }, ''); else history.pushState({ nav: st }, ''); } catch (e) {}
 }
 function navStart() {
     curNav = navState();
-    try { history.replaceState({ nav: curNav }, ''); } catch (e) {}
+    try {
+        // 작품 화면으로 바로 켜졌어도 뒤로가기는 메인(작품 목록)으로 가도록 아래에 메인 칸을 깔아 둠
+        if (!curNav.home) { history.replaceState({ nav: { home: true } }, ''); history.pushState({ nav: curNav }, ''); }
+        else history.replaceState({ nav: curNav }, '');
+    } catch (e) {}
     navReady = true;
 }
 function closeTopOverlay() {

@@ -1658,6 +1658,11 @@ body.cozy .health-tab-btn.on{background:var(--surface) !important;color:var(--cz
 body.cozy .health-tab-btn svg{flex-shrink:0}
 
 /* 코지: 건강 관리 — 인사 카드 · 말랑한 카드 · 파스텔 수치 */
+.hl-pills{overflow-x:auto;scrollbar-width:none;margin:0 0 16px !important;flex-wrap:nowrap}.hl-pills::-webkit-scrollbar{display:none}.hl-pills button{flex:none;white-space:nowrap}
+.hl-ph{margin-bottom:16px}.hl-ph h1{margin:4px 0 2px;font-size:22px;font-weight:600;color:#fff}
+body.cozy .hl-page .card{border:0;border-radius:22px;padding:20px 22px;box-shadow:0 6px 24px rgba(90,60,40,.07);background:var(--surface)}
+body.cozy .hl-page .cond-card{border-radius:20px !important;border-color:transparent !important;box-shadow:0 3px 14px rgba(90,60,40,.06)}
+body.cozy .hl-page .btn.bp{border-radius:99px}
 .hl-hero{position:relative;overflow:hidden;border-radius:26px;padding:22px 26px;margin-bottom:14px;background:linear-gradient(135deg,var(--cz-soft),var(--cz-paper) 60%,color-mix(in srgb,#BCD0B6 28%,var(--surface)))}
 .hl-hero h1{margin:2px 0 4px;font-family:'Instrument Serif',Georgia,'Noto Serif KR',serif;font-weight:400;font-size:32px;letter-spacing:-.5px;color:var(--text)}
 .hl-hero p{margin:0;font-family:var(--hand);font-size:18px;color:var(--cz-deep);word-break:keep-all;line-height:1.45}
@@ -5232,7 +5237,7 @@ function czObj(kind,id){
   if(kind==='dreamArea') return dreamData().areas[id]||null;
   if(kind==='wish'){ var ps=String(id).split('~'),ar=dreamData().areas[ps[0]]; return ar?(ar.wants||[]).find(function(w){return w.id===ps[1];})||null:null; }
   if(kind==='ledger'){ if(!S.ledgerBanner||typeof S.ledgerBanner!=='object')S.ledgerBanner={id:'ledger'}; return S.ledgerBanner; }
-  if(kind==='ledgerCal'||kind==='memories'||kind==='ledgerSet'||kind==='settingsPage'||kind==='ledgerAssets'||kind==='roadmap'||kind==='overview'||kind==='savings'||kind==='routine'||kind==='deadlines'||kind==='insights'||kind==='journal'||kind==='routinecal'||kind==='monthly'||kind==='todoMonth'||kind==='diaryMonth'){ if(!S.banners||typeof S.banners!=='object')S.banners={}; if(!S.banners[kind])S.banners[kind]={id:kind}; return S.banners[kind]; }
+  if(kind==='ledgerCal'||kind==='memories'||kind==='ledgerSet'||kind==='settingsPage'||kind==='ledgerAssets'||kind==='roadmap'||kind==='overview'||kind==='savings'||kind==='routine'||kind==='deadlines'||kind==='health'||kind==='insights'||kind==='journal'||kind==='routinecal'||kind==='monthly'||kind==='todoMonth'||kind==='diaryMonth'){ if(!S.banners||typeof S.banners!=='object')S.banners={}; if(!S.banners[kind])S.banners[kind]={id:kind}; return S.banners[kind]; }
   return null;
 }
 var _czTarget=null;
@@ -8647,9 +8652,14 @@ ${existingFontLinks}
 // ════ 건강 관리 ════
 // 건강 관리 맨 위 인사 카드: 다음 건강 일정까지 며칠 남았는지 다정하게 알려 준다
 function hlHero(H){
-  var nx=((H&&H.schedules)||[]).filter(function(x){return x.date&&!x.done&&dLeft(x.date)>=0;}).sort(function(a,b){return a.date.localeCompare(b.date);})[0];
-  var line=nx?'다음 건강 일정은 <b>'+esc(nx.title||'검진')+'</b>, '+(dLeft(nx.date)===0?'<b>오늘</b>이에요':'<b>D-'+dLeft(nx.date)+'</b> 남았어요'):'오늘도 내 몸을 다정하게 챙겨요';
-  return '<div class="hl-hero"><i class="hl-b1"></i><i class="hl-b2"></i><div class="hl-eye">my health</div><h1>건강 관리</h1><p>'+line+' ♡</p></div>';
+  var up=((H&&H.schedules)||[]).filter(function(x){return x.date&&!x.done&&dLeft(x.date)>=0;}).sort(function(a,b){return a.date.localeCompare(b.date);});
+  var nx=up[0],hb=czObj('health','health'),url=hb.photo||czPick('건강','health');
+  var big=nx?(dLeft(nx.date)===0?'D-DAY':'D-'+dLeft(nx.date)):'';
+  return '<div class="dlz-hero hl-ph" style="background-image:url(\''+esc(url).replace(/'/g,'%27')+'\')"><div class="dlz-hero-in">'
+    +'<div class="dlz-kick">MY HEALTH</div>'
+    +(nx?'<div class="dlz-big">'+big+'</div><h1>'+esc(nx.title||'검진')+'</h1><div class="dlz-sub">'+esc(nx.date.replace(/-/g,'. '))+' · 다음 건강 일정</div>':'<h1>건강 관리</h1><div class="dlz-sub">오늘도 내 몸을 다정하게 챙겨요 ♡</div>')
+    +'<div class="dlz-pills"><span>예정 '+up.length+'개</span></div>'
+    +'</div><span class="cz-ph-btns"><button type="button" class="cz-ph-btn" onclick="czPickPhoto(\'health\',\'health\')" title="사진 바꾸기">'+CZI.cam+'</button>'+(hb.photo?'<button type="button" class="cz-ph-btn" onclick="czResetPhoto(\'health\',\'health\')" title="기본 사진으로">'+CZI.reset+'</button>':'')+'</span></div>';
 }
 function renderHealth(){
   if(!S.health) S.health={schedules:[],records:[],memo:'',inbody:[],tab:'summary'};
@@ -8678,7 +8688,11 @@ function renderHealth(){
     {bg:'#8FCFA0',text:'#245C3A'},
     {bg:'#C9A06B',text:'#5C3E1A'}
   ];
-  let html='<div class="health-tabs" style="position:relative;display:flex;align-items:flex-end;gap:4px;margin-bottom:18px;padding:0 2px;border-bottom:2px solid var(--border)">';
+  let html='';
+  if(document.body.classList.contains('cozy')){
+    html+='<div class="rc-tabs dm-tabs hl-pills">'+tabs.map(function(t){return '<button type="button" class="'+(tab===t.k?'on':'')+'" onclick="setHealthTab(\''+t.k+'\')">'+t.l+'</button>';}).join('')+'</div>';
+  } else {
+  html+='<div class="health-tabs" style="position:relative;display:flex;align-items:flex-end;gap:4px;margin-bottom:18px;padding:0 2px;border-bottom:2px solid var(--border)">';
   tabs.forEach(function(t,ti){
     var on=tab===t.k;
     var pal=tabColors[ti];
@@ -8697,6 +8711,7 @@ function renderHealth(){
       '">'+tabIco[t.k]+t.l+'</button>';
   });
   html+='</div>';
+  }
 
   // ══ 탭 0: 건강 요약 ══
   if(tab==='summary'){

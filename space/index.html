@@ -7956,9 +7956,9 @@ function renderDeadlines(){
   const valid=allDeadlines().concat(dlPageExtras()).filter(d=>d.date&&validDateRe.test(d.date));
   const sorted=[...valid].sort((a,b)=>a.date.localeCompare(b.date));
   // 지난 마감은 최근 7일 이내 + 미완료만 표시
-  const over=sorted.filter(d=>{const dd=dLeft(d.date);return dd<0&&dd>=-7&&!d.done;}),up=sorted.filter(d=>dLeft(d.date)>=0&&!d.done);
+  const over=sorted.filter(d=>{const dd=dLeft(d.date);return dd<0&&!d.done;}),up=sorted.filter(d=>dLeft(d.date)>=0&&!d.done);
   // 7일 넘게 지났는데 아직도 미완료인 마감 (방치된 항목 — 완료/삭제하기 전까진 여기서 계속 보임)
-  const stale=sorted.filter(d=>{const dd=dLeft(d.date);return dd<-7&&!d.done;});
+  const stale=[]; // 지나간 미완료 마감은 전부 맨 위 '지나간 마감'에 모아 보여 줌
   const doneList=sorted.filter(d=>d.done&&dLeft(d.date)>=-30);
   const isCz=document.body.classList.contains('cozy');
   let html='';
@@ -7980,7 +7980,7 @@ function renderDeadlines(){
   }
   if(over.length>0){
     html+='<div style="margin-bottom:20px">'+
-      '<div class="ct" style="color:var(--red);margin-bottom:10px">⚠️ 놓친 마감 <span style="font-size:0.8em;color:var(--t3);font-weight:400">(최근 7일)</span></div>'+
+      '<div class="ct" style="color:var(--red);margin-bottom:10px">⚠️ 지나간 마감 <span style="font-size:0.8em;color:var(--t3);font-weight:400">(아직 안 끝낸 것 '+over.length+'개 · 완료하거나 ✕로 정리해요)</span></div>'+
       '<div class="dl-grid">'+over.map(dlRow).join('')+'</div>'+
     '</div>';
   }

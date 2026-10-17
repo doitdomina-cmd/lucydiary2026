@@ -12889,7 +12889,7 @@ function ldMonthlyPace(){
 }
 function ldGoalCalc(){
   var g=LD.assetGoal;if(!g||!g.amount)return null;
-  var assets=LD.assets||[],net=assets.reduce(function(s,a){return s+(a.type==='asset'?a.amount:-a.amount);},0);
+  var assets=ldAllAssets(),net=assets.reduce(function(s,a){return s+(a.type==='asset'?a.amount:-a.amount);},0);
   var t=todStr(),rem=Math.max(0,g.amount-net),pct=Math.max(0,Math.min(100,Math.round(net/g.amount*100)));
   var months=g.date?Math.max(1,ldMonthsBetween(t,g.date)):null,need=months?Math.ceil(rem/months):null,pace=ldMonthlyPace(),eta=null;
   if(pace>0&&rem>0){var d=new Date();d.setMonth(d.getMonth()+Math.ceil(rem/pace));eta=d.getFullYear()+'년 '+(d.getMonth()+1)+'월';}
@@ -13026,8 +13026,15 @@ function goalTipsCard(){
   return '<div class="card gt"><div class="tdr-h"><div class="tdk"><em>for you</em>목표 코치</div></div>'+tips.map(function(x){return '<button type="button" class="gt-row" onclick="'+x.go+'"><span class="gt-ic">'+x.ic+'</span><span class="gt-b"><b>'+x.tx+'</b>'+(x.sub?'<small>'+x.sub+'</small>':'')+'</span></button>';}).join('')+'</div>';
 }
 
+// 저축 현황(기존 저축 + 드림보드 저축 카드)을 자산 현황에 자동으로 끌어와 보여 줌 (저축은 저축 현황에서만 관리)
+function ldAllAssets(){
+  var out=(LD.assets||[]).slice(),sv=S.savings||{};
+  if((sv.current||0)>0)out.push({id:'sv~main',type:'asset',category:'저축',name:esc(sv.goalName||'저축 현황')+' <small style="color:var(--t3)">(자동)</small>',amount:sv.current,_sv:true});
+  try{wishSaveGoals().forEach(function(g){if((g.w.saveCur||0)>0)out.push({id:'sv~'+g.w.id,type:'asset',category:'저축',name:'♡ '+esc(g.w.text)+' <small style="color:var(--t3)">(자동)</small>',amount:g.w.saveCur,_sv:true});});}catch(e){}
+  return out;
+}
 function renderLedgerAssets(){
-  const assets=(LD.assets||[]);
+  const assets=ldAllAssets();
   const totalAsset=assets.filter(a=>a.type==='asset').reduce((s,a)=>s+a.amount,0);
   const totalLiab=assets.filter(a=>a.type==='liability').reduce((s,a)=>s+a.amount,0);
   const netWorth=totalAsset-totalLiab;
@@ -13057,11 +13064,11 @@ function renderLedgerAssets(){
     if(assetRows.length>0){
       html+='<div style="font-size:0.78em;color:var(--t3);font-weight:500;margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">자산</div>';
       assetRows.forEach(function(a){
-        html+='<div class="ld-arow" onclick="if(!event.target.closest(\'.bi\'))openLedgerAssetForm(\''+a.id+'\')" style="display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--border);cursor:pointer">';
+        html+='<div class="ld-arow" onclick="'+(a._sv?'ledgerTab=\'savings\';render()':'if(!event.target.closest(\'.bi\'))openLedgerAssetForm(\''+a.id+'\')')+'" style="display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--border);cursor:pointer">';
         html+='<div style="flex:1"><div style="font-size:0.9em;font-weight:500">'+a.name+'</div>';
         html+='<div style="font-size:0.78em;color:var(--t3)">'+a.category+(a.interestRate?' · '+a.interestRate+'%':''+(a.maturityDate?' · 만기 '+a.maturityDate:''))+'</div></div>';
         html+='<div style="font-size:0.95em;color:var(--green);font-weight:500">'+fmtMoney(a.amount)+'</div>';
-        html+='<button class="bi" onclick="deleteLedgerAsset(\''+a.id+'\')" style="font-size:0.8em;color:var(--t3)">✕</button></div>';
+        html+=(a._sv?'<span style="font-size:0.8em;color:var(--t3);width:18px;text-align:center">›</span>':'<button class="bi" onclick="deleteLedgerAsset(\''+a.id+'\')" style="font-size:0.8em;color:var(--t3)">✕</button>')+'</div>';
       });
     }
     if(liabRows.length>0){

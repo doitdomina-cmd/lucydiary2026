@@ -8147,20 +8147,28 @@ function navState() {
     return { wid: curWorkId(), doc: W.panes[W.activeEditor]?.active || null, mtab: isPhone() ? pref.mtab : null };
 }
 const sameNav = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+var navOverHome = false; // 기록 맨 위가 '메인 위에 쌓은 작품 칸'인지
 function navSync() {
     if (!navReady || navApplying) return;
     const st = navState();
     if (sameNav(st, curNav)) return;
-    // 작품 안에서 회차·탭만 바뀔 때는 기록을 덧붙이지 않고 현재 칸을 갈아 끼움 → 뒤로가기는 '작품 안 이전 화면'이 아니라 메인(작품 목록)으로
-    const sameWork = curNav && !curNav.home && !st.home && curNav.wid === st.wid;
-    curNav = st;
-    try { if (sameWork) history.replaceState({ nav: st }, ''); else history.pushState({ nav: st }, ''); } catch (e) {}
+    const was = curNav; curNav = st;
+    try {
+        if (st.home) {
+            // 작품 → 메인: 새 칸을 쌓지 않고 한 칸 뒤로 (작품 칸을 지우고 메인 칸으로 돌아감)
+            if (navOverHome) { navOverHome = false; navApplying = true; history.back(); setTimeout(() => { navApplying = false; curNav = navState(); }, 150); }
+            else history.replaceState({ nav: st }, '');
+        } else if (was && !was.home) {
+            // 작품 안 이동(회차·탭·다른 작품)은 칸을 쌓지 않음 → 뒤로가기는 항상 메인
+            history.replaceState({ nav: st }, '');
+        } else { history.pushState({ nav: st }, ''); navOverHome = true; }
+    } catch (e) {}
 }
 function navStart() {
     curNav = navState();
     try {
         // 작품 화면으로 바로 켜졌어도 뒤로가기는 메인(작품 목록)으로 가도록 아래에 메인 칸을 깔아 둠
-        if (!curNav.home) { history.replaceState({ nav: { home: true } }, ''); history.pushState({ nav: curNav }, ''); }
+        if (!curNav.home) { history.replaceState({ nav: { home: true } }, ''); history.pushState({ nav: curNav }, ''); navOverHome = true; }
         else history.replaceState({ nav: curNav }, '');
     } catch (e) {}
     navReady = true;
@@ -8184,7 +8192,7 @@ window.addEventListener('popstate', e => {
     const st = e.state && e.state.nav; if (!st) return;
     navApplying = true;
     try {
-        if (st.home) { if (!$('.home')) openHome(); }
+        if (st.home) { navOverHome = false; if (!$('.home')) openHome(); }
         else {
             if ($('.home')) closeHome();
             if (st.wid && st.wid !== curWorkId() && get(st.wid)) { layout().workId = st.wid; touch(layout()); }

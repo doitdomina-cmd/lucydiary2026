@@ -279,6 +279,13 @@ body.sb-collapsed .sb-collapse-btn{left:0}
 .sb-pj-wrap.collapsed .sb-pj-hd{border-bottom:none}
 .sb-pj-wrap.collapsed .sb-pj-body{display:none}
 .sb-pj-body::-webkit-scrollbar{width:0;height:0;display:none}
+.nav-sub-lbl{font-size:10.5px;letter-spacing:1.4px;color:var(--t3);padding:8px 10px 2px 12px;text-transform:uppercase}
+.nav.nav-sub{padding-left:22px}
+.sb-fold{cursor:pointer;user-select:none}
+.sb-fold .sb-chev{font-size:11px;transition:transform .15s}
+.sb-fold.closed .sb-chev{transform:rotate(-90deg)}
+.mg-body{display:flex;flex-direction:column}
+.mg-body.closed{display:none}
 .sb-lbl{font-size:0.7143em;font-weight:500;color:var(--t3);letter-spacing:.08em;text-transform:uppercase;padding:0 8px;margin-bottom:5px;display:flex;align-items:center;justify-content:space-between}
 .nav{display:flex;align-items:center;gap:10px;padding:4px 10px;border-radius:var(--rsm);cursor:pointer;color:var(--t2);font-size:0.9643em;border:none;background:none;width:100%;text-align:left;transition:all .15s;font-family:var(--sans)}
 .nav:hover{background:var(--s3);color:var(--text)}
@@ -2783,21 +2790,24 @@ body.menu-font-on .sb .nav,body.menu-font-on .sb .sb-lbl,body.menu-font-on .sb-p
       <div class="sb-lbl">Schedule</div>
       <button class="nav" id="nav-today" onclick="go('today')"><span class="nav-ic" data-color="#F5C842"></span>Today<span class="nav-bd" id="today-bd" style="display:none"></span></button>
       <button class="nav" title="월간" id="nav-calendar" onclick="go('calendar')"><span class="nav-ic" data-color="#61C0BF"></span>Monthly</button>
+      <button class="nav" title="마감 관리" id="nav-deadlines" onclick="go('deadlines')"><span class="nav-ic" data-color="#E07070"></span>마감 관리</button>
       <button class="nav" title="감사 일기" id="nav-diary" onclick="go('diary')"><span class="nav-ic" data-color="#B2B0E8"></span>Thanks Diary</button>
     </div>
     <div class="sb-sec">
       <div class="sb-lbl">Goals</div>
       <button class="nav" title="My Goals" id="nav-life" onclick="go('life')"><span class="nav-ic" data-color="#8BBF88"></span>My Goals</button>
       <button class="nav" title="프로젝트" id="nav-projects" onclick="go('projects')"><span class="nav-ic" data-color="#F5C490"></span>Projects</button>
-      <button class="nav" title="가계부" id="nav-ledger" onclick="go('ledger')"><span class="nav-ic" data-color="#7CB9A8"></span>가계부</button>
+      <div class="nav-sub-lbl">Money</div>
+      <button class="nav nav-sub" title="가계부" id="nav-ledger" onclick="go('ledger')"><span class="nav-ic" data-color="#7CB9A8"></span>가계부</button>
+      <button class="nav nav-sub" title="저축 관리" id="nav-savings" onclick="go('savings')"><span class="nav-ic" data-color="#A8C5A0"></span>저축 관리</button>
     </div>
     <div class="sb-sec">
-      <div class="sb-lbl">Manage</div>
-      <button class="nav" title="마감 관리" id="nav-deadlines" onclick="go('deadlines')"><span class="nav-ic" data-color="#E07070"></span>마감 관리</button>
+      <div class="sb-lbl sb-fold" id="mg-hd" onclick="toggleManage()"><span>Manage</span><span class="sb-chev" id="mg-chev">▾</span></div>
+      <div class="mg-body" id="mg-body">
       <button class="nav" title="건강 관리" id="nav-health" onclick="go('health')"><span class="nav-ic" data-color="#E8A0A0"></span>건강 관리</button>
-      <button class="nav" title="저축 관리" id="nav-savings" onclick="go('savings')"><span class="nav-ic" data-color="#A8C5A0"></span>저축 관리</button>
       <button class="nav" title="루틴 설정" id="nav-routine" onclick="go('routine')"><span class="nav-ic" data-color="#E8A87C"></span>루틴 설정</button>
       <button class="nav" title="회고 & 통계" id="nav-insights" onclick="go('insights')"><span class="nav-ic" data-color="#B89BD9"></span>회고 & 통계</button>
+      </div>
     </div>
   </div>
   <div class="sb-pj-wrap" id="pj-nav-sec" style="display:none">
@@ -3340,6 +3350,11 @@ let viewDate = todStr();
 
 const titles = {routinecal:'Routine Calendar',memories:'Memories',dream:'Dream Board',dreamArea:'Dream Board',today:'Today',diary:'Thanks Diary',calendar:'Monthly',todocal:'To Do',routine:'루틴 설정',life:'My Goals',overview:'Goals 요약',projects:'Projects',deadlines:'마감 관리',savings:'저축 관리',health:'건강 관리',settings:'설정',ledger:'가계부',insights:'회고 & 통계',journal:'Journal',timeline:'Roadmap',ledgerYear:'가계부'};
 
+
+// Manage 메뉴 접기/펼치기 (이 기기에 기억)
+function applyManage(closed){var b=document.getElementById('mg-body'),h=document.getElementById('mg-hd');if(b)b.classList.toggle('closed',closed);if(h)h.classList.toggle('closed',closed);}
+function toggleManage(){var b=document.getElementById('mg-body');var c=!(b&&b.classList.contains('closed'));applyManage(c);try{localStorage.setItem('lucy_mg_closed',c?'1':'0');}catch(e){}}
+(function(){var c=false;try{c=localStorage.getItem('lucy_mg_closed')==='1';}catch(e){}applyManage(c);})();
 function go(p, pid, _fromPopstate){
   page=p; activePid=pid||null; if(p!=='projects') pjFilter='';
   if(p==='health'&&S.health) S.health.tab='summary';
@@ -3350,6 +3365,7 @@ function go(p, pid, _fromPopstate){
     history.pushState(state,'',(p==='today'&&!pid)?window.location.pathname:url);
   }
   document.querySelectorAll('.nav').forEach(e=>e.classList.remove('on'));
+  if(['health','routine','insights'].includes(p)) applyManage(false);
   const n=document.getElementById('nav-'+((p==='dreamArea'||p==='timeline')?'dream':p==='routinecal'?'journal':p==='ledgerYear'?'ledger':p));
   if(n) n.classList.add('on');
   const tbTitle=document.getElementById('tb-title');

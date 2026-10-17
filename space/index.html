@@ -287,6 +287,8 @@ body.sb-collapsed .sb-collapse-btn{left:0}
 .today-sv .tsv-b{height:8px;border-radius:99px;background:var(--s2);overflow:hidden}
 .today-sv .tsv-b i{display:block;height:100%;border-radius:99px;background:var(--accent)}
 .today-sv .tsv-f{margin-top:8px;font-size:12px;color:var(--t3)}
+.jr-ys{border:1px solid rgba(255,255,255,.55);background:rgba(255,255,255,.22);color:inherit;border-radius:99px;padding:5px 10px;font-size:13px;font-family:inherit;margin-right:4px;cursor:pointer}
+.jr-ys option{color:#333}
 .sb-fold{cursor:pointer;user-select:none}
 .sb-fold .sb-chev{font-size:11px;transition:transform .15s}
 .sb-fold.closed .sb-chev{transform:rotate(-90deg)}
@@ -3949,7 +3951,7 @@ function rcView(){
   var rb=czObj('routinecal','routinecal'),rurl=rb.photo||'dream/dream-3.jpg';
   var h='<div class="jr rc-pg"><div class="jr-hero" style="background-image:url(\''+esc(rurl).replace(/'/g,'%27')+'\')"><div class="jr-hero-in">'
     +'<div class="jr-kick">ROUTINE CALENDAR · '+y+'</div>'
-    +'<div class="jr-trow"><h1><small>'+EN[mo-1]+'</small>'+mo+'월의 루틴</h1><div class="jr-nav"><button type="button" class="jr-nb" onclick="rcMove(-1)" title="이전 달">‹</button>'+(isNow?'':'<button type="button" class="jr-now" onclick="rcMonth=\'\';render()">이번 달</button>')+'<button type="button" class="jr-nb" onclick="rcMove(1)" title="다음 달">›</button></div></div>'
+    +'<div class="jr-trow"><h1><small>'+EN[mo-1]+'</small>'+mo+'월의 루틴</h1><div class="jr-nav">'+yearSelHtml(y,'rcSetYear')+'<button type="button" class="jr-nb" onclick="rcMove(-1)" title="이전 달">‹</button>'+(isNow?'':'<button type="button" class="jr-now" onclick="rcMonth=\'\';render()">이번 달</button>')+'<button type="button" class="jr-nb" onclick="rcMove(1)" title="다음 달">›</button></div></div>'
     +'<div class="jr-nums"><div><b>'+curAll+'<small>번</small></b><span>이번 달 한 루틴</span></div><div><b>'+doneDays+'<small>일</small></b><span>루틴 한 날</span></div><div><b>'+kinds+'<small>개</small></b><span>루틴 종류</span></div></div>'
     +'</div><span class="cz-ph-btns"><button type="button" class="cz-ph-btn" onclick="czPickPhoto(\'routinecal\',\'routinecal\')" title="사진 바꾸기">'+CZI.cam+'</button>'+(rb.photo?'<button type="button" class="cz-ph-btn" onclick="czResetPhoto(\'routinecal\',\'routinecal\')" title="기본 사진으로">'+CZI.reset+'</button>':'')+'</span></div>';
   h+='<div class="rc-split"><div class="rc-main">';
@@ -6660,6 +6662,14 @@ function savePjReview(pid,ym,k,v){var p=S.projects.find(function(x){return x.id=
 
 // ═══════════ Journal: 이번 달을 저널처럼 (프로젝트 기록·사진 일지 + 월 회고 + 감사 일기 + 숫자 기록 + 완료한 것) ═══════════
 var jrYm=null,_jrPh=[];
+// 저널·루틴 달력: 연도 바로 고르기 (같은 달 유지)
+function yearSelHtml(y,fn){
+  var cy=new Date().getFullYear(),lo=Math.min(cy-6,y),hi=Math.max(cy+1,y),o='';
+  for(var i=hi;i>=lo;i--)o+='<option value="'+i+'"'+(i===y?' selected':'')+'>'+i+'년</option>';
+  return '<select class="jr-ys" onchange="'+fn+'(this.value)" title="연도 고르기">'+o+'</select>';
+}
+function jrSetYear(v){var ym=jrMonth();jrYm=v+'-'+ym.slice(5);render();}
+function rcSetYear(v){var m=rcMonth||todStr().slice(0,7);rcMonth=v+'-'+m.slice(5);render();}
 function jrMonth(){return jrYm||(jrYm=todStr().slice(0,7));}
 function jrShift(n){var ym=jrMonth(),y=parseInt(ym.slice(0,4),10),m=parseInt(ym.slice(5),10)-1+n;y+=Math.floor(m/12);m=((m%12)+12)%12;jrYm=y+'-'+String(m+1).padStart(2,'0');render();var el=document.getElementById('main');if(el)el.scrollTop=0;}
 function jrNow(){jrYm=todStr().slice(0,7);render();}
@@ -6721,7 +6731,7 @@ function renderJournal(){
   var jb=czObj('journal','journal'),jurl=jb.photo||'dream/dream-5.jpg',isNow=ym===todStr().slice(0,7);
   var hero='<div class="jr-hero" style="background-image:url(\''+esc(jurl).replace(/'/g,'%27')+'\')"><div class="jr-hero-in">'+
     '<div class="jr-kick">MY JOURNAL · '+y+'</div>'+
-    '<div class="jr-trow"><h1><small>'+EN[mo-1]+'</small>'+mo+'월의 저널</h1><div class="jr-nav"><button type="button" class="jr-nb" onclick="jrShift(-1)" title="이전 달">‹</button>'+(isNow?'':'<button type="button" class="jr-now" onclick="jrNow()">이번 달</button>')+'<button type="button" class="jr-nb" onclick="jrShift(1)" title="다음 달">›</button></div></div>'+
+    '<div class="jr-trow"><h1><small>'+EN[mo-1]+'</small>'+mo+'월의 저널</h1><div class="jr-nav">'+yearSelHtml(y,'jrSetYear')+'<button type="button" class="jr-nb" onclick="jrShift(-1)" title="이전 달">‹</button>'+(isNow?'':'<button type="button" class="jr-now" onclick="jrNow()">이번 달</button>')+'<button type="button" class="jr-nb" onclick="jrShift(1)" title="다음 달">›</button></div></div>'+
     '<div class="jr-nums"><div><b>'+(logCnt+rtCnt)+'<small>개</small></b><span>프로젝트·루틴 기록</span></div><div><b>'+thumbs.length+'<small>장</small></b><span>사진</span></div><div><b>'+diaryDays+'<small>일</small></b><span>감사 일기</span></div><div><b>'+todoCnt+'<small>개</small></b><span>완료한 할 일</span></div></div>'+
     '</div><span class="cz-ph-btns"><button type="button" class="cz-ph-btn" onclick="czPickPhoto(\'journal\',\'journal\')" title="사진 바꾸기">'+CZI.cam+'</button>'+(jb.photo?'<button type="button" class="cz-ph-btn" onclick="czResetPhoto(\'journal\',\'journal\')" title="기본 사진으로">'+CZI.reset+'</button>':'')+'</span></div>';
   return '<div class="jr">'+hero+body+'</div>';
@@ -7178,7 +7188,7 @@ function savePj(){
   S.projects.push({id:gid(),name,emoji:'',icon:selPjI,desc:document.getElementById('pj-d').value,dday,lifeAreaId:selPjA,color:selPjC,tasks:[],milestones:[],notes:'',routinized:[],links:[]});
   save();closeMo();render();
 }
-function delPj(id){if(!confirm('프로젝트를 삭제할까요?\n(관련 마감일, 루틴화 일정, 캘린더 이벤트도 함께 삭제됩니다)'))return;const pj=S.projects.find(p=>p.id===id);const rzIds=pj&&pj.routinized?pj.routinized.map(r=>r.id):[];S.deadlines=S.deadlines.filter(d=>d.projectId!==id);S.calEvents=S.calEvents.filter(e=>e.projectId!==id);if(rzIds.length>0)S.routines=S.routines.filter(r=>!rzIds.includes(r.id));if(S.savings&&S.savings.entries&&rzIds.length>0){rzIds.forEach(function(rid){var prefix='rzsave-'+rid+'-';S.savings.entries.filter(e=>e.id&&e.id.indexOf(prefix)===0).forEach(e=>{S.savings.current-=e.amount;});S.savings.entries=S.savings.entries.filter(e=>!(e.id&&e.id.indexOf(prefix)===0));});if(S.savings.current<0)S.savings.current=0;}S.projects=S.projects.filter(p=>p.id!==id);if(activePid===id){activePid=null;page='projects';}save();render();}
+function delPj(id){var _pj=S.projects.find(p=>p.id===id);if(_pj&&!_pj.completed&&confirm('끝난 프로젝트라면 삭제 대신 "완료"로 보관할 수 있어요.\n완료로 보관하면 기록·루틴·사진이 모두 그대로 남아요.\n\n[확인] 완료로 보관   [취소] 삭제 계속')){togPjComplete(id);return;}if(!confirm('정말 삭제할까요?\n(관련 마감일, 루틴화 일정, 캘린더 이벤트도 함께 삭제되고 되돌릴 수 없어요)'))return;const pj=S.projects.find(p=>p.id===id);const rzIds=pj&&pj.routinized?pj.routinized.map(r=>r.id):[];S.deadlines=S.deadlines.filter(d=>d.projectId!==id);S.calEvents=S.calEvents.filter(e=>e.projectId!==id);if(rzIds.length>0)S.routines=S.routines.filter(r=>!rzIds.includes(r.id));if(S.savings&&S.savings.entries&&rzIds.length>0){rzIds.forEach(function(rid){var prefix='rzsave-'+rid+'-';S.savings.entries.filter(e=>e.id&&e.id.indexOf(prefix)===0).forEach(e=>{S.savings.current-=e.amount;});S.savings.entries=S.savings.entries.filter(e=>!(e.id&&e.id.indexOf(prefix)===0));});if(S.savings.current<0)S.savings.current=0;}S.projects=S.projects.filter(p=>p.id!==id);if(activePid===id){activePid=null;page='projects';}save();render();}
 
 function openPjEditModal(pid){
   const p=S.projects.find(x=>x.id===pid);if(!p)return;

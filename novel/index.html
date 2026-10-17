@@ -8191,6 +8191,14 @@ window.addEventListener('popstate', e => {
     if (closeTopOverlay()) { try { history.pushState({ nav: curNav }, ''); } catch (_) {} return; }
     const st = e.state && e.state.nav; if (!st) return;
     navApplying = true;
+    // 작품에서 뒤로 갔는데 도착한 칸이 (예전에 쓰던) 다른 작품 칸이면, 그 작품으로 가지 말고 메인으로 — 칸도 메인으로 고쳐 둠
+    if (!st.home && curNav && !curNav.home) {
+        try { history.replaceState({ nav: { home: true } }, ''); } catch (_) {}
+        navOverHome = false;
+        try { if (!$('.home')) openHome(); } finally { navApplying = false; }
+        curNav = navState();
+        return;
+    }
     try {
         if (st.home) { navOverHome = false; if (!$('.home')) openHome(); }
         else {

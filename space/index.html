@@ -279,8 +279,6 @@ body.sb-collapsed .sb-collapse-btn{left:0}
 .sb-pj-wrap.collapsed .sb-pj-hd{border-bottom:none}
 .sb-pj-wrap.collapsed .sb-pj-body{display:none}
 .sb-pj-body::-webkit-scrollbar{width:0;height:0;display:none}
-.nav-sub-lbl{font-size:10.5px;letter-spacing:1.4px;color:var(--t3);padding:8px 10px 2px 12px;text-transform:uppercase}
-.nav.nav-sub{padding-left:22px}
 .sb-fold{cursor:pointer;user-select:none}
 .sb-fold .sb-chev{font-size:11px;transition:transform .15s}
 .sb-fold.closed .sb-chev{transform:rotate(-90deg)}
@@ -2797,9 +2795,7 @@ body.menu-font-on .sb .nav,body.menu-font-on .sb .sb-lbl,body.menu-font-on .sb-p
       <div class="sb-lbl">Goals</div>
       <button class="nav" title="My Goals" id="nav-life" onclick="go('life')"><span class="nav-ic" data-color="#8BBF88"></span>My Goals</button>
       <button class="nav" title="프로젝트" id="nav-projects" onclick="go('projects')"><span class="nav-ic" data-color="#F5C490"></span>Projects</button>
-      <div class="nav-sub-lbl">Money</div>
-      <button class="nav nav-sub" title="가계부" id="nav-ledger" onclick="go('ledger')"><span class="nav-ic" data-color="#7CB9A8"></span>가계부</button>
-      <button class="nav nav-sub" title="저축 관리" id="nav-savings" onclick="go('savings')"><span class="nav-ic" data-color="#A8C5A0"></span>저축 관리</button>
+      <button class="nav" title="머니" id="nav-money" onclick="go('ledger')"><span class="nav-ic" data-color="#7CB9A8"></span>Money</button>
     </div>
     <div class="sb-sec">
       <div class="sb-lbl sb-fold" id="mg-hd" onclick="toggleManage()"><span>Manage</span><span class="sb-chev" id="mg-chev">▾</span></div>
@@ -3366,7 +3362,7 @@ function go(p, pid, _fromPopstate){
   }
   document.querySelectorAll('.nav').forEach(e=>e.classList.remove('on'));
   if(['health','routine','insights'].includes(p)) applyManage(false);
-  const n=document.getElementById('nav-'+((p==='dreamArea'||p==='timeline')?'dream':p==='routinecal'?'journal':p==='ledgerYear'?'ledger':p));
+  const n=document.getElementById('nav-'+((p==='dreamArea'||p==='timeline')?'dream':p==='routinecal'?'journal':(p==='ledgerYear'||p==='ledger'||p==='savings')?'money':p));
   if(n) n.classList.add('on');
   const tbTitle=document.getElementById('tb-title');
   const topbar=document.querySelector('.topbar');
@@ -3525,6 +3521,9 @@ function updateDreamYear(){var el=document.getElementById('sb-year');if(el)el.in
 // 저널 위 탭: Journal / Routine Calendar
 function jrTabs(){
   return '<div class="rc-tabs dm-tabs"><button class="'+(page==='journal'?'on':'')+'" onclick="go(\'journal\')">Journal</button><button class="'+(page==='routinecal'?'on':'')+'" onclick="go(\'routinecal\')">Routine Calendar</button></div>';
+}
+function moneyTabs(){
+  return '<div class="rc-tabs dm-tabs"><button class="'+(page==='ledger'||page==='ledgerYear'?'on':'')+'" onclick="go(\'ledger\')">가계부</button><button class="'+(page==='savings'?'on':'')+'" onclick="go(\'savings\')">저축 관리</button></div>';
 }
 function dmTabs(){
   return '<div class="rc-tabs dm-tabs"><button class="'+(page==='dream'?'on':'')+'" onclick="go(\'dream\')">Dream Board</button><button class="'+(page==='timeline'?'on':'')+'" onclick="go(\'timeline\')">Roadmap</button></div>';
@@ -4404,12 +4403,12 @@ function render(){
   else if(page==='life') div.innerHTML=renderLife();
   else if(page==='projects') div.innerHTML=activePid?renderPjDetail(activePid):renderProjects();
   else if(page==='deadlines') div.innerHTML=renderDeadlines();
-  else if(page==='savings') div.innerHTML=renderSavings();
+  else if(page==='savings') div.innerHTML=moneyTabs()+renderSavings();
   else if(page==='health') div.innerHTML=renderHealth();
   else if(page==='overview') div.innerHTML=renderOverview();
   else if(page==='settings') div.innerHTML=renderSettings();
-  else if(page==='ledger') div.innerHTML=renderLedger();
-  else if(page==='ledgerYear') div.innerHTML=renderLedgerYear();
+  else if(page==='ledger') div.innerHTML=moneyTabs()+renderLedger();
+  else if(page==='ledgerYear') div.innerHTML=moneyTabs()+renderLedgerYear();
   else if(page==='insights') div.innerHTML=renderInsights();
   else if(page==='journal') div.innerHTML=jrTabs()+renderJournal();
   else if(page==='timeline') div.innerHTML=dmTabs()+renderTimeline();

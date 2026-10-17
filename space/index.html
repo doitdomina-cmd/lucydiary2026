@@ -286,6 +286,7 @@ body.sb-collapsed .sb-collapse-btn{left:0}
 .today-sv .tsv-n small{font-size:13px;font-weight:400;color:var(--t3)}
 .today-sv .tsv-b{height:8px;border-radius:99px;background:var(--s2);overflow:hidden}
 .today-sv .tsv-b i{display:block;height:100%;border-radius:99px;background:var(--accent)}
+.today-sv .tsv-r{margin-top:10px;font-size:12px;color:var(--t2);display:grid;grid-template-columns:1fr auto;gap:2px 8px}.today-sv .tsv-r i{grid-column:1/-1;height:5px;border-radius:99px;background:var(--s2);overflow:hidden}.today-sv .tsv-r u{display:block;height:100%;background:var(--accent);border-radius:99px}.today-sv .tsv-r b{font-weight:500;color:var(--t3)}
 .today-sv .tsv-f{margin-top:8px;font-size:12px;color:var(--t3)}
 .jr-ys{border:1px solid rgba(255,255,255,.55);background:rgba(255,255,255,.22);color:inherit;border-radius:99px;padding:5px 10px;font-size:13px;font-family:inherit;margin-right:4px;cursor:pointer}
 .jr-ys option{color:#333}
@@ -5178,15 +5179,24 @@ function renderToday(){
   return '<div class="today-life">'+czTodayBanner()+czTodayZones()+'<div class="tl-legacy">'+renderTodayLegacy()+'</div>'+todaySavingsCard()+'</div>';
 }
 // Today 맨 아래: 저축 현황 카드 (누르면 가계부 > 저축 현황)
+function savingsTotals(){
+  var sv=S.savings||{},cur=sv.current||0,goal=sv.goal||0,gs=[];
+  try{gs=wishSaveGoals();}catch(e){}
+  gs.forEach(function(g){cur+=g.w.saveCur||0;goal+=g.w.saveTarget||0;});
+  return {cur:cur,goal:goal,pc:goal?Math.min(100,Math.round(cur/goal*100)):0,wishes:gs};
+}
 function todaySavingsCard(){
   try{
-    var sv=S.savings||{},cur=sv.current||0,goal=sv.goal||0,pc=goal?Math.min(100,Math.round(cur/goal*100)):0;
+    var T=savingsTotals(),sv=S.savings||{},cur=T.cur,goal=T.goal,pc=T.pc;
     var ym=todStr().slice(0,7),mo=(sv.entries||[]).filter(function(e){return e.date&&e.date.slice(0,7)===ym;}).reduce(function(a,e){return a+(e.amount||0);},0);
+    T.wishes.forEach(function(g){(g.w.saveEntries||[]).forEach(function(e){if(e.date&&e.date.slice(0,7)===ym)mo+=e.amount||0;});});
+    var rows=T.wishes.map(function(g){var w=g.w,p2=Math.min(100,Math.round((w.saveCur||0)/w.saveTarget*100));
+      return '<div class="tsv-r"><span>♡ '+esc(w.text)+'</span><b>'+money(w.saveCur||0)+' / '+money(w.saveTarget)+'</b><i><u style="width:'+p2+'%"></u></i></div>';}).join('');
     return '<button type="button" class="today-sv" onclick="go(\'savings\')">'
       +'<div class="tsv-h"><span>저축 현황</span><em>'+(goal?pc+'%':'목표 정하기')+'</em></div>'
       +'<div class="tsv-n">'+money(cur)+(goal?'<small> / '+money(goal)+'</small>':'')+'</div>'
       +(goal?'<div class="tsv-b"><i style="width:'+pc+'%"></i></div>':'')
-      +'<div class="tsv-f">'+(goal?'남은 금액 '+money(Math.max(0,goal-cur))+' · ':'')+'이번 달 +'+money(mo)+'</div></button>';
+      +'<div class="tsv-f">'+(goal?'남은 금액 '+money(Math.max(0,goal-cur))+' · ':'')+'이번 달 +'+money(mo)+'</div>'+rows+'</button>';
   }catch(e){return '';}
 }
 
@@ -5349,11 +5359,11 @@ function czTodayBe(now){
 function czTodayStats(){
   try{
     var ds=todStr(),rs=routinesForDate(ds),ck=S.checks[ds]||{},dn=rs.filter(function(r){return ck[r.id];}).length,rp=rs.length?Math.round(dn/rs.length*100):0;
-    var sv=S.savings||{},sp=sv.goal?Math.min(100,Math.round((sv.current||0)/sv.goal*100)):0;
+    var sv=S.savings||{},_T=savingsTotals(),sp=_T.pc;
     var chip=function(lab,pc,sub,on){return '<button type="button" class="cz-stat" onclick="'+on+'"><span>'+lab+'</span><b>'+pc+'%</b><i><u style="width:'+pc+'%"></u></i><em>'+sub+'</em></button>';};
     var now2=new Date(),ym=ds.slice(0,7),gl=(S.monthlyGoals&&S.monthlyGoals[ym])||[],gd=gl.filter(function(g){return g.done;}).length,nx=gl.find(function(g){return !g.done;});
     var goalChip='<button type="button" class="cz-stat cz-stat-g" onclick="calY='+now2.getFullYear()+';calM='+now2.getMonth()+';go(\'calendar\')"><span>'+(now2.getMonth()+1)+'월 목표</span><b>'+(gl.length?gd+' / '+gl.length:'+')+'</b><em>'+(gl.length?(nx?'다음 · '+esc(nx.text):'✿ 이번 달 목표 완료!'):'목표 추가하기')+'</em></button>';
-    return '<div class="cz-stats">'+goalChip+(sv.goal?chip('저축 달성',sp,money(sv.current||0),"go('savings')"):'')+'</div>';
+    return '<div class="cz-stats">'+goalChip+(_T.goal?chip('저축 달성',sp,money(_T.cur),"go('savings')"):'')+'</div>';
   }catch(e){return '';}
 }
 function czSeason(now){

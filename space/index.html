@@ -5464,6 +5464,17 @@ function czApplyPos(){
     }
   });
 }
+// 돌리기를 눌러도 위치 맞추기 모드를 닫지 않고, 다시 그려진 사진에서 이어서 계속 돌릴 수 있게
+function czReopenMove(t){
+  setTimeout(function(){
+    var found=null;
+    document.querySelectorAll('.cz-ph-btns').forEach(function(btns){
+      if(found)return;var q=czParseTarget(btns);
+      if(q&&q.kind===t.kind&&q.id===t.id&&btns.parentElement)found=btns.parentElement;
+    });
+    if(found)czStartMove(found,t);
+  },60);
+}
 function czStartMove(el,t){
   var o=czObj(t.kind,t.id);if(!o)return;
   if(el.classList.contains('cz-moving'))return;
@@ -5486,7 +5497,7 @@ function czStartMove(el,t){
   el.addEventListener('pointerdown',down,true);el.addEventListener('pointermove',move,true);el.addEventListener('pointerup',up,true);el.addEventListener('pointercancel',up,true);el.addEventListener('click',stopClick,true);
   bar.querySelector('.cz-mv-done').onclick=done;
   bar.querySelector('.cz-mv-reset').onclick=function(e){e.stopPropagation();x=50;y=50;apply();};
-  bar.querySelector('.cz-mv-rot').onclick=function(e){e.stopPropagation();e.preventDefault();var b=e.currentTarget;b.disabled=true;b.textContent='돌리는 중…';czRotatePhoto(t.kind,t.id).then(function(){done();}).catch(function(err){b.disabled=false;b.textContent='↻ 돌리기';alert((err&&err.message)||'사진을 돌리지 못했어요.');});};
+  bar.querySelector('.cz-mv-rot').onclick=function(e){e.stopPropagation();e.preventDefault();var b=e.currentTarget;b.disabled=true;b.textContent='돌리는 중…';czRotatePhoto(t.kind,t.id).then(function(){czReopenMove(t);}).catch(function(err){b.disabled=false;b.textContent='↻ 돌리기';alert((err&&err.message)||'사진을 돌리지 못했어요.');});};
 }
 // 사진을 오른쪽으로 90° 돌려서 다시 저장 (이 기기 사진이면 바로, 클라우드 사진이면 받아와서 돌림)
 function czRotatePhoto(kind,id){

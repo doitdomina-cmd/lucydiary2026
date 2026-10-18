@@ -457,6 +457,7 @@ body.sb-collapsed .sb-collapse-btn{left:0}
 .oy-kick{font-size:11px;letter-spacing:2px;color:var(--cz-muted,var(--t3))}
 .oy-head h1{margin:2px 0 0;font-family:'Instrument Serif','Noto Serif KR',Georgia,serif;font-weight:400;font-size:44px;line-height:1;color:var(--text)}
 .oy-nav{display:flex;gap:6px}
+.oy-nav{flex-wrap:nowrap;flex:none}.oy-nav button{white-space:nowrap}.oy-kick{white-space:nowrap}
 .oy-nav button{border:1px solid var(--cz-line,var(--border));background:var(--surface);color:var(--text);border-radius:99px;min-width:36px;height:36px;padding:0 12px;cursor:pointer;font-family:inherit;font-size:14px}
 .oy-sub{font-size:12px;color:var(--t3);margin:0 0 12px}
 .oy-scroll{overflow:auto;border:1px solid var(--cz-line,var(--border));border-radius:14px;background:var(--surface);max-height:calc(100vh - 210px);-webkit-overflow-scrolling:touch}
@@ -490,6 +491,17 @@ thead .oy-m{z-index:5;top:0}
 .oy.fit .oy-c.today{box-shadow:inset 0 0 0 1.5px var(--cz-acc,var(--accent))}
 @media(min-width:900px){.oy.fit .oy-c{height:52px}.oy.fit .oy-dh{font-size:10px}.oy.fit .oy-c em{height:6px}}
 .oy-fit{font-size:12px !important}
+/* 1 Year 기간 막대 */
+.oy-t tr{--ln:0}
+.oy-c{overflow:visible !important;padding-top:calc(var(--ln,0) * 13px) !important;height:calc(62px + var(--ln,0) * 13px) !important}
+.oy-bar{position:absolute;z-index:2;left:1px;top:calc(11px + var(--l,0) * 13px);width:calc(var(--n) * 100% - 2px);height:12px;line-height:12px;padding:0 5px;border-radius:6px;background:var(--c);color:#fff;font-size:9px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-sizing:border-box;cursor:pointer;text-shadow:0 1px 1px rgba(0,0,0,.25)}
+.oy-bar.cl{border-top-left-radius:0;border-bottom-left-radius:0}.oy-bar.cr{border-top-right-radius:0;border-bottom-right-radius:0}
+.oy-add{background:var(--cz-acc,var(--accent)) !important;color:#fff !important;border-color:transparent !important}
+.oy.fit .oy-c{height:calc(40px + var(--ln,0) * 12px) !important;padding-top:calc(var(--ln,0) * 12px) !important}
+.oy.fit .oy-bar{top:calc(2px + var(--l,0) * 12px);height:11px;line-height:11px;font-size:8px;padding:0 3px}
+@media(min-width:900px){.oy.fit .oy-c{height:calc(52px + var(--ln,0) * 13px) !important;padding-top:calc(var(--ln,0) * 13px) !important}.oy.fit .oy-bar{top:calc(3px + var(--l,0) * 13px);height:12px;line-height:12px;font-size:9px}}
+.oy.fit .oy-c em{margin-top:2px}
+
 .sb-fold{cursor:pointer;user-select:none}
 .sb-fold .sb-chev{font-size:11px;transition:transform .15s}
 .sb-fold.closed .sb-chev{transform:rotate(-90deg)}
@@ -3778,28 +3790,65 @@ function oyCollect(y){
   return map;
 }
 function oyMove(n){oyYear+=n;render();var m=document.getElementById('main');if(m)m.scrollTop=0;}
+var oyColor='#8FA3BA';
+function oyBarsOf(y){return (S.yearBars||[]).filter(function(b){return b.start&&b.end&&b.start.slice(0,4)<=String(y)&&b.end.slice(0,4)>=String(y);});}
 function oyDay(ds){
   var it=(oyCollect(+ds.slice(0,4))[ds]||[]);
+  var bars=(S.yearBars||[]).filter(function(b){return b.start<=ds&&ds<=b.end;});
   var d=new Date(ds+'T00:00:00'),WD=['일','월','화','수','목','금','토'];
-  var body=it.length?it.map(function(x){return '<div onclick="closeMo();'+x.on+'" style="display:flex;align-items:center;gap:8px;padding:9px 2px;border-bottom:1px solid var(--border);cursor:pointer;'+(x.done?'opacity:.5;text-decoration:line-through':'')+'"><i style="width:10px;height:10px;border-radius:50%;background:'+x.c+';flex:none"></i><span>'+esc(x.t)+'</span></div>';}).join(''):'<div style="color:var(--t3);padding:14px 2px">이 날은 비어 있어요.</div>';
-  openMo((d.getMonth()+1)+'월 '+d.getDate()+'일 ('+WD[d.getDay()]+')',body,'<button class="btn bg" onclick="closeMo()">닫기</button><button class="btn bp" onclick="closeMo();openEvModal(\''+ds+'\')">+ 일정 추가</button>');
+  var row=function(c,t,on,done){return '<div onclick="closeMo();'+on+'" style="display:flex;align-items:center;gap:8px;padding:9px 2px;border-bottom:1px solid var(--border);cursor:pointer;'+(done?'opacity:.5;text-decoration:line-through':'')+'"><i style="width:10px;height:10px;border-radius:'+(on.indexOf('oyBar')===0?'3px':'50%')+';background:'+c+';flex:none"></i><span>'+esc(t)+'</span></div>';};
+  var body=bars.map(function(b){return row(b.color,b.title+' ('+b.start.slice(5).replace('-','/')+' ~ '+b.end.slice(5).replace('-','/')+')',"oyBar('"+b.id+"')");}).join('')
+    +it.map(function(x){return row(x.c,x.t,x.on,x.done);}).join('');
+  if(!body)body='<div style="color:var(--t3);padding:14px 2px">이 날은 비어 있어요.</div>';
+  openMo((d.getMonth()+1)+'월 '+d.getDate()+'일 ('+WD[d.getDay()]+')',body,'<button class="btn bg" onclick="closeMo();openEvModal(\''+ds+'\')">+ 일정</button><button class="btn bp" onclick="closeMo();oyBar(null,\''+ds+'\')">+ 기간 (여행 등)</button>');
 }
+// 기간 일정(막대) 만들기·고치기
+function oyBar(id,ds){
+  var b=id?(S.yearBars||[]).find(function(x){return x.id===id;}):null;
+  var st=b?b.start:(ds||todStr()),en=b?b.end:st;
+  oyColor=b?b.color:oyColor;
+  closeMo();
+  openMo(b?'기간 일정 고치기':'기간 일정 만들기',
+    '<div class="fg"><label class="fl">이름</label><input class="inp" id="oy-t" placeholder="예: 제주 여행" value="'+esc(b?b.title:'')+'"></div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div class="fg"><label class="fl">시작</label><input type="date" class="inp" id="oy-s" value="'+st+'"></div><div class="fg"><label class="fl">끝</label><input type="date" class="inp" id="oy-e" value="'+en+'"></div></div>'+
+    '<div class="fg"><label class="fl">색상</label><div class="cops" id="oy-cops">'+COLORS.map(function(c){return '<div class="cop '+(c===oyColor?'on':'')+'" style="background:'+c+'" onclick="oyPickC(this,\''+c+'\')"></div>';}).join('')+'</div></div>',
+    (b?'<button class="btn bg" style="margin-right:auto;color:var(--red)" onclick="oyBarDel(\''+b.id+'\')">삭제</button>':'')+'<button class="btn bg" onclick="closeMo()">취소</button><button class="btn bp" onclick="oyBarSave(\''+(b?b.id:'')+'\')">저장</button>');
+  setTimeout(function(){var t=document.getElementById('oy-t');if(t&&!b)t.focus();},50);
+}
+function oyPickC(el,c){oyColor=c;document.querySelectorAll('#oy-cops .cop').forEach(function(e){e.classList.remove('on');});el.classList.add('on');}
+function oyBarSave(id){
+  var t=document.getElementById('oy-t').value.trim(),a=document.getElementById('oy-s').value,e=document.getElementById('oy-e').value||a;
+  if(!t||!a){alert('이름과 시작 날짜를 적어 주세요.');return;}
+  if(e<a){var x=a;a=e;e=x;}
+  if(!S.yearBars)S.yearBars=[];
+  if(id){var b=S.yearBars.find(function(y){return y.id===id;});if(b){b.title=t;b.start=a;b.end=e;b.color=oyColor;}}
+  else S.yearBars.push({id:gid(),title:t,start:a,end:e,color:oyColor});
+  oyYear=+a.slice(0,4);save();closeMo();render();
+}
+function oyBarDel(id){if(!confirm('이 기간 일정을 지울까요?'))return;S.yearBars=(S.yearBars||[]).filter(function(b){return b.id!==id;});save();closeMo();render();}
 function renderOneYear(){
   var y=oyYear,map=oyCollect(y),t=todStr(),MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],WD=['일','월','화','수','목','금','토'];
-  var total=Object.keys(map).reduce(function(a,k){return a+map[k].length;},0);
+  var yb=oyBarsOf(y);
+  var total=Object.keys(map).reduce(function(a,k){return a+map[k].length;},0)+yb.length;
   var h='<div class="oy'+(oyFit?' fit':'')+'"><div class="oy-head"><div><div class="oy-kick">1 YEAR · 한눈에 보는 한 해</div><h1>'+y+'</h1></div>'
-    +'<div class="oy-nav"><button type="button" class="oy-fit" onclick="oyFit=!oyFit;render()" title="한 화면에 전체 보기 / 칸을 크게 보기">'+(oyFit?'🔍 크게':'▦ 전체')+'</button><button type="button" onclick="oyMove(-1)" title="이전 해">‹</button>'+(y===new Date().getFullYear()?'':'<button type="button" class="oy-now" onclick="oyYear=new Date().getFullYear();render()">올해</button>')+'<button type="button" onclick="oyMove(1)" title="다음 해">›</button></div></div>'
-    +'<div class="oy-sub">일정·마감·드림보드 날짜·건강 일정이 모여요 · 칸을 누르면 그날이 열려요 · 올해 '+total+'개</div>'
+    +'<div class="oy-nav"><button type="button" class="oy-add" onclick="oyBar(null)" title="여행처럼 기간이 있는 일정 만들기">＋ 기간</button><button type="button" class="oy-fit" onclick="oyFit=!oyFit;render()" title="한 화면에 전체 보기 / 칸을 크게 보기">'+(oyFit?'🔍 크게':'▦ 전체')+'</button><button type="button" onclick="oyMove(-1)" title="이전 해">‹</button>'+(y===new Date().getFullYear()?'':'<button type="button" class="oy-now" onclick="oyYear=new Date().getFullYear();render()">올해</button>')+'<button type="button" onclick="oyMove(1)" title="다음 해">›</button></div></div>'
+    +'<div class="oy-sub">일정·마감·꿈 날짜·건강 일정이 모여요 · 칸을 누르면 그날이 열리고, <b>＋ 기간</b>으로 여행 같은 막대를 만들어요 · 올해 '+total+'개</div>'
     +'<div class="oy-scroll"><table class="oy-t"><thead><tr><th class="oy-m"></th>';
   for(var d=1;d<=31;d++)h+='<th class="oy-dh">'+d+'</th>';
   h+='</tr></thead><tbody>';
   for(var m=0;m<12;m++){
-    var last=new Date(y,m+1,0).getDate();
-    h+='<tr><th class="oy-m"><b>'+(m+1)+'</b><small>'+MN[m]+'</small></th>';
+    var last=new Date(y,m+1,0).getDate(),mp=(m+1<10?'0':'')+(m+1),first=y+'-'+mp+'-01',lastDs=y+'-'+mp+'-'+String(last).padStart(2,'0');
+    // 이 달에 걸친 막대: 줄(lane)을 겹치지 않게 배정
+    var segs=yb.filter(function(b){return b.start<=lastDs&&b.end>=first;}).sort(function(a,b){return a.start.localeCompare(b.start)||b.end.localeCompare(a.end);}).map(function(b){
+      var sd=b.start<first?1:+b.start.slice(8),ed=b.end>lastDs?last:+b.end.slice(8);return {b:b,s:sd,e:ed,cl:b.start<first,cr:b.end>lastDs};});
+    var laneEnd=[];segs.forEach(function(sg){var l=0;while(laneEnd[l]!==undefined&&laneEnd[l]>=sg.s)l++;laneEnd[l]=sg.e;sg.l=l;});
+    var lanes=laneEnd.length,byStart={};segs.forEach(function(sg){(byStart[sg.s]||(byStart[sg.s]=[])).push(sg);});
+    h+='<tr style="--ln:'+lanes+'"><th class="oy-m"><b>'+(m+1)+'</b><small>'+MN[m]+'</small></th>';
     for(var dd=1;dd<=31;dd++){
       if(dd>last){h+='<td class="oy-c oy-x"></td>';continue;}
-      var ds=y+'-'+String(m+1).padStart(2,'0')+'-'+String(dd).padStart(2,'0'),wd=new Date(y,m,dd).getDay(),its=map[ds]||[];
+      var ds=y+'-'+mp+'-'+String(dd).padStart(2,'0'),wd=new Date(y,m,dd).getDay(),its=map[ds]||[];
       h+='<td class="oy-c'+(wd===0?' sun':wd===6?' sat':'')+(ds===t?' today':'')+(its.length?' has':'')+'" onclick="oyDay(\''+ds+'\')"><i>'+WD[wd]+'</i>'
+        +(byStart[dd]||[]).map(function(sg){return '<b class="oy-bar'+(sg.cl?' cl':'')+(sg.cr?' cr':'')+'" style="--n:'+(sg.e-sg.s+1)+';--l:'+sg.l+';--c:'+esc(sg.b.color)+'" onclick="event.stopPropagation();oyBar(\''+sg.b.id+'\')" title="'+esc(sg.b.title)+'">'+esc(sg.b.title)+'</b>';}).join('')
         +its.slice(0,3).map(function(x){return '<em style="--c:'+esc(x.c)+(x.done?';opacity:.45':'')+'">'+esc(x.t)+'</em>';}).join('')
         +(its.length>3?'<small>+'+(its.length-3)+'</small>':'')+'</td>';
     }

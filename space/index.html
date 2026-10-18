@@ -3850,11 +3850,9 @@ function monthTabs(){
 // ═══════════ 1 Year: 1년을 한 장에 (월 12줄 × 날짜 31칸) ═══════════
 var oyYear=new Date().getFullYear(),oyFit=true; // oyFit: 한 화면에 1년 전체 맞춤(기본) / false: 칸을 크게 + 옆으로 밀기
 function oyCollect(y){
+  // 1 Year에는 '드림보드에 넣은 날짜'만 자동으로 모이고, 나머지(여행 등)는 ＋ 기간 막대로 직접 만든다
   var map={};
-  function add(ds,o){if(!ds||ds.slice(0,4)!==String(y))return;(map[ds]||(map[ds]=[])).push(o);}
-  (S.calEvents||[]).forEach(function(e){if(e.rzId)return;add(e.date,{t:e.title||'',c:e.color||'#7E91B0',on:"openEvDetailModal('"+e.id+"')"});});
-  allDeadlines().forEach(function(d){add(d.date,{t:String(d.title||'').replace(/<[^>]*>/g,''),c:d._wish?'#EF805E':'#C9603F',done:d.done,on:"dlOpen('"+d.id+"')"});});
-  ((S.health&&S.health.schedules)||[]).forEach(function(h){add(h.date,{t:'♡ '+(h.title||''),c:'#E8A0A0',done:h.done,on:"go('health')"});});
+  wishDeadlines().forEach(function(d){if(!d.date||d.date.slice(0,4)!==String(y))return;(map[d.date]||(map[d.date]=[])).push({t:String(d.title||'').replace(/<[^>]*>/g,''),c:'#EF805E',done:d.done,on:"dlOpen('"+d.id+"')"});});
   return map;
 }
 function oyMove(n){oyYear+=n;render();var m=document.getElementById('main');if(m)m.scrollTop=0;}
@@ -3869,7 +3867,7 @@ function oyDay(ds){
   var body=bars.map(function(b){return row(b.color,b.title+' ('+b.start.slice(5).replace('-','/')+' ~ '+b.end.slice(5).replace('-','/')+')',"oyBar('"+b.id+"')");}).join('')
     +it.map(function(x){return row(x.c,x.t,x.on,x.done);}).join('');
   if(!body)body='<div style="color:var(--t3);padding:14px 2px">이 날은 비어 있어요.</div>';
-  openMo((d.getMonth()+1)+'월 '+d.getDate()+'일 ('+WD[d.getDay()]+')',body,'<button class="btn bg" onclick="closeMo();openEvModal(\''+ds+'\')">+ 일정</button><button class="btn bp" onclick="closeMo();oyBar(null,\''+ds+'\')">+ 기간 (여행 등)</button>');
+  openMo((d.getMonth()+1)+'월 '+d.getDate()+'일 ('+WD[d.getDay()]+')',body,'<button class="btn bg" onclick="closeMo()">닫기</button><button class="btn bp" onclick="closeMo();oyBar(null,\''+ds+'\')">+ 기간 (여행 등)</button>');
 }
 // 기간 일정(막대) 만들기·고치기
 function oyBar(id,ds){
@@ -3901,7 +3899,7 @@ function renderOneYear(){
   var total=Object.keys(map).reduce(function(a,k){return a+map[k].length;},0)+yb.length;
   var h='<div class="oy'+(oyFit?' fit':'')+'"><div class="oy-head"><div><div class="oy-kick">1 YEAR · 한눈에 보는 한 해</div><h1>'+y+'</h1></div>'
     +'<div class="oy-nav"><button type="button" class="oy-add" onclick="oyBar(null)" title="여행처럼 기간이 있는 일정 만들기">＋ 기간</button><button type="button" class="oy-fit" onclick="oyFit=!oyFit;render()" title="한 화면에 전체 보기 / 칸을 크게 보기">'+(oyFit?'🔍 크게':'▦ 전체')+'</button><button type="button" onclick="oyMove(-1)" title="이전 해">‹</button>'+(y===new Date().getFullYear()?'':'<button type="button" class="oy-now" onclick="oyYear=new Date().getFullYear();render()">올해</button>')+'<button type="button" onclick="oyMove(1)" title="다음 해">›</button></div></div>'
-    +'<div class="oy-sub">일정·마감·꿈 날짜·건강 일정이 모여요 · 칸을 누르면 그날이 열리고, <b>＋ 기간</b>으로 여행 같은 막대를 만들어요 · 올해 '+total+'개</div>'
+    +'<div class="oy-sub">드림보드에 넣은 날짜가 모이고, <b>＋ 기간</b>으로 여행 같은 막대를 직접 만들어요 · 올해 '+total+'개</div>'
     +'<div class="oy-scroll"><table class="oy-t"><thead><tr><th class="oy-m"></th>';
   for(var d=1;d<=31;d++)h+='<th class="oy-dh">'+d+'</th>';
   h+='</tr></thead><tbody>';

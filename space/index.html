@@ -3853,7 +3853,7 @@ var oyYear=new Date().getFullYear(),oyFit=true; // oyFit: 한 화면에 1년 전
 function oyCollect(y){
   // 1 Year에는 '드림보드에 넣은 날짜'만 자동으로 모이고, 나머지(여행 등)는 ＋ 기간 막대로 직접 만든다
   var map={};
-  wishDeadlines().forEach(function(d){if(!d.date||d.date.slice(0,4)!==String(y))return;(map[d.date]||(map[d.date]=[])).push({t:String(d.title||'').replace(/<[^>]*>/g,''),c:'#EF805E',done:d.done,on:"dlOpen('"+d.id+"')"});});
+  wishDeadlines().forEach(function(d){if(!d.date||d.date.slice(0,4)!==String(y))return;var ww=wishOfDl(d.id);if(!ww||!ww.oneYear)return;(map[d.date]||(map[d.date]=[])).push({t:String(d.title||'').replace(/<[^>]*>/g,''),c:'#EF805E',done:d.done,on:"dlOpen('"+d.id+"')"});});
   return map;
 }
 function oyMove(n){oyYear+=n;render();var m=document.getElementById('main');if(m)m.scrollTop=0;}
@@ -3900,7 +3900,7 @@ function renderOneYear(){
   var total=Object.keys(map).reduce(function(a,k){return a+map[k].length;},0)+yb.length;
   var h='<div class="oy'+(oyFit?' fit':'')+'" style="--oz:'+oyZoom+'"><div class="oy-head"><div><div class="oy-kick">1 YEAR · 한눈에 보는 한 해</div><h1>'+y+'</h1></div>'
     +'<div class="oy-nav"><button type="button" class="oy-add" onclick="oyBar(null)" title="여행처럼 기간이 있는 일정 만들기">＋ 기간</button><button type="button" class="oy-fit" onclick="oyFit=!oyFit;oyZoom=1;render()" title="한 화면에 전체 보기 / 칸을 크게 보기">'+(oyFit?'🔍 크게':'▦ 전체')+'</button><button type="button" onclick="oyMove(-1)" title="이전 해">‹</button>'+(y===new Date().getFullYear()?'':'<button type="button" class="oy-now" onclick="oyYear=new Date().getFullYear();render()">올해</button>')+'<button type="button" onclick="oyMove(1)" title="다음 해">›</button></div></div>'
-    +'<div class="oy-sub">드림보드에 넣은 날짜가 모이고, <b>＋ 기간</b>으로 여행 같은 막대를 직접 만들어요 · 올해 '+total+'개</div>'
+    +'<div class="oy-sub">드림보드에서 <b>1 Year에 표시</b>한 꿈의 날짜가 모이고, <b>＋ 기간</b>으로 여행 같은 막대를 직접 만들어요 · 올해 '+total+'개</div>'
     +'<div class="oy-scroll"><table class="oy-t"><thead><tr><th class="oy-m"></th>';
   for(var d=1;d<=31;d++)h+='<th class="oy-dh">'+d+'</th>';
   h+='</tr></thead><tbody>';
@@ -4176,6 +4176,7 @@ function openWishForm(wid){
     +'<label class="dmd-lbl" for="wf-name">이름</label><input class="dmd-f" id="wf-name" maxlength="80" placeholder="'+wishKindInfo(curK).ph+'" value="'+esc(_wishDraft.text)+'">'
     +'<label class="dmd-lbl" for="wf-desc">설명</label><textarea class="dmd-f" id="wf-desc" maxlength="400" placeholder="왜 이루고 싶은지, 어떤 모습인지 적어 보세요">'+esc(_wishDraft.desc||'')+'</textarea>'
     +'<label class="dmd-lbl" for="wf-dday">디데이 <small>이루고 싶은 날</small></label><input class="dmd-f" id="wf-dday" type="date" value="'+esc(_wishDraft.dday||'')+'">'
+    +'<label class="wf-done"><input type="checkbox" id="wf-oy" '+(_wishDraft.oneYear?'checked':'')+'> 1 Year에 표시 <small>디데이가 1 Year 달력에 나와요</small></label>'
     +'<label class="wf-done"><input type="checkbox" id="wf-sv" '+(_wishDraft.saveGoal?'checked':'')+' onchange="document.getElementById(\'wf-svrow\').style.display=this.checked?\'\':\'none\'"> 저축 목표로 만들기 <small>가계부 > 저축 현황에 카드가 생겨요</small></label>'
     +'<div id="wf-svrow" style="'+(_wishDraft.saveGoal?'':'display:none;')+'margin:6px 0 2px"><label class="dmd-lbl" for="wf-svt">목표 금액 <small>만원 단위 (3억 = 30000)</small></label><input class="dmd-f" id="wf-svt" type="number" min="0" step="100" inputmode="numeric" placeholder="예: 30000" value="'+(_wishDraft.saveTarget?Math.round(_wishDraft.saveTarget/10000):'')+'"></div>'
     +(w?'<label class="wf-done"><input type="checkbox" id="wf-done" '+(w.done?'checked':'')+'> 이뤘어요</label>':'')
@@ -4201,7 +4202,7 @@ function saveWish(){
   var name=(document.getElementById('wf-name').value||'').trim();
   if(!name){document.getElementById('wf-name').focus();return;}
   var w=_wishDraft,isNew=w._new,newPhoto=w._newPhoto;delete w._new;delete w._newPhoto;
-  w.kind=wishKind(w);w.text=name;w.desc=(document.getElementById('wf-desc').value||'').trim();w.dday=document.getElementById('wf-dday').value||'';
+  w.kind=wishKind(w);w.text=name;w.desc=(document.getElementById('wf-desc').value||'').trim();w.dday=document.getElementById('wf-dday').value||'';w.oneYear=!!(document.getElementById('wf-oy')||{}).checked;
   var svc=document.getElementById('wf-sv'),svt=Math.round((parseFloat((document.getElementById('wf-svt')||{}).value)||0)*10000);
   if(svc&&svc.checked&&svt>0){w.saveGoal=true;w.saveTarget=svt;if(!w.saveEntries)w.saveEntries=[];w.saveCur=w.saveCur||0;}else if(svc){w.saveGoal=false;}
   var dc=document.getElementById('wf-done');if(dc){if(dc.checked&&!w.done)w.doneAt=todStr();w.done=dc.checked;if(!w.done)delete w.doneAt;}

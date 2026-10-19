@@ -6186,24 +6186,29 @@ function twAudio() {
 }
 function twSound(kind) {
     const c = twAudio(); if (!c) return;
-    const t = c.currentTime, out = c.createGain(); out.gain.value = 0.55; out.connect(c.destination);
-    const clack = (freq, vol, thud) => {
-        const src = c.createBufferSource(); src.buffer = twNoise; src.playbackRate.value = 0.85 + Math.random() * 0.3;
-        const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = freq * (0.9 + Math.random() * 0.2); bp.Q.value = 1.1;
-        const g = c.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
-        src.connect(bp); bp.connect(g); g.connect(out); src.start(t);
-        const o = c.createOscillator(); o.type = 'sine'; o.frequency.setValueAtTime(thud, t); o.frequency.exponentialRampToValueAtTime(thud * 0.5, t + 0.07);
-        const og = c.createGain(); og.gain.setValueAtTime(vol * 0.55, t); og.gain.exponentialRampToValueAtTime(0.001, t + 0.065);
-        o.connect(og); og.connect(out); o.start(t); o.stop(t + 0.075);
+    const t = c.currentTime, out = c.createGain(); out.gain.value = 0.6; out.connect(c.destination);
+    // 타자기 '탁': 울림(사인파) 없이 아주 짧은 잡음 두 번 — 활자가 종이를 치는 딱 + 활자대가 돌아오는 작은 착
+    const tick = (at, freq, vol, len, type = 'bandpass', q = 0.8) => {
+        const src = c.createBufferSource(); src.buffer = twNoise; src.playbackRate.value = 0.9 + Math.random() * 0.2;
+        const f = c.createBiquadFilter(); f.type = type; f.frequency.value = freq * (0.92 + Math.random() * 0.16); f.Q.value = q;
+        const g = c.createGain(); g.gain.setValueAtTime(0.0001, t + at); g.gain.linearRampToValueAtTime(vol, t + at + 0.002); g.gain.exponentialRampToValueAtTime(0.001, t + at + len);
+        src.connect(f); f.connect(g); g.connect(out); src.start(t + at); src.stop(t + at + len + 0.01);
     };
-    if (kind === 'space') clack(1900, 0.6, 130);
-    else if (kind === 'back') clack(2500, 0.4, 200);
+    const tak = (vol = 1) => { tick(0, 2200, 0.9 * vol, 0.022, 'highpass', 0.7); tick(0.004, 1300, 0.45 * vol, 0.03); tick(0.028, 3200, 0.18 * vol, 0.015); };
+    if (kind === 'space') { tick(0, 1500, 0.55, 0.03, 'highpass', 0.6); tick(0.005, 900, 0.35, 0.035); }
+    else if (kind === 'back') tick(0, 2600, 0.3, 0.014, 'highpass', 0.6);
     else if (kind === 'enter') {
-        clack(1700, 0.8, 120);
-        const o = c.createOscillator(), g = c.createGain(); o.type = 'sine'; o.frequency.value = 2350;
-        g.gain.setValueAtTime(0.0001, t + 0.04); g.gain.exponentialRampToValueAtTime(0.35, t + 0.06); g.gain.exponentialRampToValueAtTime(0.001, t + 1.1);
-        o.connect(g); g.connect(out); o.start(t + 0.04); o.stop(t + 1.2);
-    } else clack(3000, 0.65, 180);
+        tak(1);
+        // 캐리지 리턴이 밀려가는 '스르륵' + 끝에 걸리는 '착' + 종소리
+        const src = c.createBufferSource(); src.buffer = twNoise; src.loop = true;
+        const f = c.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 2; f.frequency.setValueAtTime(900, t + 0.05); f.frequency.linearRampToValueAtTime(2200, t + 0.32);
+        const g = c.createGain(); g.gain.setValueAtTime(0.0001, t + 0.05); g.gain.linearRampToValueAtTime(0.12, t + 0.1); g.gain.linearRampToValueAtTime(0.0001, t + 0.33);
+        src.connect(f); f.connect(g); g.connect(out); src.start(t + 0.05); src.stop(t + 0.35);
+        tick(0.34, 1800, 0.6, 0.03, 'highpass', 0.7);
+        const o = c.createOscillator(), og = c.createGain(); o.type = 'sine'; o.frequency.value = 2350;
+        og.gain.setValueAtTime(0.0001, t + 0.36); og.gain.exponentialRampToValueAtTime(0.25, t + 0.375); og.gain.exponentialRampToValueAtTime(0.001, t + 1.3);
+        o.connect(og); og.connect(out); o.start(t + 0.36); o.stop(t + 1.35);
+    } else tak(0.85 + Math.random() * 0.25);
 }
 function twCaretPos() {
     const sel = getSelection(); if (!sel.rangeCount) return null;

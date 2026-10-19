@@ -588,6 +588,10 @@ a.mini { text-decoration: none; color: inherit; display: inline-flex; align-item
 body.typewriter .manuscript[contenteditable="true"] { caret-color: var(--accent); caret-shape: block; }
 body.tw-ov .manuscript[contenteditable="true"] { caret-color: transparent; }
 #tw-caret { position: fixed; z-index: 60; pointer-events: none; background: var(--accent); opacity: .55; border-radius: 1px; mix-blend-mode: multiply; animation: twBlink 1.05s steps(1) infinite; }
+#tw-caret.thin { background: color-mix(in srgb, var(--accent) 75%, #000); opacity: 1; mix-blend-mode: normal; border-radius: 2px; animation: twBlink2 1.05s steps(1) infinite; }
+#tw-caret.thin.hit { animation: twBlink3 1.05s steps(1) infinite; }
+@keyframes twBlink2 { 0%, 60% { opacity: 1; } 61%, 100% { opacity: .15; } }
+@keyframes twBlink3 { 0%, 60% { opacity: 1; } 61%, 100% { opacity: .15; } }
 #tw-caret.hit { animation: twHit .12s ease-out, twBlink 1.05s steps(1) .12s infinite; }
 @keyframes twBlink { 0%, 60% { opacity: .55; } 61%, 100% { opacity: .12; } }
 @keyframes twHit { 0% { transform: translateY(2px) scaleY(.92); opacity: .9; } 100% { transform: none; opacity: .55; } }
@@ -6214,23 +6218,26 @@ function twSound(kind) {
 function twCaretPos() {
     const sel = getSelection(); if (!sel.rangeCount) return null;
     const ed = (sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement))?.closest?.('.manuscript[contenteditable="true"]');
-    if (!ed || !sel.isCollapsed) return null;
+    if (!ed || !sel.isCollapsed || !ed.contains(document.activeElement) && document.activeElement !== ed) return null;
     const r = sel.getRangeAt(0).cloneRange(); let rect = r.getClientRects()[0];
     if (!rect || (!rect.width && !rect.height)) {
         const n = sel.anchorNode, o = sel.anchorOffset;
         if (n.nodeType === 3 && n.length) { const q = document.createRange(); if (o > 0) { q.setStart(n, o - 1); q.setEnd(n, o); const b = q.getClientRects()[0]; if (b) rect = { left: b.right, top: b.top, height: b.height }; } else { q.setStart(n, 0); q.setEnd(n, 1); const b = q.getClientRects()[0]; if (b) rect = { left: b.left, top: b.top, height: b.height }; } }
         else { const b = (n.nodeType === 1 ? n : n.parentElement).getBoundingClientRect(); const lh = parseFloat(getComputedStyle(ed).lineHeight) || 24; rect = { left: b.left + parseFloat(getComputedStyle(n.nodeType === 1 ? n : n.parentElement).paddingLeft || 0), top: b.top, height: lh }; }
     }
-    return rect ? { x: rect.left, y: rect.top, h: rect.height || 24 } : null;
+    if (!rect) return null;
+    const box = (ed.closest('.ed-wrap') || ed).getBoundingClientRect(); // 원고 창 밖으로 스크롤된 커서는 그리지 않음
+    if (rect.top + (rect.height || 0) < box.top || rect.top > box.bottom) return null;
+    return { x: rect.left, y: rect.top, h: rect.height || 24 };
 }
 function twUpdateCaret(hit) {
     let el = $('#tw-caret');
-    if (!pref.tw) { el?.remove(); document.body.classList.remove('tw-ov'); return; }
     const p = twCaretPos();
     if (!p || document.body.classList.contains('rn-open')) { el?.remove(); document.body.classList.remove('tw-ov'); return; }
     if (!el) { el = document.createElement('div'); el.id = 'tw-caret'; document.body.appendChild(el); }
-    const w = Math.max(3, Math.round(p.h * 0.14));
-    el.style.cssText = `left:${p.x}px;top:${p.y + 1}px;width:${w}px;height:${Math.max(10, p.h - 2)}px`;
+    const w = pref.tw ? Math.max(3, Math.round(p.h * 0.14)) : 2.5;
+    el.classList.toggle('thin', !pref.tw);
+    el.style.cssText = pref.tw ? `left:${p.x}px;top:${p.y + 1}px;width:${w}px;height:${Math.max(10, p.h - 2)}px` : `left:${p.x - 1}px;top:${p.y - 2}px;width:${w}px;height:${Math.max(12, p.h + 4)}px`;
     document.body.classList.add('tw-ov');
     if (hit) { el.classList.remove('hit'); void el.offsetWidth; el.classList.add('hit'); }
 }
@@ -6251,11 +6258,11 @@ document.addEventListener('keydown', e => {
     if (['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Tab', 'Escape', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(k)) return;
     twSound(k === ' ' ? 'space' : k === 'Enter' ? 'enter' : (k === 'Backspace' || k === 'Delete') ? 'back' : 'key');
 });
-document.addEventListener('input', e => { if (pref.tw && e.target.closest && e.target.closest('.manuscript')) { twUpdateCaret(true); } else if (pref.tw && /^(insert|delete)/.test(e.inputType || '') ) twUpdateCaret(true); }, true);
-document.addEventListener('selectionchange', () => { if (pref.tw) twUpdateCaret(false); });
-window.addEventListener('scroll', () => { if (pref.tw) twUpdateCaret(false); }, true);
-window.addEventListener('resize', () => { if (pref.tw) twUpdateCaret(false); });
-document.addEventListener('focusout', () => { if (pref.tw) setTimeout(() => twUpdateCaret(false), 50); });
+document.addEventListener('input', e => { if (e.target.closest && e.target.closest('.manuscript')) { twUpdateCaret(true); } else if (/^(insert|delete)/.test(e.inputType || '') ) twUpdateCaret(true); }, true);
+document.addEventListener('selectionchange', () => twUpdateCaret(false));
+window.addEventListener('scroll', () => twUpdateCaret(false), true);
+window.addEventListener('resize', () => twUpdateCaret(false));
+document.addEventListener('focusout', () => setTimeout(() => twUpdateCaret(false), 50));
 applyTypewriter();
 function tryAutoReplace(ed) {
     const rules = replaceRules().filter(r => r.on !== false && r.from);

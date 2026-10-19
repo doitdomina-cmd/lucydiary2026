@@ -9,6 +9,7 @@
 | 시놉시스(에피소드 기획 보드) | `synop/` | `synop/index.html` |
 | 정산(Royalty Manager Pro) | `royalty/` | `royalty/index.html` |
 | 일정 매니저 | `mobile/` | `mobile/index.html` |
+| 집필 일정 계산기 | `schedule/` | `schedule/index.html` |
 
 - 맨 위 `index.html`은 `space/`로 넘겨 주는 안내 페이지일 뿐이다. **여기에 앱 파일을 덮어쓰지 말 것.**
 - 예전 `novel.html` / `synop.html` / `royalty.html` 은 없다. 옛 위치에 올리면 안 보인다.

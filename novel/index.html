@@ -514,6 +514,23 @@ a.mini { text-decoration: none; color: inherit; display: inline-flex; align-item
 .align-pick button { width: 38px; height: 32px; border: 1px solid var(--line); border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; }
 .align-pick button.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 .manuscript[contenteditable="false"] { opacity: .85; cursor: default; }
+.fbk .fb-body { flex: 1; overflow-y: auto; padding: 4px 12px 14px; font-size: 13px; }
+.fb-lbl { font-weight: 700; margin: 10px 0 5px; font-size: 12.5px; } .fb-lbl small { font-weight: 400; color: var(--muted); margin-left: 4px; }
+.fb-pds { display: flex; flex-wrap: wrap; gap: 6px; }
+.fb-chip { border: 1.5px solid color-mix(in srgb, var(--pc) 45%, var(--line)); background: transparent; color: inherit; border-radius: 99px; padding: 4px 10px; font-size: 12.5px; cursor: pointer; }
+.fb-chip.on { background: color-mix(in srgb, var(--pc) 16%, transparent); border-color: var(--pc); font-weight: 700; }
+.fb-seg button { flex: 1; }
+.fb-ask { width: 100%; box-sizing: border-box; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: inherit; font: inherit; }
+.fb-when { font-size: 11px; color: var(--muted); margin: 6px 0; }
+.fb-pd { border: 1px solid var(--line); border-left: 4px solid var(--pc); border-radius: 8px; padding: 9px 10px; margin-bottom: 9px; background: var(--panel); }
+.fb-pdh { display: flex; justify-content: space-between; align-items: center; } .fb-score { font-weight: 800; color: var(--pc); }
+.fb-one { font-weight: 700; margin: 6px 0 6px; line-height: 1.5; }
+.fb-str, .fb-weak { margin: 5px 0; line-height: 1.5; } .fb-str b, .fb-weak b { display: block; font-weight: 600; }
+.fb-str q { display: block; color: var(--muted); font-size: 12px; margin: 2px 0 0 4px; quotes: "“" "”"; }
+.fb-weak span { display: block; color: var(--muted); font-size: 12.5px; margin-left: 4px; }
+.fb-next { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--line); } .fb-next b { display: block; font-size: 12px; } .fb-next span { display: block; font-size: 12.5px; }
+.fb-rd { margin-top: 12px; } .fb-cm { border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; margin: 6px 0; background: var(--panel); line-height: 1.5; }
+.fb-nick { font-weight: 700; margin-right: 6px; } .fb-st { color: #e8a008; font-size: 11.5px; }
 body.typewriter .manuscript[contenteditable="true"] { caret-color: var(--accent); caret-shape: block; }
 body.tw-ov .manuscript[contenteditable="true"] { caret-color: transparent; }
 #tw-caret { position: fixed; z-index: 60; pointer-events: none; background: var(--accent); opacity: .55; border-radius: 1px; mix-blend-mode: multiply; animation: twBlink 1.05s steps(1) infinite; }
@@ -1457,6 +1474,7 @@ nav.mtabs { display: none; }
         <button class="sb-sw" data-sbc="bg-red-50" style="background:#d9a9a4" title="색"></button><button class="sb-sw" data-sbc="bg-blue-50" style="background:#a3bcd1" title="색"></button><button class="sb-sw" data-sbc="bg-green-50" style="background:#a8c3ab" title="색"></button><button class="sb-sw" data-sbc="bg-orange-50" style="background:#d3b48c" title="색"></button><button class="sb-sw" data-sbc="bg-pink-50" style="background:#d6b0bd" title="색"></button><button class="sb-sw" data-sbc="bg-purple-50" style="background:#b7abc9" title="색"></button><button class="sb-sw sb-sw-x" data-sbc="" title="색 빼기"><i class="ic ic-x"></i></button>
         <span class="sep"></span></span>
  <button class="tb small" id="btn-revise" title="퇴고 보기: 왼쪽 원고 · 오른쪽 쪽 보기 (다시 누르면 원래대로)"><i class="ic ic-file-pen-line"></i> 퇴고</button>
+ <button class="tb small" id="btn-fb" title="피드백: PD 6명의 눈으로 이 회차를 읽고 독자 댓글까지 받아봐요 (AI)"><i class="ic ic-sparkles"></i> 피드백</button>
  <button class="tb small" id="btn-tw" title="타자기 모드: 굵은 커서와 타자기 소리 (다시 누르면 꺼져요)"><i class="ic ic-pen-line"></i> 타자기</button>
  <button class="tb small" id="btn-rename" title="이름 바꾸기 모드: 인물 이름을 조사까지 맞춰 한 번에 바꿔요"><i class="ic ic-replace"></i> 이름 바꾸기</button>
  <button class="tb small keep-sel" id="btn-spell" title="맞춤법 점검 (오른쪽 옆 창)"><i class="ic ic-spell-check"></i> 맞춤법</button>
@@ -3173,7 +3191,7 @@ $('#btn-menu').addEventListener('click', e => {
     const W = WL();
     const pop = showPop(e.currentTarget, `
         <button data-act="new-work"><i class="ic ic-plus"></i> 새 작품</button><button data-act="rename-work">작품 이름 바꾸기</button><button data-act="delete-work" class="danger">작품 삭제</button><button data-act="home"><i class="ic ic-house"></i> 작품 목록으로</button><hr>
-        <button data-act="typewriter"><i class="ic ic-pen-line"></i> 타자기 모드</button><button data-act="rename-mode"><i class="ic ic-replace"></i> 이름 바꾸기 모드</button><button data-act="spell"><i class="ic ic-spell-check"></i> 맞춤법 1차 점검</button><button data-act="repeat"><i class="ic ic-repeat"></i> 반복 표현 점검</button><button data-act="hl"><i class="ic ic-highlighter"></i> 형광펜 목록</button><button data-act="replace"><i class="ic ic-replace"></i> 자동 치환 · 따옴표</button><hr>
+        <button data-act="feedback"><i class="ic ic-sparkles"></i> 피드백 (PD·독자)</button><button data-act="typewriter"><i class="ic ic-pen-line"></i> 타자기 모드</button><button data-act="rename-mode"><i class="ic ic-replace"></i> 이름 바꾸기 모드</button><button data-act="spell"><i class="ic ic-spell-check"></i> 맞춤법 1차 점검</button><button data-act="repeat"><i class="ic ic-repeat"></i> 반복 표현 점검</button><button data-act="hl"><i class="ic ic-highlighter"></i> 형광펜 목록</button><button data-act="replace"><i class="ic ic-replace"></i> 자동 치환 · 따옴표</button><hr>
         <button data-act="mobile"><i class="ic ic-smartphone"></i> 모바일 미리보기</button><button data-act="fullboard"><i class="ic ic-layout-dashboard"></i> 작품 전체 메모 보드</button><button data-act="typo"><i class="ic ic-type"></i> 원고 크기 · 줄간격 · 문단</button><button data-act="settings"><i class="ic ic-settings"></i> 설정 (테마 · 글꼴)</button><hr>
         <button data-act="copy-ep"><i class="ic ic-copy"></i> 현재 회차 복사 (줄바꿈 규칙)</button><button data-act="export"><i class="ic ic-file-down"></i> 내보내기 (docx·epub·txt…)</button><hr>
         <button data-act="zip"><i class="ic ic-archive"></i> 작품 백업 내려받기 (ZIP)</button><button data-act="backup">전체 백업 저장 (JSON)</button><button data-act="restore">백업 불러오기 (ZIP·JSON)</button><button data-act="cloud"><i class="ic ic-folder"></i> 자동 백업 설정 (구글 드라이브 · PC 폴더)</button>`);
@@ -3194,6 +3212,7 @@ async function menuAction(e) {
     if (a === 'keys') openShortcuts();
     if (a === 'rename-mode') toggleRename();
     if (a === 'typewriter') toggleTypewriter();
+    if (a === 'feedback') openFeedback();
     if (a === 'spell') openSpellPanel();
     if (a === 'repeat') openRepeatReport();
     if (a === 'mobile') openMobilePreview();
@@ -4864,6 +4883,7 @@ document.addEventListener('input', e => { if (foldPanel && e.target.closest && e
 // 오른쪽 옆 창(맞춤법·반복 표현·형광펜·접기 목록)은 같은 자리라 하나만
 function closeSidePanels(keep) {
     if (keep !== 'spell' && typeof closeSpellPanel === 'function') closeSpellPanel();
+    if (keep !== 'fb' && typeof closeFeedback === 'function') closeFeedback();
     if (keep !== 'repeat' && typeof closeRepeatPanel === 'function') closeRepeatPanel();
     if (keep !== 'hl' && typeof closeHlPanel === 'function') closeHlPanel();
     if (keep !== 'fold' && typeof closeFoldPanel === 'function') closeFoldPanel();
@@ -4874,6 +4894,7 @@ $$('.keep-sel').forEach(b => b.addEventListener('mousedown', e => e.preventDefau
 $('#btn-spell').addEventListener('click', () => openSpellPanel());
 $('#btn-rename').addEventListener('click', () => toggleRename());
 $('#btn-tw').addEventListener('click', () => toggleTypewriter());
+$('#btn-fb').addEventListener('click', () => openFeedback());
 // 퇴고 보기: 지금 회차를 왼쪽 원고 + 오른쪽 쪽 보기로. 이미 퇴고 보기면 한 창으로 돌아감
 function reviseMode() {
     const W = WL();
@@ -5635,6 +5656,109 @@ function rnClose() {
     if (applied) toast('이름 바꾸기를 마쳤어요. 바뀐 내용은 그대로 적용돼 있어요.');
 }
 function toggleRename() { if (rn.on) rnClose(); else rnOpen(); }
+
+/* ───────── 피드백: PD 6명 + 독자 댓글 (AI) ───────── */
+const FB_PDS = [
+    { id: 'sweet', n: '달달 PD', e: '🍯', c: '#e0527a', d: '독자의 마음으로, 응원 먼저', look: '캐릭터 매력, 감정선, 관계성 케미, 여운', tone: '가장 다정하고 말투가 부드럽다. 그래도 아쉬운 점은 빼지 않는다.' },
+    { id: 'hot', n: '화끈 PD', e: '🔥', c: '#f26a21', d: '도파민과 훅, 거침없이', look: '도입 흡입력, 보상 주기, 전개 속도, 절단·훅', tone: '시원시원하고 직설적이다.' },
+    { id: 'calm', n: '차분 PD', e: '☕', c: '#3b82c4', d: '문장과 장면을 다듬는 실무 편집', look: '가독성, 장면 구성, 대사, 묘사 밀도', tone: '담백하고 실무적이다. 문장 단위로 짚는다.' },
+    { id: 'serious', n: '진지 PD', e: '🧐', c: '#7c4ddb', d: '구조와 개연성을 해부', look: '구조, 개연성, 캐릭터 동기, 설정 정합성', tone: '논리적이고 꼼꼼하다.' },
+    { id: 'trend', n: '트렌드 PD', e: '📈', c: '#e8a008', d: '시장과 타깃 독자의 눈', look: '키워드 충족, 타깃 적합성, 차별점, 화제성', tone: '시장 감각으로 말한다.' },
+    { id: 'serial', n: '연재 PD', e: '🧵', c: '#14a37f', d: '회차 연속성과 떡밥 장부', look: '회차 연결, 떡밥 관리, 캐릭터 일관성, 톤앤매너', tone: '연재 흐름 관점으로 말한다.' }
+];
+const FB_SPICY = [{ id: 'mild', n: '순한맛', d: '응원과 몰입 위주' }, { id: 'normal', n: '보통맛', d: '실제 연재 댓글창의 온도' }, { id: 'hot', n: '매운맛', d: '아쉬운 점 + 보고 싶은 전개' }];
+let fbPanel = null, fbDoc = null, fbBusy = false, fbMsg = '';
+function fbSet() { const s = settings(); return { pds: s.fbPds || ['sweet', 'hot', 'calm'], spicy: s.fbSpicy || 'normal', ask: s.fbAsk || '' }; }
+function fbSave(k, v) { const s = settings(); s[k] = v; touch(s); }
+function openFeedback() {
+    const id = activeDocId();
+    if (!id) { toast('피드백 받을 회차를 원고 창에 열어 주세요.'); return; }
+    closeSidePanels('fb'); fbDoc = id; fbMsg = '';
+    if (!fbPanel) {
+        fbPanel = document.createElement('aside'); fbPanel.className = 'spl fbk'; document.body.appendChild(fbPanel);
+        fbPanel.addEventListener('mousedown', e => { if (e.target.closest('button')) e.preventDefault(); });
+        fbPanel.addEventListener('click', onFbClick);
+        fbPanel.addEventListener('input', e => { if (e.target.id === 'fb-ask') fbSave('fbAsk', e.target.value); });
+    }
+    renderFeedback();
+}
+function closeFeedback() { fbPanel?.remove(); fbPanel = null; fbDoc = null; }
+function fbResultHtml(r) {
+    if (!r) return '';
+    const pd = id => FB_PDS.find(p => p.id === id);
+    const stars = n => '★'.repeat(Math.max(0, Math.min(5, Math.round(n) || 0))) + '☆'.repeat(5 - Math.max(0, Math.min(5, Math.round(n) || 0)));
+    const list = (a, f) => (Array.isArray(a) ? a : []).map(f).join('');
+    return `<div class="fb-when">${esc(new Date(r.at).toLocaleString('ko-KR'))} · ${esc((FB_SPICY.find(x => x.id === r.spicy) || {}).n || '')}${r.ask ? ' · “' + esc(r.ask.slice(0, 30)) + '”' : ''}</div>` +
+        list(r.pds, o => { const p = pd(o.id); if (!p) return '';
+            return `<div class="fb-pd" style="--pc:${p.c}"><div class="fb-pdh"><span>${p.e} <b>${p.n}</b></span><span class="fb-score">${esc(String(o.score ?? ''))} / 10</span></div>
+            <div class="fb-one">“${esc(o.oneLine || '')}”</div>
+            ${list(o.strengths, x => `<div class="fb-str"><b>👍 ${esc(x.point || '')}</b>${x.quote ? `<q>${esc(x.quote)}</q>` : ''}</div>`)}
+            ${list(o.weaknesses, x => `<div class="fb-weak"><b>🔧 ${esc(x.point || '')}</b>${x.fix ? `<span>→ ${esc(x.fix)}</span>` : ''}</div>`)}
+            ${(o.next || []).length ? `<div class="fb-next"><b>다음 화에 넣으면 좋을 것</b>${list(o.next, x => `<span>· ${esc(x)}</span>`)}</div>` : ''}</div>`; }) +
+        ((r.readers || []).length ? `<div class="fb-rd"><b>💬 독자 댓글</b>${list(r.readers, x => `<div class="fb-cm"><span class="fb-nick">${esc(x.nick || '독자')}</span><span class="fb-st">${stars(x.stars)}</span><div>${esc(x.comment || '')}</div></div>`)}</div>` : '');
+}
+function renderFeedback() {
+    if (!fbPanel) return;
+    const it = items[fbDoc], st = fbSet();
+    fbPanel.innerHTML = `<div class="spl-head"><b>피드백</b><span class="spl-count">${esc(it?.title || '')}</span><span style="flex:1"></span><button class="mini" data-fb-close title="닫기"><i class="ic ic-x"></i></button></div>
+        <div class="fb-body">
+        <div class="fb-lbl">누구에게 보여 줄까요 <small>1~3명 · 고른 PD가 각자 다른 눈으로 읽어요</small></div>
+        <div class="fb-pds">${FB_PDS.map(p => `<button class="fb-chip ${st.pds.includes(p.id) ? 'on' : ''}" style="--pc:${p.c}" data-fb-pd="${p.id}" title="${esc(p.d + ' · ' + p.look)}">${p.e} ${p.n}</button>`).join('')}</div>
+        <div class="fb-lbl">맵기 <small>${esc((FB_SPICY.find(x => x.id === st.spicy) || {}).d || '')}</small></div>
+        <div class="seg fb-seg">${FB_SPICY.map(x => `<button class="${st.spicy === x.id ? 'on' : ''}" data-fb-sp="${x.id}">${x.n}</button>`).join('')}</div>
+        <div class="fb-lbl">이번 화는 이런 걸 봐 주세요 <small>비워 두어도 돼요</small></div>
+        <input class="fb-ask" id="fb-ask" maxlength="120" placeholder="예) 연회장 판촉이 너무 쉽게 풀리는지 봐 주세요" value="${esc(st.ask)}">
+        <div class="spl-ai" style="padding:6px 0 8px">${aiReady()
+            ? `<button class="btn primary" data-fb-go ${fbBusy ? 'disabled' : ''}><i class="ic ic-sparkles"></i> ${fbBusy ? 'PD들이 읽는 중…' : '피드백 받기'}</button>`
+            : '<button class="btn" data-fb-key><i class="ic ic-sparkles"></i> AI 키 넣고 피드백 받기</button>'}<span class="spl-msg">${esc(fbMsg)}</span></div>
+        <div class="fb-res">${it?.fb ? fbResultHtml(it.fb) : '<div class="spl-empty">아직 받은 피드백이 없어요.<br>PD와 맵기를 고르고 “피드백 받기”를 눌러 보세요.</div>'}</div></div>`;
+}
+async function onFbClick(e) {
+    const t = e.target.closest('button'); if (!t) return;
+    if (t.dataset.fbClose != null) { closeFeedback(); return; }
+    if (t.dataset.fbKey != null) { openSettings('ai'); return; }
+    if (t.dataset.fbPd) {
+        const st = fbSet(), i = st.pds.indexOf(t.dataset.fbPd);
+        if (i >= 0) { if (st.pds.length > 1) st.pds.splice(i, 1); } else if (st.pds.length < 3) st.pds.push(t.dataset.fbPd); else { toast('PD는 최대 3명까지 고를 수 있어요.'); return; }
+        fbSave('fbPds', st.pds); renderFeedback(); return;
+    }
+    if (t.dataset.fbSp) { fbSave('fbSpicy', t.dataset.fbSp); renderFeedback(); return; }
+    if (t.dataset.fbGo != null && !fbBusy) await runFeedback();
+}
+async function runFeedback() {
+    const it = items[fbDoc]; if (!it) return;
+    const text = htmlToPlain(stripExcluded(it.body)).trim();
+    if (text.length < 200) { fbMsg = '원고가 너무 짧아요. 200자 이상 써 주세요.'; renderFeedback(); return; }
+    const st = fbSet(), pds = st.pds.map(id => FB_PDS.find(p => p.id === id)).filter(Boolean);
+    const sp = { mild: '순한맛: 칭찬과 응원을 중심으로, 아쉬운 점은 부드럽게 한두 가지만.', normal: '보통맛: 실제 연재 댓글창 정도의 온도. 칭찬과 아쉬움 균형.', hot: '매운맛: 아쉬운 점을 날카롭고 구체적으로 짚고, 독자가 더 보고 싶어 할 전개도 제안.' }[st.spicy];
+    const body = text.length > 14000 ? text.slice(0, 14000) + '\n…(이하 생략)' : text;
+    const prompt = `너는 한국 웹소설 편집부의 PD들과 독자들이야. 아래 원고(${it.title || '회차'})를 읽고 피드백을 JSON 객체 하나로만 답해.
+PD 목록(각자 보는 축과 말투가 달라야 해):
+${pds.map(p => `- id "${p.id}" ${p.n}: 보는 축=${p.look}. 말투=${p.tone}`).join('\n')}
+맵기: ${sp}
+${st.ask.trim() ? `작가가 특별히 봐 달라고 한 것: ${st.ask.trim()}` : ''}
+규칙:
+- strengths의 quote는 원고에 실제로 있는 문장을 그대로 짧게 인용해. 없는 대사를 지어내지 마. 근거 없는 칭찬 금지.
+- weaknesses마다 구체적인 대안(fix)을 붙여.
+- PD마다 strengths 2개, weaknesses 1~2개, next(다음 화에 넣으면 좋을 것) 1~2개.
+- score는 1~10 정수.
+- readers는 이 장르 독자 댓글 6개. nick은 재미있는 닉네임, stars는 1~5, comment는 한두 문장, 서로 다른 반응(웃음, 감탄, 걱정, 추측 등)으로.
+형식: {"pds":[{"id":"","oneLine":"한 줄 평","score":9,"strengths":[{"point":"","quote":""}],"weaknesses":[{"point":"","fix":""}],"next":[""]}],"readers":[{"nick":"","stars":5,"comment":""}]}
+
+원고:
+${body}`;
+    fbBusy = true; fbMsg = ''; renderFeedback();
+    try {
+        const out = await aiJson(prompt, 'best', 6000);
+        if (!out || !Array.isArray(out.pds)) throw aiErr('http', 'AI 답을 읽지 못했어요.');
+        it.fb = { at: Date.now(), spicy: st.spicy, ask: st.ask, pds: out.pds.filter(o => FB_PDS.some(p => p.id === o.id)), readers: Array.isArray(out.readers) ? out.readers.slice(0, 8) : [] };
+        touch(it);
+        fbMsg = '';
+    } catch (err) {
+        fbMsg = err && err.code === 'quota' ? aiQuotaMsg(err) : (AI_ERR_MSG[err && err.code] || '피드백을 받지 못했어요. 잠시 뒤 다시 눌러 주세요.');
+    }
+    fbBusy = false; renderFeedback();
+}
 
 /* ───────── 타자기 모드: 굵은 블록 커서 + 타자기 소리 ───────── */
 let twCtx = null, twNoise = null;
@@ -7108,7 +7232,8 @@ const aiReady = () => !!synSample || !!aiKey();
 const aiErr = (code, msg) => Object.assign(new Error(msg || code), { code });
 function parseJsonLoose(t) {
     t = String(t || '').replace(/```(?:json)?/g, '');
-    const a = t.indexOf('['), b = t.lastIndexOf(']');
+    const ia = t.indexOf('['), ib = t.indexOf('{'), obj = ib >= 0 && (ia < 0 || ib < ia);
+    const a = obj ? ib : ia, b = obj ? t.lastIndexOf('}') : t.lastIndexOf(']');
     return JSON.parse(a >= 0 && b > a ? t.slice(a, b + 1) : t);
 }
 // 무료 사용량을 다 쓴 모델은 풀릴 때까지 건너뜀 (이 기기에 기억)
@@ -7119,7 +7244,7 @@ function markGeminiExhausted(model, msg) {
     pref.aiExhausted = { ...(pref.aiExhausted || {}), [model]: Date.now() + ms }; savePref();
 }
 // tier: 'best' = 좋은 모델 먼저(하루 무료 횟수 적음), 'lite' = 가벼운 모델 먼저(무료 횟수 넉넉, 자동 검사용)
-async function aiJson(prompt, tier = 'best') {
+async function aiJson(prompt, tier = 'best', maxTokens = 500) {
     if (synSample) return synSample.json(prompt, { modelTier: 'quick' });
     const key = aiKey(); if (!key) throw aiErr('no_key');
     const fail = async r => { const t = await r.text(); return aiErr(r.status === 429 ? 'rate_limited' : /credit|billing|quota/i.test(t) && r.status !== 401 ? 'credit' : [400, 401, 403].includes(r.status) ? 'bad_key' : 'http', t.slice(0, 300)); };
@@ -7156,7 +7281,7 @@ async function aiJson(prompt, tier = 'best') {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-        body: JSON.stringify({ model: 'claude-sonnet-5-5', max_tokens: 500, messages: [{ role: 'user', content: prompt }] })
+        body: JSON.stringify({ model: 'claude-sonnet-5-5', max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] })
     });
     if (!r.ok) throw await fail(r);
     const j = await r.json();

@@ -409,11 +409,13 @@ a.mini { text-decoration: none; color: inherit; display: inline-flex; align-item
 .sbv-host { flex: 1; min-height: 0; }
 .pomo-dock { flex: none; padding: 8px 12px 10px; border-bottom: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; gap: 6px; }
 .pomo-dock.on { background: color-mix(in srgb, var(--accent-soft) 45%, var(--panel)); }
-.pk-line { display: flex; align-items: center; gap: 4px; font-size: 12px; font-variant-numeric: tabular-nums; min-height: 24px; }
-.pk-state { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; }
+.pk-line { display: flex; flex-wrap: wrap; row-gap: 2px; align-items: center; gap: 4px; font-size: 12px; font-variant-numeric: tabular-nums; min-height: 24px; }
+.pk-state { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; white-space: nowrap; flex: none; }
+.pk-state .pk-pause { font-size: 10.5px; font-weight: 700; color: var(--muted); background: color-mix(in srgb, var(--muted) 14%, transparent); border-radius: 99px; padding: 1px 6px; }
+.pk-btns { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; flex: none; }
 .pk-state b { color: var(--accent); font-size: 14px; }
 .pk-sub { color: var(--muted); font-size: 11px; margin-left: 4px; }
-.pk-now { margin-left: 6px; color: var(--muted); } .pk-now b { color: var(--accent); }
+.pk-now { margin-left: 6px; color: var(--muted); white-space: nowrap; flex: none; } .pk-now b { color: var(--accent); }
 .pk-now small { font-size: 10px; }
 .pk-go { color: var(--accent); font-weight: 700; }
 .pk-goal { display: flex; flex-direction: column; gap: 6px; text-align: left; width: 100%; padding: 0; }
@@ -9369,14 +9371,16 @@ function pomoDockHtml() {
     const r = pomoRun(), S = pomoSet(), today = pomoDay(dayKeyOf(Date.now()), false), sm = daySummary(today, true);
     const goal = today ? today.goal : S.pomoGoal, p = pct1(sm.total, goal), nextN = (today ? today.classes.length : 0) + 1;
     let line;
-    if (r.phase === 'work') line = `<span class="pk-state"><i class="ic ic-timer"></i> ${r.n}교시 <b data-live="time">${mmss(r.start + S.pomoWork * 60000 - (r.paused ? r.pausedAt : Date.now()))}</b>${r.paused ? ' <small>(일시정지)</small>' : ''}</span>
+    if (r.phase === 'work') line = `<span class="pk-state"><i class="ic ic-timer"></i> ${r.n}교시 <b data-live="time">${mmss(r.start + S.pomoWork * 60000 - (r.paused ? r.pausedAt : Date.now()))}</b>${r.paused ? '<span class="pk-pause">일시정지</span>' : ''}</span>
         <span class="pk-now">+<b data-live="w">${fmt(Math.max(0, grandAll() - r.base))}</b><small>/${fmt(r.target)}</small></span><span style="flex:1"></span>
         <button class="mini" data-po="${r.paused ? 'resume' : 'pause'}" title="${r.paused ? '이어서 하기' : '일시정지'}">${r.paused ? '▶' : '⏸'}</button><button class="mini" data-po="end" title="이 교시 끝내기">■</button>`;
     else if (r.phase === 'rest') line = `<span class="pk-state"><i class="ic ic-coffee"></i> ${r.restDone ? '휴식 끝' : `휴식 <b data-live="time">${mmss(r.restStart + S.pomoRest * 60000 - Date.now())}</b>`}</span><span style="flex:1"></span>
         <button class="mini pk-go" data-po="start" title="${nextN}교시 시작">▶ ${nextN}교시</button><button class="mini" data-po="stop" title="오늘 마치기">마치기</button>`;
     else line = `<span class="pk-state"><i class="ic ic-timer"></i> 뽀모</span><small class="pk-sub">${S.pomoWork}분 · 휴식 ${S.pomoRest}분</small><span style="flex:1"></span>
         <button class="mini pk-go" data-po="start" title="${nextN}교시 시작">▶ ${nextN}교시</button>`;
-    return `<div class="pk-line">${line}<button class="mini" data-po="cal" title="집필 기록 달력"><i class="ic ic-calendar-days"></i></button><button class="mini" data-po="set" title="뽀모 설정"><i class="ic ic-settings"></i></button></div>
+    // 버튼들은 한 묶음으로: 좁으면 묶음째 다음 줄 오른쪽으로 내려감 (하나씩 흩어지지 않게)
+    line = line.replace(/<span style="flex:1"><\/span>\s*/, '<span class="pk-btns">');
+    return `<div class="pk-line">${line}<button class="mini" data-po="cal" title="집필 기록 달력"><i class="ic ic-calendar-days"></i></button><button class="mini" data-po="set" title="뽀모 설정"><i class="ic ic-settings"></i></button></span></div>
         <button class="pk-goal" data-po="today" title="오늘 집필 기록 자세히"><span class="po-goal-row"><span><span data-live="cum">${fmt(sm.total)}</span> / ${fmt(goal)}자</span><b class="po-pct" data-live="pct">${Math.floor(p)}%</b></span>
             <span class="po-gbar"><i data-live="gbar" style="width:${Math.min(100, p)}%"></i></span></button>`;
 }

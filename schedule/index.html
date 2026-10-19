@@ -53,21 +53,27 @@ tr.rest td{color:var(--sub)}
 .sum b{display:block;font-size:16px;color:var(--pri-d)}
 .sum span{font-size:11px;color:var(--sub)}
 .count-res{margin-top:8px;font-size:14px}
-.calhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
-.calhead b{font-size:16px}
-.calhead button{padding:5px 12px}
-.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;user-select:none;-webkit-user-select:none}
-.cal .dh{text-align:center;font-size:11px;color:var(--sub);padding:3px 0;background:#f3f6f5;border-radius:6px}
-.cal .dh.su{color:#c0504d}
+.seg{display:flex;gap:0;margin-bottom:8px}
+.seg button{flex:1;background:#eef2f1;color:var(--pri-d);border-radius:0}
+.seg button:first-child{border-radius:8px 0 0 8px}
+.seg button:last-child{border-radius:0 8px 8px 0}
+.seg button.on{background:var(--pri);color:#fff}
+.mt{font-size:15px;font-weight:700;margin:14px 0 6px;color:var(--pri-d)}
+.mt:first-child{margin-top:0}
+#cal{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:pan-y}
+.mg{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
+.mg .dh{text-align:center;font-size:11px;color:var(--sub);padding:3px 0;background:#f3f6f5;border-radius:6px}
+.mg .dh.su{color:#c0504d}
 .cell{min-height:64px;border:1px dashed var(--line);border-radius:7px;padding:2px;background:#fff;overflow:hidden}
 .cell.blank{border:0;background:transparent}
 .cell.off{background:#fff6ec}
 .cell.skip{background:#eee}
+.cell.rest{background:#e4e4e4}
 .cell.today .dn{background:var(--sec);color:#fff}
 .cell.drop{outline:2px solid var(--pri);background:var(--pri-l)}
 .dn{display:inline-block;min-width:17px;text-align:center;font-size:10px;line-height:17px;border-radius:9px;color:var(--sub)}
-.chip{margin-top:2px;font-size:10px;line-height:15px;padding:0 3px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:clip;touch-action:none;cursor:grab;color:#3a3a3a}
-.chip.rest{background:#e6e6e6!important;color:#777;cursor:default;touch-action:auto}
+.chip{margin-top:2px;font-size:10px;line-height:15px;padding:0 3px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:clip;cursor:grab;color:#3a3a3a}
+.chip.rest{background:#cfcfcf!important;color:#666;cursor:default}
 .chip.sel{box-shadow:0 0 0 2px #334155}
 .ghost-drag{position:fixed;z-index:20;pointer-events:none;padding:3px 8px;border-radius:6px;font-size:12px;color:#222;box-shadow:0 2px 8px rgba(0,0,0,.25);opacity:.9}
 .modes{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
@@ -78,6 +84,7 @@ tr.rest td{color:var(--sub)}
 .legend div{display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--line);font-size:13px;cursor:pointer}
 .legend div.sel{background:#fff3e6}
 .legend i{width:12px;height:12px;border-radius:4px;flex:none}
+.legend button{margin-left:6px}
 .legend span{color:var(--sub);margin-left:auto;font-size:12px;white-space:nowrap}
 .fixrow{display:flex;gap:6px;align-items:flex-end;margin-top:8px}
 .fixrow>div{flex:1}
@@ -110,21 +117,20 @@ tr.rest td{color:var(--sub)}
 <div id="rows"></div>
 <div class="bar">
   <button id="addWork">+ 작품 추가</button>
-  <button class="ghost" id="addRest">+ 휴식/교정 칸</button>
 </div>
 <div class="hint">분량은 “16만”, “32.7만”, “160000”처럼 적을 수 있어요. 작품마다 하루 분량을 따로 정하면 기본값 대신 적용돼요. 각 작품은 목표 분량을 채운 뒤 다음 집필일에 다음 작품으로 넘어가요.</div>
 </section>
 
 <section>
 <h2>달력</h2>
-<div class="hint" style="margin:0 0 6px">작품 막대를 끌어서 옮기거나, 막대를 눌러 선택한 뒤 시작할 날짜를 누르세요. (여러 달에 걸치면 선택 후 달을 넘겨서 날짜를 누르면 돼요)</div>
-<div class="modes">
+<div class="seg"><button id="mWork" class="on">작품 옮기기</button><button id="mRest">휴식 넣기</button></div>
+<div class="hint" id="chint" style="margin:0 0 6px"></div>
+<div class="modes" id="wmodes">
   <label><input type="radio" name="mode" value="after" checked>뒤 작품도 같이</label>
   <label><input type="radio" name="mode" value="one">이 작품만</label>
 </div>
 <div class="selbar" id="selbar"><span id="seltxt"></span><button class="ghost sm" id="unsel">선택 해제</button></div>
-<div class="calhead"><button class="ghost" id="prevM">◀</button><b id="calTitle"></b><button class="ghost" id="nextM">▶</button></div>
-<div class="cal" id="cal"></div>
+<div id="cal"></div>
 <div class="legend" id="legend"></div>
 </section>
 
@@ -158,7 +164,6 @@ function sample() {
       {t:'w', name:'『권태의 종말』', chars:'16만', pace:''},
       {t:'w', name:'『두근두근 호감도 업!』', chars:'32.7만', pace:''},
       {t:'w', name:'텐북 BL 단독 배너', chars:'26.1만', pace:''},
-      {t:'r', name:'교정 1주 + 휴식 1주', days:'14'},
       {t:'w', name:'『키치 웨딩』 원픽 후보', chars:'20만', pace:''},
       {t:'w', name:'현로 단권 ①', chars:'12만', pace:''},
       {t:'w', name:'위브랩 BL', chars:'18.3만', pace:''}
@@ -168,6 +173,7 @@ function sample() {
 var S;
 try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
 if (!S || !S.rows) S = sample();
+if (!S.rests) S.rests = [];
 function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
 
 // "16만", "32.7만", "160,000" → 숫자
@@ -218,6 +224,7 @@ function compute() {
   if (cur == null) { out.err = '시작일을 선택하세요'; return out; }
   var defPace = num(S.pace);
   var skip = parseSkip(S.skip);
+  S.rests.forEach(function (r) { for (var d = r.s; d <= r.e && d - r.s < 800; d++) skip[d] = 1; });
   var off = {}; S.off.forEach(function (d) { off[d] = 1; });
   if (S.off.length >= 7) { out.err = '쉬는 요일이 7일이에요. 하루는 일해야 계산돼요'; return out; }
   function isWork(d) { return !off[dow(d)] && !skip[d]; }
@@ -293,8 +300,10 @@ function renderResult() {
     }
   });
   html += '</table>';
+  var rl = S.rests.slice().sort(function (a, b) { return a.s - b.s; }).map(function (r) { return (r.name || '휴식') + ' ' + fmtD(r.s) + (r.e > r.s ? '~' + fmtD(r.e) : ''); });
+  if (rl.length) html += '<div class="hint" style="margin-top:8px">쉬는 날: ' + esc(rl.join(' / ')) + '</div>';
   el.innerHTML = html;
-  lastText = lines.join('\n') + '\n\n총 ' + fmtMan(o.total) + '자 (' + fmt(o.total) + '자) · 종료 ' + fmtD(o.end, true);
+  lastText = lines.join('\n') + (rl.length ? '\n쉬는 날: ' + rl.join(' / ') : '') + '\n\n총 ' + fmtMan(o.total) + '자 (' + fmt(o.total) + '자) · 종료 ' + fmtD(o.end, true);
 }
 
 // ---- 입력 UI ----
@@ -363,10 +372,9 @@ $('rows').addEventListener('click', function (e) {
   renderRows(); refresh();
 });
 $('addWork').onclick = function () { S.rows.push({t:'w', name:'', chars:'', pace:''}); renderRows(); refresh(); };
-$('addRest').onclick = function () { S.rows.push({t:'r', name:'교정/휴식', days:'7'}); renderRows(); refresh(); };
 $('reset').onclick = function () {
   if (!confirm('모든 입력을 예시 값으로 되돌릴까요?')) return;
-  S = sample(); $('start').value = S.start; $('pace').value = S.pace; $('skip').value = '';
+  S = sample(); S.rests = []; $('start').value = S.start; $('pace').value = S.pace; $('skip').value = '';
   renderDays(); renderRows(); refresh();
 };
 function toast(m) { var t = $('toast'); t.textContent = m; t.classList.add('on'); setTimeout(function () { t.classList.remove('on'); }, 1500); }
@@ -384,44 +392,65 @@ $('txt').addEventListener('input', function () {
 
 // ---- 달력 ----
 var COLORS = ['#f6c9a8','#bfe0d3','#cfd9f6','#f3c6d8','#e8dcab','#d5c6ea','#c2e3ef','#f0d0b8'];
-var calY = null, calM = 0, sel = -1, mode = 'after', drag = null;
+var sel = -1, mode = 'after', rmode = false, drag = null, cellMap = {}, hlCells = [];
 function dstr(day) { var d = dObj(day); return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate()); }
 function shortName(r) { return (r.name || (r.t === 'r' ? '휴식' : '작품')).replace(/[『』「」]/g, ''); }
 function color(i) { return COLORS[i % COLORS.length]; }
+function restAt(day) {
+  for (var k = 0; k < S.rests.length; k++) if (S.rests[k].s <= day && day <= S.rests[k].e) return S.rests[k];
+  return null;
+}
+function rid() { return 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
 
 function renderCal() {
   var o = lastO, cal = $('cal');
-  if (!o || o.err) { cal.innerHTML = ''; $('legend').innerHTML = ''; $('calTitle').textContent = ''; return; }
-  if (calY == null) {
-    var f = null;
-    o.items.forEach(function (it) { if (!it.bad && (f == null || it.start < f)) f = it.start; });
-    var d0 = dObj(f == null ? parseD(S.start) : f);
-    calY = d0.getUTCFullYear(); calM = d0.getUTCMonth();
-  }
-  $('calTitle').textContent = calY + '년 ' + (calM + 1) + '월';
+  if (!o || o.err) { cal.innerHTML = ''; $('legend').innerHTML = ''; cellMap = {}; return; }
+  var first = parseD(S.start), last = null;
+  o.items.forEach(function (it) {
+    if (it.bad) return;
+    if (first == null || it.start < first) first = it.start;
+    if (last == null || it.end > last) last = it.end;
+  });
+  S.rests.forEach(function (r) { if (r.s < first) first = r.s; if (last == null || r.e > last) last = r.e; });
+  var today = Math.floor((Date.now() - new Date().getTimezoneOffset() * 6e4) / 864e5);
+  var y0 = dObj(first).getUTCFullYear(), m0 = dObj(first).getUTCMonth();
+  var endY = Math.max(dObj(today).getUTCFullYear(), y0) + 1;
+  var lim = Date.UTC(endY, 11, 31) / 864e5;
+  if (last == null || last < lim) last = lim;
+  var y1 = dObj(last).getUTCFullYear(), m1 = dObj(last).getUTCMonth();
+
   var map = {};
   o.items.forEach(function (it, i) {
     if (it.bad) return;
-    for (var d = it.start; d <= it.end; d++) (map[d] = map[d] || []).push(i);
+    for (var d = it.start; d <= it.end; d++) if (it.rest || !restAt(d)) (map[d] = map[d] || []).push(i);
   });
-  var skip = parseSkip(S.skip), first = Date.UTC(calY, calM, 1) / 864e5;
-  var nDays = new Date(Date.UTC(calY, calM + 1, 0)).getUTCDate();
-  var today = Math.floor((Date.now() - new Date().getTimezoneOffset() * 6e4) / 864e5);
-  var h = ['일','월','화','수','목','금','토'].map(function (w, k) { return '<div class="dh' + (k === 0 ? ' su' : '') + '">' + w + '</div>'; }).join('');
-  for (var b = 0; b < dow(first); b++) h += '<div class="cell blank"></div>';
-  for (var n = 0; n < nDays; n++) {
-    var day = first + n, cls = 'cell';
-    if (S.off.indexOf(dow(day)) >= 0) cls += ' off';
-    if (skip[day]) cls += ' skip';
-    if (day === today) cls += ' today';
-    h += '<div class="' + cls + '" data-day="' + day + '"><span class="dn">' + (n + 1) + '</span>';
-    (map[day] || []).forEach(function (i) {
-      var it = o.items[i], rest = !!it.rest;
-      h += '<div class="chip' + (rest ? ' rest' : '') + (i === sel ? ' sel' : '') + '" data-i="' + i + '" data-day="' + day + '" style="background:' + color(i) + '">' + esc(shortName(it.r)) + '</div>';
-    });
+  var skip = parseSkip(S.skip), h = '';
+  for (var y = y0, m = m0; y < y1 || (y === y1 && m <= m1); m++) {
+    if (m > 11) { m = 0; y++; if (y > y1 || (y === y1 && m > m1)) break; }
+    var f = Date.UTC(y, m, 1) / 864e5, nDays = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+    h += '<div class="mt">' + y + '년 ' + (m + 1) + '월</div><div class="mg">' +
+      ['일','월','화','수','목','금','토'].map(function (w, k) { return '<div class="dh' + (k === 0 ? ' su' : '') + '">' + w + '</div>'; }).join('');
+    for (var b = 0; b < dow(f); b++) h += '<div class="cell blank"></div>';
+    for (var n = 0; n < nDays; n++) {
+      var day = f + n, cls = 'cell', rr = restAt(day);
+      if (S.off.indexOf(dow(day)) >= 0) cls += ' off';
+      if (skip[day]) cls += ' skip';
+      if (rr) cls += ' rest';
+      if (day === today) cls += ' today';
+      h += '<div class="' + cls + '" data-day="' + day + '"><span class="dn">' + (n + 1) + '</span>';
+      if (rr && rr.s === day) h += '<div class="chip rest">' + esc(rr.name || '휴식') + '</div>';
+      (map[day] || []).forEach(function (i) {
+        var it = o.items[i];
+        h += '<div class="chip' + (it.rest ? ' rest' : '') + (i === sel ? ' sel' : '') + '" data-i="' + i + '" data-day="' + day + '"' + (it.rest ? '' : ' style="background:' + color(i) + '"') + '>' + esc(shortName(it.r)) + '</div>';
+      });
+      h += '</div>';
+    }
     h += '</div>';
   }
   cal.innerHTML = h;
+  cellMap = {};
+  cal.querySelectorAll('.cell[data-day]').forEach(function (c) { cellMap[c.dataset.day] = c; });
+  hlCells = [];
 
   var lg = '';
   o.items.forEach(function (it, i) {
@@ -429,9 +458,13 @@ function renderCal() {
     lg += '<div data-lg="' + i + '" class="' + (i === sel ? 'sel' : '') + '"><i style="background:' + (it.rest ? '#ddd' : color(i)) + '"></i>' + esc(shortName(it.r)) + (it.fixed ? ' 📌' : '') +
       '<span>' + fmtD(it.start, true).slice(2) + ' ~ ' + fmtD(it.end, true).slice(2) + '</span></div>';
   });
+  S.rests.slice().sort(function (a, b) { return a.s - b.s; }).forEach(function (r) {
+    lg += '<div data-rg="' + r.id + '"><i style="background:#cfcfcf"></i>' + esc(r.name || '휴식') +
+      '<span>' + fmtD(r.s, true).slice(2) + (r.e > r.s ? ' ~ ' + fmtD(r.e, true).slice(2) : '') + ' · ' + (r.e - r.s + 1) + '일</span><button class="warn sm" data-rdel="' + r.id + '">✕</button></div>';
+  });
   $('legend').innerHTML = lg;
   var bar = $('selbar'), it2 = sel >= 0 && o.items[sel];
-  if (it2 && !it2.bad) { bar.style.display = 'flex'; $('seltxt').textContent = '「' + shortName(it2.r) + '」 선택됨 — 시작할 날짜를 누르세요'; }
+  if (!rmode && it2 && !it2.bad) { bar.style.display = 'flex'; $('seltxt').textContent = '「' + shortName(it2.r) + '」 선택됨 — 시작할 날짜를 누르세요'; }
   else { bar.style.display = 'none'; sel = -1; }
 }
 
@@ -451,23 +484,38 @@ function moveWork(i, delta) {
   renderRows(); refresh();
 }
 
-function monthShift(k) {
-  calM += k;
-  if (calM < 0) { calM = 11; calY--; } else if (calM > 11) { calM = 0; calY++; }
+function setRmode(v) {
+  rmode = v; sel = -1;
+  $('mWork').classList.toggle('on', !v); $('mRest').classList.toggle('on', v);
+  $('wmodes').style.display = v ? 'none' : 'flex';
+  $('chint').textContent = v
+    ? '날짜를 누르면 그 날이 휴식이 돼요. 여러 날은 눌러서 끌어요. 휴식의 첫날/마지막 날을 끌면 줄이고 늘이고, 가운데를 끌면 통째로 옮겨요. (폰은 0.3초 꾹 누른 뒤 끌어요)'
+    : '작품 막대를 끌어서 옮겨요. (폰은 0.3초 꾹 누른 뒤 끌어요) 막대를 눌러 선택한 뒤 시작할 날짜를 눌러도 돼요.';
   renderCal();
 }
-$('prevM').onclick = function () { monthShift(-1); };
-$('nextM').onclick = function () { monthShift(1); };
+$('mWork').onclick = function () { setRmode(false); };
+$('mRest').onclick = function () { setRmode(true); };
+setRmode(false);
 $('unsel').onclick = function () { sel = -1; renderCal(); };
 document.querySelectorAll('input[name=mode]').forEach(function (r) {
   r.addEventListener('change', function () { mode = this.value; });
 });
 $('legend').addEventListener('click', function (e) {
+  var del = e.target.closest('[data-rdel]');
+  if (del) { S.rests = S.rests.filter(function (r) { return r.id !== del.dataset.rdel; }); refresh(); return; }
+  var rg = e.target.closest('[data-rg]');
+  if (rg) {
+    var r = S.rests.filter(function (x) { return x.id === rg.dataset.rg; })[0];
+    var nm = r && prompt('이름 (예: 교정, 휴식)', r.name || '휴식');
+    if (nm != null) { r.name = nm.trim() || '휴식'; refresh(); }
+    return;
+  }
   var row = e.target.closest('[data-lg]'); if (!row) return;
   var i = +row.dataset.lg, it = lastO.items[i];
   sel = (sel === i) ? -1 : i;
-  if (sel >= 0) { var d = dObj(it.start); calY = d.getUTCFullYear(); calM = d.getUTCMonth(); }
+  if (rmode) setRmode(false);
   renderCal();
+  if (sel >= 0 && cellMap[it.start]) cellMap[it.start].scrollIntoView({block: 'center', behavior: 'smooth'});
 });
 $('rows').addEventListener('change', function (e) {
   if (e.target.dataset && e.target.dataset.f === 'start') renderRows();
@@ -478,48 +526,92 @@ function cellAt(x, y) {
   var el = document.elementFromPoint(x, y);
   return el && el.closest ? el.closest('.cell[data-day]') : null;
 }
-function clearDrop() { calEl.querySelectorAll('.drop').forEach(function (c) { c.classList.remove('drop'); }); }
-function endDrag() {
-  if (ghost) { ghost.remove(); ghost = null; }
-  clearDrop(); drag = null;
+function hl(s, e) {
+  hlCells.forEach(function (c) { c.classList.remove('drop'); });
+  hlCells = [];
+  for (var d = s; d <= e && d - s < 800; d++) if (cellMap[d]) { cellMap[d].classList.add('drop'); hlCells.push(cellMap[d]); }
 }
+function endDrag() {
+  if (drag && drag.timer) clearTimeout(drag.timer);
+  if (ghost) { ghost.remove(); ghost = null; }
+  hl(1, 0); drag = null;
+}
+calEl.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+calEl.addEventListener('touchmove', function (e) { if (drag && drag.armed) e.preventDefault(); }, {passive: false});
 calEl.addEventListener('pointerdown', function (e) {
-  var chip = e.target.closest('.chip');
-  if (!chip || chip.classList.contains('rest')) return;
-  drag = {i: +chip.dataset.i, day: +chip.dataset.day, x: e.clientX, y: e.clientY, moved: false, id: e.pointerId};
-  try { chip.setPointerCapture(e.pointerId); } catch (err) {}
+  if (e.button > 0) return;
+  var c = e.target.closest('.cell[data-day]'); if (!c) return;
+  var day = +c.dataset.day, chip = e.target.closest('.chip');
+  var d = {x: e.clientX, y: e.clientY, id: e.pointerId, moved: false, day: day, armed: e.pointerType !== 'touch'};
+  if (rmode) {
+    var r = restAt(day);
+    if (r) { d.kind = 'rest'; d.r = r; d.o = {s: r.s, e: r.e}; d.how = day === r.e ? 'end' : (day === r.s ? 'start' : 'move'); }
+    else d.kind = 'new';
+  } else {
+    if (!chip || chip.classList.contains('rest')) return;
+    d.kind = 'work'; d.i = +chip.dataset.i;
+  }
+  drag = d;
+  try { calEl.setPointerCapture(e.pointerId); } catch (err) {}
+  if (!d.armed) d.timer = setTimeout(function () { if (drag === d) { d.armed = true; if (navigator.vibrate) navigator.vibrate(15); } }, 280);
 });
 calEl.addEventListener('pointermove', function (e) {
   if (!drag || e.pointerId !== drag.id) return;
-  if (!drag.moved && Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y) < 8) return;
+  var dist = Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y);
+  if (!drag.armed) { if (dist > 8) endDrag(); return; }
+  if (!drag.moved && dist < 8) return;
   if (!drag.moved) {
     drag.moved = true;
-    ghost = document.createElement('div');
-    ghost.className = 'ghost-drag';
-    ghost.style.background = color(drag.i);
-    ghost.textContent = shortName(lastO.items[drag.i].r);
-    document.body.appendChild(ghost);
+    if (drag.kind === 'work') {
+      ghost = document.createElement('div');
+      ghost.className = 'ghost-drag';
+      ghost.style.background = color(drag.i);
+      ghost.textContent = shortName(lastO.items[drag.i].r);
+      document.body.appendChild(ghost);
+    }
   }
-  ghost.style.left = (e.clientX + 10) + 'px'; ghost.style.top = (e.clientY - 28) + 'px';
-  clearDrop();
-  var c = cellAt(e.clientX, e.clientY); if (c) c.classList.add('drop');
+  var c = cellAt(e.clientX, e.clientY), dy = c ? +c.dataset.day : null;
+  if (drag.kind === 'work') {
+    ghost.style.left = (e.clientX + 10) + 'px'; ghost.style.top = (e.clientY - 28) + 'px';
+    hl(dy == null ? 1 : dy, dy == null ? 0 : dy);
+    return;
+  }
+  if (dy == null) return;
+  var pv;
+  if (drag.kind === 'new') pv = {s: Math.min(drag.day, dy), e: Math.max(drag.day, dy)};
+  else if (drag.how === 'end') pv = {s: drag.o.s, e: Math.max(drag.o.s, dy)};
+  else if (drag.how === 'start') pv = {s: Math.min(dy, drag.o.e), e: drag.o.e};
+  else pv = {s: drag.o.s + dy - drag.day, e: drag.o.e + dy - drag.day};
+  drag.pv = pv; hl(pv.s, pv.e);
 });
 calEl.addEventListener('pointerup', function (e) {
   if (!drag || e.pointerId !== drag.id) return;
   var d = drag, c = d.moved ? cellAt(e.clientX, e.clientY) : null;
   endDrag();
-  if (d.moved) { if (c) moveWork(d.i, +c.dataset.day - d.day); }
-  else if (sel >= 0 && sel !== d.i) { var s0 = lastO.items[sel]; if (s0 && !s0.bad) moveWork(sel, d.day - s0.start); }
-  else { sel = (sel === d.i) ? -1 : d.i; renderCal(); }
+  if (d.kind === 'work') {
+    if (d.moved) { if (c) moveWork(d.i, +c.dataset.day - d.day); }
+    else if (sel >= 0 && sel !== d.i) { var s0 = lastO.items[sel]; if (s0 && !s0.bad) moveWork(sel, d.day - s0.start); }
+    else { sel = (sel === d.i) ? -1 : d.i; renderCal(); }
+    return;
+  }
+  if (d.moved && d.pv) {
+    if (d.kind === 'new') S.rests.push({id: rid(), s: d.pv.s, e: d.pv.e, name: '휴식'});
+    else { d.r.s = d.pv.s; d.r.e = d.pv.e; }
+    refresh();
+  } else if (!d.moved && d.kind === 'new') {
+    S.rests.push({id: rid(), s: d.day, e: d.day, name: '휴식'});
+    refresh();
+  }
 });
 calEl.addEventListener('pointercancel', endDrag);
 calEl.addEventListener('click', function (e) {
+  if (rmode) return;
   var ch = e.target.closest('.chip');
   if (ch && !ch.classList.contains('rest')) return;
   var c = e.target.closest('.cell[data-day]');
   if (!c || sel < 0) return;
   var it = lastO.items[sel];
-  if (it && !it.bad) { var k = sel; moveWork(k, +c.dataset.day - it.start); }
+  if (it && !it.bad) moveWork(sel, +c.dataset.day - it.start);
 });
 
 renderDays(); renderRows(); renderResult();

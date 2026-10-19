@@ -471,7 +471,6 @@ function openEditor(i) {
   var r = S.rows[i]; if (!r || r.t === 'r') return;
   sheetI = i; renderSheet();
   $('sheet').style.display = 'flex';
-  if (navigator.vibrate) navigator.vibrate(20);
   var el = $('sBody').querySelector('[data-f=chars]'); if (el) { el.focus(); el.select(); }
 }
 function closeSheet() { sheetI = -1; $('sheet').style.display = 'none'; }
@@ -675,7 +674,6 @@ function hl(s, e) {
 }
 function endDrag() {
   if (drag && drag.timer) clearTimeout(drag.timer);
-  if (drag && drag.timer2) clearTimeout(drag.timer2);
   if (ghost) { ghost.remove(); ghost = null; }
   hl(1, 0); drag = null;
 }
@@ -684,10 +682,6 @@ function pinchInfo() {
   return {d: Math.hypot(a.x - b.x, a.y - b.y) || 1, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2};
 }
 calEl.addEventListener('contextmenu', function (e) { e.preventDefault(); });
-calEl.addEventListener('dblclick', function (e) {
-  var ch = e.target.closest('.chip');
-  if (ch && !rmode && !ch.classList.contains('rest')) openEditor(+ch.dataset.i);
-});
 calEl.addEventListener('touchmove', function (e) { if (drag && drag.armed) e.preventDefault(); }, {passive: false});
 calEl.addEventListener('pointerdown', function (e) {
   if (e.button > 0) return;
@@ -713,9 +707,6 @@ calEl.addEventListener('pointerdown', function (e) {
   }
   drag = d;
   if (!d.armed) d.timer = setTimeout(function () { if (drag === d) { d.armed = true; if (navigator.vibrate) navigator.vibrate(15); } }, 280);
-  if (d.kind === 'work') d.timer2 = setTimeout(function () {
-    if (drag === d && !d.moved) { var k = d.i; endDrag(); noClick = Date.now() + 700; openEditor(k); }
-  }, 600);
 });
 calEl.addEventListener('pointermove', function (e) {
   if (ptrs[e.pointerId]) { ptrs[e.pointerId].x = e.clientX; ptrs[e.pointerId].y = e.clientY; }
@@ -774,6 +765,7 @@ calEl.addEventListener('pointerup', function (e) {
     if (d.moved) { if (c) moveWork(d.i, +c.dataset.day - d.day); }
     else if (sel >= 0 && sel !== d.i) { var s0 = lastO.items[sel], k0 = sel; sel = -1; if (s0 && !s0.bad) moveWork(k0, d.day - s0.start); }
     else if (sel === d.i) { sel = -1; renderCal(); }
+    else openEditor(d.i);
     return;
   }
   if (d.moved && d.pv) {

@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#87ada1">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="일정계산기">
+<title>집필 일정 계산기</title>
+<style>
+:root{--pri:#87ada1;--pri-d:#5f8a7d;--pri-l:#effcf6;--sec:#f4a261;--bg:#f8f9fa;--tx:#334155;--sub:#64748b;--line:#e2e8f0;--card:#fff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:Pretendard,-apple-system,"Noto Sans KR",sans-serif;font-size:15px;line-height:1.5;padding:0 0 env(safe-area-inset-bottom)}
+header{background:var(--pri);color:#fff;padding:14px 16px;position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between}
+header h1{font-size:17px;margin:0}
+main{max-width:760px;margin:0 auto;padding:12px 16px 60px}
+section{background:var(--card);border-radius:14px;padding:14px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+h2{font-size:15px;margin:0 0 10px;color:var(--pri-d)}
+label{display:block;font-size:12px;color:var(--sub);margin-bottom:3px}
+input,textarea,select{width:100%;font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--tx)}
+input:focus,textarea:focus{outline:2px solid var(--pri);border-color:transparent}
+textarea{resize:vertical;min-height:70px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.days{display:flex;gap:6px;flex-wrap:wrap}
+.days label{display:flex;align-items:center;gap:4px;margin:0;font-size:14px;color:var(--tx);padding:6px 10px;border:1px solid var(--line);border-radius:999px;cursor:pointer;user-select:none}
+.days input{width:auto;margin:0}
+.days label.off{background:#fde8d4;border-color:var(--sec)}
+button{font:inherit;border:0;border-radius:8px;padding:8px 12px;background:var(--pri);color:#fff;cursor:pointer}
+button.ghost{background:#eef2f1;color:var(--pri-d)}
+button.warn{background:#fbe5e5;color:#b84a4a}
+button.sm{padding:5px 9px;font-size:13px}
+.row{border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:10px;background:#fcfdfd}
+.row.rest{background:#fff8f0;border-color:#f6dcc0}
+.row .top{display:flex;gap:6px;align-items:center;margin-bottom:8px}
+.row .top .no{font-weight:700;color:var(--pri-d);min-width:22px}
+.row .top input{flex:1}
+.row .grid3{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:8px}
+.row .acts{display:flex;gap:4px}
+.hint{font-size:12px;color:var(--sub);margin-top:3px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{font-size:12px;color:var(--sub);text-align:left;padding:6px 4px;border-bottom:2px solid var(--line)}
+td{padding:9px 4px;border-bottom:1px solid var(--line);vertical-align:top}
+td.n,th.n{text-align:right;white-space:nowrap}
+td.d{white-space:nowrap;font-variant-numeric:tabular-nums}
+tr.rest td{color:var(--sub)}
+.wk{color:var(--sub);font-size:11px}
+.sum{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.sum div{background:var(--pri-l);border-radius:10px;padding:8px 10px}
+.sum b{display:block;font-size:16px;color:var(--pri-d)}
+.sum span{font-size:11px;color:var(--sub)}
+.count-res{margin-top:8px;font-size:14px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#334155;color:#fff;padding:8px 16px;border-radius:999px;font-size:13px;opacity:0;pointer-events:none;transition:.2s}
+.toast.on{opacity:1}
+</style>
+</head>
+<body>
+<header><h1>📅 집필 일정 계산기</h1><button class="ghost sm" id="reset">초기화</button></header>
+<main>
+
+<section>
+<h2>기본 설정</h2>
+<div class="grid">
+  <div><label>시작일</label><input type="date" id="start"></div>
+  <div><label>하루 집필 분량 (자)</label><input type="text" id="pace" inputmode="decimal" placeholder="예: 4000 / 0.4만"></div>
+</div>
+<div style="margin-top:10px">
+  <label>쉬는 요일 (눌러서 토글)</label>
+  <div class="days" id="days"></div>
+</div>
+<div style="margin-top:10px">
+  <label>쉬는 날짜 (추가 휴무) — 줄/쉼표로 구분, 예: 2026-12-25, 2027-01-01 ~ 2027-01-03</label>
+  <textarea id="skip" placeholder="2026-12-25&#10;2027-02-06 ~ 2027-02-09"></textarea>
+</div>
+</section>
+
+<section>
+<h2>작품 목록</h2>
+<div id="rows"></div>
+<div class="bar">
+  <button id="addWork">+ 작품 추가</button>
+  <button class="ghost" id="addRest">+ 휴식/교정 칸</button>
+</div>
+<div class="hint">분량은 “16만”, “32.7만”, “160000”처럼 적을 수 있어요. 작품마다 하루 분량을 따로 정하면 기본값 대신 적용돼요. 각 작품은 목표 분량을 채운 뒤 다음 집필일에 다음 작품으로 넘어가요.</div>
+</section>
+
+<section>
+<h2>계산 결과</h2>
+<div class="sum" id="sum"></div>
+<div id="result"></div>
+<div class="bar"><button id="copy">결과 복사</button></div>
+</section>
+
+<section>
+<h2>글자수 세기 (분량 확인용)</h2>
+<textarea id="txt" placeholder="원고를 붙여넣으면 글자수를 세요"></textarea>
+<div class="count-res" id="cnt"></div>
+</section>
+
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+'use strict';
+var KEY = 'schedule-calc-v1';
+var WK = ['일','월','화','수','목','금','토'];
+var $ = function (id) { return document.getElementById(id); };
+
+function sample() {
+  return {
+    start: '2026-10-20', pace: '5000', off: [0], skip: '',
+    rows: [
+      {t:'w', name:'『권태의 종말』', chars:'16만', pace:''},
+      {t:'w', name:'『두근두근 호감도 업!』', chars:'32.7만', pace:''},
+      {t:'w', name:'텐북 BL 단독 배너', chars:'26.1만', pace:''},
+      {t:'r', name:'교정 1주 + 휴식 1주', days:'14'},
+      {t:'w', name:'『키치 웨딩』 원픽 후보', chars:'20만', pace:''},
+      {t:'w', name:'현로 단권 ①', chars:'12만', pace:''},
+      {t:'w', name:'위브랩 BL', chars:'18.3만', pace:''}
+    ]
+  };
+}
+var S;
+try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+if (!S || !S.rows) S = sample();
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+
+// "16만", "32.7만", "160,000" → 숫자
+function num(v) {
+  v = String(v == null ? '' : v).replace(/[,\s자]/g, '');
+  if (!v) return 0;
+  var m = v.match(/^(\d+(?:\.\d+)?)(만|천)?$/);
+  if (!m) return NaN;
+  var n = parseFloat(m[1]);
+  if (m[2] === '만') n *= 10000; else if (m[2] === '천') n *= 1000;
+  return Math.round(n);
+}
+function fmt(n) { return Math.round(n).toLocaleString('ko-KR'); }
+function fmtMan(n) {
+  if (n >= 10000) { var m = Math.round(n / 100) / 100; return String(m) + '만'; }
+  return fmt(n);
+}
+
+// ---- 날짜 (UTC 정오 기준 일수로 처리) ----
+function parseD(s) {
+  var m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(String(s).trim());
+  if (!m) return null;
+  return Date.UTC(+m[1], +m[2] - 1, +m[3]) / 864e5;
+}
+function dObj(day) { return new Date(day * 864e5); }
+function dow(day) { return dObj(day).getUTCDay(); }
+function pad(n) { return (n < 10 ? '0' : '') + n; }
+function fmtD(day, withYear) {
+  var d = dObj(day);
+  return (withYear ? d.getUTCFullYear() + '.' : '') + pad(d.getUTCMonth() + 1) + '.' + pad(d.getUTCDate());
+}
+function parseSkip(text) {
+  var set = {};
+  String(text || '').split(/[\n,;]+/).forEach(function (part) {
+    part = part.trim(); if (!part) return;
+    var seg = part.split(/\s*[~\-–]\s*(?=\d{4}-)/);
+    var a = parseD(seg[0]), b = seg[1] ? parseD(seg[1]) : a;
+    if (a == null || b == null) return;
+    for (var d = a; d <= b && d - a < 800; d++) set[d] = 1;
+  });
+  return set;
+}
+
+// ---- 계산 ----
+function compute() {
+  var out = { items: [], total: 0, wdays: 0, end: null, err: '' };
+  var cur = parseD(S.start);
+  if (cur == null) { out.err = '시작일을 선택하세요'; return out; }
+  var defPace = num(S.pace);
+  var skip = parseSkip(S.skip);
+  var off = {}; S.off.forEach(function (d) { off[d] = 1; });
+  if (S.off.length >= 7) { out.err = '쉬는 요일이 7일이에요. 하루는 일해야 계산돼요'; return out; }
+  function isWork(d) { return !off[dow(d)] && !skip[d]; }
+
+  S.rows.forEach(function (r) {
+    if (r.t === 'r') {
+      var n = Math.max(0, Math.round(num(r.days) || 0));
+      if (!n) { out.items.push({r: r, bad: true}); return; }
+      out.items.push({r: r, rest: true, start: cur, end: cur + n - 1, days: n});
+      cur += n;
+      return;
+    }
+    var chars = num(r.chars);
+    var pace = r.pace ? num(r.pace) : defPace;
+    if (!chars || isNaN(chars) || !pace || isNaN(pace) || pace <= 0) { out.items.push({r: r, bad: true}); return; }
+    var need = Math.ceil(chars / pace), guard = 0;
+    while (!isWork(cur) && guard++ < 4000) cur++;
+    var start = cur, cnt = 1, last = cur;
+    while (cnt < need && guard++ < 40000) {
+      cur++;
+      if (isWork(cur)) { cnt++; last = cur; }
+    }
+    out.items.push({r: r, start: start, end: last, chars: chars, wdays: need, days: last - start + 1, pace: pace});
+    out.total += chars; out.wdays += need; out.end = last;
+    cur = last + 1;
+  });
+  return out;
+}
+
+function rangeText(it, st) {
+  var y = dObj(it.start).getUTCFullYear();
+  var s = fmtD(it.start, y !== st.year);
+  st.year = y;
+  var y2 = dObj(it.end).getUTCFullYear();
+  var e = fmtD(it.end, y2 !== y);
+  st.year = y2;
+  return s + '~' + e;
+}
+
+function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+
+var lastText = '';
+function renderResult() {
+  var o = compute();
+  var el = $('result'), sm = $('sum');
+  if (o.err) { el.innerHTML = '<div class="hint">' + esc(o.err) + '</div>'; sm.innerHTML = ''; lastText = ''; return; }
+  var firstStart = null;
+  o.items.forEach(function (it) { if (firstStart == null && !it.bad) firstStart = it.start; });
+  var calDays = (firstStart != null && o.end != null) ? o.end - firstStart + 1 : 0;
+  sm.innerHTML =
+    '<div><b>' + (o.end != null ? fmtD(o.end, true) : '-') + '</b><span>종료일</span></div>' +
+    '<div><b>' + fmtMan(o.total) + '자</b><span>총 분량 (' + fmt(o.total) + ')</span></div>' +
+    '<div><b>' + calDays + '일</b><span>집필일 ' + o.wdays + '일</span></div>';
+
+  var st = {year: null}, html = '<table><tr><th>기간</th><th>작품</th><th class="n">분량</th></tr>', lines = [];
+  o.items.forEach(function (it, i) {
+    if (it.bad) {
+      html += '<tr><td class="d">-</td><td colspan="2" class="hint">' + (i + 1) + '번 칸: 분량(또는 하루 분량/일수)을 확인하세요</td></tr>';
+      return;
+    }
+    var rt = rangeText(it, st), wk = WK[dow(it.start)] + '~' + WK[dow(it.end)];
+    if (it.rest) {
+      html += '<tr class="rest"><td class="d">' + rt + '<div class="wk">' + wk + '</div></td><td>' + esc(it.r.name || '휴식') + '</td><td class="n">—</td></tr>';
+      lines.push(rt + '  ' + (it.r.name || '휴식') + '  —');
+    } else {
+      var note = it.wdays + '집필일' + (it.days !== it.wdays ? ' / ' + it.days + '일' : '') + ' · 일 ' + fmt(it.pace);
+      html += '<tr><td class="d">' + rt + '<div class="wk">' + wk + '</div></td><td><b>' + esc(it.r.name || '(이름 없음)') + '</b><div class="wk">' + note + '</div></td><td class="n">' + fmtMan(it.chars) + '</td></tr>';
+      lines.push(rt + '  ' + (it.r.name || '(이름 없음)') + '  ' + fmtMan(it.chars));
+    }
+  });
+  html += '</table>';
+  el.innerHTML = html;
+  lastText = lines.join('\n') + '\n\n총 ' + fmtMan(o.total) + '자 (' + fmt(o.total) + '자) · 종료 ' + fmtD(o.end, true);
+}
+
+// ---- 입력 UI ----
+function renderDays() {
+  var h = '';
+  [1,2,3,4,5,6,0].forEach(function (d) {
+    var off = S.off.indexOf(d) >= 0;
+    h += '<label class="' + (off ? 'off' : '') + '"><input type="checkbox" data-d="' + d + '"' + (off ? ' checked' : '') + '>' + WK[d] + '</label>';
+  });
+  $('days').innerHTML = h;
+}
+function renderRows() {
+  var h = '';
+  S.rows.forEach(function (r, i) {
+    var acts = '<div class="acts"><button class="ghost sm" data-a="up" data-i="' + i + '">↑</button><button class="ghost sm" data-a="dn" data-i="' + i + '">↓</button><button class="warn sm" data-a="del" data-i="' + i + '">✕</button></div>';
+    if (r.t === 'r') {
+      h += '<div class="row rest"><div class="top"><span class="no">' + (i + 1) + '</span><input data-f="name" data-i="' + i + '" value="' + esc(r.name || '') + '" placeholder="교정 / 휴식">' + acts + '</div>' +
+        '<div class="grid3"><div><label>기간 (일)</label><input data-f="days" data-i="' + i + '" inputmode="numeric" value="' + esc(r.days || '') + '" placeholder="14"></div></div></div>';
+    } else {
+      h += '<div class="row"><div class="top"><span class="no">' + (i + 1) + '</span><input data-f="name" data-i="' + i + '" value="' + esc(r.name || '') + '" placeholder="작품 이름">' + acts + '</div>' +
+        '<div class="grid3"><div><label>목표 분량 (자)</label><input data-f="chars" data-i="' + i + '" inputmode="decimal" value="' + esc(r.chars || '') + '" placeholder="16만"></div>' +
+        '<div><label>하루 분량 (선택)</label><input data-f="pace" data-i="' + i + '" inputmode="decimal" value="' + esc(r.pace || '') + '" placeholder="기본값"></div>' +
+        '<div><label>예상 집필일</label><input disabled data-est="' + i + '"></div></div></div>';
+    }
+  });
+  $('rows').innerHTML = h || '<div class="hint">작품을 추가하세요</div>';
+  updateEst();
+}
+function updateEst() {
+  var dp = num(S.pace);
+  S.rows.forEach(function (r, i) {
+    var el = document.querySelector('[data-est="' + i + '"]');
+    if (!el) return;
+    var c = num(r.chars), p = r.pace ? num(r.pace) : dp;
+    el.value = (c && p && !isNaN(c) && !isNaN(p)) ? Math.ceil(c / p) + '일' : '-';
+  });
+}
+function refresh() { save(); updateEst(); renderResult(); }
+
+$('start').value = S.start; $('pace').value = S.pace; $('skip').value = S.skip || '';
+$('start').addEventListener('input', function () { S.start = this.value; refresh(); });
+$('pace').addEventListener('input', function () { S.pace = this.value; refresh(); });
+$('skip').addEventListener('input', function () { S.skip = this.value; refresh(); });
+$('days').addEventListener('change', function (e) {
+  var d = +e.target.dataset.d, i = S.off.indexOf(d);
+  if (e.target.checked && i < 0) S.off.push(d); else if (!e.target.checked && i >= 0) S.off.splice(i, 1);
+  renderDays(); refresh();
+});
+$('rows').addEventListener('input', function (e) {
+  var t = e.target; if (!t.dataset.f) return;
+  S.rows[+t.dataset.i][t.dataset.f] = t.value; refresh();
+});
+$('rows').addEventListener('click', function (e) {
+  var b = e.target.closest('button'); if (!b) return;
+  var i = +b.dataset.i, a = b.dataset.a, r = S.rows;
+  if (a === 'del') { if (!confirm((i + 1) + '번 칸을 지울까요?')) return; r.splice(i, 1); }
+  else if (a === 'up' && i > 0) { var x = r[i]; r[i] = r[i-1]; r[i-1] = x; }
+  else if (a === 'dn' && i < r.length - 1) { var y = r[i]; r[i] = r[i+1]; r[i+1] = y; }
+  renderRows(); refresh();
+});
+$('addWork').onclick = function () { S.rows.push({t:'w', name:'', chars:'', pace:''}); renderRows(); refresh(); };
+$('addRest').onclick = function () { S.rows.push({t:'r', name:'교정/휴식', days:'7'}); renderRows(); refresh(); };
+$('reset').onclick = function () {
+  if (!confirm('모든 입력을 예시 값으로 되돌릴까요?')) return;
+  S = sample(); $('start').value = S.start; $('pace').value = S.pace; $('skip').value = '';
+  renderDays(); renderRows(); refresh();
+};
+function toast(m) { var t = $('toast'); t.textContent = m; t.classList.add('on'); setTimeout(function () { t.classList.remove('on'); }, 1500); }
+$('copy').onclick = function () {
+  if (!lastText) return;
+  var done = function () { toast('복사했어요'); };
+  if (navigator.clipboard) navigator.clipboard.writeText(lastText).then(done, function () { prompt('복사하세요', lastText); });
+  else prompt('복사하세요', lastText);
+};
+$('txt').addEventListener('input', function () {
+  var v = this.value, withSp = Array.from(v).length;
+  var noSp = Array.from(v.replace(/\s/g, '')).length;
+  $('cnt').innerHTML = v ? '공백 포함 <b>' + fmt(withSp) + '</b>자 · 공백 제외 <b>' + fmt(noSp) + '</b>자' : '';
+});
+
+renderDays(); renderRows(); renderResult();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
+})();
+</script>
+</body>
+</html>

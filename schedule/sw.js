@@ -1,4 +1,4 @@
-const CACHE_NAME = 'schedule-app-v1';
+const CACHE_NAME = 'schedule-app-v2';
 const ASSETS = ['./', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (event) => {

@@ -6102,7 +6102,6 @@ function openContinue() {
         ctPanel.addEventListener('input', e => { if (e.target.id === 'ct-dir') { pref.contDir = e.target.value; savePref(); } if (e.target.id === 'ct-out') ctText = e.target.value; });
     }
     renderContinue();
-    if (aiReady()) runContinue();
 }
 function closeContinue() { ctPanel?.remove(); ctPanel = null; ctRange = null; ctEd = null; }
 function renderContinue() {
@@ -6114,10 +6113,11 @@ function renderContinue() {
         <input class="fb-ask" id="ct-dir" maxlength="150" placeholder="이렇게 흘러가면 좋겠어요 (비워 두면 트릿대로)" value="${esc(pref.contDir || '')}">
         ${!aiReady() ? '<button class="btn" data-ct="key"><i class="ic ic-sparkles"></i> AI 키 넣기</button>'
             : ctBusy ? '<div class="spl-empty">앞 내용을 읽고 이어서 쓰는 중…</div>'
+            : !ctText ? '<div class="spl-empty">분량과 흐름을 고르고 <b>쓰기</b>를 눌러 주세요.</div>'
             : ctText ? `<textarea class="fb-ask ct-out" id="ct-out" rows="12">${esc(ctText)}</textarea><small class="ct-n">${countChars(ctText).noSpace}자 · 고친 뒤 넣어도 돼요</small>` : ''}
         ${ctMsg ? `<div class="spl-msg">${esc(ctMsg)}</div>` : ''}
         </div>
-        <div class="ct-btns">${aiReady() ? `<button class="btn primary" data-ct="put" ${!ctText || ctBusy ? 'disabled' : ''}>원고에 넣기</button><button class="btn" data-ct="again" ${ctBusy ? 'disabled' : ''}>${ctText ? '다시 쓰기' : '쓰기'}</button>` : ''}<button class="btn" data-ct="close">닫기</button></div>`;
+        <div class="ct-btns">${aiReady() ? `${ctText && !ctBusy ? '<button class="btn primary" data-ct="put">원고에 넣기</button>' : ''}<button class="btn ${ctText ? '' : 'primary'}" data-ct="again" ${ctBusy ? 'disabled' : ''}>${ctBusy ? '쓰는 중…' : ctText ? '다시 쓰기' : '쓰기'}</button>` : ''}<button class="btn" data-ct="close">닫기</button></div>`;
 }
 async function runContinue() {
     if (ctBusy || !ctEd || !ctRange) return;

@@ -60,7 +60,7 @@ tr.rest td{color:var(--sub)}
 .seg button:last-child{border-radius:0 8px 8px 0}
 .seg button.on{background:var(--pri);color:#fff}
 #calwrap{overflow:auto;max-height:78vh;border:1px solid var(--line);border-radius:10px;background:#fbfcfc;touch-action:none;padding:8px}
-#cal{--cs:20px;display:grid;grid-template-columns:repeat(6,max-content);gap:calc(var(--cs)*.9) calc(var(--cs)*.6);width:max-content;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+#cal{--cs:20px;display:grid;grid-template-columns:repeat(var(--cols,3),max-content);gap:calc(var(--cs)*.9) calc(var(--cs)*.6);width:max-content;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .mt{font-size:max(8px,calc(var(--cs)*.55));font-weight:700;margin-bottom:calc(var(--cs)*.2);color:var(--pri-d)}
 .mg{display:grid;grid-template-columns:repeat(7,var(--cs));gap:1px}
 .mg .dh{text-align:center;font-size:max(6px,calc(var(--cs)*.32));color:var(--sub);line-height:1.6}
@@ -82,6 +82,8 @@ tr.rest td{color:var(--sub)}
 .sheetbox{background:#fff;width:100%;max-width:520px;border-radius:16px 16px 0 0;padding:14px 16px 24px;max-height:85vh;overflow:auto}
 .shead{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
 .shead b{font-size:15px}
+.colseg{display:inline-flex;margin:0}
+.colseg button{padding:5px 10px}
 .zoombar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
 .ghost-drag{position:fixed;z-index:20;pointer-events:none;padding:3px 8px;border-radius:6px;font-size:12px;color:#222;box-shadow:0 2px 8px rgba(0,0,0,.25);opacity:.9}
 .modes{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
@@ -141,7 +143,7 @@ tr.rest td{color:var(--sub)}
   <label><input type="radio" name="mode" value="one">이 작품만</label>
 </div>
 <div class="selbar" id="selbar"><span id="seltxt"></span><button class="ghost sm" id="unsel">선택 해제</button></div>
-<div class="zoombar"><button class="ghost sm" id="zOut">－</button><button class="ghost sm" id="zIn">＋</button><button class="ghost sm" id="zFit">6개월 맞춤</button><span class="hint" style="margin:0 0 0 4px">두 손가락으로 확대·축소, 한 손가락으로 밀기 (PC는 Ctrl+휠)</span></div>
+<div class="zoombar"><button class="ghost sm" id="zOut">－</button><button class="ghost sm" id="zIn">＋</button><span class="hint" style="margin:0 0 0 6px">한 줄에</span><span class="seg colseg"><button data-cols="1">1</button><button data-cols="2">2</button><button data-cols="3">3</button><button data-cols="6">6</button></span><span class="hint" style="margin:0">개월</span><span class="hint" style="margin:0 0 0 4px">두 손가락으로 확대·축소, 한 손가락으로 밀기 (PC는 Ctrl+휠)</span></div>
 <div id="calwrap"><div id="cal"></div></div>
 <div class="legend" id="legend"></div>
 </section>
@@ -524,7 +526,7 @@ function renderCal() {
       if (rr && rr.s === day) h += '<div class="chip rest">' + lblHtml(rr.name || '휴식', Math.min(7 - dow(day), rr.e - day + 1, nDays - n)) + '</div>';
       (map[day] || []).forEach(function (i) {
         var it = o.items[i];
-        h += '<div class="chip' + (it.rest ? ' rest' : '') + (i === sel ? ' sel' : '') + '" data-i="' + i + '" data-day="' + day + '"' + (it.rest ? '' : ' style="background:' + color(i) + '"') + ' title="' + esc(shortName(it.r)) + '">' + ((day === it.start || dow(day) === 0 || n === 0) ? lblHtml(shortName(it.r), Math.min(7 - dow(day), it.end - day + 1, nDays - n)) : '') + '</div>';
+        h += '<div class="chip' + (it.rest ? ' rest' : '') + (i === sel ? ' sel' : '') + '" data-i="' + i + '" data-day="' + day + '"' + (it.rest ? '' : ' style="background:' + color(i) + '"') + ' title="' + esc(shortName(it.r)) + '">' + (((day === it.start || dow(day) === 0 || n === 0) && (Math.min(7 - dow(day), it.end - day + 1, nDays - n) >= 3 || Math.min(7 - dow(day), it.end - day + 1, nDays - n) === it.end - day + 1)) ? lblHtml(shortName(it.r), Math.min(7 - dow(day), it.end - day + 1, nDays - n)) : '') + '</div>';
       });
       h += '</div>';
     }
@@ -608,11 +610,7 @@ $('rows').addEventListener('change', function (e) {
 });
 
 var calEl = $('calwrap'), calc = $('cal'), ghost = null, ptrs = {}, pinch = null, pan = null, noClick = 0, cs = 20;
-function saveCs() { S.cs = Math.round(cs * 10) / 10; S.csv = 2; save(); }
-function defaultCs() {
-  var w = calEl.clientWidth;
-  return w < 700 ? 24 : Math.max(20, Math.min(40, Math.floor(((w - 16 - 36) / 45) * 10) / 10));
-}
+function saveCs() { S.cs = Math.round(cs * 10) / 10; S.csv = 3; S.cols = cols; save(); }
 function applyCs(v, fx, fy) {
   v = Math.max(6, Math.min(64, v));
   var ox = (calEl.scrollLeft + fx) / cs, oy = (calEl.scrollTop + fy) / cs;
@@ -621,11 +619,20 @@ function applyCs(v, fx, fy) {
   calc.classList.toggle('tiny', cs < 12); calc.classList.toggle('big', cs >= 34);
   calEl.scrollLeft = ox * cs - fx; calEl.scrollTop = oy * cs - fy;
 }
-function fitCs() { applyCs(Math.floor(((calEl.clientWidth - 16 - 36) / 45) * 10) / 10, 0, 0); calEl.scrollLeft = 0; saveCs(); }
+var cols = 3;
+function setCols(k, fit) {
+  cols = k;
+  calc.style.setProperty('--cols', k);
+  document.querySelectorAll('.colseg button').forEach(function (b) { b.classList.toggle('on', +b.dataset.cols === k); });
+  if (fit) {
+    applyCs(Math.floor(((calEl.clientWidth - 16 - 6 * k) / (7 * k + 0.6 * (k - 1))) * 10) / 10, 0, 0);
+    calEl.scrollLeft = 0; calEl.scrollTop = 0; saveCs();
+  }
+}
+document.querySelectorAll('.colseg button').forEach(function (b) { b.onclick = function () { setCols(+b.dataset.cols, true); }; });
 function zoomBy(k) { applyCs(cs * k, calEl.clientWidth / 2, calEl.clientHeight / 2); saveCs(); }
 $('zIn').onclick = function () { zoomBy(1.25); };
 $('zOut').onclick = function () { zoomBy(0.8); };
-$('zFit').onclick = fitCs;
 calEl.addEventListener('wheel', function (e) {
   if (!(e.ctrlKey || e.metaKey)) return;
   e.preventDefault();
@@ -773,7 +780,7 @@ calEl.addEventListener('click', function (e) {
 });
 
 renderDays(); renderRows(); renderResult();
-if (S.cs && S.csv === 2) applyCs(S.cs, 0, 0); else { applyCs(defaultCs(), 0, 0); calEl.scrollLeft = 0; saveCs(); }
+if (S.cs && S.csv === 3) { setCols(S.cols || 3, false); applyCs(S.cs, 0, 0); } else setCols(calEl.clientWidth < 700 ? 1 : 3, true);
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
 })();
 </script>

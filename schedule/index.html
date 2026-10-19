@@ -53,6 +53,34 @@ tr.rest td{color:var(--sub)}
 .sum b{display:block;font-size:16px;color:var(--pri-d)}
 .sum span{font-size:11px;color:var(--sub)}
 .count-res{margin-top:8px;font-size:14px}
+.calhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.calhead b{font-size:16px}
+.calhead button{padding:5px 12px}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;user-select:none;-webkit-user-select:none}
+.cal .dh{text-align:center;font-size:11px;color:var(--sub);padding:3px 0;background:#f3f6f5;border-radius:6px}
+.cal .dh.su{color:#c0504d}
+.cell{min-height:64px;border:1px dashed var(--line);border-radius:7px;padding:2px;background:#fff;overflow:hidden}
+.cell.blank{border:0;background:transparent}
+.cell.off{background:#fff6ec}
+.cell.skip{background:#eee}
+.cell.today .dn{background:var(--sec);color:#fff}
+.cell.drop{outline:2px solid var(--pri);background:var(--pri-l)}
+.dn{display:inline-block;min-width:17px;text-align:center;font-size:10px;line-height:17px;border-radius:9px;color:var(--sub)}
+.chip{margin-top:2px;font-size:10px;line-height:15px;padding:0 3px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:clip;touch-action:none;cursor:grab;color:#3a3a3a}
+.chip.rest{background:#e6e6e6!important;color:#777;cursor:default;touch-action:auto}
+.chip.sel{box-shadow:0 0 0 2px #334155}
+.ghost-drag{position:fixed;z-index:20;pointer-events:none;padding:3px 8px;border-radius:6px;font-size:12px;color:#222;box-shadow:0 2px 8px rgba(0,0,0,.25);opacity:.9}
+.modes{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.modes label{display:flex;align-items:center;gap:4px;margin:0;font-size:13px;color:var(--tx);padding:5px 10px;border:1px solid var(--line);border-radius:999px;cursor:pointer}
+.modes input{width:auto;margin:0}
+.selbar{background:#fff3e6;border:1px solid var(--sec);border-radius:10px;padding:6px 10px;font-size:13px;margin-bottom:8px;display:none;align-items:center;justify-content:space-between;gap:8px}
+.legend{margin-top:10px}
+.legend div{display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--line);font-size:13px;cursor:pointer}
+.legend div.sel{background:#fff3e6}
+.legend i{width:12px;height:12px;border-radius:4px;flex:none}
+.legend span{color:var(--sub);margin-left:auto;font-size:12px;white-space:nowrap}
+.fixrow{display:flex;gap:6px;align-items:flex-end;margin-top:8px}
+.fixrow>div{flex:1}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#334155;color:#fff;padding:8px 16px;border-radius:999px;font-size:13px;opacity:0;pointer-events:none;transition:.2s}
 .toast.on{opacity:1}
 </style>
@@ -85,6 +113,19 @@ tr.rest td{color:var(--sub)}
   <button class="ghost" id="addRest">+ 휴식/교정 칸</button>
 </div>
 <div class="hint">분량은 “16만”, “32.7만”, “160000”처럼 적을 수 있어요. 작품마다 하루 분량을 따로 정하면 기본값 대신 적용돼요. 각 작품은 목표 분량을 채운 뒤 다음 집필일에 다음 작품으로 넘어가요.</div>
+</section>
+
+<section>
+<h2>달력</h2>
+<div class="hint" style="margin:0 0 6px">작품 막대를 끌어서 옮기거나, 막대를 눌러 선택한 뒤 시작할 날짜를 누르세요. (여러 달에 걸치면 선택 후 달을 넘겨서 날짜를 누르면 돼요)</div>
+<div class="modes">
+  <label><input type="radio" name="mode" value="after" checked>뒤 작품도 같이</label>
+  <label><input type="radio" name="mode" value="one">이 작품만</label>
+</div>
+<div class="selbar" id="selbar"><span id="seltxt"></span><button class="ghost sm" id="unsel">선택 해제</button></div>
+<div class="calhead"><button class="ghost" id="prevM">◀</button><b id="calTitle"></b><button class="ghost" id="nextM">▶</button></div>
+<div class="cal" id="cal"></div>
+<div class="legend" id="legend"></div>
 </section>
 
 <section>
@@ -182,10 +223,12 @@ function compute() {
   function isWork(d) { return !off[dow(d)] && !skip[d]; }
 
   S.rows.forEach(function (r) {
+    var fix = r.start ? parseD(r.start) : null;
+    if (fix != null) cur = fix;
     if (r.t === 'r') {
       var n = Math.max(0, Math.round(num(r.days) || 0));
       if (!n) { out.items.push({r: r, bad: true}); return; }
-      out.items.push({r: r, rest: true, start: cur, end: cur + n - 1, days: n});
+      out.items.push({r: r, rest: true, fixed: fix != null, start: cur, end: cur + n - 1, days: n});
       cur += n;
       return;
     }
@@ -193,14 +236,14 @@ function compute() {
     var pace = r.pace ? num(r.pace) : defPace;
     if (!chars || isNaN(chars) || !pace || isNaN(pace) || pace <= 0) { out.items.push({r: r, bad: true}); return; }
     var need = Math.ceil(chars / pace), guard = 0;
-    while (!isWork(cur) && guard++ < 4000) cur++;
+    if (fix == null) while (!isWork(cur) && guard++ < 4000) cur++;
     var start = cur, cnt = 1, last = cur;
     while (cnt < need && guard++ < 40000) {
       cur++;
       if (isWork(cur)) { cnt++; last = cur; }
     }
-    out.items.push({r: r, start: start, end: last, chars: chars, wdays: need, days: last - start + 1, pace: pace});
-    out.total += chars; out.wdays += need; out.end = last;
+    out.items.push({r: r, fixed: fix != null, start: start, end: last, chars: chars, wdays: need, days: last - start + 1, pace: pace});
+    out.total += chars; out.wdays += need; out.end = Math.max(out.end == null ? last : out.end, last);
     cur = last + 1;
   });
   return out;
@@ -218,13 +261,15 @@ function rangeText(it, st) {
 
 function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
 
-var lastText = '';
+var lastText = '', lastO = null;
 function renderResult() {
   var o = compute();
   var el = $('result'), sm = $('sum');
+  lastO = o;
+  renderCal();
   if (o.err) { el.innerHTML = '<div class="hint">' + esc(o.err) + '</div>'; sm.innerHTML = ''; lastText = ''; return; }
   var firstStart = null;
-  o.items.forEach(function (it) { if (firstStart == null && !it.bad) firstStart = it.start; });
+  o.items.forEach(function (it) { if (!it.bad && (firstStart == null || it.start < firstStart)) firstStart = it.start; });
   var calDays = (firstStart != null && o.end != null) ? o.end - firstStart + 1 : 0;
   sm.innerHTML =
     '<div><b>' + (o.end != null ? fmtD(o.end, true) : '-') + '</b><span>종료일</span></div>' +
@@ -261,18 +306,22 @@ function renderDays() {
   });
   $('days').innerHTML = h;
 }
+function fixRow(r, i) {
+  return '<div class="fixrow"><div><label>시작일 직접 지정 (비우면 앞 작품 다음 날 자동)</label><input type="date" data-f="start" data-i="' + i + '" value="' + esc(r.start || '') + '"></div>' +
+    (r.start ? '<button class="ghost sm" data-a="unfix" data-i="' + i + '">원래대로</button>' : '') + '</div>';
+}
 function renderRows() {
   var h = '';
   S.rows.forEach(function (r, i) {
     var acts = '<div class="acts"><button class="ghost sm" data-a="up" data-i="' + i + '">↑</button><button class="ghost sm" data-a="dn" data-i="' + i + '">↓</button><button class="warn sm" data-a="del" data-i="' + i + '">✕</button></div>';
     if (r.t === 'r') {
       h += '<div class="row rest"><div class="top"><span class="no">' + (i + 1) + '</span><input data-f="name" data-i="' + i + '" value="' + esc(r.name || '') + '" placeholder="교정 / 휴식">' + acts + '</div>' +
-        '<div class="grid3"><div><label>기간 (일)</label><input data-f="days" data-i="' + i + '" inputmode="numeric" value="' + esc(r.days || '') + '" placeholder="14"></div></div></div>';
+        '<div class="grid3"><div><label>기간 (일)</label><input data-f="days" data-i="' + i + '" inputmode="numeric" value="' + esc(r.days || '') + '" placeholder="14"></div></div>' + fixRow(r, i) + '</div>';
     } else {
       h += '<div class="row"><div class="top"><span class="no">' + (i + 1) + '</span><input data-f="name" data-i="' + i + '" value="' + esc(r.name || '') + '" placeholder="작품 이름">' + acts + '</div>' +
         '<div class="grid3"><div><label>목표 분량 (자)</label><input data-f="chars" data-i="' + i + '" inputmode="decimal" value="' + esc(r.chars || '') + '" placeholder="16만"></div>' +
         '<div><label>하루 분량 (선택)</label><input data-f="pace" data-i="' + i + '" inputmode="decimal" value="' + esc(r.pace || '') + '" placeholder="기본값"></div>' +
-        '<div><label>예상 집필일</label><input disabled data-est="' + i + '"></div></div></div>';
+        '<div><label>예상 집필일</label><input disabled data-est="' + i + '"></div></div>' + fixRow(r, i) + '</div>';
     }
   });
   $('rows').innerHTML = h || '<div class="hint">작품을 추가하세요</div>';
@@ -300,12 +349,15 @@ $('days').addEventListener('change', function (e) {
 });
 $('rows').addEventListener('input', function (e) {
   var t = e.target; if (!t.dataset.f) return;
-  S.rows[+t.dataset.i][t.dataset.f] = t.value; refresh();
+  S.rows[+t.dataset.i][t.dataset.f] = t.value;
+  if (t.dataset.f === 'start') { refresh(); return; }
+  refresh();
 });
 $('rows').addEventListener('click', function (e) {
   var b = e.target.closest('button'); if (!b) return;
   var i = +b.dataset.i, a = b.dataset.a, r = S.rows;
-  if (a === 'del') { if (!confirm((i + 1) + '번 칸을 지울까요?')) return; r.splice(i, 1); }
+  if (a === 'unfix') delete r[i].start;
+  else if (a === 'del') { if (!confirm((i + 1) + '번 칸을 지울까요?')) return; r.splice(i, 1); }
   else if (a === 'up' && i > 0) { var x = r[i]; r[i] = r[i-1]; r[i-1] = x; }
   else if (a === 'dn' && i < r.length - 1) { var y = r[i]; r[i] = r[i+1]; r[i+1] = y; }
   renderRows(); refresh();
@@ -328,6 +380,146 @@ $('txt').addEventListener('input', function () {
   var v = this.value, withSp = Array.from(v).length;
   var noSp = Array.from(v.replace(/\s/g, '')).length;
   $('cnt').innerHTML = v ? '공백 포함 <b>' + fmt(withSp) + '</b>자 · 공백 제외 <b>' + fmt(noSp) + '</b>자' : '';
+});
+
+// ---- 달력 ----
+var COLORS = ['#f6c9a8','#bfe0d3','#cfd9f6','#f3c6d8','#e8dcab','#d5c6ea','#c2e3ef','#f0d0b8'];
+var calY = null, calM = 0, sel = -1, mode = 'after', drag = null;
+function dstr(day) { var d = dObj(day); return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate()); }
+function shortName(r) { return (r.name || (r.t === 'r' ? '휴식' : '작품')).replace(/[『』「」]/g, ''); }
+function color(i) { return COLORS[i % COLORS.length]; }
+
+function renderCal() {
+  var o = lastO, cal = $('cal');
+  if (!o || o.err) { cal.innerHTML = ''; $('legend').innerHTML = ''; $('calTitle').textContent = ''; return; }
+  if (calY == null) {
+    var f = null;
+    o.items.forEach(function (it) { if (!it.bad && (f == null || it.start < f)) f = it.start; });
+    var d0 = dObj(f == null ? parseD(S.start) : f);
+    calY = d0.getUTCFullYear(); calM = d0.getUTCMonth();
+  }
+  $('calTitle').textContent = calY + '년 ' + (calM + 1) + '월';
+  var map = {};
+  o.items.forEach(function (it, i) {
+    if (it.bad) return;
+    for (var d = it.start; d <= it.end; d++) (map[d] = map[d] || []).push(i);
+  });
+  var skip = parseSkip(S.skip), first = Date.UTC(calY, calM, 1) / 864e5;
+  var nDays = new Date(Date.UTC(calY, calM + 1, 0)).getUTCDate();
+  var today = Math.floor((Date.now() - new Date().getTimezoneOffset() * 6e4) / 864e5);
+  var h = ['일','월','화','수','목','금','토'].map(function (w, k) { return '<div class="dh' + (k === 0 ? ' su' : '') + '">' + w + '</div>'; }).join('');
+  for (var b = 0; b < dow(first); b++) h += '<div class="cell blank"></div>';
+  for (var n = 0; n < nDays; n++) {
+    var day = first + n, cls = 'cell';
+    if (S.off.indexOf(dow(day)) >= 0) cls += ' off';
+    if (skip[day]) cls += ' skip';
+    if (day === today) cls += ' today';
+    h += '<div class="' + cls + '" data-day="' + day + '"><span class="dn">' + (n + 1) + '</span>';
+    (map[day] || []).forEach(function (i) {
+      var it = o.items[i], rest = !!it.rest;
+      h += '<div class="chip' + (rest ? ' rest' : '') + (i === sel ? ' sel' : '') + '" data-i="' + i + '" data-day="' + day + '" style="background:' + color(i) + '">' + esc(shortName(it.r)) + '</div>';
+    });
+    h += '</div>';
+  }
+  cal.innerHTML = h;
+
+  var lg = '';
+  o.items.forEach(function (it, i) {
+    if (it.bad) return;
+    lg += '<div data-lg="' + i + '" class="' + (i === sel ? 'sel' : '') + '"><i style="background:' + (it.rest ? '#ddd' : color(i)) + '"></i>' + esc(shortName(it.r)) + (it.fixed ? ' 📌' : '') +
+      '<span>' + fmtD(it.start, true).slice(2) + ' ~ ' + fmtD(it.end, true).slice(2) + '</span></div>';
+  });
+  $('legend').innerHTML = lg;
+  var bar = $('selbar'), it2 = sel >= 0 && o.items[sel];
+  if (it2 && !it2.bad) { bar.style.display = 'flex'; $('seltxt').textContent = '「' + shortName(it2.r) + '」 선택됨 — 시작할 날짜를 누르세요'; }
+  else { bar.style.display = 'none'; sel = -1; }
+}
+
+function moveWork(i, delta) {
+  var o = lastO, it = o && o.items[i];
+  if (!it || it.bad || !delta) return;
+  S.rows[i].start = dstr(it.start + delta);
+  if (mode === 'after') {
+    for (var j = i + 1; j < S.rows.length; j++) {
+      var p = S.rows[j].start ? parseD(S.rows[j].start) : null;
+      if (p != null) S.rows[j].start = dstr(p + delta);
+    }
+  } else {
+    var nx = o.items[i + 1];
+    if (nx && !nx.bad && !S.rows[i + 1].start) S.rows[i + 1].start = dstr(nx.start);
+  }
+  renderRows(); refresh();
+}
+
+function monthShift(k) {
+  calM += k;
+  if (calM < 0) { calM = 11; calY--; } else if (calM > 11) { calM = 0; calY++; }
+  renderCal();
+}
+$('prevM').onclick = function () { monthShift(-1); };
+$('nextM').onclick = function () { monthShift(1); };
+$('unsel').onclick = function () { sel = -1; renderCal(); };
+document.querySelectorAll('input[name=mode]').forEach(function (r) {
+  r.addEventListener('change', function () { mode = this.value; });
+});
+$('legend').addEventListener('click', function (e) {
+  var row = e.target.closest('[data-lg]'); if (!row) return;
+  var i = +row.dataset.lg, it = lastO.items[i];
+  sel = (sel === i) ? -1 : i;
+  if (sel >= 0) { var d = dObj(it.start); calY = d.getUTCFullYear(); calM = d.getUTCMonth(); }
+  renderCal();
+});
+$('rows').addEventListener('change', function (e) {
+  if (e.target.dataset && e.target.dataset.f === 'start') renderRows();
+});
+
+var calEl = $('cal'), ghost = null;
+function cellAt(x, y) {
+  var el = document.elementFromPoint(x, y);
+  return el && el.closest ? el.closest('.cell[data-day]') : null;
+}
+function clearDrop() { calEl.querySelectorAll('.drop').forEach(function (c) { c.classList.remove('drop'); }); }
+function endDrag() {
+  if (ghost) { ghost.remove(); ghost = null; }
+  clearDrop(); drag = null;
+}
+calEl.addEventListener('pointerdown', function (e) {
+  var chip = e.target.closest('.chip');
+  if (!chip || chip.classList.contains('rest')) return;
+  drag = {i: +chip.dataset.i, day: +chip.dataset.day, x: e.clientX, y: e.clientY, moved: false, id: e.pointerId};
+  try { chip.setPointerCapture(e.pointerId); } catch (err) {}
+});
+calEl.addEventListener('pointermove', function (e) {
+  if (!drag || e.pointerId !== drag.id) return;
+  if (!drag.moved && Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y) < 8) return;
+  if (!drag.moved) {
+    drag.moved = true;
+    ghost = document.createElement('div');
+    ghost.className = 'ghost-drag';
+    ghost.style.background = color(drag.i);
+    ghost.textContent = shortName(lastO.items[drag.i].r);
+    document.body.appendChild(ghost);
+  }
+  ghost.style.left = (e.clientX + 10) + 'px'; ghost.style.top = (e.clientY - 28) + 'px';
+  clearDrop();
+  var c = cellAt(e.clientX, e.clientY); if (c) c.classList.add('drop');
+});
+calEl.addEventListener('pointerup', function (e) {
+  if (!drag || e.pointerId !== drag.id) return;
+  var d = drag, c = d.moved ? cellAt(e.clientX, e.clientY) : null;
+  endDrag();
+  if (d.moved) { if (c) moveWork(d.i, +c.dataset.day - d.day); }
+  else if (sel >= 0 && sel !== d.i) { var s0 = lastO.items[sel]; if (s0 && !s0.bad) moveWork(sel, d.day - s0.start); }
+  else { sel = (sel === d.i) ? -1 : d.i; renderCal(); }
+});
+calEl.addEventListener('pointercancel', endDrag);
+calEl.addEventListener('click', function (e) {
+  var ch = e.target.closest('.chip');
+  if (ch && !ch.classList.contains('rest')) return;
+  var c = e.target.closest('.cell[data-day]');
+  if (!c || sel < 0) return;
+  var it = lastO.items[sel];
+  if (it && !it.bad) { var k = sel; moveWork(k, +c.dataset.day - it.start); }
 });
 
 renderDays(); renderRows(); renderResult();

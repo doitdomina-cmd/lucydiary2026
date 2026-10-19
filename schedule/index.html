@@ -66,7 +66,7 @@ tr.rest td{color:var(--sub)}
 .mg .dh{text-align:center;font-size:max(6px,calc(var(--cs)*.32));color:var(--sub);line-height:1.6}
 .mg .dh.su{color:#c0504d}
 .tiny .dh{display:none}
-.cell{width:var(--cs);height:calc(var(--cs)*1.5);border:1px solid #e9eeed;border-radius:calc(var(--cs)*.15);padding:1px;background:#fff;box-sizing:border-box}
+.cell{position:relative;width:var(--cs);height:calc(var(--cs)*1.5);border:1px solid #e9eeed;border-radius:calc(var(--cs)*.15);padding:1px;background:#fff;box-sizing:border-box}
 .cell.blank{border:0;background:transparent}
 .cell.off{background:#fff6ec}
 .cell.skip{background:#eee}
@@ -76,6 +76,8 @@ tr.rest td{color:var(--sub)}
 .dn{display:inline-block;padding:0 2px;border-radius:3px;font-size:max(6px,calc(var(--cs)*.34));line-height:1.15;color:var(--sub)}
 .chip{position:relative;margin-top:calc(var(--cs)*.06);height:calc(var(--cs)*.42);padding:0;border-radius:2px;cursor:grab}
 .chip.rest{background:#cfcfcf!important;cursor:default}
+.mk{position:absolute;right:1px;font-size:max(6px,calc(var(--cs)*.24));line-height:1.25;padding:0 3px;border-radius:3px;font-weight:700;color:#333;pointer-events:none;white-space:nowrap;box-shadow:0 0 0 1px rgba(0,0,0,.25)}
+.tiny .mk{display:none}
 .lbl{position:absolute;left:2px;top:0;height:100%;line-height:calc(var(--cs)*.42);font-size:max(6.5px,calc(var(--cs)*.3));overflow:hidden;white-space:nowrap;text-overflow:ellipsis;pointer-events:none;color:#2b2b2b;z-index:3}
 .chip.sel{box-shadow:0 0 0 2px #334155}
 .sheet{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:50;display:none;align-items:flex-end;justify-content:center}
@@ -114,6 +116,10 @@ tr.rest td{color:var(--sub)}
 <div class="grid">
   <div><label>시작일</label><input type="date" id="start"></div>
   <div><label>하루 집필 분량 (자)</label><input type="text" id="pace" inputmode="decimal" placeholder="예: 4000 / 0.4만"></div>
+</div>
+<div style="margin-top:10px">
+  <label>글자수를 달력에 적는 간격 (자) — 예: 4만 (비우면 끔)</label>
+  <input type="text" id="mark" inputmode="decimal" placeholder="4만">
 </div>
 <div style="margin-top:10px">
   <label>쉬는 요일 (눌러서 토글)</label>
@@ -189,6 +195,7 @@ var S;
 try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
 if (!S || !S.rows) S = sample();
 if (!S.rests) S.rests = [];
+if (S.mark === undefined) S.mark = '4만';
 function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
 
 // "16만", "32.7만", "160,000" → 숫자
@@ -239,15 +246,16 @@ function getChanges(r) {
     .sort(function (a, b) { return a.at - b.at; });
 }
 // 글자수를 다 채우는 데 필요한 집필일 수 (그날 시작 시점의 누적 글자수에 맞는 분량으로 하루를 계산)
-function needDays(chars, basePace, changes) {
-  var done = 0, days = 0;
-  while (done < chars && days < 5000) {
+function cumSeries(chars, basePace, changes) {
+  var done = 0, cum = [];
+  while (done < chars && cum.length < 5000) {
     var p = basePace;
     changes.forEach(function (c) { if (done >= c.at) p = c.pace; });
-    done += p; days++;
+    done += p; cum.push(done);
   }
-  return days;
+  return cum;
 }
+function needDays(chars, basePace, changes) { return cumSeries(chars, basePace, changes).length; }
 
 // ---- 계산 ----
 function compute() {
@@ -276,12 +284,21 @@ function compute() {
     if (!chars || isNaN(chars) || !pace || isNaN(pace) || pace <= 0) { out.items.push({r: r, bad: true}); return; }
     var chg = getChanges(r), need = needDays(chars, pace, chg), guard = 0;
     if (fix == null) while (!isWork(cur) && guard++ < 4000) cur++;
-    var start = cur, cnt = 1, last = cur;
+    var start = cur, cnt = 1, last = cur, wd = [cur];
     while (cnt < need && guard++ < 40000) {
       cur++;
-      if (isWork(cur)) { cnt++; last = cur; }
+      if (isWork(cur)) { cnt++; last = cur; wd.push(cur); }
     }
-    out.items.push({r: r, fixed: fix != null, chg: chg.length, start: start, end: last, chars: chars, wdays: need, days: last - start + 1, pace: pace});
+    var step = num(S.mark), marks = [];
+    if (step > 0 && !isNaN(step)) {
+      var cum = cumSeries(chars, pace, chg), j = 0;
+      for (var k = step; k < chars && marks.length < 200; k += step) {
+        while (j < cum.length - 1 && cum[j] < k) j++;
+        marks.push({n: k, day: wd[j]});
+      }
+      marks.push({n: chars, day: last, total: true});
+    }
+    out.items.push({r: r, marks: marks, fixed: fix != null, chg: chg.length, start: start, end: last, chars: chars, wdays: need, days: last - start + 1, pace: pace});
     out.total += chars; out.wdays += need; out.end = Math.max(out.end == null ? last : out.end, last);
     cur = last + 1;
   });
@@ -327,8 +344,9 @@ function renderResult() {
       lines.push(rt + '  ' + (it.r.name || '휴식') + '  —');
     } else {
       var note = it.wdays + '집필일' + (it.days !== it.wdays ? ' / ' + it.days + '일' : '') + ' · 일 ' + fmt(it.pace) + (it.chg ? ' → 구간별' : '');
-      html += '<tr><td class="d">' + rt + '<div class="wk">' + wk + '</div></td><td><b>' + esc(it.r.name || '(이름 없음)') + '</b><div class="wk">' + note + '</div></td><td class="n">' + fmtMan(it.chars) + '</td></tr>';
+      html += '<tr><td class="d">' + rt + '<div class="wk">' + wk + '</div></td><td><b>' + esc(it.r.name || '(이름 없음)') + '</b><div class="wk">' + note + (it.marks && it.marks.length > 1 ? '<div class="wk">' + it.marks.filter(function (m) { return !m.total; }).map(function (m) { return fmtMan(m.n) + ' ' + fmtD(m.day); }).join(' · ') + '</div>' : '') + '</td><td class="n">' + fmtMan(it.chars) + '</td></tr>';
       lines.push(rt + '  ' + (it.r.name || '(이름 없음)') + '  ' + fmtMan(it.chars));
+      if (it.marks && it.marks.length > 1) lines.push('   ' + it.marks.filter(function (m) { return !m.total; }).map(function (m) { return fmtMan(m.n) + ' ' + fmtD(m.day); }).join(' · '));
     }
   });
   html += '</table>';
@@ -388,9 +406,10 @@ function updateEst() {
 }
 function refresh() { save(); updateEst(); renderResult(); }
 
-$('start').value = S.start; $('pace').value = S.pace; $('skip').value = S.skip || '';
+$('start').value = S.start; $('pace').value = S.pace; $('skip').value = S.skip || ''; $('mark').value = S.mark || '';
 $('start').addEventListener('input', function () { S.start = this.value; refresh(); });
 $('pace').addEventListener('input', function () { S.pace = this.value; refresh(); });
+$('mark').addEventListener('input', function () { S.mark = this.value; refresh(); });
 $('skip').addEventListener('input', function () { S.skip = this.value; refresh(); });
 $('days').addEventListener('change', function (e) {
   var d = +e.target.dataset.d, i = S.off.indexOf(d);
@@ -430,7 +449,7 @@ $('rows').addEventListener('click', rowsClick);
 $('addWork').onclick = function () { S.rows.push({t:'w', name:'', chars:'', pace:''}); renderRows(); refresh(); };
 $('reset').onclick = function () {
   if (!confirm('모든 입력을 예시 값으로 되돌릴까요?')) return;
-  S = sample(); S.rests = []; $('start').value = S.start; $('pace').value = S.pace; $('skip').value = '';
+  S = sample(); S.rests = []; S.mark = '4만'; $('start').value = S.start; $('pace').value = S.pace; $('skip').value = ''; $('mark').value = S.mark;
   renderDays(); renderRows(); refresh();
 };
 function toast(m) { var t = $('toast'); t.textContent = m; t.classList.add('on'); setTimeout(function () { t.classList.remove('on'); }, 1500); }
@@ -508,6 +527,8 @@ function renderCal() {
     if (it.bad) return;
     for (var d = it.start; d <= it.end; d++) if (it.rest || !restAt(d)) (map[d] = map[d] || []).push(i);
   });
+  var mkMap = {};
+  o.items.forEach(function (it, i) { (it.marks || []).forEach(function (m) { (mkMap[m.day] = mkMap[m.day] || []).push({n: m.n, i: i, total: m.total}); }); });
   var skip = parseSkip(S.skip), h = '';
   for (var y = y0, m = m0; y < y1 || (y === y1 && m <= m1); m++) {
     if (m > 11) { m = 0; y++; if (y > y1 || (y === y1 && m > m1)) break; }
@@ -527,6 +548,9 @@ function renderCal() {
       (map[day] || []).forEach(function (i) {
         var it = o.items[i];
         h += '<div class="chip' + (it.rest ? ' rest' : '') + (i === sel ? ' sel' : '') + '" data-i="' + i + '" data-day="' + day + '"' + (it.rest ? '' : ' style="background:' + color(i) + '"') + ' title="' + esc(shortName(it.r)) + '">' + (((day === it.start || dow(day) === 0 || n === 0) && (Math.min(7 - dow(day), it.end - day + 1, nDays - n) >= 3 || Math.min(7 - dow(day), it.end - day + 1, nDays - n) === it.end - day + 1)) ? lblHtml(shortName(it.r), Math.min(7 - dow(day), it.end - day + 1, nDays - n)) : '') + '</div>';
+      });
+      (mkMap[day] || []).forEach(function (m, k) {
+        h += '<div class="mk" style="bottom:calc(1px + var(--cs)*' + (0.28 * k) + ');background:' + color(m.i) + '">' + (m.total ? '총 ' : '') + fmtMan(m.n) + '</div>';
       });
       h += '</div>';
     }

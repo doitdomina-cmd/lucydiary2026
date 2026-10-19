@@ -66,7 +66,7 @@ tr.rest td{color:var(--sub)}
 .mg .dh{text-align:center;font-size:max(6px,calc(var(--cs)*.32));color:var(--sub);line-height:1.6}
 .mg .dh.su{color:#c0504d}
 .tiny .dh{display:none}
-.cell{width:var(--cs);height:calc(var(--cs)*1.3);border:1px solid #e9eeed;border-radius:calc(var(--cs)*.15);padding:1px;background:#fff;overflow:hidden;box-sizing:border-box}
+.cell{width:var(--cs);height:calc(var(--cs)*1.5);border:1px solid #e9eeed;border-radius:calc(var(--cs)*.15);padding:1px;background:#fff;box-sizing:border-box}
 .cell.blank{border:0;background:transparent}
 .cell.off{background:#fff6ec}
 .cell.skip{background:#eee}
@@ -74,10 +74,14 @@ tr.rest td{color:var(--sub)}
 .cell.today .dn{background:var(--sec);color:#fff}
 .cell.drop{outline:2px solid var(--pri);outline-offset:-1px;background:var(--pri-l)}
 .dn{display:inline-block;padding:0 2px;border-radius:3px;font-size:max(6px,calc(var(--cs)*.34));line-height:1.15;color:var(--sub)}
-.chip{margin-top:calc(var(--cs)*.06);height:max(4px,calc(var(--cs)*.24));line-height:max(4px,calc(var(--cs)*.24));font-size:max(8px,calc(var(--cs)*.2));padding:0 2px;border-radius:2px;white-space:nowrap;overflow:hidden;cursor:grab;color:transparent}
-.big .chip{color:#3a3a3a}
+.chip{position:relative;margin-top:calc(var(--cs)*.06);height:calc(var(--cs)*.42);padding:0;border-radius:2px;cursor:grab}
 .chip.rest{background:#cfcfcf!important;cursor:default}
+.lbl{position:absolute;left:2px;top:0;height:100%;line-height:calc(var(--cs)*.42);font-size:max(6.5px,calc(var(--cs)*.3));overflow:hidden;white-space:nowrap;text-overflow:ellipsis;pointer-events:none;color:#2b2b2b;z-index:3}
 .chip.sel{box-shadow:0 0 0 2px #334155}
+.sheet{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:50;display:none;align-items:flex-end;justify-content:center}
+.sheetbox{background:#fff;width:100%;max-width:520px;border-radius:16px 16px 0 0;padding:14px 16px 24px;max-height:85vh;overflow:auto}
+.shead{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.shead b{font-size:15px}
 .zoombar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
 .ghost-drag{position:fixed;z-index:20;pointer-events:none;padding:3px 8px;border-radius:6px;font-size:12px;color:#222;box-shadow:0 2px 8px rgba(0,0,0,.25);opacity:.9}
 .modes{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
@@ -156,6 +160,7 @@ tr.rest td{color:var(--sub)}
 </section>
 
 </main>
+<div class="sheet" id="sheet"><div class="sheetbox"><div class="shead"><b id="sTitle"></b><button class="sm" id="sClose">완료</button></div><div id="sBody"></div></div></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -369,14 +374,14 @@ function renderRows() {
   });
   $('rows').innerHTML = h || '<div class="hint">작품을 추가하세요</div>';
   updateEst();
+  if (sheetI >= 0 && !skipSheet) renderSheet();
 }
 function updateEst() {
   var dp = num(S.pace);
   S.rows.forEach(function (r, i) {
-    var el = document.querySelector('[data-est="' + i + '"]');
-    if (!el) return;
     var c = num(r.chars), p = r.pace ? num(r.pace) : dp;
-    el.value = (c && p && !isNaN(c) && !isNaN(p)) ? needDays(c, p, getChanges(r)) + '일' : '-';
+    var v = (c && p && !isNaN(c) && !isNaN(p)) ? needDays(c, p, getChanges(r)) + '일' : '-';
+    document.querySelectorAll('[data-est="' + i + '"]').forEach(function (el) { el.value = v; });
   });
 }
 function refresh() { save(); updateEst(); renderResult(); }
@@ -390,16 +395,18 @@ $('days').addEventListener('change', function (e) {
   if (e.target.checked && i < 0) S.off.push(d); else if (!e.target.checked && i >= 0) S.off.splice(i, 1);
   renderDays(); refresh();
 });
-$('rows').addEventListener('input', function (e) {
+function rowsInput(e) {
   var t = e.target; if (!t.dataset.f) return;
   if (t.dataset.c != null) { S.rows[+t.dataset.i].changes[+t.dataset.c][t.dataset.f] = t.value; refresh(); return; }
   S.rows[+t.dataset.i][t.dataset.f] = t.value;
   if (t.dataset.f === 'start') { refresh(); return; }
   refresh();
-});
-$('rows').addEventListener('click', function (e) {
+}
+$('rows').addEventListener('input', rowsInput);
+function rowsClick(e) {
   var b = e.target.closest('button'); if (!b) return;
   var i = +b.dataset.i, a = b.dataset.a, r = S.rows;
+  if (sheetI >= 0 && (a === 'del' || a === 'up' || a === 'dn')) closeSheet();
   if (a === 'ins') {
     var it0 = lastO && lastO.items[i];
     if (!it0 || it0.bad) { toast('분량을 먼저 입력하세요'); return; }
@@ -416,7 +423,8 @@ $('rows').addEventListener('click', function (e) {
   else if (a === 'up' && i > 0) { var x = r[i]; r[i] = r[i-1]; r[i-1] = x; }
   else if (a === 'dn' && i < r.length - 1) { var y = r[i]; r[i] = r[i+1]; r[i+1] = y; }
   renderRows(); refresh();
-});
+}
+$('rows').addEventListener('click', rowsClick);
 $('addWork').onclick = function () { S.rows.push({t:'w', name:'', chars:'', pace:''}); renderRows(); refresh(); };
 $('reset').onclick = function () {
   if (!confirm('모든 입력을 예시 값으로 되돌릴까요?')) return;
@@ -435,6 +443,34 @@ $('txt').addEventListener('input', function () {
   var noSp = Array.from(v.replace(/\s/g, '')).length;
   $('cnt').innerHTML = v ? '공백 포함 <b>' + fmt(withSp) + '</b>자 · 공백 제외 <b>' + fmt(noSp) + '</b>자' : '';
 });
+
+// ---- 작품 편집 시트 (달력에서 막대를 꾹 누르면) ----
+var sheetI = -1, skipSheet = false;
+function openEditor(i) {
+  var r = S.rows[i]; if (!r || r.t === 'r') return;
+  sheetI = i; renderSheet();
+  $('sheet').style.display = 'flex';
+  if (navigator.vibrate) navigator.vibrate(20);
+  var el = $('sBody').querySelector('[data-f=chars]'); if (el) { el.focus(); el.select(); }
+}
+function closeSheet() { sheetI = -1; $('sheet').style.display = 'none'; }
+function renderSheet() {
+  var i = sheetI, r = S.rows[i];
+  if (!r) { closeSheet(); return; }
+  $('sTitle').textContent = '「' + (r.name || '작품').replace(/[『』「」]/g, '') + '」 편집';
+  $('sBody').innerHTML = '<label>이름</label><input data-f="name" data-i="' + i + '" value="' + esc(r.name || '') + '">' +
+    '<div class="grid3" style="margin-top:8px"><div><label>목표 글자수</label><input data-f="chars" data-i="' + i + '" inputmode="decimal" value="' + esc(r.chars || '') + '" placeholder="16만"></div>' +
+    '<div><label>하루 분량</label><input data-f="pace" data-i="' + i + '" inputmode="decimal" value="' + esc(r.pace || '') + '" placeholder="기본값"></div>' +
+    '<div><label>예상 집필일</label><input disabled data-est="' + i + '"></div></div>' +
+    (r.start ? '<div class="fixrow"><span class="hint" style="margin:0">📌 ' + esc(r.start.slice(5).replace('-', '.')) + ' 시작으로 고정됨</span><button class="ghost sm" data-a="unfix" data-i="' + i + '">고정 풀기</button></div>' : '') +
+    chgRows(r, i);
+  updateEst();
+}
+$('sBody').addEventListener('input', function (e) { skipSheet = true; rowsInput(e); renderRows(); skipSheet = false; });
+$('sBody').addEventListener('click', rowsClick);
+$('sClose').onclick = closeSheet;
+$('sheet').addEventListener('click', function (e) { if (e.target === $('sheet')) closeSheet(); });
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && sheetI >= 0) closeSheet(); });
 
 // ---- 달력 ----
 var COLORS = ['#f6c9a8','#bfe0d3','#cfd9f6','#f3c6d8','#e8dcab','#d5c6ea','#c2e3ef','#f0d0b8'];
@@ -485,10 +521,10 @@ function renderCal() {
       if (day === today) cls += ' today';
       var ws = (map[day] || []).filter(function (i) { return !o.items[i].rest && !rr; });
       h += '<div class="' + cls + '" data-day="' + day + '" data-w="' + ws.join(',') + '"><span class="dn">' + (n + 1) + '</span>';
-      if (rr && rr.s === day) h += '<div class="chip rest">' + esc(rr.name || '휴식') + '</div>';
+      if (rr && rr.s === day) h += '<div class="chip rest">' + lblHtml(rr.name || '휴식', Math.min(7 - dow(day), rr.e - day + 1, nDays - n)) + '</div>';
       (map[day] || []).forEach(function (i) {
         var it = o.items[i];
-        h += '<div class="chip' + (it.rest ? ' rest' : '') + (i === sel ? ' sel' : '') + '" data-i="' + i + '" data-day="' + day + '"' + (it.rest ? '' : ' style="background:' + color(i) + '"') + ' title="' + esc(shortName(it.r)) + '">' + esc(shortName(it.r)) + '</div>';
+        h += '<div class="chip' + (it.rest ? ' rest' : '') + (i === sel ? ' sel' : '') + '" data-i="' + i + '" data-day="' + day + '"' + (it.rest ? '' : ' style="background:' + color(i) + '"') + ' title="' + esc(shortName(it.r)) + '">' + ((day === it.start || dow(day) === 0 || n === 0) ? lblHtml(shortName(it.r), Math.min(7 - dow(day), it.end - day + 1, nDays - n)) : '') + '</div>';
       });
       h += '</div>';
     }
@@ -515,6 +551,9 @@ function renderCal() {
   else { bar.style.display = 'none'; sel = -1; }
 }
 
+function lblHtml(text, cols) {
+  return '<span class="lbl" style="width:calc(var(--cs)*' + Math.max(1, cols) + ' - 3px)">' + esc(text) + '</span>';
+}
 function moveWork(i, delta) {
   var o = lastO, it = o && o.items[i];
   if (!it || it.bad || !delta) return;
@@ -569,7 +608,11 @@ $('rows').addEventListener('change', function (e) {
 });
 
 var calEl = $('calwrap'), calc = $('cal'), ghost = null, ptrs = {}, pinch = null, pan = null, noClick = 0, cs = 20;
-function saveCs() { S.cs = Math.round(cs * 10) / 10; save(); }
+function saveCs() { S.cs = Math.round(cs * 10) / 10; S.csv = 2; save(); }
+function defaultCs() {
+  var w = calEl.clientWidth;
+  return w < 700 ? 24 : Math.max(20, Math.min(40, Math.floor(((w - 16 - 36) / 45) * 10) / 10));
+}
 function applyCs(v, fx, fy) {
   v = Math.max(6, Math.min(64, v));
   var ox = (calEl.scrollLeft + fx) / cs, oy = (calEl.scrollTop + fy) / cs;
@@ -601,6 +644,7 @@ function hl(s, e) {
 }
 function endDrag() {
   if (drag && drag.timer) clearTimeout(drag.timer);
+  if (drag && drag.timer2) clearTimeout(drag.timer2);
   if (ghost) { ghost.remove(); ghost = null; }
   hl(1, 0); drag = null;
 }
@@ -609,6 +653,10 @@ function pinchInfo() {
   return {d: Math.hypot(a.x - b.x, a.y - b.y) || 1, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2};
 }
 calEl.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+calEl.addEventListener('dblclick', function (e) {
+  var ch = e.target.closest('.chip');
+  if (ch && !rmode && !ch.classList.contains('rest')) openEditor(+ch.dataset.i);
+});
 calEl.addEventListener('touchmove', function (e) { if (drag && drag.armed) e.preventDefault(); }, {passive: false});
 calEl.addEventListener('pointerdown', function (e) {
   if (e.button > 0) return;
@@ -634,6 +682,9 @@ calEl.addEventListener('pointerdown', function (e) {
   }
   drag = d;
   if (!d.armed) d.timer = setTimeout(function () { if (drag === d) { d.armed = true; if (navigator.vibrate) navigator.vibrate(15); } }, 280);
+  if (d.kind === 'work') d.timer2 = setTimeout(function () {
+    if (drag === d && !d.moved) { var k = d.i; endDrag(); noClick = Date.now() + 700; openEditor(k); }
+  }, 600);
 });
 calEl.addEventListener('pointermove', function (e) {
   if (ptrs[e.pointerId]) { ptrs[e.pointerId].x = e.clientX; ptrs[e.pointerId].y = e.clientY; }
@@ -722,7 +773,7 @@ calEl.addEventListener('click', function (e) {
 });
 
 renderDays(); renderRows(); renderResult();
-if (S.cs) applyCs(S.cs, 0, 0); else fitCs();
+if (S.cs && S.csv === 2) applyCs(S.cs, 0, 0); else { applyCs(defaultCs(), 0, 0); calEl.scrollLeft = 0; saveCs(); }
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
 })();
 </script>

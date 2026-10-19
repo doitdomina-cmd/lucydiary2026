@@ -6189,21 +6189,21 @@ function twSound(kind) {
     const t = c.currentTime, out = c.createGain(); out.gain.value = 0.55; out.connect(c.destination);
     const clack = (freq, vol, thud) => {
         const src = c.createBufferSource(); src.buffer = twNoise; src.playbackRate.value = 0.85 + Math.random() * 0.3;
-        const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = freq * (0.9 + Math.random() * 0.2); bp.Q.value = 0.9;
-        const g = c.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+        const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = freq * (0.9 + Math.random() * 0.2); bp.Q.value = 1.4;
+        const g = c.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.035);
         src.connect(bp); bp.connect(g); g.connect(out); src.start(t);
         const o = c.createOscillator(); o.type = 'sine'; o.frequency.setValueAtTime(thud, t); o.frequency.exponentialRampToValueAtTime(thud * 0.5, t + 0.07);
-        const og = c.createGain(); og.gain.setValueAtTime(vol * 0.9, t); og.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
-        o.connect(og); og.connect(out); o.start(t); o.stop(t + 0.1);
+        const og = c.createGain(); og.gain.setValueAtTime(vol * 0.25, t); og.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+        o.connect(og); og.connect(out); o.start(t); o.stop(t + 0.05);
     };
-    if (kind === 'space') clack(1400, 0.7, 90);
-    else if (kind === 'back') clack(1800, 0.45, 150);
+    if (kind === 'space') clack(2600, 0.55, 260);
+    else if (kind === 'back') clack(3600, 0.35, 380);
     else if (kind === 'enter') {
-        clack(1200, 0.9, 80);
+        clack(2400, 0.7, 240);
         const o = c.createOscillator(), g = c.createGain(); o.type = 'sine'; o.frequency.value = 2350;
         g.gain.setValueAtTime(0.0001, t + 0.04); g.gain.exponentialRampToValueAtTime(0.35, t + 0.06); g.gain.exponentialRampToValueAtTime(0.001, t + 1.1);
         o.connect(g); g.connect(out); o.start(t + 0.04); o.stop(t + 1.2);
-    } else clack(2600, 0.7, 120);
+    } else clack(4200, 0.6, 420);
 }
 function twCaretPos() {
     const sel = getSelection(); if (!sel.rangeCount) return null;
@@ -6223,7 +6223,7 @@ function twUpdateCaret(hit) {
     const p = twCaretPos();
     if (!p || document.body.classList.contains('rn-open')) { el?.remove(); document.body.classList.remove('tw-ov'); return; }
     if (!el) { el = document.createElement('div'); el.id = 'tw-caret'; document.body.appendChild(el); }
-    const w = Math.max(9, p.h * 0.5);
+    const w = Math.max(3, Math.round(p.h * 0.14));
     el.style.cssText = `left:${p.x}px;top:${p.y + 1}px;width:${w}px;height:${Math.max(10, p.h - 2)}px`;
     document.body.classList.add('tw-ov');
     if (hit) { el.classList.remove('hit'); void el.offsetWidth; el.classList.add('hit'); }

@@ -93,6 +93,7 @@
         .tl-scn-bar button.scn.on { background: #FFD9A0; }
         .tl-scn-bar button.add { color: #9a6a20; } .tl-scn-bar .spacer { flex: 1; }
         .tl-scn-bar button.wi-del { color: #c04040; }
+        .tl-scn-bar .tl-scn-hint { font-size: 11.5px; color: #9a6a20; font-weight: 700; }
         #year-timeline-content.tl-whatif-on { outline: 3px dashed #F0A040; outline-offset: -8px; }
         #tl-whatif-panel { margin: 0 0 10px; padding: 10px 12px; border: 1.5px dashed #E0A050; border-radius: 12px; background: #FFF7E6; }
         #tl-whatif-panel .wi-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 12px; color: #7a5a30; margin-bottom: 8px; }
@@ -8341,7 +8342,6 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             </div>
 
             <div id="tl-scn-bar" class="tl-scn-bar"></div>
-            <div id="tl-whatif-panel" style="display:none"></div>
             <div id="year-timeline-body" class="flex-1 overflow-y-auto overflow-x-hidden scroll-invisible"></div>
 
             <div class="mt-3 pt-3 border-t border-slate-100 flex items-center gap-4 text-xs text-slate-400 shrink-0">
@@ -19806,37 +19806,51 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
         const TL_LIGHT_WEEKLY = 10000;   // 일주일 평균 이 글자수 미만인 집필 구간(예: 주 1회 4천자)은 연간 일정·쉬는 구간에서 뺀다
 
         // ══ 연간 집필 일정 '가정표' ══
-        // '가정표 1·2…'는 실제 일정을 통째로 복사한, 이름 붙은 별도 일정표다. 그 안에서 글자수를 바꾸고 블록을 넣고 빼도 실제 일정·월간 달력에는 아무 영향이 없고, 저장돼서 다시 열어도 남아 있다.
-        const timelineWhatIf = { on: false, id: null, spans: [], schedules: {}, shift: true };
-        function tlSched() { return timelineWhatIf.on ? timelineWhatIf.schedules : writeSchedules; }
-        function tlSpans() { return timelineWhatIf.on ? timelineWhatIf.spans : writeSpans; }
+        // '가정표 1·2…'는 실제 일정을 통째로 복사한, 이름 붙은 별도 일정표다.
+        // 가정표를 열어 둔 동안에는 writeSpans / writeSchedules 가 그 가정표의 복사본을 가리킨다 → 연간 일정의 기존 기능(막대 끌어 옮기기·양끝 조절·눌러서 편집·기간 일정 추가)이 그대로 가정표 안에서만 동작한다.
+        // 저장(runSave)·백업은 항상 실제 일정으로 되돌려 놓고 처리하므로 실제 일정·월간 달력은 절대 바뀌지 않는다.
+        const timelineWhatIf = { on: false, id: null };
+        let _wiReal = null;     // 가정표를 열기 전 실제 데이터 { ws, sp }
+        function tlSched() { return writeSchedules; }
+        function tlSpans() { return writeSpans; }
         function _wiId() { return 'wi_' + Date.now().toString(36) + Math.floor(Math.random() * 1e5).toString(36); }
-        function _wiSorted() { return timelineWhatIf.spans.slice().sort((a, b) => a.startDate.localeCompare(b.startDate) || a.endDate.localeCompare(b.endDate) || a.id.localeCompare(b.id)); }
-        function _wiShiftSpan(sp, delta) {
-            sp.startDate = spanDateAdd(sp.startDate, delta); sp.endDate = spanDateAdd(sp.endDate, delta);
-            (sp.midBreaks || []).forEach(b => { if (b.start) b.start = spanDateAdd(b.start, delta); if (b.end) b.end = spanDateAdd(b.end, delta); });
-        }
-        function _wiShiftAfter(sp, delta) {        // 정렬 순서로 sp 뒤에 있는 블록들을 delta 일 만큼 민다
-            if (!timelineWhatIf.shift || !delta) return;
-            const order = _wiSorted(); const at = order.findIndex(x => x.id === sp.id);
-            order.slice(at + 1).forEach(x => _wiShiftSpan(x, delta));
-        }
-        function _wiEndForChars(sp, target) {      // 하루 글자수는 그대로, 총 글자수가 target 이 되는 가장 이른 끝날짜
-            for (let n = 1; n <= 900; n++) {
-                const end = spanDateAdd(sp.startDate, n - 1);
-                if (calcSpanStats({ ...sp, endDate: end }).totalChars >= target) return end;
-            }
-            return sp.endDate;
-        }
         function _wiCurrentScenario() { return timelineScenarios.find(x => x.id === timelineWhatIf.id) || null; }
-        function wiSync() {                         // 고칠 때마다 가정표에 저장 (실제 일정은 건드리지 않는다)
-            const sc = _wiCurrentScenario(); if (!sc) return;
-            sc.spans = timelineWhatIf.spans; sc.updated = Date.now();
-            save(true);
+        function wiLeaveScenario() {
+            if (!timelineWhatIf.on || !_wiReal) { timelineWhatIf.on = false; timelineWhatIf.id = null; return; }
+            const sc = _wiCurrentScenario();
+            if (sc) { sc.schedules = writeSchedules; sc.spans = writeSpans; }
+            writeSchedules = _wiReal.ws; writeSpans = _wiReal.sp;
+            _wiReal = null; timelineWhatIf.on = false; timelineWhatIf.id = null;
+            try { renderWriteCalendar(); } catch (e) {}
         }
-        // 실제 일정을 복사한 블록 묶음을 만든다: 카드로 확정된 일정은 같은 모양의 '기간 일정' 블록으로, 아직 카드 없는 기간 일정은 그대로 복사 (모두 새 id → 실제 데이터와 연결 없음)
+        function wiEnterScenario(sc) {
+            if (timelineWhatIf.on) wiLeaveScenario();
+            _wiReal = { ws: writeSchedules, sp: writeSpans };
+            sc.schedules = sc.schedules || {};
+            writeSchedules = sc.schedules; writeSpans = sc.spans;
+            timelineWhatIf.on = true; timelineWhatIf.id = sc.id;
+        }
+        // 저장·백업은 가정표가 열려 있어도 실제 데이터로 처리하고, 가정표 내용은 가정표 목록 안에만 저장한다
+        (function installWhatIfSaveGuard() {
+            const wrap = (name) => {
+                const orig = window[name] || (typeof eval(name) === 'function' ? eval(name) : null); if (!orig) return;
+                const guarded = function (...args) {
+                    if (!timelineWhatIf.on || !_wiReal) return orig.apply(this, args);
+                    const sc = _wiCurrentScenario(); const sw = { ws: writeSchedules, sp: writeSpans };
+                    if (sc) { sc.schedules = sw.ws; sc.spans = sw.sp; sc.updated = Date.now(); }
+                    writeSchedules = _wiReal.ws; writeSpans = _wiReal.sp;
+                    try { return orig.apply(this, args); } finally { writeSchedules = sw.ws; writeSpans = sw.sp; }
+                };
+                if (name === 'runSave') runSave = guarded; else if (name === 'downloadBackup') downloadBackup = guarded;
+            };
+            wrap('runSave'); wrap('downloadBackup');
+        })();
+        // 실제 일정을 복사한 블록 묶음 {spans, schedules}: 카드로 확정된 일정은 같은 모양의 '기간 일정' 블록으로, 카드 없는 기간 일정은 그대로 복사 (모두 새 id → 실제 데이터와 연결 없음)
         function _wiBuildCopy() {
-            const prevOn = timelineWhatIf.on; timelineWhatIf.on = false;
+            const real = timelineWhatIf.on && _wiReal ? _wiReal : { ws: writeSchedules, sp: writeSpans };
+            const swapped = timelineWhatIf.on && _wiReal;
+            const keepWs = writeSchedules, keepSp = writeSpans;
+            if (swapped) { writeSchedules = real.ws; writeSpans = real.sp; }
             try {
                 const years = new Set(); Object.keys(writeSchedules).forEach(d => years.add(Number(d.slice(0, 4))));
                 (writeSpans || []).forEach(sp => { years.add(Number(sp.startDate.slice(0, 4))); years.add(Number(sp.endDate.slice(0, 4))); });
@@ -19857,23 +19871,23 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                     });
                 });
                 return out;
-            } finally { timelineWhatIf.on = prevOn; }
+            } finally { if (swapped) { writeSchedules = keepWs; writeSpans = keepSp; } }
         }
         function wiSelectScenario(id) {             // id 가 null 이면 실제 일정
             const sc = id ? timelineScenarios.find(x => x.id === id) : null;
-            if (sc) { timelineWhatIf.on = true; timelineWhatIf.id = sc.id; timelineWhatIf.spans = sc.spans; timelineWhatIf.schedules = {}; }
-            else { timelineWhatIf.on = false; timelineWhatIf.id = null; timelineWhatIf.spans = []; }
+            if (sc) wiEnterScenario(sc); else wiLeaveScenario();
             renderTimelineWhatIfPanel(); renderYearTimeline();
         }
         function wiNewScenario() {
             let n = 1; while (timelineScenarios.some(x => x.name === '가정표 ' + n)) n++;
-            const sc = { id: 'scn_' + Date.now().toString(36), name: '가정표 ' + n, spans: _wiBuildCopy(), created: Date.now() };
+            const sc = { id: 'scn_' + Date.now().toString(36), name: '가정표 ' + n, spans: _wiBuildCopy(), schedules: {}, created: Date.now() };
             timelineScenarios.push(sc); save(true); wiSelectScenario(sc.id);
         }
         function wiDuplicateScenario() {
             const cur = _wiCurrentScenario(); if (!cur) return;
             let n = 1; while (timelineScenarios.some(x => x.name === cur.name + ' 복사' + (n > 1 ? n : ''))) n++;
-            const sc = { id: 'scn_' + Date.now().toString(36), name: cur.name + ' 복사' + (n > 1 ? n : ''), spans: JSON.parse(JSON.stringify(cur.spans)).map(x => ({ ...x, id: _wiId() })), created: Date.now() };
+            const copySpans = JSON.parse(JSON.stringify(writeSpans)).map(x => ({ ...x, id: _wiId() }));
+            const sc = { id: 'scn_' + Date.now().toString(36), name: cur.name + ' 복사' + (n > 1 ? n : ''), spans: copySpans, schedules: JSON.parse(JSON.stringify(writeSchedules)), created: Date.now() };
             timelineScenarios.push(sc); save(true); wiSelectScenario(sc.id);
         }
         function wiRenameScenario() {
@@ -19884,106 +19898,42 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
         function wiDeleteScenario() {
             const cur = _wiCurrentScenario(); if (!cur) return;
             if (!confirm(`「${cur.name}」을(를) 지울까요? (실제 일정은 그대로예요)`)) return;
-            timelineScenarios = timelineScenarios.filter(x => x.id !== cur.id); save(true); wiSelectScenario(null);
+            wiLeaveScenario();
+            timelineScenarios = timelineScenarios.filter(x => x.id !== cur.id); save(true);
+            renderTimelineWhatIfPanel(); renderYearTimeline();
         }
         function wiRecopyScenario() {
             const cur = _wiCurrentScenario(); if (!cur) return;
             if (!confirm(`「${cur.name}」의 내용을 지우고, 지금 실제 일정을 다시 복사해 올까요?`)) return;
-            cur.spans = _wiBuildCopy(); timelineWhatIf.spans = cur.spans; save(true);
+            const fresh = _wiBuildCopy();
+            writeSpans = fresh; writeSchedules = {}; cur.spans = fresh; cur.schedules = writeSchedules; save(true);
             renderTimelineWhatIfPanel(); renderYearTimeline();
         }
-        function wiEdit(id, field, val) {
-            const sp = timelineWhatIf.spans.find(x => x.id === id); if (!sp) return;
-            if (field === 'title') { sp.title = String(val || ''); }
-            else if (field === 'start') {
-                if (!val) return; const delta = spanDayDiff(sp.startDate, val); if (!delta) return;
-                _wiShiftSpan(sp, delta); _wiShiftAfter(sp, delta);
-            }
-            else if (field === 'daily') { sp.dailyChars = Math.max(0, parseInt(val) || 0); }
-            else if (field === 'chars') {
-                const target = Math.max(0, parseInt(String(val).replace(/,/g, '')) || 0);
-                if (!(sp.dailyChars > 0)) { alert('하루 글자수가 0이라 총 글자수로 기간을 계산할 수 없어요. 하루 글자수를 먼저 넣어 주세요.'); renderTimelineWhatIfPanel(); return; }
-                const oldEnd = sp.endDate; sp.endDate = _wiEndForChars(sp, target);
-                _wiShiftAfter(sp, spanDayDiff(oldEnd, sp.endDate));
-            }
-            else if (field === 'days') {
-                const n = Math.max(1, parseInt(val) || 1); const oldEnd = sp.endDate; sp.endDate = spanDateAdd(sp.startDate, n - 1);
-                _wiShiftAfter(sp, spanDayDiff(oldEnd, sp.endDate));
-            }
-            wiSync(); renderTimelineWhatIfPanel(); renderYearTimeline();
-        }
-        function wiInsertAfter(id, kind) {
-            const sp = timelineWhatIf.spans.find(x => x.id === id); if (!sp) return;
-            const start = spanDateAdd(sp.endDate, 1);
-            let nb;
-            if (kind === 'rest') {
-                nb = { id: _wiId(), title: '휴식', workId: '', startDate: start, endDate: spanDateAdd(start, 6), type: 'rest', restMode: 'weekly', restWeekdays: [], restPerWeek: 0, midBreaks: [], dailyRanges: [], dailyChars: 0, dailySplit: 1, color: '#F2DCCB', memo: '' };
-            } else {
-                nb = { ...JSON.parse(JSON.stringify(sp)), id: _wiId(), title: '새 블록', startDate: start, midBreaks: [], dailyRanges: [], type: 'write' };
-                nb.endDate = _wiEndForChars(nb, Math.max(1, (nb.dailyChars || 5000) * 10));
-            }
-            const len = spanDayDiff(nb.startDate, nb.endDate) + 1;
-            _wiShiftAfter(sp, len);                      // 끼워 넣은 만큼 뒤 블록을 민다
-            timelineWhatIf.spans.push(nb);
-            wiSync(); renderTimelineWhatIfPanel(); renderYearTimeline();
-        }
-        function wiAddAtEnd() {
-            const order = _wiSorted(); const y = timelineYear;
-            const last = order.length ? order[order.length - 1] : null;
-            if (last) { wiInsertAfter(last.id, 'write'); return; }
-            const nb = { id: _wiId(), title: '새 블록', workId: '', startDate: `${y}-01-01`, endDate: `${y}-01-14`, type: 'write', restMode: 'weekly', restWeekdays: [], restPerWeek: 1, midBreaks: [], dailyRanges: [], dailyChars: 5000, dailySplit: 1, color: '#E2D1A0', memo: '' };
-            timelineWhatIf.spans.push(nb); wiSync(); renderTimelineWhatIfPanel(); renderYearTimeline();
-        }
-        function wiDelete(id) {
-            const sp = timelineWhatIf.spans.find(x => x.id === id); if (!sp) return;
-            const len = spanDayDiff(sp.startDate, sp.endDate) + 1;
-            _wiShiftAfter(sp, -len);                     // 빠진 만큼 뒤 블록을 당긴다
-            timelineWhatIf.spans = timelineWhatIf.spans.filter(x => x.id !== id);
-            wiSync(); renderTimelineWhatIfPanel(); renderYearTimeline();
+        function wiAddBlock() {                     // 기간 일정 추가 창을 열어, 가정표에 블록(카드)을 하나 더한다
+            const now = new Date();
+            const ds = timelineYear === now.getFullYear() ? getYYYYMMDD(now) : `${timelineYear}-01-01`;
+            openWriteSpanModal(null, ds);
         }
         function renderTimelineWhatIfPanel() {
-            const bar = document.getElementById('tl-scn-bar'), box = document.getElementById('tl-whatif-panel');
+            const bar = document.getElementById('tl-scn-bar');
             const content = document.getElementById('year-timeline-content');
             if (content) content.classList.toggle('tl-whatif-on', timelineWhatIf.on);
+            if (!bar) return;
             const esc = escapeHtml;
-            if (bar) {
-                bar.innerHTML = `<button class="${timelineWhatIf.on ? '' : 'on'}" onclick="wiSelectScenario(null)">실제 일정</button>` +
-                    timelineScenarios.map(sc => `<button class="${timelineWhatIf.id === sc.id ? 'on scn' : 'scn'}" onclick="wiSelectScenario('${sc.id}')">🧪 ${esc(sc.name)}</button>`).join('') +
-                    `<button class="add" onclick="wiNewScenario()" title="지금 실제 일정을 통째로 복사해서 새 가정표를 만들어요. 그 안에서 마음대로 고쳐도 실제 일정은 그대로예요">＋ 가정표 만들기</button>` +
-                    (timelineWhatIf.on ? `<span class="spacer"></span><button onclick="wiRenameScenario()">이름 바꾸기</button><button onclick="wiDuplicateScenario()">복제</button><button onclick="wiRecopyScenario()" title="이 가정표를 지우고 지금 실제 일정을 다시 복사">실제 일정으로 다시 복사</button><button class="wi-del" onclick="wiDeleteScenario()">가정표 지우기</button>` : '');
-            }
-            if (!box) return;
-            if (!timelineWhatIf.on) { box.style.display = 'none'; box.innerHTML = ''; return; }
-            const y = timelineYear;
-            const rows = _wiSorted().filter(sp => sp.startDate <= `${y}-12-31` && sp.endDate >= `${y}-01-01`);
-            const tr = rows.map(sp => {
-                const st = calcSpanStats(sp), conf = SPAN_TYPES[sp.type || 'write'] || SPAN_TYPES.write, isW = !!conf.chars;
-                const wk = sp.workId ? (resolveWorkItem(sp.workId).displayTitle || '') : '';
-                return `<tr>
-                    <td><input class="wi-in wi-t" value="${esc(sp.title || '')}" placeholder="${esc(conf.label)}" onchange="wiEdit('${sp.id}','title',this.value)"><small>${conf.icon} ${esc(conf.label)}${wk ? ' · ' + esc(wk) : ''}</small></td>
-                    <td><input type="date" class="wi-in" value="${sp.startDate}" onchange="wiEdit('${sp.id}','start',this.value)"></td>
-                    <td class="wi-c">${sp.endDate.slice(2)}</td>
-                    <td>${isW ? `<span class="wi-d">${st.totalDays}일 / 집필 ${st.workDays}일</span>` : `<input type="number" class="wi-in wi-n" min="1" value="${st.totalDays}" onchange="wiEdit('${sp.id}','days',this.value)">일`}</td>
-                    <td>${isW ? `<input type="number" class="wi-in wi-n" min="0" step="500" value="${sp.dailyChars || 0}" onchange="wiEdit('${sp.id}','daily',this.value)">` : '-'}</td>
-                    <td>${isW ? `<input type="number" class="wi-in wi-n wi-big" min="0" step="1000" value="${st.totalChars}" onchange="wiEdit('${sp.id}','chars',this.value)">` : '-'}</td>
-                    <td class="wi-act"><button onclick="wiInsertAfter('${sp.id}','write')" title="이 블록 바로 뒤에 새 블록 끼워 넣기">＋블록</button><button onclick="wiInsertAfter('${sp.id}','rest')" title="이 블록 뒤에 휴식 7일 끼워 넣기">＋휴식</button><button class="wi-del" onclick="wiDelete('${sp.id}')" title="이 블록 지우기">✕</button></td>
-                </tr>`;
-            }).join('');
-            box.style.display = '';
-            box.innerHTML = `<div class="wi-head"><span>이 표는 <b>${esc((_wiCurrentScenario() || {}).name || '')}</b> 안에서만 바뀌어요. 실제 일정·월간 달력에는 반영되지 않고, 고친 내용은 자동으로 저장돼요.</span>
-                <label class="wi-sh"><input type="checkbox" ${timelineWhatIf.shift ? 'checked' : ''} onchange="timelineWhatIf.shift = this.checked; renderTimelineWhatIfPanel()"> 뒤 블록 같이 밀기·당기기</label>
-                <button onclick="wiAddAtEnd()">＋ 블록 추가</button></div>
-                <div class="wi-wrap"><table class="wi-tbl"><thead><tr><th>제목</th><th>시작일</th><th>끝</th><th>기간</th><th>하루 글자수</th><th>총 글자수</th><th></th></tr></thead><tbody>${tr || '<tr><td colspan="7" class="wi-empty">이 해에 블록이 없어요. 「＋ 블록 추가」로 만들어 보세요.</td></tr>'}</tbody></table></div>`;
+            bar.innerHTML = `<button class="${timelineWhatIf.on ? '' : 'on'}" onclick="wiSelectScenario(null)">실제 일정</button>` +
+                timelineScenarios.map(sc => `<button class="${timelineWhatIf.id === sc.id ? 'on scn' : 'scn'}" onclick="wiSelectScenario('${sc.id}')">🧪 ${esc(sc.name)}</button>`).join('') +
+                `<button class="add" onclick="wiNewScenario()" title="지금 실제 일정을 통째로 복사해서 새 가정표를 만들어요. 그 안에서 마음대로 고쳐도 실제 일정은 그대로예요">＋ 가정표 만들기</button>` +
+                (timelineWhatIf.on ? `<span class="spacer"></span><span class="tl-scn-hint">카드를 끌거나 눌러서 고쳐 보세요 · 실제 일정에는 반영되지 않아요</span><button class="add" onclick="wiAddBlock()">＋ 블록 추가</button><button onclick="wiRenameScenario()">이름 바꾸기</button><button onclick="wiDuplicateScenario()">복제</button><button onclick="wiRecopyScenario()" title="이 가정표를 지우고 지금 실제 일정을 다시 복사">실제 일정으로 다시 복사</button><button class="wi-del" onclick="wiDeleteScenario()">가정표 지우기</button>` : '');
         }
         function openYearTimeline() {
             timelineYear = writeCalDate.getFullYear();
             // 창을 먼저 띄워야 실제 너비를 잴 수 있다 (가로 스크롤 없이 딱 맞추기 위함)
             document.getElementById('year-timeline-modal').classList.add('open');
-            timelineWhatIf.on = false; timelineWhatIf.id = null; timelineWhatIf.spans = [];
+            wiLeaveScenario();
             renderTimelineWhatIfPanel();
             requestAnimationFrame(renderYearTimeline);
         }
-        function closeYearTimeline() { document.getElementById('year-timeline-modal').classList.remove('open'); timelineWhatIf.on = false; timelineWhatIf.id = null; timelineWhatIf.spans = []; }
+        function closeYearTimeline() { document.getElementById('year-timeline-modal').classList.remove('open'); wiLeaveScenario(); }
         function changeTimelineYear(delta) { timelineYear += delta; renderYearTimeline(); }
 
         function tlIsLeap(y) { return (y%4===0 && y%100!==0) || y%400===0; }

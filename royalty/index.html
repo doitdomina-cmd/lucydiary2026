@@ -106,7 +106,7 @@
         #write-year-page td.today i.dn { color: var(--primary); }
         #write-year-page .wy-c { display: block; margin: 2px 0 0; padding: 1px 2px; border-radius: 3px; font-size: 9.5px; letter-spacing: -.3px; font-weight: 700; color: #4a4036; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; box-shadow: 0 1px 2px rgba(0,0,0,.14); }
         #write-year-page .wy-more { display: block; font-size: 9.5px; color: #8a7a66; font-weight: 700; }
-        #write-year-page .wy-s { display: block; height: 4px; margin: 3px 0 0; border-radius: 2px; }
+        #write-year-page .wy-s { display: block; height: 13px; line-height: 13px; margin: 2px -1px 0; padding: 0 3px; border-radius: 3px; font-size: 9.5px; font-weight: 700; color: #4a4036; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.3px; }
         /* PC 앱: 제목 줄이 없어서 맨 위 띠를 끌면 창이 움직이고, 오른쪽 위 창 버튼 자리는 비워 둔다 */
         body.electron-app::before { content: ''; position: fixed; top: 0; left: 0; right: 140px; height: 12px; -webkit-app-region: drag; z-index: 9990; }
         body.electron-app main { padding-top: 30px; }
@@ -5734,6 +5734,13 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                             </div>
                         </div>
                         
+                        <div id="write-move-opts" class="flex flex-wrap items-center gap-x-4 gap-y-1 mb-2 text-xs text-slate-500">
+                            <span class="font-bold">카드를 끌어 옮길 때</span>
+                            <label class="inline-flex items-center gap-1 cursor-pointer"><input type="radio" name="write-move-mode" value="one" onchange="setWriteMoveMode(this.value)"> 이 칸만</label>
+                            <label class="inline-flex items-center gap-1 cursor-pointer"><input type="radio" name="write-move-mode" value="work" onchange="setWriteMoveMode(this.value)"> 이 작품 전체 같이</label>
+                            <label class="inline-flex items-center gap-1 cursor-pointer"><input type="radio" name="write-move-mode" value="after" onchange="setWriteMoveMode(this.value)"> 이 뒤로 전체 같이</label>
+                            <label class="inline-flex items-center gap-1 cursor-pointer" title="뒤로 미룰 때 비는 날들을 기간 일정의 '휴식'으로 자동 추가해요"><input type="checkbox" id="write-move-rest" onchange="setWriteMoveRest(this.checked)"> 휴식 넣기</label>
+                        </div>
                         <div class="grid grid-cols-7 gap-1">
                             <div class="text-center font-bold text-rose-500 text-xs py-2 bg-slate-50 rounded-t">일</div>
                             <div class="text-center font-bold text-slate-500 text-xs py-2 bg-slate-50 rounded-t">월</div>
@@ -19870,10 +19877,16 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                     });
                     if (items.length > shown) chips += `<span class="wy-more">+${items.length - shown}</span>`;
                     let bars = '';
+                    const dow = new Date(y, m, d).getDay();
                     spans.filter(sp => sp.startDate <= ds && sp.endDate >= ds).slice(0, 3).forEach(sp => {
                         const rw = sp.workId ? resolveWorkItem(sp.workId) : null;
-                        const tt = (sp.title && sp.title !== '(제목 없음)') ? sp.title : (rw && rw.work ? rw.displayTitle : '기간 일정');
-                        bars += `<b class="wy-s" style="background:${spanColorSolid(sp.color)}" title="${escapeHtml(tt)}"></b>`;
+                        const tt = (sp.title && sp.title !== '(제목 없음)') ? sp.title : (rw && rw.work ? rw.displayTitle : '');
+                        const tl = (SPAN_TYPES[sp.type || 'write'] || SPAN_TYPES.write).label;
+                        const lead = sp.startDate === ds || dow === 0 || d === 1;   // 시작일·주 첫날·달 첫날에만 글씨를 쓴다
+                        const tt2 = (tt && tt !== tl) ? tt : '';
+                        const txt = lead ? escapeHtml(tl + (tt2 ? ' · ' + tt2 : '')) : '';
+                        const sc = spanColorSolid(sp.color);
+                        bars += `<b class="wy-s" style="background:${hexToRgba(sc, 0.75)}" title="${escapeHtml(tl + (tt ? ' · ' + tt : '') + ' (' + sp.startDate.slice(5) + ' ~ ' + sp.endDate.slice(5) + ')')}">${txt}</b>`;
                     });
                     arr.push(`<td class="wy-d${items.length || bars ? ' has' : ''}${ds === todayStr ? ' today' : ''}" onclick="writeYearJump('${ds}')"><i class="dn">${d}</i>${chips}${bars}</td>`);
                 }
@@ -23245,6 +23258,45 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
         function handleDragEnter(e) { e.preventDefault(); if(e.currentTarget.dataset.date) e.currentTarget.classList.add('cal-drag-over'); }
         function handleDragLeave(e) { if(e.currentTarget.dataset.date) e.currentTarget.classList.remove('cal-drag-over'); }
 
+        // ── 집필 달력: 카드를 끌 때 '이 칸만 / 이 작품 전체 / 이 뒤로 전체' + 휴식 넣기 ──
+        let writeMoveMode = 'one', writeMoveRest = false;
+        try { writeMoveMode = localStorage.getItem('write_move_mode') || 'one'; writeMoveRest = localStorage.getItem('write_move_rest') === '1'; } catch (e) {}
+        function syncWriteMoveUI() {
+            document.querySelectorAll('input[name="write-move-mode"]').forEach(r => { r.checked = r.value === writeMoveMode; });
+            const c = document.getElementById('write-move-rest'); if (c) c.checked = writeMoveRest;
+        }
+        function setWriteMoveMode(v) { writeMoveMode = v; try { localStorage.setItem('write_move_mode', v); } catch (e) {} }
+        function setWriteMoveRest(b) { writeMoveRest = !!b; try { localStorage.setItem('write_move_rest', b ? '1' : '0'); } catch (e) {} }
+        window.addEventListener('load', () => setTimeout(syncWriteMoveUI, 400));
+        // 카드 하나를 targetDate 로 옮기되, 모드에 따라 같이 옮길 일정을 함께 민다. 처리했으면 true
+        function applyWriteBulkMove(data, targetDate) {
+            if (writeMoveMode === 'one' || !data || data.originDate === targetDate) return false;
+            const src = (writeSchedules[data.originDate] || []).find(x => x.id === data.id);
+            if (!src) return false;
+            const offset = spanDayDiff(data.originDate, targetDate);   // 양수 = 뒤로, 음수 = 앞으로
+            const baseOf = id => String(id || '').split('::')[0];
+            const wBase = baseOf(src.workId);
+            const moves = [];   // { from, item }
+            Object.keys(writeSchedules).forEach(ds => (writeSchedules[ds] || []).forEach(it => {
+                const hit = writeMoveMode === 'work' ? baseOf(it.workId) === wBase : ds >= data.originDate;
+                if (hit) moves.push({ from: ds, item: it });
+            }));
+            if (!moves.length) return false;
+            const label = writeMoveMode === 'work' ? '이 작품의 일정 전체' : '이 날짜 뒤의 모든 일정';
+            const spanHits = (writeSpans || []).filter(sp => writeMoveMode === 'work' ? (sp.workId && baseOf(sp.workId) === wBase) : sp.startDate >= data.originDate);
+            if (!confirm(`${label}(카드 ${moves.length}개${spanHits.length ? ', 기간 일정 ' + spanHits.length + '개' : ''})를 ${Math.abs(offset)}일 ${offset > 0 ? '뒤로' : '앞으로'} 옮길까요?`)) return true;
+            moves.forEach(m => { const arr = writeSchedules[m.from]; const k = arr.indexOf(m.item); if (k > -1) arr.splice(k, 1); if (arr.length === 0) delete writeSchedules[m.from]; });
+            moves.forEach(m => { const nd = spanDateAdd(m.from, offset); m.item.date = nd; (writeSchedules[nd] = writeSchedules[nd] || []).push(m.item); });
+            spanHits.forEach(sp => { sp.startDate = spanDateAdd(sp.startDate, offset); sp.endDate = spanDateAdd(sp.endDate, offset); });
+            // 휴식 넣기: 뒤로 미룬 만큼 비는 날(원래 날짜 ~ 옮긴 날짜 전날)을 기간 일정의 '휴식'으로
+            if (writeMoveRest && offset > 0) {
+                writeSpans.push({ id: 'wsp_' + Date.now() + Math.floor(Math.random() * 1000), title: '휴식', workId: '', startDate: data.originDate, endDate: spanDateAdd(targetDate, -1),
+                    type: 'rest', restMode: 'weekly', restWeekdays: [], restPerWeek: 0, midBreaks: [], dailyRanges: [], dailyChars: 0, dailySplit: 1, color: '#F2DCCB', memo: '' });
+            }
+            save(); renderWriteCalendar();
+            try { refreshOpenYearTimeline(); } catch (e) {}
+            return true;
+        }
         function handleWriteDragStart(e, id, dateStr) {
             e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'write', id, originDate: dateStr }));
             e.dataTransfer.effectAllowed = 'move';
@@ -23260,6 +23312,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             try {
                 const data = JSON.parse(e.dataTransfer.getData('text/plain'));
                 if(data.type !== 'write' || data.originDate === targetDate) return;
+                if (applyWriteBulkMove(data, targetDate)) return;
                 
                 let idx = writeSchedules[data.originDate]?.findIndex(s => s.id === data.id);
                 if(idx > -1) {
@@ -23337,6 +23390,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             try {
                 const data = JSON.parse(e.dataTransfer.getData('text/plain'));
                 if (data.type !== 'write') return;
+                if (data.originDate !== targetDate && applyWriteBulkMove(data, targetDate)) return;
                 if (moveScheduleItem(writeSchedules, data, targetDate, targetId, insertAfter)) {
                     save(); renderWriteCalendar();
                 }

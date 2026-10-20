@@ -86,7 +86,10 @@
         /* 창 스크롤 막대는 body 가 맡는다(body 에 overflow 가 있어서 브라우저가 body 를 '화면 스크롤 담당'으로 본다) */
         html::-webkit-scrollbar, body::-webkit-scrollbar { width: 14px; height: 14px; }
         /* 연간 집필 달력(12개월 한 장) */
-        #write-year-page .wy-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 24px 26px; padding: 2px 4px 8px; }
+        /* 연간 달력 화면만 본문 최대 너비(1700px) 제한을 풀고, 넓은 화면에서는 한 줄에 6개월 */
+        body.wy-open main { max-width: none; }
+        #write-year-page .wy-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 22px 18px; padding: 2px 4px 8px; }
+        @media (min-width: 1800px) { #write-year-page .wy-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
         #write-year-page .wy-back { padding: 5px 12px; border-radius: 999px; border: 1.4px dashed rgba(120,100,70,.45); background: #FFFCF4; font-size: 12px; font-weight: 700; color: #6b5a43; }
         #write-year-page .wy-back:hover { background: #FFF3D1; }
         #write-year-page .wy-mt { display: inline-block; font-weight: 800; font-size: 1.15rem; color: var(--primary); margin: 0 0 6px; cursor: pointer; }
@@ -94,14 +97,14 @@
         #write-year-page table { width: 100%; border-collapse: separate; border-spacing: 3px; table-layout: fixed; }
         #write-year-page th { font-size: 11px; font-weight: 700; color: #8a7a66; padding: 2px 0; border: 1px dashed rgba(120,100,70,.3); border-radius: 7px; background: #FFFCF4; }
         #write-year-page th.wy-sun { color: #d4736c; } #write-year-page th.wy-sat { color: #5b8fd0; }
-        #write-year-page td { padding: 2px 2px 3px; vertical-align: top; height: 84px; text-align: center; font-size: 11.5px; border: 1px dashed rgba(120,100,70,.3); border-radius: 9px; background: #FFFCF4; cursor: pointer; overflow: hidden; }
+        #write-year-page td { padding: 2px 2px 3px; vertical-align: top; height: 84px; text-align: center; font-size: 11px; padding: 2px 1px 3px; border: 1px dashed rgba(120,100,70,.3); border-radius: 9px; background: #FFFCF4; cursor: pointer; overflow: hidden; }
         #write-year-page td.wy-e { background: transparent; border-color: transparent; cursor: default; }
         #write-year-page td.has { border-style: solid; border-color: rgba(200,170,110,.6); background: #FFFAF0; }
         #write-year-page td.today { outline: 2px solid var(--primary); outline-offset: -2px; }
         #write-year-page td:not(.wy-e):hover { background: #FFF3D1; }
         #write-year-page i.dn { font-style: normal; display: block; text-align: left; padding: 0 3px 1px; font-size: 12px; font-weight: 800; color: #6b5a43; line-height: 1.3; }
         #write-year-page td.today i.dn { color: var(--primary); }
-        #write-year-page .wy-c { display: block; margin: 2px 1px 0; padding: 1px 4px; border-radius: 4px; font-size: 11px; font-weight: 700; color: #4a4036; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; box-shadow: 0 1px 2px rgba(0,0,0,.14); }
+        #write-year-page .wy-c { display: block; margin: 2px 0 0; padding: 1px 2px; border-radius: 3px; font-size: 9.5px; letter-spacing: -.3px; font-weight: 700; color: #4a4036; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; box-shadow: 0 1px 2px rgba(0,0,0,.14); }
         #write-year-page .wy-more { display: block; font-size: 9.5px; color: #8a7a66; font-weight: 700; }
         #write-year-page .wy-s { display: block; height: 4px; margin: 3px 0 0; border-radius: 2px; }
         /* PC 앱: 제목 줄이 없어서 맨 위 띠를 끌면 창이 움직이고, 오른쪽 위 창 버튼 자리는 비워 둔다 */
@@ -19823,12 +19826,14 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             }
             [...tab.children].forEach(c => { if (c !== pg) { if (c.dataset.wyDisp === undefined) c.dataset.wyDisp = c.style.display || ''; c.style.display = 'none'; } });
             pg.style.display = '';
+            document.body.classList.add('wy-open');
             renderWriteYearCal();
             window.scrollTo(0, 0);
         }
         function closeWriteYearCal() {
             const tab = document.getElementById('tab-write'), pg = document.getElementById('write-year-page');
             if (pg) pg.style.display = 'none';
+            document.body.classList.remove('wy-open');
             if (tab) [...tab.children].forEach(c => { if (c !== pg && c.dataset.wyDisp !== undefined) { c.style.display = c.dataset.wyDisp; delete c.dataset.wyDisp; } });
         }
         function writeYearJump(ds) {
@@ -19859,7 +19864,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                         if (!t.category) goalSum += Number(t.goal) || 0;
                         if (shown >= 3) return; shown++;
                         const gc = getGenreColor(r.work.genre);
-                        const label = t.category ? `[${t.category}] ${short(r.displayTitle, 5)}` : `${short(r.displayTitle, 5)} ${(Number(t.goal) || 0).toLocaleString()}`;
+                        const label = r.displayTitle;
                         const tip = `${r.displayTitle}${t.category ? ' [' + t.category + ']' : ''}${t.goal ? ' · ' + Number(t.goal).toLocaleString() + '자' : ''}`;
                         chips += `<span class="wy-c" style="background:${hexToRgba(gc, 0.45)}${t.isCompleted ? '; opacity:.6' : ''}" title="${escapeHtml(tip)}">${escapeHtml(label)}</span>`;
                     });

@@ -92,6 +92,7 @@
         @media (min-width: 1800px) { #write-year-page .wy-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
         #write-year-page .wy-back { padding: 5px 12px; border-radius: 999px; border: 1.4px dashed rgba(120,100,70,.45); background: #FFFCF4; font-size: 12px; font-weight: 700; color: #6b5a43; }
         #write-year-page .wy-back:hover { background: #FFF3D1; }
+        #write-year-page .wy-m { container-type: inline-size; }
         #write-year-page .wy-mt { display: inline-block; font-weight: 800; font-size: 1.15rem; color: var(--primary); margin: 0 0 6px; cursor: pointer; }
         #write-year-page .wy-mt small { font-size: .7rem; font-weight: 700; color: #8a7a66; margin-left: 8px; }
         #write-year-page table { width: 100%; border-collapse: separate; border-spacing: 1.5px; table-layout: fixed; }
@@ -104,11 +105,11 @@
         #write-year-page td:not(.wy-e):hover { background: #FFF3D1; }
         #write-year-page td.wy-over { outline: 2px dashed var(--primary); outline-offset: -2px; background: #FFF3D1; }
         #write-year-page .wy-c[draggable="true"], #write-year-page .wy-s[draggable="true"] { cursor: grab; }
-        #write-year-page i.dn { font-style: normal; display: block; text-align: left; padding: 0 3px 1px; font-size: 12px; font-weight: 800; color: #6b5a43; line-height: 1.3; }
+        #write-year-page i.dn { font-style: normal; display: block; text-align: left; padding: 0 3px 1px; font-size: clamp(11px, 2.8cqw, 17px); font-weight: 800; color: #6b5a43; line-height: 1.3; }
         #write-year-page td.today i.dn { color: var(--primary); }
-        #write-year-page .wy-c { display: block; margin: 2px 0 0; padding: 1px 0; border-radius: 3px; font-size: 8px; letter-spacing: -.5px; text-align: center; font-weight: 700; color: #4a4036; white-space: nowrap; overflow: hidden; text-overflow: clip; text-align: left; box-shadow: 0 1px 2px rgba(0,0,0,.14); }
+        #write-year-page .wy-c { display: block; margin: 2px 0 0; padding: 1px 0; border-radius: 3px; font-size: var(--wy-fs, 9px); letter-spacing: -.04em; text-align: center; font-weight: 700; color: #4a4036; white-space: nowrap; overflow: hidden; text-overflow: clip; text-align: left; box-shadow: 0 1px 2px rgba(0,0,0,.14); }
         #write-year-page .wy-more { display: block; font-size: 9.5px; color: #8a7a66; font-weight: 700; }
-        #write-year-page .wy-s { display: block; height: 13px; line-height: 13px; margin: 2px -1px 0; padding: 0 3px; border-radius: 3px; font-size: 9.5px; font-weight: 700; color: #4a4036; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.3px; }
+        #write-year-page .wy-s { display: block; height: clamp(13px, 3.1cqw, 22px); line-height: clamp(13px, 3.1cqw, 22px); margin: 2px -1px 0; padding: 0 3px; border-radius: 3px; font-size: clamp(8.5px, 2.3cqw, 15px); font-weight: 700; color: #4a4036; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.3px; }
         /* PC 앱: 제목 줄이 없어서 맨 위 띠를 끌면 창이 움직이고, 오른쪽 위 창 버튼 자리는 비워 둔다 */
         body.electron-app::before { content: ''; position: fixed; top: 0; left: 0; right: 140px; height: 12px; -webkit-app-region: drag; z-index: 9990; }
         body.electron-app main { padding-top: 30px; }
@@ -19868,8 +19869,6 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                 const byAfter = writeMoveMode === 'after' && ds >= sp.startDate;
                 if (linked || byWork || byAfter) moves.push({ from: ds, item: it });
             }));
-            const modeTxt = writeMoveMode === 'work' ? '이 작품 전체' : writeMoveMode === 'after' ? '이 뒤로 전체' : '이 일정';
-            if (!confirm(`${modeTxt}(기간 일정 ${spanHits.length}개${moves.length ? ', 카드 ' + moves.length + '개' : ''})를 ${Math.abs(offset)}일 ${offset > 0 ? '뒤로' : '앞으로'} 옮길까요?`)) return false;
             const oldStart = sp.startDate;
             moves.forEach(m => { const arr = writeSchedules[m.from]; const k = arr.indexOf(m.item); if (k > -1) arr.splice(k, 1); if (arr.length === 0) delete writeSchedules[m.from]; });
             moves.forEach(m => { const nd = spanDateAdd(m.from, offset); m.item.date = nd; (writeSchedules[nd] = writeSchedules[nd] || []).push(m.item); });
@@ -19903,6 +19902,20 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             closeWriteYearCal();
             renderWriteCalendar();
         }
+        // 연간 달력 카드 글씨: 가장 넓은 5글자 제목이 칸 폭을 꽉 채우도록 한 번에 크기를 정한다 (글꼴이 바뀌어도 맞음)
+        function fitWriteYearChips() {
+            const body = document.getElementById('write-year-body'); if (!body) return;
+            const chips = [...body.querySelectorAll('.wy-c')]; if (!chips.length) { body.style.removeProperty('--wy-fs'); return; }
+            const cs = getComputedStyle(chips[0]);
+            const probe = document.createElement('span');
+            probe.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;font-weight:700;font-family:' + cs.fontFamily + ';letter-spacing:-.04em;font-size:20px';
+            document.body.appendChild(probe);
+            let maxW = 0; chips.forEach(c => { probe.textContent = c.textContent; maxW = Math.max(maxW, probe.getBoundingClientRect().width); });
+            probe.remove();
+            const avail = Math.min(...chips.map(c => c.clientWidth)) - 2;
+            if (maxW > 0 && avail > 0) body.style.setProperty('--wy-fs', Math.max(8, Math.min(18, 20 * avail / maxW)).toFixed(2) + 'px');
+        }
+        window.addEventListener('resize', () => { try { const pg = document.getElementById('write-year-page'); if (pg && pg.style.display !== 'none') fitWriteYearChips(); } catch (e) {} });
         function renderWriteYearCal() {
             const y = writeYearView, body = document.getElementById('write-year-body');
             const lbl = document.getElementById('write-year-label'); if (lbl) lbl.textContent = y + '년';
@@ -19951,6 +19964,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                     <table><thead><tr><th class="wy-sun">일</th><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th class="wy-sat">토</th></tr></thead><tbody>${trs.join('')}</tbody></table></div>`;
             }
             body.innerHTML = html + '</div>';
+            requestAnimationFrame(fitWriteYearChips); setTimeout(fitWriteYearChips, 80);
         }
 
         function openYearTimeline() {
@@ -23336,9 +23350,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                 if (hit) moves.push({ from: ds, item: it });
             }));
             if (!moves.length) return false;
-            const label = writeMoveMode === 'work' ? '이 작품의 일정 전체' : '이 날짜 뒤의 모든 일정';
             const spanHits = (writeSpans || []).filter(sp => writeMoveMode === 'work' ? (sp.workId && baseOf(sp.workId) === wBase) : sp.startDate >= data.originDate);
-            if (!confirm(`${label}(카드 ${moves.length}개${spanHits.length ? ', 기간 일정 ' + spanHits.length + '개' : ''})를 ${Math.abs(offset)}일 ${offset > 0 ? '뒤로' : '앞으로'} 옮길까요?`)) return true;
             moves.forEach(m => { const arr = writeSchedules[m.from]; const k = arr.indexOf(m.item); if (k > -1) arr.splice(k, 1); if (arr.length === 0) delete writeSchedules[m.from]; });
             moves.forEach(m => { const nd = spanDateAdd(m.from, offset); m.item.date = nd; (writeSchedules[nd] = writeSchedules[nd] || []).push(m.item); });
             spanHits.forEach(sp => { sp.startDate = spanDateAdd(sp.startDate, offset); sp.endDate = spanDateAdd(sp.endDate, offset); });

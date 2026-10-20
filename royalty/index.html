@@ -85,6 +85,30 @@
         /* 창 오른쪽 세로 스크롤 막대(PC 앱·웹 공통): 테마마다 어울리는 둥근 알약 모양 */
         /* 창 스크롤 막대는 body 가 맡는다(body 에 overflow 가 있어서 브라우저가 body 를 '화면 스크롤 담당'으로 본다) */
         html::-webkit-scrollbar, body::-webkit-scrollbar { width: 14px; height: 14px; }
+        /* 연간 집필 일정 '가정표' */
+        .tl-scn-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 8px; }
+        .tl-scn-bar button { padding: 4px 12px; border-radius: 999px; border: 1.4px dashed rgba(120,100,70,.45); background: #FFFCF4; color: #6b5a43; font-size: 12px; font-weight: 800; white-space: nowrap; }
+        .tl-scn-bar button:hover { background: #FFF3D1; }
+        .tl-scn-bar button.on { background: #FFE9B8; border-style: solid; color: #5b3d10; }
+        .tl-scn-bar button.scn.on { background: #FFD9A0; }
+        .tl-scn-bar button.add { color: #9a6a20; } .tl-scn-bar .spacer { flex: 1; }
+        .tl-scn-bar button.wi-del { color: #c04040; }
+        .tl-scn-bar .tl-scn-hint { font-size: 11.5px; color: #9a6a20; font-weight: 700; }
+        #year-timeline-content.tl-whatif-on { outline: 3px dashed #F0A040; outline-offset: -8px; }
+        #tl-whatif-panel { margin: 0 0 10px; padding: 10px 12px; border: 1.5px dashed #E0A050; border-radius: 12px; background: #FFF7E6; }
+        #tl-whatif-panel .wi-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 12px; color: #7a5a30; margin-bottom: 8px; }
+        #tl-whatif-panel .wi-head > span { flex: 1 1 320px; }
+        #tl-whatif-panel button { padding: 3px 10px; border-radius: 8px; border: 1.2px solid rgba(120,90,40,.4); background: #fff; font-size: 12px; font-weight: 700; color: #6b4a1a; }
+        #tl-whatif-panel button:hover { background: #FFF3D1; }
+        #tl-whatif-panel .wi-wrap { max-height: 190px; overflow-y: auto; }
+        #tl-whatif-panel table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        #tl-whatif-panel th { text-align: left; padding: 3px 6px; color: #8a6a3a; font-weight: 800; position: sticky; top: 0; background: #FFF7E6; }
+        #tl-whatif-panel td { padding: 3px 6px; border-top: 1px dotted rgba(120,90,40,.3); vertical-align: middle; white-space: nowrap; }
+        #tl-whatif-panel td small { display: block; color: #9a8a70; font-size: 10px; }
+        #tl-whatif-panel .wi-in { border: 1px solid rgba(120,90,40,.35); border-radius: 6px; padding: 2px 6px; background: #fff; font-size: 12px; max-width: 100%; }
+        #tl-whatif-panel .wi-t { width: 170px; } #tl-whatif-panel .wi-n { width: 78px; } #tl-whatif-panel .wi-big { width: 96px; font-weight: 800; }
+        #tl-whatif-panel .wi-act button { margin-right: 4px; } #tl-whatif-panel .wi-del { color: #c04040; }
+        #tl-whatif-panel .wi-empty { text-align: center; padding: 14px; color: #9a8a70; }
         /* PC 앱: 제목 줄이 없어서 맨 위 띠를 끌면 창이 움직이고, 오른쪽 위 창 버튼 자리는 비워 둔다 */
         body.electron-app::before { content: ''; position: fixed; top: 0; left: 0; right: 140px; height: 12px; -webkit-app-region: drag; z-index: 9990; }
         body.electron-app main { padding-top: 30px; }
@@ -8317,6 +8341,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                 </div>
             </div>
 
+            <div id="tl-scn-bar" class="tl-scn-bar"></div>
             <div id="year-timeline-body" class="flex-1 overflow-y-auto overflow-x-hidden scroll-invisible"></div>
 
             <div class="mt-3 pt-3 border-t border-slate-100 flex items-center gap-4 text-xs text-slate-400 shrink-0">
@@ -8444,7 +8469,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="text-sm font-bold text-slate-600 block mb-1">시작일</label>
-                        <input type="date" id="span-start-input" oninput="updateSpanPreview()" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:border-amber-400">
+                        <input type="date" id="span-start-input" oninput="onSpanStartChanged(); updateSpanPreview()" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:border-amber-400">
                     </div>
                     <div>
                         <label class="text-sm font-bold text-slate-600 block mb-1">종료일</label>
@@ -8830,6 +8855,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
         // 🟢 [NEW] 기간 일정(긴 일정) — 집필 달력 위에 여러 날에 걸쳐 길게 표시되는 막대.
         // { id, title, workId, startDate, endDate, restPerWeek, dailyChars, color, memo }
         let writeSpans = [];
+        let timelineScenarios = [];   // 연간 집필 일정 '가정표' 목록 [{ id, name, spans:[...] }] — 실제 일정과 완전히 분리된 복사본
         let taskSchedules = {};
         // [NEW] 집필 카운터 초기화 기준점 — storageKey별로 "이 값까지는 카운터에서 뺀다"를 저장.
         // 실제 글자수 기록(writerDailyData)은 그대로 두고, 진행률/카운터 표시만 0부터 다시 세게 하기 위함.
@@ -9027,7 +9053,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                     const dataToSave = { settingsPresets, uiTheme: { theme: activeTheme, customColor: localStorage.getItem('custom_color_v6') || '', bgMain: document.documentElement.style.getPropertyValue('--bg-main').trim() || localStorage.getItem('bg_main_v6') || '', appFont: localStorage.getItem('app_font_v1') || '', menuFont: localStorage.getItem('menu_font_v1') || '' },
                         masterWorks, monthlyData, years, publisherData, analysisData, 
                         publisherSortOrder, publisherCardSortOrder, publisherViewMode, genreList, genreBadgeOpacity, tableFontSettings, crosshairSettings,
-                        writeSchedules, writeSpans, writeVolumes, writeMergedVolumeWorks, taskSchedules, contacts, penNames, widgetSettingsData, ddayCardDesigns, ddayCardFonts, modalDesign, calCardDesigns, calCardFonts, calCardSizes, writeCardSettings, taskCardSettings, taskColors: TASK_COLORS, taskCategoryList, writeColors: WRITE_COLORS, writeCategoryList,
+                        writeSchedules, writeSpans, timelineScenarios, writeVolumes, writeMergedVolumeWorks, taskSchedules, contacts, penNames, widgetSettingsData, ddayCardDesigns, ddayCardFonts, modalDesign, calCardDesigns, calCardFonts, calCardSizes, writeCardSettings, taskCardSettings, taskColors: TASK_COLORS, taskCategoryList, writeColors: WRITE_COLORS, writeCategoryList,
                         writerWorks, writerDailyData, writerGlobalDailyGoal, writeCounterBase, writeCounterResetDate, submissions, webtoonSubs, webtoonSubOrder, incomeGoals, taxSettings, taxGoalMemos, charGoals, writerLastWorkKey, taxGoalItems, contactSortMode, webtoonManage, webtoonCardSettings, penNameColorOverrides, webtoonViewFilter, webtoonSortMode, workManage, workManageCardSettings, workManageViewFilter, workManageSortMode, refSchedWorks, refSchedHidden
                     };
                     const jsonStr = JSON.stringify(dataToSave);
@@ -9095,6 +9121,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             if (parsed.crosshairSettings) crosshairSettings = parsed.crosshairSettings;
             writeSchedules = parsed.writeSchedules || {};
             writeSpans = parsed.writeSpans || [];
+            timelineScenarios = Array.isArray(parsed.timelineScenarios) ? parsed.timelineScenarios : [];
             try { migrateAllSpanColors(); } catch (e) { /* 아직 준비 전이면 그릴 때 다시 변환 */ }
             writeVolumes = parsed.writeVolumes || {};
             writeMergedVolumeWorks = parsed.writeMergedVolumeWorks || {};
@@ -9839,7 +9866,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
         function downloadBackup() { 
             const data = { settingsPresets, 
                 masterWorks, monthlyData, years, publisherData, analysisData, publisherSortOrder, publisherCardSortOrder, publisherViewMode, genreList, theme: localStorage.getItem('theme_v6'), customColor: localStorage.getItem('custom_color_v6'), genreBadgeOpacity, bgMain: localStorage.getItem('bg_main_v6'), tableFontSettings, crosshairSettings, 
-                writeSchedules, writeSpans, writeVolumes, writeMergedVolumeWorks, taskSchedules, writeCardSettings, taskCardSettings, taskColors: TASK_COLORS, taskCategoryList, writeColors: WRITE_COLORS, writeCategoryList,
+                writeSchedules, writeSpans, timelineScenarios, writeVolumes, writeMergedVolumeWorks, taskSchedules, writeCardSettings, taskCardSettings, taskColors: TASK_COLORS, taskCategoryList, writeColors: WRITE_COLORS, writeCategoryList,
                 contacts, penNames, widgetSettingsData, ddayCardDesigns, ddayCardFonts, modalDesign, calCardDesigns, calCardFonts, calCardSizes, submissions, webtoonSubs, webtoonSubOrder, contactSortMode, webtoonViewFilter, webtoonSortMode,
                 // [FIX] 글자수 관리 탭 데이터가 백업에서 빠져있던 문제 수정 — 아래 항목들이 누락되어 있었음
                 writerWorks, writerDailyData, writerGlobalDailyGoal, writeCounterBase, writeCounterResetDate, writerLastWorkKey,
@@ -19778,13 +19805,135 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
         const TL_MIN_DAYS = 3;    // 이 일수 이하 짧은 일정은 막대로 표시하지 않음
         const TL_LIGHT_WEEKLY = 10000;   // 일주일 평균 이 글자수 미만인 집필 구간(예: 주 1회 4천자)은 연간 일정·쉬는 구간에서 뺀다
 
+        // ══ 연간 집필 일정 '가정표' ══
+        // '가정표 1·2…'는 실제 일정을 통째로 복사한, 이름 붙은 별도 일정표다.
+        // 가정표를 열어 둔 동안에는 writeSpans / writeSchedules 가 그 가정표의 복사본을 가리킨다 → 연간 일정의 기존 기능(막대 끌어 옮기기·양끝 조절·눌러서 편집·기간 일정 추가)이 그대로 가정표 안에서만 동작한다.
+        // 저장(runSave)·백업은 항상 실제 일정으로 되돌려 놓고 처리하므로 실제 일정·월간 달력은 절대 바뀌지 않는다.
+        const timelineWhatIf = { on: false, id: null };
+        let _wiReal = null;     // 가정표를 열기 전 실제 데이터 { ws, sp }
+        function tlSched() { return writeSchedules; }
+        function tlSpans() { return writeSpans; }
+        function _wiId() { return 'wi_' + Date.now().toString(36) + Math.floor(Math.random() * 1e5).toString(36); }
+        function _wiCurrentScenario() { return timelineScenarios.find(x => x.id === timelineWhatIf.id) || null; }
+        function wiLeaveScenario() {
+            if (!timelineWhatIf.on || !_wiReal) { timelineWhatIf.on = false; timelineWhatIf.id = null; return; }
+            const sc = _wiCurrentScenario();
+            if (sc) { sc.schedules = writeSchedules; sc.spans = writeSpans; }
+            writeSchedules = _wiReal.ws; writeSpans = _wiReal.sp;
+            _wiReal = null; timelineWhatIf.on = false; timelineWhatIf.id = null;
+            try { renderWriteCalendar(); } catch (e) {}
+        }
+        function wiEnterScenario(sc) {
+            if (timelineWhatIf.on) wiLeaveScenario();
+            _wiReal = { ws: writeSchedules, sp: writeSpans };
+            sc.schedules = sc.schedules || {};
+            writeSchedules = sc.schedules; writeSpans = sc.spans;
+            timelineWhatIf.on = true; timelineWhatIf.id = sc.id;
+        }
+        // 저장·백업은 가정표가 열려 있어도 실제 데이터로 처리하고, 가정표 내용은 가정표 목록 안에만 저장한다
+        (function installWhatIfSaveGuard() {
+            const wrap = (name) => {
+                const orig = window[name] || (typeof eval(name) === 'function' ? eval(name) : null); if (!orig) return;
+                const guarded = function (...args) {
+                    if (!timelineWhatIf.on || !_wiReal) return orig.apply(this, args);
+                    const sc = _wiCurrentScenario(); const sw = { ws: writeSchedules, sp: writeSpans };
+                    if (sc) { sc.schedules = sw.ws; sc.spans = sw.sp; sc.updated = Date.now(); }
+                    writeSchedules = _wiReal.ws; writeSpans = _wiReal.sp;
+                    try { return orig.apply(this, args); } finally { writeSchedules = sw.ws; writeSpans = sw.sp; }
+                };
+                if (name === 'runSave') runSave = guarded; else if (name === 'downloadBackup') downloadBackup = guarded;
+            };
+            wrap('runSave'); wrap('downloadBackup');
+        })();
+        // 실제 일정을 복사한 블록 묶음 {spans, schedules}: 카드로 확정된 일정은 같은 모양의 '기간 일정' 블록으로, 카드 없는 기간 일정은 그대로 복사 (모두 새 id → 실제 데이터와 연결 없음)
+        function _wiBuildCopy() {
+            const real = timelineWhatIf.on && _wiReal ? _wiReal : { ws: writeSchedules, sp: writeSpans };
+            const swapped = timelineWhatIf.on && _wiReal;
+            const keepWs = writeSchedules, keepSp = writeSpans;
+            if (swapped) { writeSchedules = real.ws; writeSpans = real.sp; }
+            try {
+                const years = new Set(); Object.keys(writeSchedules).forEach(d => years.add(Number(d.slice(0, 4))));
+                (writeSpans || []).forEach(sp => { years.add(Number(sp.startDate.slice(0, 4))); years.add(Number(sp.endDate.slice(0, 4))); });
+                years.add(timelineYear);
+                const confirmedIds = new Set(); Object.values(writeSchedules).forEach(l => (l || []).forEach(c => { if (c.spanId) confirmedIds.add(c.spanId); }));
+                const out = [];
+                (writeSpans || []).filter(sp => !confirmedIds.has(sp.id)).forEach(sp => out.push({ ...JSON.parse(JSON.stringify(sp)), id: _wiId() }));
+                [...years].sort().forEach(y => {
+                    const data = buildYearTimelineData(y);
+                    data.items.filter(it => it.kind === 'work' && it.group === 'write').forEach(it => {
+                        const base = { id: _wiId(), title: it.title || '', workId: it.workId, startDate: tlIndexToDate(it.startIdx, y), endDate: tlIndexToDate(it.endIdx, y),
+                            type: 'write', restMode: 'weekly', restWeekdays: [], restPerWeek: 0, midBreaks: [], dailyRanges: [], dailyChars: 0, dailySplit: 1, color: it.color || '#E2D1A0', memo: '' };
+                        const span = it.endIdx - it.startIdx + 1, rest = Math.max(0, span - (it.days || span));
+                        base.restPerWeek = Math.min(7, Math.round(7 * rest / span));
+                        const st = calcSpanStats(base);
+                        base.dailyChars = st.workDays ? Math.round((it.chars || 0) / st.workDays) : 0;
+                        out.push(base);
+                    });
+                });
+                return out;
+            } finally { if (swapped) { writeSchedules = keepWs; writeSpans = keepSp; } }
+        }
+        function wiSelectScenario(id) {             // id 가 null 이면 실제 일정
+            const sc = id ? timelineScenarios.find(x => x.id === id) : null;
+            if (sc) wiEnterScenario(sc); else wiLeaveScenario();
+            renderTimelineWhatIfPanel(); renderYearTimeline();
+        }
+        function wiNewScenario() {
+            let n = 1; while (timelineScenarios.some(x => x.name === '가정표 ' + n)) n++;
+            const sc = { id: 'scn_' + Date.now().toString(36), name: '가정표 ' + n, spans: _wiBuildCopy(), schedules: {}, created: Date.now() };
+            timelineScenarios.push(sc); save(true); wiSelectScenario(sc.id);
+        }
+        function wiDuplicateScenario() {
+            const cur = _wiCurrentScenario(); if (!cur) return;
+            let n = 1; while (timelineScenarios.some(x => x.name === cur.name + ' 복사' + (n > 1 ? n : ''))) n++;
+            const copySpans = JSON.parse(JSON.stringify(writeSpans)).map(x => ({ ...x, id: _wiId() }));
+            const sc = { id: 'scn_' + Date.now().toString(36), name: cur.name + ' 복사' + (n > 1 ? n : ''), spans: copySpans, schedules: JSON.parse(JSON.stringify(writeSchedules)), created: Date.now() };
+            timelineScenarios.push(sc); save(true); wiSelectScenario(sc.id);
+        }
+        function wiRenameScenario() {
+            const cur = _wiCurrentScenario(); if (!cur) return;
+            const nm = prompt('가정표 이름', cur.name); if (nm === null) return;
+            cur.name = nm.trim() || cur.name; save(true); renderTimelineWhatIfPanel();
+        }
+        function wiDeleteScenario() {
+            const cur = _wiCurrentScenario(); if (!cur) return;
+            if (!confirm(`「${cur.name}」을(를) 지울까요? (실제 일정은 그대로예요)`)) return;
+            wiLeaveScenario();
+            timelineScenarios = timelineScenarios.filter(x => x.id !== cur.id); save(true);
+            renderTimelineWhatIfPanel(); renderYearTimeline();
+        }
+        function wiRecopyScenario() {
+            const cur = _wiCurrentScenario(); if (!cur) return;
+            if (!confirm(`「${cur.name}」의 내용을 지우고, 지금 실제 일정을 다시 복사해 올까요?`)) return;
+            const fresh = _wiBuildCopy();
+            writeSpans = fresh; writeSchedules = {}; cur.spans = fresh; cur.schedules = writeSchedules; save(true);
+            renderTimelineWhatIfPanel(); renderYearTimeline();
+        }
+        function wiAddBlock() {                     // 기간 일정 추가 창을 열어, 가정표에 블록(카드)을 하나 더한다
+            const now = new Date();
+            const ds = timelineYear === now.getFullYear() ? getYYYYMMDD(now) : `${timelineYear}-01-01`;
+            openWriteSpanModal(null, ds);
+        }
+        function renderTimelineWhatIfPanel() {
+            const bar = document.getElementById('tl-scn-bar');
+            const content = document.getElementById('year-timeline-content');
+            if (content) content.classList.toggle('tl-whatif-on', timelineWhatIf.on);
+            if (!bar) return;
+            const esc = escapeHtml;
+            bar.innerHTML = `<button class="${timelineWhatIf.on ? '' : 'on'}" onclick="wiSelectScenario(null)">실제 일정</button>` +
+                timelineScenarios.map(sc => `<button class="${timelineWhatIf.id === sc.id ? 'on scn' : 'scn'}" onclick="wiSelectScenario('${sc.id}')">🧪 ${esc(sc.name)}</button>`).join('') +
+                `<button class="add" onclick="wiNewScenario()" title="지금 실제 일정을 통째로 복사해서 새 가정표를 만들어요. 그 안에서 마음대로 고쳐도 실제 일정은 그대로예요">＋ 가정표 만들기</button>` +
+                (timelineWhatIf.on ? `<span class="spacer"></span><span class="tl-scn-hint">카드를 끌거나 눌러서 고쳐 보세요 · 실제 일정에는 반영되지 않아요</span><button class="add" onclick="wiAddBlock()">＋ 블록 추가</button><button onclick="wiRenameScenario()">이름 바꾸기</button><button onclick="wiDuplicateScenario()">복제</button><button onclick="wiRecopyScenario()" title="이 가정표를 지우고 지금 실제 일정을 다시 복사">실제 일정으로 다시 복사</button><button class="wi-del" onclick="wiDeleteScenario()">가정표 지우기</button>` : '');
+        }
         function openYearTimeline() {
             timelineYear = writeCalDate.getFullYear();
             // 창을 먼저 띄워야 실제 너비를 잴 수 있다 (가로 스크롤 없이 딱 맞추기 위함)
             document.getElementById('year-timeline-modal').classList.add('open');
+            wiLeaveScenario();
+            renderTimelineWhatIfPanel();
             requestAnimationFrame(renderYearTimeline);
         }
-        function closeYearTimeline() { document.getElementById('year-timeline-modal').classList.remove('open'); }
+        function closeYearTimeline() { document.getElementById('year-timeline-modal').classList.remove('open'); wiLeaveScenario(); }
         function changeTimelineYear(delta) { timelineYear += delta; renderYearTimeline(); }
 
         function tlIsLeap(y) { return (y%4===0 && y%100!==0) || y%400===0; }
@@ -19816,7 +19965,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
 
             // ── 1) 그 해 집필 카드들을 작품별로 모은다
             const groups = {};
-            Object.entries(writeSchedules).forEach(([dateStr, list]) => {
+            Object.entries(tlSched()).forEach(([dateStr, list]) => {
                 if (!dateStr.startsWith(`${y}-`)) return;
                 (list || []).forEach(s => {
                     if (!isScheduleWorkValid(s.workId)) return;
@@ -19912,7 +20061,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             // ── 3) 기간 일정도 같은 줄에 함께 얹는다
             const spans = [];
             const midBreakSegs = [];   // 기간 일정 중간에 넣어둔 '중간 휴식 기간'만 따로 모아서, 쉬는 구간 줄에도 노란 빗금으로 표시
-            writeSpans
+            tlSpans()
                 .filter(s => s.startDate <= `${y}-12-31` && s.endDate >= `${y}-01-01`)
                 .filter(s => !tlIsExcludedWork(s.workId))   // 초단편에 연결된 기간 일정도 제외
                 .sort((a, b) => a.startDate.localeCompare(b.startDate))
@@ -20022,7 +20171,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
 
             // ── 5) 월별 목표 글자수 (집필 카드 기준)
             const monthly = new Array(12).fill(0).map(() => ({ chars: 0, days: new Set() }));
-            Object.entries(writeSchedules).forEach(([dateStr, list]) => {
+            Object.entries(tlSched()).forEach(([dateStr, list]) => {
                 if (!dateStr.startsWith(`${y}-`)) return;
                 const m = Number(dateStr.slice(5, 7)) - 1;
                 (list || []).forEach(s => {
@@ -20067,7 +20216,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
 
             // 아직 카드로 안 만들어진(확정 안 된) 집필형 기간 일정 — 작품 연결 여부로 계약작/자유작을 가른다
             const confirmedSpanIds = new Set();
-            Object.values(writeSchedules).forEach(list => (list || []).forEach(s => { if (s.spanId) confirmedSpanIds.add(s.spanId); }));
+            Object.values(tlSched()).forEach(list => (list || []).forEach(s => { if (s.spanId) confirmedSpanIds.add(s.spanId); }));
             const pendingWriteSpans = spans.filter(sp => (sp.span.type || 'write') === 'write' && !confirmedSpanIds.has(sp.span.id));
             const contractSpans = pendingWriteSpans.filter(sp => sp.span.workId && !confirmedWorkIds.has(sp.span.workId));
             const freeSpans = pendingWriteSpans.filter(sp => !sp.span.workId);
@@ -20469,7 +20618,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
 
             // 월별 목표 — 확정(카드) 글자수와 예정(아직 카드 없는 집필형 기간 일정) 글자수를 나눠서 같이 보여준다
             const confirmedSpanIdsForMonth = new Set();
-            Object.values(writeSchedules).forEach(list => (list || []).forEach(s => { if (s.spanId) confirmedSpanIdsForMonth.add(s.spanId); }));
+            Object.values(tlSched()).forEach(list => (list || []).forEach(s => { if (s.spanId) confirmedSpanIdsForMonth.add(s.spanId); }));
             const pendingWriteSpans = spans.filter(sp => (sp.span.type || 'write') === 'write' && !confirmedSpanIdsForMonth.has(sp.span.id));
             const monthRows = Array.from({ length: 12 }, (_, m) => {
                 const monthStr = `${y}-${String(m + 1).padStart(2, '0')}`;
@@ -20548,7 +20697,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
 
             const win = frame.contentWindow;
             win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
-                <title>${timelineYear}년 집필 일정</title>
+                <title>${timelineYear}년 집필 일정${(timelineWhatIf.on && _wiCurrentScenario()) ? ' - ' + _wiCurrentScenario().name : ''}</title>
                 <style>
                     @page { size: A4 landscape; margin: 10mm; }
                     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; box-sizing: border-box; }
@@ -21316,7 +21465,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             // ── 헤더
             c.fillStyle = '#fffbeb'; c.fillRect(0, 0, W, 116);
             c.fillStyle = '#f59e0b'; c.fillRect(0, 0, W, 5);
-            text(`${y}년 집필 일정표`, PAD, 46, { size: 32, weight: '800', color: '#78350f' });
+            text(`${y}년 집필 일정표${(typeof timelineWhatIf !== 'undefined' && timelineWhatIf.on && _wiCurrentScenario()) ? '  🧪 ' + _wiCurrentScenario().name : ''}`, PAD, 46, { size: 32, weight: '800', color: '#78350f' });
             text(`작성일 ${getYYYYMMDD(new Date())} · 루시 다이어리 집필 관리`, PAD, 82, { size: 14, color: '#a16207' });
             text(`작품 ${d.works.length}편 · 기간 일정 ${d.spans.length}건`, W - PAD, 46, { size: 16, weight: '700', color: '#92400e', align: 'right' });
             text(`총 목표 ${num(d.totalChars)}자`, W - PAD, 78, { size: 22, weight: '800', color: '#b45309', align: 'right' });
@@ -21424,7 +21573,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                 if (!blob) { alert('이미지 생성에 실패했습니다.'); return; }
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
-                a.href = url; a.download = `집필일정_${y}년.png`;
+                a.href = url; a.download = `집필일정_${y}년${(timelineWhatIf.on && _wiCurrentScenario()) ? '_' + _wiCurrentScenario().name.replace(/[\/:*?"<>|]/g, '') : ''}.png`;
                 document.body.appendChild(a); a.click(); a.remove();
                 setTimeout(() => URL.revokeObjectURL(url), 1000);
             }, 'image/png');
@@ -21574,12 +21723,12 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
 
         // 기간 일정 종류 — '집필'만 쉬는 날/글자수를 계산하고, 나머지는 기간만 표시
         const SPAN_TYPES = {
-            write:    { label: '집필',      icon: '🖋️', hint: '쉬는 날과 하루 집필량으로 예상 글자수를 계산합니다. (작품을 안 정하면 유동 집필 슬롯으로 취급돼요.)', rest: true,  chars: true },
-            edit:     { label: '교정',      icon: '📝', hint: '쉬는 날은 고를 수 있고, 글자수는 계산하지 않습니다.', rest: true,  chars: false },
-            rest:     { label: '휴식',      icon: '☕', hint: '쉬는 기간으로만 표시합니다.', rest: false, chars: false },
-            trip:     { label: '여행',      icon: '✈️', hint: '기간만 표시합니다.', rest: false, chars: false },
-            synopsis: { label: '시놉/기획', icon: '📓', hint: '기간만 표시합니다. (시놉시스·기획 작업 등)', rest: false, chars: false },
-            etc:      { label: '기타',      icon: '💗', hint: '기간만 표시합니다. (자료조사·미팅 등)', rest: false, chars: false }
+            write:    { label: '집필',      icon: '♥︎', hint: '쉬는 날과 하루 집필량으로 예상 글자수를 계산합니다. (작품을 안 정하면 유동 집필 슬롯으로 취급돼요.)', rest: true,  chars: true },
+            edit:     { label: '교정',      icon: '★︎', hint: '쉬는 날은 고를 수 있고, 글자수는 계산하지 않습니다.', rest: true,  chars: false },
+            rest:     { label: '휴식',      icon: '☁︎', hint: '쉬는 기간으로만 표시합니다.', rest: false, chars: false },
+            trip:     { label: '여행',      icon: '✿︎', hint: '기간만 표시합니다.', rest: false, chars: false },
+            synopsis: { label: '시놉/기획', icon: '✧︎', hint: '기간만 표시합니다. (시놉시스·기획 작업 등)', rest: false, chars: false },
+            etc:      { label: '기타',      icon: '♪︎', hint: '기간만 표시합니다. (자료조사·미팅 등)', rest: false, chars: false }
         };
         let currentSpanType = 'write';
 
@@ -22024,6 +22173,13 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
         }
 
         // 모달에서 값이 바뀔 때마다 "총 며칠 / 며칠 집필 / 몇 자" 미리보기 갱신
+        // 새 기간 일정(블록)을 만들 때 시작일을 고르면 종료일을 자동으로 일주일 뒤로 맞춘다 (기존 일정을 고칠 때는 건드리지 않는다)
+        function onSpanStartChanged() {
+            if (currentEditSpanId) return;
+            const st = document.getElementById('span-start-input'), en = document.getElementById('span-end-input');
+            if (!st || !en || !st.value) return;
+            en.value = spanDateAdd(st.value, 7);
+        }
         function updateSpanPreview() {
             const start = document.getElementById('span-start-input').value;
             const end = document.getElementById('span-end-input').value;
@@ -22270,7 +22426,8 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                     : `${st.totalDays}일`;
                 p.info = {
                     sType, spanWork, spanTitle,
-                    headText: `${sType.icon} ${spanTitle}${spanTitle && spanWork ? ' · ' : ''}${spanWork}`,
+                    typeTag: (['edit', 'synopsis', 'rest'].includes(s.type || 'write') && spanTitle !== sType.label) ? sType.label : '',
+                    headText: `${sType.icon} ${(['edit', 'synopsis', 'rest'].includes(s.type || 'write') && spanTitle !== sType.label) ? sType.label + (spanTitle || spanWork ? ' · ' : '') : ''}${spanTitle}${spanTitle && spanWork ? ' · ' : ''}${spanWork}`,
                     statText: st.noChars ? daysTxt : `${daysTxt} · ${st.totalChars.toLocaleString()}자${cumText}`
                 };
                 p.info.label = `${p.info.headText} · ${p.info.statText}`;
@@ -22368,7 +22525,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                     let segText;
                     if (isFirstSeg) segText = `${lead}${p.statsNextRow ? headText : label}`;
                     else if (isSecondSeg && p.statsNextRow) segText = `↪ ${label}`;
-                    else segText = `↪ ${sType.icon} ${spanTitle || spanWork}`;
+                    else segText = `↪ ${sType.icon} ${p.info.typeTag ? p.info.typeTag + ((spanTitle || spanWork) ? ' · ' : '') : ''}${spanTitle || spanWork}`;
                     bar.innerHTML = `<span style="padding:0 10px 0 16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${segText}</span>`;
                     // 막대 몸통을 잡고 끌면 일정 전체가 통째로 옮겨진다 (그냥 클릭하면 편집 창)
                     bar.onmousedown = (e) => startSpanMove(e, s.id);

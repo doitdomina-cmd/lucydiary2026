@@ -8469,7 +8469,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="text-sm font-bold text-slate-600 block mb-1">시작일</label>
-                        <input type="date" id="span-start-input" oninput="updateSpanPreview()" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:border-amber-400">
+                        <input type="date" id="span-start-input" oninput="onSpanStartChanged(); updateSpanPreview()" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:border-amber-400">
                     </div>
                     <div>
                         <label class="text-sm font-bold text-slate-600 block mb-1">종료일</label>
@@ -22173,6 +22173,13 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
         }
 
         // 모달에서 값이 바뀔 때마다 "총 며칠 / 며칠 집필 / 몇 자" 미리보기 갱신
+        // 새 기간 일정(블록)을 만들 때 시작일을 고르면 종료일을 자동으로 일주일 뒤로 맞춘다 (기존 일정을 고칠 때는 건드리지 않는다)
+        function onSpanStartChanged() {
+            if (currentEditSpanId) return;
+            const st = document.getElementById('span-start-input'), en = document.getElementById('span-end-input');
+            if (!st || !en || !st.value) return;
+            en.value = spanDateAdd(st.value, 7);
+        }
         function updateSpanPreview() {
             const start = document.getElementById('span-start-input').value;
             const end = document.getElementById('span-end-input').value;

@@ -85,6 +85,22 @@
         /* 창 오른쪽 세로 스크롤 막대(PC 앱·웹 공통): 테마마다 어울리는 둥근 알약 모양 */
         /* 창 스크롤 막대는 body 가 맡는다(body 에 overflow 가 있어서 브라우저가 body 를 '화면 스크롤 담당'으로 본다) */
         html::-webkit-scrollbar, body::-webkit-scrollbar { width: 14px; height: 14px; }
+        /* 연간 집필 달력(12개월 한 장) */
+        #write-year-modal .wy-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 18px 20px; padding: 2px 4px 8px; }
+        #write-year-modal .wy-mt { display: inline-block; font-weight: 800; font-size: 1.15rem; color: var(--primary); margin: 0 0 6px; cursor: pointer; }
+        #write-year-modal .wy-mt small { font-size: .7rem; font-weight: 700; color: #8a7a66; margin-left: 8px; }
+        #write-year-modal table { width: 100%; border-collapse: separate; border-spacing: 3px; table-layout: fixed; }
+        #write-year-modal th { font-size: 11px; font-weight: 700; color: #8a7a66; padding: 2px 0; border: 1px dashed rgba(120,100,70,.3); border-radius: 7px; background: #FFFCF4; }
+        #write-year-modal th.wy-sun { color: #d4736c; } #write-year-modal th.wy-sat { color: #5b8fd0; }
+        #write-year-modal td { padding: 2px 2px 3px; vertical-align: top; height: 58px; text-align: center; font-size: 10.5px; border: 1px dashed rgba(120,100,70,.3); border-radius: 9px; background: #FFFCF4; cursor: pointer; overflow: hidden; }
+        #write-year-modal td.wy-e { background: transparent; border-color: transparent; cursor: default; }
+        #write-year-modal td.has { border-style: solid; border-color: rgba(200,170,110,.6); background: #FFFAF0; }
+        #write-year-modal td.today { outline: 2px solid var(--primary); outline-offset: -2px; }
+        #write-year-modal td:not(.wy-e):hover { background: #FFF3D1; }
+        #write-year-modal i.dn { font-style: normal; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: color-mix(in srgb, var(--primary) 60%, #ffffff); color: #fff; font-size: 10.5px; font-weight: 700; }
+        #write-year-modal .wy-c { display: block; margin: 2px 1px 0; padding: 1px 3px; border-radius: 4px; font-size: 10px; font-weight: 700; color: #4a4036; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; box-shadow: 0 1px 2px rgba(0,0,0,.14); }
+        #write-year-modal .wy-more { display: block; font-size: 9.5px; color: #8a7a66; font-weight: 700; }
+        #write-year-modal .wy-s { display: block; height: 4px; margin: 3px 0 0; border-radius: 2px; }
         /* PC 앱: 제목 줄이 없어서 맨 위 띠를 끌면 창이 움직이고, 오른쪽 위 창 버튼 자리는 비워 둔다 */
         body.electron-app::before { content: ''; position: fixed; top: 0; left: 0; right: 140px; height: 12px; -webkit-app-region: drag; z-index: 9990; }
         body.electron-app main { padding-top: 30px; }
@@ -5703,6 +5719,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                             </div>
                             <div id="write-nav-pill" class="flex items-center bg-slate-100 rounded-lg p-1">
                                 <button type="button" class="wr-timeline-btn" onclick="openYearTimeline()" title="연간 일정 한눈에 보기"><i class="fa-solid fa-calendar-days"></i></button>
+                                <button type="button" class="wr-timeline-btn" onclick="openWriteYearCal()" title="1년 달력을 한 장으로 보기"><i class="fa-solid fa-table-cells"></i></button>
                                 <button onclick="changeWriteMonth(-1)" class="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-white rounded-md transition-all"><i class="fa-solid fa-chevron-left"></i></button>
                                 <span id="write-cal-title" class="px-4 font-bold text-slate-700 w-32 text-center">2026년 5월</span>
                                 <button onclick="changeWriteMonth(1)" class="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-white rounded-md transition-all"><i class="fa-solid fa-chevron-right"></i></button>
@@ -19777,6 +19794,87 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
         const TL_GAP_MERGE = 7;   // 이 일수 이하로 떨어진 일정은 한 덩어리로 묶어서 표시
         const TL_MIN_DAYS = 3;    // 이 일수 이하 짧은 일정은 막대로 표시하지 않음
         const TL_LIGHT_WEEKLY = 10000;   // 일주일 평균 이 글자수 미만인 집필 구간(예: 주 1회 4천자)은 연간 일정·쉬는 구간에서 뺀다
+
+        // ── 집필 관리: 1년치 달력을 한 장(12개월)으로 보기 ──
+        let writeYearView = new Date().getFullYear();
+        function openWriteYearCal(y) {
+            if (typeof y === 'number') writeYearView = y; else writeYearView = writeCalDate.getFullYear();
+            let ov = document.getElementById('write-year-modal');
+            if (!ov) {
+                ov = document.createElement('div'); ov.id = 'write-year-modal'; ov.className = 'modal-overlay';
+                ov.innerHTML = `<div id="write-year-content" class="modal-content modal-lg" style="max-width: 2100px; width: 96%; height: auto; max-height: calc(100vh - 48px); display:flex; flex-direction:column;">
+                    <div class="flex justify-between items-center mb-3 shrink-0 flex-wrap gap-2">
+                        <div class="flex items-center gap-3">
+                            <h3 class="text-lg font-bold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-table-cells text-emerald-500"></i> 연간 집필 달력</h3>
+                            <div class="flex items-center bg-slate-100 rounded-lg p-1">
+                                <button onclick="openWriteYearCal(writeYearView - 1)" class="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-white rounded-md transition-all"><i class="fa-solid fa-chevron-left"></i></button>
+                                <span id="write-year-label" class="px-4 font-bold text-slate-700 w-24 text-center"></span>
+                                <button onclick="openWriteYearCal(writeYearView + 1)" class="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-white rounded-md transition-all"><i class="fa-solid fa-chevron-right"></i></button>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="text-xs text-slate-400">💡 날짜나 달 이름을 누르면 그 달 달력으로 이동해요</span>
+                            <button onclick="closeWriteYearCal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-times text-xl"></i></button>
+                        </div>
+                    </div>
+                    <div id="write-year-body" class="overflow-y-auto custom-scrollbar flex-1 min-h-0"></div>
+                </div>`;
+                ov.addEventListener('click', e => { if (e.target === ov) closeWriteYearCal(); });
+                document.body.appendChild(ov);
+            }
+            renderWriteYearCal();
+            ov.classList.add('open');
+        }
+        function closeWriteYearCal() { const ov = document.getElementById('write-year-modal'); if (ov) ov.classList.remove('open'); }
+        function writeYearJump(ds) {
+            const [yy, mm] = ds.split('-').map(Number);
+            writeCalDate = new Date(yy, mm - 1, 1);
+            closeWriteYearCal();
+            renderWriteCalendar();
+        }
+        function renderWriteYearCal() {
+            const y = writeYearView, body = document.getElementById('write-year-body');
+            const lbl = document.getElementById('write-year-label'); if (lbl) lbl.textContent = y + '년';
+            if (!body) return;
+            const todayStr = getYYYYMMDD(new Date());
+            const pad = n => String(n).padStart(2, '0');
+            const spans = writeSpans || [];
+            const short = (t, n) => { t = String(t || ''); return t.length > n ? t.slice(0, n - 1) + '…' : t; };
+            let html = '<div class="wy-grid">';
+            for (let m = 0; m < 12; m++) {
+                const first = new Date(y, m, 1).getDay(), days = new Date(y, m + 1, 0).getDate();
+                let goalSum = 0; const arr = [];
+                for (let i = 0; i < first; i++) arr.push('<td class="wy-e"></td>');
+                for (let d = 1; d <= days; d++) {
+                    const ds = `${y}-${pad(m + 1)}-${pad(d)}`;
+                    const items = (writeSchedules[ds] || []).filter(t => { const r = resolveWorkItem(t.workId); return r && r.work; });
+                    let chips = '', shown = 0;
+                    items.forEach(t => {
+                        const r = resolveWorkItem(t.workId);
+                        if (!t.category) goalSum += Number(t.goal) || 0;
+                        if (shown >= 2) return; shown++;
+                        const gc = getGenreColor(r.work.genre);
+                        const label = t.category ? `[${t.category}] ${short(r.displayTitle, 5)}` : `${short(r.displayTitle, 5)} ${(Number(t.goal) || 0).toLocaleString()}`;
+                        const tip = `${r.displayTitle}${t.category ? ' [' + t.category + ']' : ''}${t.goal ? ' · ' + Number(t.goal).toLocaleString() + '자' : ''}`;
+                        chips += `<span class="wy-c" style="background:${hexToRgba(gc, 0.45)}${t.isCompleted ? '; opacity:.6' : ''}" title="${escapeHtml(tip)}">${escapeHtml(label)}</span>`;
+                    });
+                    if (items.length > shown) chips += `<span class="wy-more">+${items.length - shown}</span>`;
+                    let bars = '';
+                    spans.filter(sp => sp.startDate <= ds && sp.endDate >= ds).slice(0, 3).forEach(sp => {
+                        const rw = sp.workId ? resolveWorkItem(sp.workId) : null;
+                        const tt = (sp.title && sp.title !== '(제목 없음)') ? sp.title : (rw && rw.work ? rw.displayTitle : '기간 일정');
+                        bars += `<b class="wy-s" style="background:${spanColorSolid(sp.color)}" title="${escapeHtml(tt)}"></b>`;
+                    });
+                    arr.push(`<td class="wy-d${items.length || bars ? ' has' : ''}${ds === todayStr ? ' today' : ''}" onclick="writeYearJump('${ds}')"><i class="dn">${d}</i>${chips}${bars}</td>`);
+                }
+                while (arr.length % 7) arr.push('<td class="wy-e"></td>');
+                const trs = [];
+                for (let i = 0; i < arr.length; i += 7) trs.push('<tr>' + arr.slice(i, i + 7).join('') + '</tr>');
+                html += `<div class="wy-m"><div class="wy-mt" onclick="writeYearJump('${y}-${pad(m + 1)}-01')">${y}년 ${m + 1}월${goalSum ? `<small>목표 ${goalSum.toLocaleString()}자</small>` : ''}</div>
+                    <table><thead><tr><th class="wy-sun">일</th><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th class="wy-sat">토</th></tr></thead><tbody>${trs.join('')}</tbody></table></div>`;
+            }
+            body.innerHTML = html + '</div>';
+        }
 
         function openYearTimeline() {
             timelineYear = writeCalDate.getFullYear();

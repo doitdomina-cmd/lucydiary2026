@@ -13167,39 +13167,46 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             const worksTab = document.getElementById('tab-works');
             if (worksTab && worksTab.classList.contains('active')) fitWorksPanelsHeight();
         });
+        // 계약 파기 작품 삭제 선택창: 'keep'(카드·금액 남기고 작품 등록에서만 삭제) / 'wipe'(카드·금액까지 모두 삭제) / null(취소)
+        function askBrokenDeleteChoice(title) {
+            return new Promise(resolve => {
+                const ov = document.createElement('div');
+                ov.style.cssText = 'position:fixed;inset:0;background:rgba(30,25,20,.45);z-index:100000;display:flex;align-items:center;justify-content:center;padding:16px;';
+                const box = document.createElement('div');
+                box.style.cssText = 'background:#fffdf7;border-radius:14px;max-width:380px;width:100%;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.25);font-family:inherit;color:#3b342c;';
+                const esc = t => String(t).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+                box.innerHTML = `<div style="font-weight:800;font-size:15px;margin-bottom:6px;">'${esc(title)}' 삭제</div>
+                    <div style="font-size:13px;color:#6b6258;margin-bottom:14px;">어떻게 삭제할까요?</div>
+                    <button data-c="keep" style="display:block;width:100%;text-align:left;padding:11px 13px;margin-bottom:8px;border-radius:10px;border:1.5px solid #d9cfb8;background:#fff8e1;cursor:pointer;font-size:13px;line-height:1.45;"><b>카드와 정산 금액은 남기고, 작품 등록에서만 삭제</b><br><span style="color:#8a7f70;font-size:12px;">웹툰 관리의 '계약 파기' 카드와 받은 금액은 그대로 남아요.</span></button>
+                    <button data-c="wipe" style="display:block;width:100%;text-align:left;padding:11px 13px;margin-bottom:8px;border-radius:10px;border:1.5px solid #e5b9b9;background:#fdeeee;cursor:pointer;font-size:13px;line-height:1.45;"><b style="color:#b42318;">파기 카드와 정산 금액까지 모두 삭제</b><br><span style="color:#8a7f70;font-size:12px;">수입 총합에서도 빠지고 되돌릴 수 없어요.</span></button>
+                    <button data-c="cancel" style="display:block;width:100%;padding:10px;border-radius:10px;border:1.5px solid #ddd6c8;background:#fff;cursor:pointer;font-size:13px;font-weight:700;">취소</button>`;
+                const done = v => { document.removeEventListener('keydown', onKey, true); ov.remove(); resolve(v); };
+                const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); done(null); } };
+                box.querySelectorAll('button').forEach(b => b.onclick = () => done(b.dataset.c === 'cancel' ? null : b.dataset.c));
+                ov.addEventListener('click', e => { if (e.target === ov) done(null); });
+                document.addEventListener('keydown', onKey, true);
+                ov.appendChild(box); document.body.appendChild(ov);
+            });
+        }
         function deleteWork(id) {
             const bw = masterWorks.find(x => x.id === id);
             // 계약 파기 작품: 작품은 목록에서 지우되, 받은 MG 등 정산 금액은 총합에 그대로 남긴다
             if (bw?.contractBroken) {
-                if (!confirm(`'${bw.title}'을(를) 작품 등록 목록에서 삭제하시겠습니까?
-
-· 웹툰 관리의 '계약 파기' 카드와 받은 MG 등 정산 금액은 그대로 남아요.`)) return;
-                // 기본(확인)은 카드·금액 남기기. 모두 삭제는 한 번 더 확인
-                const keepCard = confirm(`카드와 정산 금액은 남기고, 작품 등록에서만 삭제할까요?
-
-[확인] 남기기 (추천)
-[취소] 다음 단계로 (카드·정산 금액까지 모두 삭제 선택)`);
-                let wipeAll = false;
-                if (!keepCard) {
-                    wipeAll = confirm(`⚠ 파기 카드와 받은 MG 등 정산 금액까지 모두 삭제합니다.
-수입 총합에서도 빠지고 되돌릴 수 없어요.
-
-정말 모두 삭제할까요?`);
-                    if (!wipeAll) return;
-                }
-                if (wipeAll) {
-                    Object.keys(monthlyData).forEach(ym => { if (monthlyData[ym] && id in monthlyData[ym]) delete monthlyData[ym][id]; });
-                    const extraIds0 = (bw.extras || []).map(e => e.id);
-                    Object.keys(taskSchedules).forEach(date => {
-                        taskSchedules[date] = taskSchedules[date].filter(t => !(t.workId === id) && !(t.extraId && extraIds0.includes(t.extraId)));
-                        if (taskSchedules[date].length === 0) delete taskSchedules[date];
-                    });
-                    if (webtoonManage[id]) delete webtoonManage[id];
-                    masterWorks = masterWorks.filter(x => x.id !== id);
-                } else {
-                    bw.removedBroken = true;   // 작품 등록 목록에서만 숨김 (웹툰 관리 '계약 파기' 카드·정산 금액은 유지)
-                }
-                save(); updateUI();
+                askBrokenDeleteChoice(bw.title).then(choice => {
+                    if (choice === 'wipe') {
+                        Object.keys(monthlyData).forEach(ym => { if (monthlyData[ym] && id in monthlyData[ym]) delete monthlyData[ym][id]; });
+                        const extraIds0 = (bw.extras || []).map(e => e.id);
+                        Object.keys(taskSchedules).forEach(date => {
+                            taskSchedules[date] = taskSchedules[date].filter(t => !(t.workId === id) && !(t.extraId && extraIds0.includes(t.extraId)));
+                            if (taskSchedules[date].length === 0) delete taskSchedules[date];
+                        });
+                        if (webtoonManage[id]) delete webtoonManage[id];
+                        masterWorks = masterWorks.filter(x => x.id !== id);
+                    } else if (choice === 'keep') {
+                        bw.removedBroken = true;   // 작품 등록 목록에서만 숨김 (웹툰 관리 '계약 파기' 카드·정산 금액은 유지)
+                    } else return;
+                    save(); updateUI();
+                });
                 return;
             }
             if(confirm("삭제하시겠습니까?")) {

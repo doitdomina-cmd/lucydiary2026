@@ -13046,7 +13046,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
         function renderMasterWorksList() {
             const container = document.getElementById('master-works-by-genre-container'), tabsContainer = document.getElementById('library-tabs'), badge = document.getElementById('total-works-badge');             const tabs = ['전체', ...genreList.map(g => g.name)];
             tabsContainer.innerHTML = tabs.map(t => `<button onclick="switchLibraryTab('${t}')" class="px-3 py-1.5 text-xs font-bold rounded-lg transition-all mb-1 ${currentLibraryTab === t ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-400 hover:bg-slate-50'}">${t}</button>`).join('');
-            container.innerHTML = ""; // 계약 파기 작품을 삭제하면 목록에서만 숨기고(removedBroken) 받은 금액은 총합에 남긴다
+            container.innerHTML = ""; // 계약 파기 작품을 작품 등록에서 삭제하면 이 목록에서만 숨긴다(removedBroken). 웹툰 관리 파기 카드·금액은 그대로
             let worksToShow = (currentLibraryTab === '전체' ? [...masterWorks] : masterWorks.filter(w => w.genre === currentLibraryTab)).filter(w => !w.removedBroken);
             const sortOrder = ['BL 장편', '현로 장편', '현로 초단', 'BL 초단', '웹툰'];
             worksToShow.sort((a,b) => {
@@ -13171,26 +13171,26 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             const bw = masterWorks.find(x => x.id === id);
             // 계약 파기 작품: 작품은 목록에서 지우되, 받은 MG 등 정산 금액은 총합에 그대로 남긴다
             if (bw?.contractBroken) {
-                if (!confirm(`'${bw.title}'을(를) 삭제하시겠습니까?
+                if (!confirm(`'${bw.title}'을(를) 작품 등록 목록에서 삭제하시겠습니까?
 
-작품 등록·계약 파기 목록에서 사라져요.`)) return;
-                // 받은 정산 금액을 남길지 같이 지울지 고른다
-                const wipeIncome = confirm(`받은 MG 등 정산 금액은 어떻게 할까요?
+· 웹툰 관리의 '계약 파기' 카드와 받은 MG 등 정산 금액은 그대로 남아요.`)) return;
+                // 카드·정산 금액까지 모두 지울지 고른다
+                const wipeAll = confirm(`카드와 정산 금액까지 모두 삭제할까요?
 
-[확인] 정산 금액도 모두 삭제 (총합에서도 빠져요)
-[취소] 정산 금액은 남기기 (수입 총합에 그대로 남아요)`);
-                if (wipeIncome) {
+[확인] 파기 카드·정산 금액도 모두 삭제 (총합에서도 빠져요)
+[취소] 작품 등록에서만 삭제 (카드·금액은 남기기)`);
+                if (wipeAll) {
                     Object.keys(monthlyData).forEach(ym => { if (monthlyData[ym] && id in monthlyData[ym]) delete monthlyData[ym][id]; });
+                    const extraIds0 = (bw.extras || []).map(e => e.id);
+                    Object.keys(taskSchedules).forEach(date => {
+                        taskSchedules[date] = taskSchedules[date].filter(t => !(t.workId === id) && !(t.extraId && extraIds0.includes(t.extraId)));
+                        if (taskSchedules[date].length === 0) delete taskSchedules[date];
+                    });
+                    if (webtoonManage[id]) delete webtoonManage[id];
                     masterWorks = masterWorks.filter(x => x.id !== id);
                 } else {
-                    bw.removedBroken = true;
+                    bw.removedBroken = true;   // 작품 등록 목록에서만 숨김 (웹툰 관리 '계약 파기' 카드·정산 금액은 유지)
                 }
-                const extraIds0 = (bw.extras || []).map(e => e.id);
-                Object.keys(taskSchedules).forEach(date => {
-                    taskSchedules[date] = taskSchedules[date].filter(t => !(t.workId === id) && !(t.extraId && extraIds0.includes(t.extraId)));
-                    if (taskSchedules[date].length === 0) delete taskSchedules[date];
-                });
-                if (webtoonManage[id]) delete webtoonManage[id];
                 save(); updateUI();
                 return;
             }
@@ -13466,7 +13466,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             if (!container) return;
             updateWebtoonViewTabsUI();
             // 계약 파기한 작품은 '계약 파기' 보기에서만 보인다 (전체 보기·필명 별로 보기 등에서는 빠짐)
-            const brokenWorks = masterWorks.filter(w => w.genre && w.genre.includes('웹툰') && w.contractBroken && !w.removedBroken);
+            const brokenWorks = masterWorks.filter(w => w.genre && w.genre.includes('웹툰') && w.contractBroken);
             const allWebtoonWorks = masterWorks.filter(w => w.genre && w.genre.includes('웹툰') && !w.contractBroken);
             const totalBadge = document.getElementById('webtoon-total-count');
             if (totalBadge) totalBadge.textContent = allWebtoonWorks.length;

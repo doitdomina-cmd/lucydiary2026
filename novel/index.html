@@ -2492,15 +2492,34 @@ function onManuscriptCopy(e) {
     // 문단 밖에 떨어진 글(부분 선택)도 문단으로 감쌈
     [...t.content.childNodes].forEach(n => { if (n.nodeType === 3 || (n.nodeType === 1 && !/^(P|DIV)$/.test(n.tagName))) { const p = document.createElement('p'); n.replaceWith(p); p.appendChild(n); } });
     t.content.querySelectorAll('p, div').forEach(p => { p.removeAttribute('data-fold'); p.removeAttribute('data-fold-x'); p.style.margin = '0'; if (!p.textContent.trim() && !p.querySelector('br')) p.innerHTML = '<br>'; });
-    // 한글은 rgb(…) 색을 거꾸로(파랑↔빨강) 읽어서, 색은 모두 #RRGGBB로 바꿔 넘김 (+ font color도 같이)
-    const hex = c => { const m = /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i.exec(c || ''); return m ? '#' + [m[1], m[2], m[3]].map(v => (+v).toString(16).padStart(2, '0')).join('') : c; };
-    t.content.querySelectorAll('[style]').forEach(n => {
-        if (n.style.color) { const c = hex(n.style.color); n.style.color = c; if (n.tagName === 'SPAN') { const f = document.createElement('font'); f.setAttribute('color', c); f.append(...n.childNodes); n.appendChild(f); } }
-        if (n.style.backgroundColor) n.style.backgroundColor = hex(n.style.backgroundColor);
-    });
-    const html = t.innerHTML.replace(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*[\d.]+\s*)?\)/gi, m => hex(m));
+    // 한글이 확실히 읽도록 예전(워드 시절) 방식으로 다시 씀: 글자색은 <font color="#RRGGBB">, 굵게·기울임·밑줄·취소선은 <b><i><u><s> 태그, 형광은 배경색 span
+    const hex = c => { const m = /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i.exec(c || ''); return m ? '#' + [m[1], m[2], m[3]].map(v => (+v).toString(16).padStart(2, '0')).join('').toUpperCase() : (/^#[0-9a-f]{3,6}$/i.test(c || '') ? c.toUpperCase() : ''); };
+    const run = (node, f) => [...node.childNodes].map(n => {
+        if (n.nodeType === 3) {
+            let h = esc(n.data);
+            if (!h) return '';
+            if (f.s) h = `<s>${h}</s>`; if (f.u) h = `<u>${h}</u>`; if (f.i) h = `<i>${h}</i>`; if (f.b) h = `<b>${h}</b>`;
+            if (f.c) h = `<font color="${f.c}">${h}</font>`;
+            if (f.bg) h = `<span style="background-color:${f.bg}">${h}</span>`;
+            return h;
+        }
+        if (n.nodeType !== 1) return '';
+        if (n.tagName === 'BR') return '<br>';
+        const g = { ...f }, st = n.style, tag = n.tagName, td = (st.textDecoration || '') + ' ' + (st.textDecorationLine || '');
+        if (st.color) g.c = hex(st.color); if (tag === 'FONT' && n.getAttribute('color')) g.c = hex(n.getAttribute('color'));
+        if (st.backgroundColor) g.bg = /transparent/.test(st.backgroundColor) ? '' : hex(st.backgroundColor); if (tag === 'MARK') g.bg = g.bg || '#FFF3A3';
+        if (/^(B|STRONG)$/.test(tag) || /^(bold|[6-9]00)$/.test(st.fontWeight)) g.b = true;
+        if (/^(I|EM)$/.test(tag) || st.fontStyle === 'italic') g.i = true;
+        if (tag === 'U' || /underline/.test(td)) g.u = true;
+        if (/^(S|STRIKE|DEL)$/.test(tag) || /line-through/.test(td)) g.s = true;
+        return run(n, g);
+    }).join('');
+    const html = [...t.content.querySelectorAll('p, div')].filter(p => !p.parentElement?.closest?.('p, div')).map(p => {
+        const al = p.style.textAlign && p.style.textAlign !== 'start' && p.style.textAlign !== 'left' ? ` align="${p.style.textAlign}"` : '';
+        const inner = run(p, {}); return `<p style="margin-top:0;margin-bottom:0"${al}>${inner.replace(/<br>$/, '') || '&nbsp;'}</p>`;
+    }).join('\r\n');
     const text = [...t.content.querySelectorAll('p, div')].map(p => p.textContent).join('\r\n');
-    e.clipboardData.setData('text/html', `<html><head><meta charset="utf-8"></head><body>${html}</body></html>`);
+    e.clipboardData.setData('text/html', `<html><head><meta charset="utf-8"></head><body>\r\n${html}\r\n</body></html>`);
     e.clipboardData.setData('text/plain', text);
     e.preventDefault();
     if (e.type === 'cut' && ed.getAttribute('contenteditable') === 'true') document.execCommand('delete');

@@ -23224,7 +23224,9 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             if(currentEditTaskId) {
                 const idx = taskSchedules[dateStr].findIndex(t => t.id === currentEditTaskId);
                 if(idx > -1) {
-                    taskSchedules[dateStr][idx] = { id: currentEditTaskId, date: dateStr, workId, category, memo, isCompleted };
+                    const old = taskSchedules[dateStr][idx];
+                    taskSchedules[dateStr][idx] = { ...old, id: currentEditTaskId, date: dateStr, workId, category, memo, isCompleted };
+                    if (old.workId !== workId) { delete taskSchedules[dateStr][idx].isAutoManuscript; delete taskSchedules[dateStr][idx].extraId; }
                 }
             } else {
                 taskSchedules[dateStr].push({
@@ -23412,6 +23414,18 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             } catch(err) {}
         }
 
+        // 스케줄 관리에서 자동 등록된 '완고 입고' 카드를 옮기면 작품(외전) 정보의 완고 입고일도 같이 바꾼다
+        function syncManuscriptDateFromTask(item) {
+            if (!item || !item.isAutoManuscript || !item.workId || !item.date) return;
+            const w = masterWorks.find(x => x.id === item.workId);
+            if (!w) return;
+            if (item.extraId) {
+                const ex = (w.extras || []).find(e => e.id === item.extraId);
+                if (ex) ex.manuscriptDate = item.date;
+            } else {
+                w.manuscriptDate = item.date;
+            }
+        }
         function handleTaskDrop(e, cell) {
             e.preventDefault(); cell.classList.remove('cal-drag-over');
             const targetDate = cell.dataset.date;
@@ -23427,6 +23441,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                     
                     if(!taskSchedules[targetDate]) taskSchedules[targetDate] = [];
                     taskSchedules[targetDate].push(item);
+                    syncManuscriptDateFromTask(item);
                     save(); renderTaskCalendar();
                 }
             } catch(err) {}
@@ -23488,6 +23503,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                 const data = JSON.parse(e.dataTransfer.getData('text/plain'));
                 if (data.type !== 'task') return;
                 if (moveScheduleItem(taskSchedules, data, targetDate, targetId, insertAfter)) {
+                    syncManuscriptDateFromTask((taskSchedules[targetDate] || []).find(x => x.id === data.id));
                     save(); renderTaskCalendar();
                 }
             } catch(err) {}

@@ -1410,7 +1410,8 @@ async function githubPush(cfg, dataStr) {
 // 기본 프로젝트 설정값 (사용자가 별도로 설정하지 않아도 자동으로 이 값으로 동기화됩니다)
 // 웹(브라우저)은 루시의 스페이스·작업실·정산과 같은 Firebase 프로젝트(writer-routine)를 쓴다.
 //  - 같은 구글 로그인을 같이 쓰고, 내 시놉은 users/{내 계정}/synop/main 에 저장돼서 내 계정만 읽고 쓸 수 있다.
-// 데스크탑(Electron)·안드로이드 앱은 익명 로그인이라 계정 구분이 안 돼서 예전 프로젝트(syno-eb309)를 그대로 쓴다.
+// 데스크탑(Electron)·안드로이드 앱도 같은 writer-routine을 쓴다. 이 둘은 구글 팝업 로그인이 막혀 있어서,
+//  웹에서 구글 계정에 '앱용 비밀번호'를 붙여 두고, 앱에서는 그 이메일+비밀번호로 로그인한다 (같은 계정 = 같은 데이터).
 const LEGACY_FIREBASE_CONFIG = {
     apiKey: "AIzaSyC1I0GQHJ4U5t0bIgWyXWlKT6pZZMZh2yI",
     projectId: "syno-eb309",
@@ -1418,7 +1419,7 @@ const LEGACY_FIREBASE_CONFIG = {
     docId: "main",
     autoSync: true
 };
-const DEFAULT_FIREBASE_CONFIG = isAutoAuthEnvironment ? LEGACY_FIREBASE_CONFIG : {
+const DEFAULT_FIREBASE_CONFIG = {
     apiKey: "AIzaSyCYWsMUSAaxnnTNoNjxw8YfZThv9-5mHak",
     projectId: "writer-routine",
     collection: "synop",
@@ -1460,7 +1461,7 @@ function loadFirebaseConfig() {
     }
     // 저장된 설정이 없으면 기본값(코드에 내장된 apiKey/프로젝트ID)을 사용
     // 웹에 예전 프로젝트(syno-eb309) 설정이 남아 있으면 새 프로젝트 설정으로 바꾼다
-    if (!isAutoAuthEnvironment && stored && stored.projectId === 'syno-eb309') {
+    if (stored && stored.projectId === 'syno-eb309') {
         const next = { ...DEFAULT_FIREBASE_CONFIG, autoSync: stored.autoSync !== false, clientId: stored.clientId };
         try { saveFirebaseConfig(next); } catch (e) {}
         return next;
@@ -1514,7 +1515,7 @@ function fbUpdateAuthUI(user) {
     const badge = document.getElementById('fb-login-badge');
     if (badge && !isAutoAuthEnvironment) {
         if (user && !user.isAnonymous) {
-            badge.innerHTML = `<i data-lucide="cloud" class="w-3.5 h-3.5 text-green-600"></i> <span class="text-green-700 font-bold">${esc ? esc(user.displayName || user.email || '로그인됨') : (user.displayName || user.email || '로그인됨')}</span> <button onclick="window.fbGoogleSignOut()" class="text-gray-400 underline hover:text-gray-600 ml-1">로그아웃</button>`;
+            badge.innerHTML = `<i data-lucide="cloud" class="w-3.5 h-3.5 text-green-600"></i> <span class="text-green-700 font-bold">${esc ? esc(user.displayName || user.email || '로그인됨') : (user.displayName || user.email || '로그인됨')}</span> <button onclick="window.fbMakeAppPassword()" class="text-blue-500 underline hover:text-blue-700 ml-1" title="데스크탑·폰 앱에서 이 계정으로 로그인할 비밀번호">앱용 비밀번호</button> <button onclick="window.fbGoogleSignOut()" class="text-gray-400 underline hover:text-gray-600 ml-1">로그아웃</button>`;
             badge.classList.remove('hidden');
         } else {
             badge.innerHTML = `<i data-lucide="cloud-off" class="w-3.5 h-3.5 text-orange-500"></i> <button onclick="window.fbGoogleSignIn()" class="text-orange-600 font-bold underline hover:text-orange-700">구글 로그인 (온라인 동기화)</button>`;
@@ -1525,21 +1526,28 @@ function fbUpdateAuthUI(user) {
     const statusIcon = document.getElementById('fb-status-icon');
     const statusBtn = document.getElementById('fb-status-icon-btn');
     if (statusIcon) {
-        const connected = isAutoAuthEnvironment ? !!user : !!(user && !user.isAnonymous);
+        const connected = !!(user && !user.isAnonymous);
         statusIcon.setAttribute('data-lucide', connected ? 'cloud-check' : 'cloud-off');
         statusIcon.classList.toggle('text-green-500', connected);
         statusIcon.classList.toggle('text-gray-300', !connected);
         if (statusBtn) {
             statusBtn.title = connected
                 ? '파이어베이스 연결됨 (클릭: 상태 다시 확인)'
-                : (isAutoAuthEnvironment ? '파이어베이스 연결 안 됨 (클릭: 재연결 시도)' : '파이어베이스 연결 안 됨 (클릭: 구글 로그인)');
+                : (isAutoAuthEnvironment ? '파이어베이스 연결 안 됨 (클릭: 로그인)' : '파이어베이스 연결 안 됨 (클릭: 구글 로그인)');
         }
         if (window.lucide) window.lucide.createIcons({ el: statusBtn });
     }
-    if (!isAutoAuthEnvironment && user && !user.isAnonymous) {
+    if (badge && isAutoAuthEnvironment) {
+        badge.innerHTML = (user && !user.isAnonymous)
+            ? `<i data-lucide="cloud" class="w-3.5 h-3.5 text-green-600"></i> <span class="text-green-700 font-bold">${esc(user.email || '로그인됨')}</span> <button onclick="window.fbGoogleSignOut()" class="text-gray-400 underline hover:text-gray-600 ml-1">로그아웃</button>`
+            : `<i data-lucide="cloud-off" class="w-3.5 h-3.5 text-orange-500"></i> <button onclick="window.fbOpenEmailLogin()" class="text-orange-600 font-bold underline hover:text-orange-700">로그인 (온라인 동기화)</button>`;
+        badge.classList.remove('hidden');
+        if (window.lucide) window.lucide.createIcons({ el: badge });
+    }
+    if (user && !user.isAnonymous) {
         const cfg = loadFirebaseConfig();
         if (cfg && cfg.apiKey && cfg.projectId && cfg.autoSync) fbStartRealtimeSync(cfg);
-    } else if (!isAutoAuthEnvironment && !user) {
+    } else if (!user) {
         fbStopRealtimeSync();
     }
 }
@@ -1566,22 +1574,20 @@ async function fbConnect(cfg) {
     }
 
     if (isAutoAuthEnvironment) {
-        // 데스크탑/안드로이드 앱: 익명 인증 (기기 내부 로그인 유지 전용, 사용자 구분 없음, 버튼 없이 항상 자동)
-        if (!fbAuthObj.currentUser) {
-            try {
-                const cred = await fbAuthObj.signInAnonymously();
-                if (isNativeAppEnvironment && cred && cred.user) {
-                    alert('이 기기의 동기화 ID (개발자에게 전달해주세요):\n' + cred.user.uid);
-                }
-            }
-            catch (e) { throw new Error(`Firebase 인증 실패 - API Key/익명 로그인 설정을 확인하세요. (${e.code || e.message})`); }
+        // 데스크탑/안드로이드 앱: 웹에서 만든 '앱용 비밀번호'(이메일+비밀번호)로 로그인. 로그인 전에는 이 기기 데이터만 씀
+        await fbWaitAuthReady();
+        const user = fbAuthObj.currentUser; // 처음 한 번 기다린 뒤엔 지금 로그인 상태를 봄 (나중에 로그인해도 반영)
+        if (!user || user.isAnonymous) {
+            if (user && user.isAnonymous) { try { await fbAuthObj.signOut(); } catch (e) {} }
+            throw new Error('LOGIN_REQUIRED');
         }
     } else {
         // 브라우저(온라인 버전): 구글 로그인 필요. 세션이 있으면 자동 복원.
         // 세션이 없으면 자동으로 리디렉션하지 않고, 화면 우상단 배지의 "구글 로그인" 버튼을
         // 사용자가 직접 클릭해야 팝업으로 로그인이 진행된다 (자동 리디렉션은 브라우저의 서드파티
         // 저장소 차단 정책 때문에 무한 로그인 루프를 유발할 수 있어 제거함).
-        const user = await fbWaitAuthReady();
+        await fbWaitAuthReady();
+        const user = fbAuthObj.currentUser;
         if (!user) {
             throw new Error('LOGIN_REQUIRED');
         }
@@ -1612,6 +1618,97 @@ window.fbGoogleSignIn = async function () {
         fbSetStatus(`구글 로그인 실패 (${e.code || e.message})`, 'err');
     }
 };
+// ── 데스크탑·폰 앱 로그인: 웹에서 구글 계정에 '앱용 비밀번호'를 붙여 두고, 앱에서는 이메일+비밀번호로 같은 계정에 들어간다 ──
+function fbEnsureApp() {
+    if (fbApp) return;
+    const cfg = loadFirebaseConfig() || DEFAULT_FIREBASE_CONFIG;
+    fbApp = fbInitApp(cfg); fbAuthObj = fbApp.auth(); fbDb = fbApp.firestore();
+    if (!_fbAuthListenerAttached) { _fbAuthListenerAttached = true; fbAuthObj.onAuthStateChanged(fbUpdateAuthUI); }
+}
+const FB_PW_HELP = 'Firebase 콘솔 → writer-routine → Authentication → 로그인 방법(Sign-in method)에서 "이메일/비밀번호"를 사용 설정해 주세요.';
+// 웹(구글 로그인 상태)에서: 이 구글 계정에 앱용 비밀번호를 붙이거나 바꾼다
+window.fbMakeAppPassword = async function () {
+    const u = fbAuthObj && fbAuthObj.currentUser;
+    if (!u || u.isAnonymous) { alert('먼저 구글로 로그인해 주세요.'); return; }
+    if (!u.email) { alert('이 구글 계정의 이메일을 알 수 없어요.'); return; }
+    const has = (u.providerData || []).some(p => p.providerId === 'password');
+    const pw = prompt(`데스크탑·폰 앱에서 쓸 비밀번호를 ${has ? '새로 ' : ''}정해 주세요. (6자 이상)\n\n앱에서는 이메일 ${u.email} 과 이 비밀번호로 로그인하면 웹과 같은 시놉이 보여요.`);
+    if (pw == null) return;
+    if (pw.length < 6) { alert('비밀번호는 6자 이상이어야 해요.'); return; }
+    const run = () => has ? u.updatePassword(pw) : u.linkWithCredential(firebase.auth.EmailAuthProvider.credential(u.email, pw));
+    try { await run(); }
+    catch (e) {
+        if (e.code === 'auth/requires-recent-login') {
+            try { await u.reauthenticateWithPopup(new firebase.auth.GoogleAuthProvider()); await run(); }
+            catch (e2) { alert('비밀번호를 만들지 못했어요. (' + (e2.code || e2.message) + ')'); return; }
+        } else if (e.code === 'auth/operation-not-allowed') { alert('아직 이메일/비밀번호 로그인이 꺼져 있어요.\n\n' + FB_PW_HELP); return; }
+        else if (e.code === 'auth/email-already-in-use' || e.code === 'auth/credential-already-in-use') { alert('이 이메일로 이미 다른 비밀번호 계정이 있어요. 앱에서 그 비밀번호로 로그인하면 다른 저장 칸이 보일 수 있어요. (' + e.code + ')'); return; }
+        else { alert('비밀번호를 만들지 못했어요. (' + (e.code || e.message) + ')'); return; }
+    }
+    alert('앱용 비밀번호를 ' + (has ? '바꿨어요' : '만들었어요') + ' ✓\n\n데스크탑·폰 앱에서 "로그인"을 누르고\n이메일: ' + u.email + '\n비밀번호: 방금 정한 것\n으로 들어가면 돼요.');
+};
+// 앱(데스크탑·폰)에서: 이메일+비밀번호 로그인 창
+window.fbOpenEmailLogin = function () {
+    document.getElementById('fb-em-modal')?.remove();
+    const m = document.createElement('div');
+    m.id = 'fb-em-modal';
+    m.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(40,30,20,.35);display:flex;align-items:center;justify-content:center;padding:16px';
+    m.innerHTML = `<div style="background:#fff;border-radius:16px;padding:20px;width:min(360px,100%);box-shadow:0 12px 40px rgba(0,0,0,.2);font-size:14px;color:#3f3a33">
+        <div style="font-weight:800;font-size:16px;margin-bottom:6px">온라인 동기화 로그인</div>
+        <div style="font-size:12px;color:#8a8175;line-height:1.5;margin-bottom:12px">웹(브라우저) 시놉에서 구글 로그인 → 위쪽 <b>앱용 비밀번호</b>로 만든 비밀번호를 넣어 주세요. 웹과 같은 시놉이 보여요.</div>
+        <input id="fb-em-email" type="email" placeholder="구글 이메일" autocomplete="username" style="width:100%;box-sizing:border-box;border:1px solid #ddd;border-radius:10px;padding:9px 11px;margin-bottom:8px">
+        <input id="fb-em-pw" type="password" placeholder="앱용 비밀번호" autocomplete="current-password" style="width:100%;box-sizing:border-box;border:1px solid #ddd;border-radius:10px;padding:9px 11px">
+        <div id="fb-em-msg" style="font-size:12px;color:#c4553a;min-height:18px;margin:6px 0"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end"><button id="fb-em-cancel" style="padding:8px 14px;border-radius:10px;border:1px solid #ddd;background:#fff">닫기</button><button id="fb-em-go" style="padding:8px 14px;border-radius:10px;border:0;background:#b08d5b;color:#fff;font-weight:700">로그인</button></div></div>`;
+    document.body.appendChild(m);
+    try { const last = localStorage.getItem('fb-em-last'); if (last) m.querySelector('#fb-em-email').value = last; } catch (e) {}
+    m.querySelector('#fb-em-cancel').onclick = () => m.remove();
+    m.querySelector('#fb-em-pw').onkeydown = e => { if (e.key === 'Enter') m.querySelector('#fb-em-go').click(); };
+    m.querySelector('#fb-em-go').onclick = async () => {
+        const email = m.querySelector('#fb-em-email').value.trim(), pw = m.querySelector('#fb-em-pw').value, msg = m.querySelector('#fb-em-msg');
+        if (!email || !pw) { msg.textContent = '이메일과 비밀번호를 넣어 주세요.'; return; }
+        msg.style.color = '#8a8175'; msg.textContent = '로그인 중…';
+        try {
+            fbEnsureApp();
+            if (!isNodeEnvironment) { try { await fbAuthObj.setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch (e) {} }
+            await fbAuthObj.signInWithEmailAndPassword(email, pw);
+            try { localStorage.setItem('fb-em-last', email); } catch (e) {}
+            m.remove();
+            await fbMergeAfterLogin();
+        } catch (e) {
+            msg.style.color = '#c4553a';
+            msg.textContent = e.code === 'auth/operation-not-allowed' ? FB_PW_HELP
+                : ['auth/wrong-password', 'auth/invalid-credential', 'auth/user-not-found', 'auth/invalid-login-credentials'].includes(e.code) ? '이메일이나 비밀번호가 맞지 않아요. 웹에서 "앱용 비밀번호"를 먼저 만들었는지 확인해 주세요.'
+                : '로그인하지 못했어요. (' + (e.code || e.message) + ')';
+        }
+    };
+    setTimeout(() => m.querySelector(m.querySelector('#fb-em-email').value ? '#fb-em-pw' : '#fb-em-email').focus(), 50);
+};
+// 앱에서 처음 로그인할 때: 클라우드(웹) 시놉을 기준으로, 이 기기에만 있던 시놉은 빠짐없이 더해서 올린다 (덮어쓰지 않음)
+async function fbMergeAfterLogin() {
+    const cfg = loadFirebaseConfig();
+    try {
+        const res = await firestorePull(cfg);
+        const cloud = (!res.notFound && Array.isArray(res.data)) ? res.data : [];
+        const add = missingBoards(cloud, window.workspaces || []);
+        if (!cloud.length) {
+            await firestorePush(cfg, JSON.stringify(window.workspaces));
+            fbShowSyncToast('이 기기의 시놉을 온라인에 올렸어요');
+        } else {
+            if (add.length) {
+                downloadSafety('before-login-merge');
+                const merged = cloud.concat(add);
+                await firestorePush(cfg, JSON.stringify(merged));
+                await fbApplyRemoteData(merged);
+                fbShowSyncToast('로그인 완료 · 이 기기에만 있던 시놉 ' + add.length + '개를 더했어요');
+            } else {
+                await fbApplyRemoteData(cloud);
+                fbShowSyncToast('로그인 완료 · 웹과 같은 시놉을 불러왔어요');
+            }
+        }
+        if (cfg.autoSync !== false) fbStartRealtimeSync(cfg);
+    } catch (e) { console.warn('로그인 뒤 동기화 실패', e); alert('로그인은 됐는데 시놉을 불러오지 못했어요. (' + (e.code || e.message) + ')'); }
+}
 window.fbGoogleSignOut = async function () {
     try { if (fbAuthObj) await fbAuthObj.signOut(); fbSetStatus('로그아웃 되었습니다.', 'info'); }
     catch (e) { console.error(e); }
@@ -1624,14 +1721,18 @@ window.fbCheckConnection = async function () {
         try {
             await fbConnect(cfg);
             fbUpdateAuthUI();
+            const u = fbAuthObj.currentUser;
+            if (u && confirm(`${u.email || '계정'} 으로 온라인 동기화 중이에요 ✓\n\n로그아웃할까요? (이 기기 데이터는 그대로 남아요)`)) await window.fbGoogleSignOut();
         } catch (e) {
             console.warn('Firebase 연결 재시도 실패:', e);
             fbUpdateAuthUI();
+            if (e && e.message === 'LOGIN_REQUIRED') window.fbOpenEmailLogin();
         }
     } else {
         const user = fbAuthObj && fbAuthObj.currentUser;
         if (user && !user.isAnonymous) {
             fbUpdateAuthUI();
+            if (confirm(`${user.email || '구글 계정'} 으로 연결돼 있어요 ✓\n\n데스크탑·폰 앱에서 같은 계정으로 들어갈 "앱용 비밀번호"를 만들(바꿀)까요?`)) await window.fbMakeAppPassword();
         } else {
             await window.fbGoogleSignIn();
             const stillNoUser = !(fbAuthObj && fbAuthObj.currentUser && !fbAuthObj.currentUser.isAnonymous);
@@ -1645,7 +1746,7 @@ window.fbCheckConnection = async function () {
 };
 
 function fbDocRef(cfg) {
-    if (!isAutoAuthEnvironment && cfg.projectId === 'writer-routine') {
+    if (cfg.projectId === 'writer-routine') {
         const u = fbAuthObj && fbAuthObj.currentUser;
         if (!u) throw new Error('LOGIN_REQUIRED');
         return fbDb.collection('users').doc(u.uid).collection('synop').doc(cfg.docId || 'main');
@@ -1706,7 +1807,7 @@ window.fbImportLegacy = async function () {
 
 // ── 클라우드 저장: 문서 하나는 1MB까지라서, 사진이 들어간 큰 시놉은 여러 조각으로 나눠 저장한다 ──
 const FB_CHUNK = 250000;   // 글자 수 기준 (한글은 3바이트라 최악 약 750KB)
-function fbIsChunked(cfg) { return !isAutoAuthEnvironment && cfg.projectId === 'writer-routine'; }
+function fbIsChunked(cfg) { return cfg.projectId === 'writer-routine'; }
 function fbSession(cfg) { if (!window._fbSid) window._fbSid = fbGetClientId(cfg) + '_' + Math.random().toString(36).slice(2, 8); return window._fbSid; }   // 같은 브라우저의 다른 탭과도 구분
 function fbPartRef(cfg, i) {
     const u = fbAuthObj && fbAuthObj.currentUser; if (!u) throw new Error('LOGIN_REQUIRED');

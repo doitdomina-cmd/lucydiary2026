@@ -13171,9 +13171,18 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             if (bw?.contractBroken) {
                 if (!confirm(`'${bw.title}'을(를) 삭제하시겠습니까?
 
-· 작품 등록·계약 파기 목록에서 사라져요.
-· 받은 MG 등 정산 금액은 수입 총합에 그대로 남아요.`)) return;
-                bw.removedBroken = true;
+작품 등록·계약 파기 목록에서 사라져요.`)) return;
+                // 받은 정산 금액을 남길지 같이 지울지 고른다
+                const wipeIncome = confirm(`받은 MG 등 정산 금액은 어떻게 할까요?
+
+[확인] 정산 금액도 모두 삭제 (총합에서도 빠져요)
+[취소] 정산 금액은 남기기 (수입 총합에 그대로 남아요)`);
+                if (wipeIncome) {
+                    Object.keys(monthlyData).forEach(ym => { if (monthlyData[ym] && id in monthlyData[ym]) delete monthlyData[ym][id]; });
+                    masterWorks = masterWorks.filter(x => x.id !== id);
+                } else {
+                    bw.removedBroken = true;
+                }
                 const extraIds0 = (bw.extras || []).map(e => e.id);
                 Object.keys(taskSchedules).forEach(date => {
                     taskSchedules[date] = taskSchedules[date].filter(t => !(t.workId === id) && !(t.extraId && extraIds0.includes(t.extraId)));

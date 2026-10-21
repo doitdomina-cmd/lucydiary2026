@@ -1412,13 +1412,6 @@ async function githubPush(cfg, dataStr) {
 //  - 같은 구글 로그인을 같이 쓰고, 내 시놉은 users/{내 계정}/synop/main 에 저장돼서 내 계정만 읽고 쓸 수 있다.
 // 데스크탑(Electron)·안드로이드 앱도 같은 writer-routine을 쓴다. 이 둘은 구글 팝업 로그인이 막혀 있어서,
 //  웹에서 구글 계정에 '앱용 비밀번호'를 붙여 두고, 앱에서는 그 이메일+비밀번호로 로그인한다 (같은 계정 = 같은 데이터).
-const LEGACY_FIREBASE_CONFIG = {
-    apiKey: "AIzaSyC1I0GQHJ4U5t0bIgWyXWlKT6pZZMZh2yI",
-    projectId: "syno-eb309",
-    collection: "episodeBoards",
-    docId: "main",
-    autoSync: true
-};
 const DEFAULT_FIREBASE_CONFIG = {
     apiKey: "AIzaSyCYWsMUSAaxnnTNoNjxw8YfZThv9-5mHak",
     projectId: "writer-routine",
@@ -1460,7 +1453,7 @@ function loadFirebaseConfig() {
         } catch (e) { stored = null; }
     }
     // 저장된 설정이 없으면 기본값(코드에 내장된 apiKey/프로젝트ID)을 사용
-    // 웹에 예전 프로젝트(syno-eb309) 설정이 남아 있으면 새 프로젝트 설정으로 바꾼다
+    // 예전 프로젝트(syno-eb309, 지금은 삭제됨) 설정이 남아 있으면 새 프로젝트 설정으로 바꾼다
     if (stored && stored.projectId === 'syno-eb309') {
         const next = { ...DEFAULT_FIREBASE_CONFIG, autoSync: stored.autoSync !== false, clientId: stored.clientId };
         try { saveFirebaseConfig(next); } catch (e) {}
@@ -1770,40 +1763,6 @@ function missingBoards(current, incoming) {
     const have = new Set((current || []).map(b => b && b.id));
     return (incoming || []).filter(b => b && b.id && !have.has(b.id));
 }
-// 예전 저장소(syno-eb309)에 있던 시놉시스를 새 저장소로 한 번 가져온다 (버튼을 눌렀을 때만: 구글 로그인 팝업이 필요해서)
-window.fbImportLegacy = async function () {
-    try {
-        if (isAutoAuthEnvironment) { alert('이 기능은 웹 버전에서만 써요.'); return; }
-        const cur = fbAuthObj && fbAuthObj.currentUser;
-        if (!cur || cur.isAnonymous) { alert('먼저 구글로 로그인해 주세요.'); return; }
-        const L = LEGACY_FIREBASE_CONFIG;
-        const lapp = (firebase.apps || []).find(a => a.name === 'legacySynoApp')
-            || firebase.initializeApp({ apiKey: L.apiKey, projectId: L.projectId, authDomain: L.projectId + '.firebaseapp.com' }, 'legacySynoApp');
-        const lauth = lapp.auth();
-        try { await lauth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch (e) {}
-        if (!lauth.currentUser) await lauth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
-        const snap = await lapp.firestore().collection(L.collection).doc(L.docId).get();
-        const d = snap.exists && snap.data();
-        let data = null;
-        try { data = d && d.data ? JSON.parse(d.data) : null; } catch (e) {}
-        if (!data || !Array.isArray(data) || !data.length) { alert('예전 저장소에 가져올 시놉시스가 없어요.'); return; }
-        const add = missingBoards(window.workspaces, data);
-        if (!add.length) { try { localStorage.setItem('fb-legacy-imported', '1'); } catch (e) {} fbUpdateAuthUI(); alert('예전 저장소의 시놉시스(' + data.length + '개)가 지금 화면에 이미 모두 있어요. 가져올 게 없어요.'); return; }
-        const names = add.slice(0, 5).map(b => '· ' + (b.title || '제목 없음')).join('\n') + (add.length > 5 ? '\n· 외 ' + (add.length - 5) + '개' : '');
-        if (!confirm('예전 저장소에는 ' + data.length + '개가 있고, 지금 화면에 없는 ' + add.length + '개를 추가할 수 있어요.\n\n' + names + '\n\n⚠ 지금 화면의 시놉시스는 건드리지 않고 없는 것만 더해요. (덮어쓰지 않아요)\n추가하기 전에 지금 상태를 파일로 한 번 내려받아 둘게요. 계속할까요?')) return;
-        downloadSafety('before-import');
-        pushHistory();
-        window.workspaces = normalizeData(window.workspaces.concat(add));
-        renderAll();
-        await firestorePush(loadFirebaseConfig(), JSON.stringify(window.workspaces));
-        try { localStorage.setItem('fb-legacy-imported', '1'); } catch (e) {}
-        fbUpdateAuthUI();
-        alert(add.length + '개를 추가해서 새 저장소에 올렸어요 ✓');
-    } catch (e) {
-        console.error(e);
-        alert('가져오지 못했어요. (' + (e.code || e.message) + ')');
-    }
-};
 
 // ── 클라우드 저장: 문서 하나는 1MB까지라서, 사진이 들어간 큰 시놉은 여러 조각으로 나눠 저장한다 ──
 const FB_CHUNK = 250000;   // 글자 수 기준 (한글은 3바이트라 최악 약 750KB)

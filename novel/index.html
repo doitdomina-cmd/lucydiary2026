@@ -2479,6 +2479,29 @@ document.addEventListener('paste', e => {
     document.execCommand('insertHTML', false, textToHtml(norm));
 });
 
+// 원고를 복사해서 한글(HWP)·워드에 붙일 때: 색·굵게·밑줄·취소선은 살리고, 문단 사이에 빈 줄이 생기지 않게 문단 간격 0으로
+function onManuscriptCopy(e) {
+    const ed = e.target.closest && e.target.closest('.manuscript'); if (!ed) return;
+    const sel = getSelection(); if (!sel.rangeCount || sel.isCollapsed) return;
+    const box = document.createElement('div');
+    for (let i = 0; i < sel.rangeCount; i++) box.appendChild(sel.getRangeAt(i).cloneContents());
+    const t = document.createElement('template'); t.innerHTML = sanitizeHtml(box.innerHTML);
+    t.content.querySelectorAll('img').forEach(n => n.remove());
+    let ps = [...t.content.querySelectorAll('p, div')];
+    if (!ps.length) { const p = document.createElement('p'); p.append(...t.content.childNodes); t.content.appendChild(p); ps = [p]; }
+    // 문단 밖에 떨어진 글(부분 선택)도 문단으로 감쌈
+    [...t.content.childNodes].forEach(n => { if (n.nodeType === 3 || (n.nodeType === 1 && !/^(P|DIV)$/.test(n.tagName))) { const p = document.createElement('p'); n.replaceWith(p); p.appendChild(n); } });
+    t.content.querySelectorAll('p, div').forEach(p => { p.removeAttribute('data-fold'); p.removeAttribute('data-fold-x'); p.style.margin = '0'; if (!p.textContent.trim() && !p.querySelector('br')) p.innerHTML = '<br>'; });
+    const html = t.innerHTML;
+    const text = [...t.content.querySelectorAll('p, div')].map(p => p.textContent).join('\r\n');
+    e.clipboardData.setData('text/html', `<html><head><meta charset="utf-8"></head><body>${html}</body></html>`);
+    e.clipboardData.setData('text/plain', text);
+    e.preventDefault();
+    if (e.type === 'cut' && ed.getAttribute('contenteditable') === 'true') document.execCommand('delete');
+}
+document.addEventListener('copy', onManuscriptCopy);
+document.addEventListener('cut', onManuscriptCopy);
+
 // 붙여넣은 HTML에서 색·굵게·밑줄·취소선만 남겨 원고 문단으로 바꿈 (꾸밈이 하나도 없으면 null → 그냥 글자로 붙여넣기)
 function pasteRichHtml(html) {
     if (!html || !/color|background|<(b|strong|u|s|strike|del)\b|line-through|underline|font-weight/i.test(html)) return null;

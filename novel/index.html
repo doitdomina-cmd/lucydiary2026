@@ -2468,6 +2468,9 @@ document.addEventListener('paste', e => {
     e.preventDefault();
     const file = [...(e.clipboardData?.files || [])].find(f => f.type.startsWith('image/'));
     if (file) { savedRange = null; insertImageFile(file); return; }
+    // 한글(HWP)·워드 등에서 색을 입힌 글(교정 표시)을 붙여넣으면 글자색·배경색·굵게·밑줄·취소선은 살림
+    const rich = pasteRichHtml((e.clipboardData || window.clipboardData).getData('text/html'));
+    if (rich) { document.execCommand('insertHTML', false, rich); return; }
     const text = (e.clipboardData || window.clipboardData).getData('text/plain');
     if (!text) return;
     let norm = text.replace(/\r\n?/g, '\n');
@@ -2475,6 +2478,54 @@ document.addEventListener('paste', e => {
     if (!norm.includes('\n')) { document.execCommand('insertText', false, norm); return; }
     document.execCommand('insertHTML', false, textToHtml(norm));
 });
+
+// 붙여넣은 HTML에서 색·굵게·밑줄·취소선만 남겨 원고 문단으로 바꿈 (꾸밈이 하나도 없으면 null → 그냥 글자로 붙여넣기)
+function pasteRichHtml(html) {
+    if (!html || !/color|background|<(b|strong|u|s|strike|del)\b|line-through|underline|font-weight/i.test(html)) return null;
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const plainColor = c => !c || /^(inherit|initial|currentcolor|windowtext|black|auto)$/i.test(c) || /^#0{3}(0{3})?$/i.test(c) || /^rgba?\(\s*0\s*,\s*0\s*,\s*0\s*(,\s*1\s*)?\)$/i.test(c);
+    const plainBg = c => !c || /^(transparent|inherit|initial|white|window|none)$/i.test(c) || /^#f{3}(f{3})?$/i.test(c) || /^rgba?\(\s*255\s*,\s*255\s*,\s*255/i.test(c) || /rgba\([^)]*,\s*0\s*\)$/i.test(c);
+    const BLOCK = /^(P|DIV|LI|TR|H[1-6]|TABLE|TBODY|UL|OL|BLOCKQUOTE|PRE|SECTION|ARTICLE)$/;
+    const paras = [[]]; let styled = false;
+    const brk = () => { if (paras[paras.length - 1].length) paras.push([]); };
+    const walk = (node, f) => {
+        for (const n of node.childNodes) {
+            if (n.nodeType === 3) {
+                const t = n.data.replace(/[\r\n]+/g, ' ');
+                if (!t) continue;
+                const st = [];
+                if (f.color) st.push('color: ' + f.color);
+                if (f.bg) st.push('background-color: ' + f.bg);
+                if (f.bold) st.push('font-weight: bold');
+                if (f.italic) st.push('font-style: italic');
+                const deco = [f.under && 'underline', f.strike && 'line-through'].filter(Boolean).join(' ');
+                if (deco) st.push('text-decoration: ' + deco);
+                if (st.length) styled = true;
+                paras[paras.length - 1].push(st.length ? `<span style="${esc(st.join('; '))}">${esc(t)}</span>` : esc(t));
+                continue;
+            }
+            if (n.nodeType !== 1 || /^(STYLE|SCRIPT|HEAD|TITLE|META|XML)$/.test(n.tagName)) continue;
+            if (n.tagName === 'BR') { paras.push([]); continue; }
+            const g = { ...f }, cs = n.style || {}, tag = n.tagName;
+            const col = cs.color || (tag === 'FONT' && n.getAttribute('color')); if (col) g.color = plainColor(col) ? '' : col;
+            const bg = cs.backgroundColor || (cs.background && /^(#|rgb)/i.test(cs.background) ? cs.background : ''); if (bg) g.bg = plainBg(bg) ? '' : bg;
+            if (/^(B|STRONG)$/.test(tag) || /^(bold|[6-9]00)$/.test(cs.fontWeight || '')) g.bold = true; else if (/^(normal|[1-4]00)$/.test(cs.fontWeight || '')) g.bold = false;
+            if (/^(I|EM)$/.test(tag) || cs.fontStyle === 'italic') g.italic = true;
+            const td = (cs.textDecoration || '') + ' ' + (cs.textDecorationLine || '');
+            if (tag === 'U' || /underline/.test(td)) g.under = true;
+            if (/^(S|STRIKE|DEL)$/.test(tag) || /line-through/.test(td)) g.strike = true;
+            const block = BLOCK.test(tag);
+            if (block) brk();
+            walk(n, g);
+            if (block) brk();
+        }
+    };
+    walk(doc.body, {});
+    if (!styled) return null;
+    while (paras.length > 1 && !paras[paras.length - 1].length) paras.pop();
+    if (paras.length === 1) return paras[0].join(''); // 한 줄이면 지금 문단 안에 그대로
+    return paras.map(p => `<p>${p.join('').trim() ? p.join('') : '<br>'}</p>`).join('');
+}
 
 let treeTimer = null;
 function scheduleTreeRefresh() {

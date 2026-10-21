@@ -13174,11 +13174,19 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                 if (!confirm(`'${bw.title}'을(를) 작품 등록 목록에서 삭제하시겠습니까?
 
 · 웹툰 관리의 '계약 파기' 카드와 받은 MG 등 정산 금액은 그대로 남아요.`)) return;
-                // 카드·정산 금액까지 모두 지울지 고른다
-                const wipeAll = confirm(`카드와 정산 금액까지 모두 삭제할까요?
+                // 기본(확인)은 카드·금액 남기기. 모두 삭제는 한 번 더 확인
+                const keepCard = confirm(`카드와 정산 금액은 남기고, 작품 등록에서만 삭제할까요?
 
-[확인] 파기 카드·정산 금액도 모두 삭제 (총합에서도 빠져요)
-[취소] 작품 등록에서만 삭제 (카드·금액은 남기기)`);
+[확인] 남기기 (추천)
+[취소] 다음 단계로 (카드·정산 금액까지 모두 삭제 선택)`);
+                let wipeAll = false;
+                if (!keepCard) {
+                    wipeAll = confirm(`⚠ 파기 카드와 받은 MG 등 정산 금액까지 모두 삭제합니다.
+수입 총합에서도 빠지고 되돌릴 수 없어요.
+
+정말 모두 삭제할까요?`);
+                    if (!wipeAll) return;
+                }
                 if (wipeAll) {
                     Object.keys(monthlyData).forEach(ym => { if (monthlyData[ym] && id in monthlyData[ym]) delete monthlyData[ym][id]; });
                     const extraIds0 = (bw.extras || []).map(e => e.id);

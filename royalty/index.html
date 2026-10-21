@@ -676,8 +676,11 @@ body.theme-spiral .grid.grid-cols-7:has(+ :is(#publish-cal-body, :is(#task-calen
         /* 작품 관리·웹툰 관리 카드 안쪽: 흰 본문 → 투명, 필명 띠·장르 뱃지·구분선 → 스킨 테두리 */
         body.theme-label :is(#workmanage-list [onclick^="openWorkManageModal"], #webtoon-manage-list [onclick^="openWebtoonManageModal"]) div[style*="background-color:#ffffff"] { background-color: transparent !important; }
         /* 카드 본문(종이 부분): 출간작 구분 색(보라 등)과 상관없이 눈 편한 종이색. 색은 위쪽 머리띠에만 */
-        body.theme-label #webtoon-manage-list [onclick^="openWebtoonManageModal"] > .rounded-b-xl { background-color: #FBF6E9 !important; }
-        body.theme-label #workmanage-list [onclick^="openWorkManageModal"] > .rounded-b-xl { background-color: #EEECE8 !important; }
+        body.theme-label #webtoon-manage-list [onclick^="openWebtoonManageModal"] > div.rounded-b-xl[style*="background-color"][style*="background-color"] { background-color: #FFFDF5 !important; }
+        body.theme-label #workmanage-list [onclick^="openWorkManageModal"] > div.rounded-b-xl[style*="background-color"][style*="background-color"] { background-color: #F6F5F3 !important; }
+        /* 작품 관리·웹툰 관리 카드 윗부분: 카드 바탕의 파스텔(분홍·노랑·연두·하늘, 라이브러리 카드와 같은 팔레트)을 그대로 보이게 */
+        body.theme-label :is(#webtoon-manage-list, #workmanage-list) [onclick^="open"] > .rounded-t-xl, body.theme-label :is(#webtoon-manage-list, #workmanage-list) [onclick^="open"] > div[style*="background-color:rgba"] { background-color: transparent !important; background-image: none !important; }
+        body.theme-label :is(#webtoon-manage-list, #workmanage-list) [onclick^="open"] { background-color: #FFFDF7 !important; background-image: none !important; }
         body.theme-label :is(#workmanage-list [onclick^="openWorkManageModal"], #webtoon-manage-list [onclick^="openWebtoonManageModal"]) div[style*="background-color:rgba"] { border-radius: 0 !important; border-top: 1.4px dashed var(--lb-dash); border-bottom: 1.4px dashed var(--lb-dash); }
         body.theme-label :is(#workmanage-list [onclick^="openWorkManageModal"], #webtoon-manage-list [onclick^="openWebtoonManageModal"]) span[style*="background-color"] { border: 1.4px dashed var(--lb-dash); border-radius: 6px !important; color: var(--lb-ink) !important; }
         body.theme-label :is(#workmanage-list [onclick^="openWorkManageModal"], #webtoon-manage-list [onclick^="openWebtoonManageModal"]) .border-t { border-top: 1.4px dashed var(--lb-dash) !important; }
@@ -13044,7 +13047,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
         function renderMasterWorksList() {
             const container = document.getElementById('master-works-by-genre-container'), tabsContainer = document.getElementById('library-tabs'), badge = document.getElementById('total-works-badge');             const tabs = ['전체', ...genreList.map(g => g.name)];
             tabsContainer.innerHTML = tabs.map(t => `<button onclick="switchLibraryTab('${t}')" class="px-3 py-1.5 text-xs font-bold rounded-lg transition-all mb-1 ${currentLibraryTab === t ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-400 hover:bg-slate-50'}">${t}</button>`).join('');
-            container.innerHTML = ""; // 계약 파기 작품을 삭제하면 목록에서만 숨기고(removedBroken) 받은 금액은 총합에 남긴다
+            container.innerHTML = ""; // 계약 파기 작품을 작품 등록에서 삭제하면 이 목록에서만 숨긴다(removedBroken). 웹툰 관리 파기 카드·금액은 그대로
             let worksToShow = (currentLibraryTab === '전체' ? [...masterWorks] : masterWorks.filter(w => w.genre === currentLibraryTab)).filter(w => !w.removedBroken);
             const sortOrder = ['BL 장편', '현로 장편', '현로 초단', 'BL 초단', '웹툰'];
             worksToShow.sort((a,b) => {
@@ -13165,31 +13168,46 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             const worksTab = document.getElementById('tab-works');
             if (worksTab && worksTab.classList.contains('active')) fitWorksPanelsHeight();
         });
+        // 계약 파기 작품 삭제 선택창: 'keep'(카드·금액 남기고 작품 등록에서만 삭제) / 'wipe'(카드·금액까지 모두 삭제) / null(취소)
+        function askBrokenDeleteChoice(title) {
+            return new Promise(resolve => {
+                const ov = document.createElement('div');
+                ov.style.cssText = 'position:fixed;inset:0;background:rgba(30,25,20,.45);z-index:100000;display:flex;align-items:center;justify-content:center;padding:16px;';
+                const box = document.createElement('div');
+                box.style.cssText = 'background:#fffdf7;border-radius:14px;max-width:380px;width:100%;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.25);font-family:inherit;color:#3b342c;';
+                const esc = t => String(t).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+                box.innerHTML = `<div style="font-weight:800;font-size:15px;margin-bottom:6px;">'${esc(title)}' 삭제</div>
+                    <div style="font-size:13px;color:#6b6258;margin-bottom:14px;">어떻게 삭제할까요?</div>
+                    <button data-c="keep" style="display:block;width:100%;text-align:left;padding:11px 13px;margin-bottom:8px;border-radius:10px;border:1.5px solid #d9cfb8;background:#fff8e1;cursor:pointer;font-size:13px;line-height:1.45;"><b>카드와 정산 금액은 남기고, 작품 등록에서만 삭제</b><br><span style="color:#8a7f70;font-size:12px;">웹툰 관리의 '계약 파기' 카드와 받은 금액은 그대로 남아요.</span></button>
+                    <button data-c="wipe" style="display:block;width:100%;text-align:left;padding:11px 13px;margin-bottom:8px;border-radius:10px;border:1.5px solid #e5b9b9;background:#fdeeee;cursor:pointer;font-size:13px;line-height:1.45;"><b style="color:#b42318;">파기 카드와 정산 금액까지 모두 삭제</b><br><span style="color:#8a7f70;font-size:12px;">수입 총합에서도 빠지고 되돌릴 수 없어요.</span></button>
+                    <button data-c="cancel" style="display:block;width:100%;padding:10px;border-radius:10px;border:1.5px solid #ddd6c8;background:#fff;cursor:pointer;font-size:13px;font-weight:700;">취소</button>`;
+                const done = v => { document.removeEventListener('keydown', onKey, true); ov.remove(); resolve(v); };
+                const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); done(null); } };
+                box.querySelectorAll('button').forEach(b => b.onclick = () => done(b.dataset.c === 'cancel' ? null : b.dataset.c));
+                ov.addEventListener('click', e => { if (e.target === ov) done(null); });
+                document.addEventListener('keydown', onKey, true);
+                ov.appendChild(box); document.body.appendChild(ov);
+            });
+        }
         function deleteWork(id) {
             const bw = masterWorks.find(x => x.id === id);
             // 계약 파기 작품: 작품은 목록에서 지우되, 받은 MG 등 정산 금액은 총합에 그대로 남긴다
             if (bw?.contractBroken) {
-                if (!confirm(`'${bw.title}'을(를) 삭제하시겠습니까?
-
-작품 등록·계약 파기 목록에서 사라져요.`)) return;
-                // 받은 정산 금액을 남길지 같이 지울지 고른다
-                const wipeIncome = confirm(`받은 MG 등 정산 금액은 어떻게 할까요?
-
-[확인] 정산 금액도 모두 삭제 (총합에서도 빠져요)
-[취소] 정산 금액은 남기기 (수입 총합에 그대로 남아요)`);
-                if (wipeIncome) {
-                    Object.keys(monthlyData).forEach(ym => { if (monthlyData[ym] && id in monthlyData[ym]) delete monthlyData[ym][id]; });
-                    masterWorks = masterWorks.filter(x => x.id !== id);
-                } else {
-                    bw.removedBroken = true;
-                }
-                const extraIds0 = (bw.extras || []).map(e => e.id);
-                Object.keys(taskSchedules).forEach(date => {
-                    taskSchedules[date] = taskSchedules[date].filter(t => !(t.workId === id) && !(t.extraId && extraIds0.includes(t.extraId)));
-                    if (taskSchedules[date].length === 0) delete taskSchedules[date];
+                askBrokenDeleteChoice(bw.title).then(choice => {
+                    if (choice === 'wipe') {
+                        Object.keys(monthlyData).forEach(ym => { if (monthlyData[ym] && id in monthlyData[ym]) delete monthlyData[ym][id]; });
+                        const extraIds0 = (bw.extras || []).map(e => e.id);
+                        Object.keys(taskSchedules).forEach(date => {
+                            taskSchedules[date] = taskSchedules[date].filter(t => !(t.workId === id) && !(t.extraId && extraIds0.includes(t.extraId)));
+                            if (taskSchedules[date].length === 0) delete taskSchedules[date];
+                        });
+                        if (webtoonManage[id]) delete webtoonManage[id];
+                        masterWorks = masterWorks.filter(x => x.id !== id);
+                    } else if (choice === 'keep') {
+                        bw.removedBroken = true;   // 작품 등록 목록에서만 숨김 (웹툰 관리 '계약 파기' 카드·정산 금액은 유지)
+                    } else return;
+                    save(); updateUI();
                 });
-                if (webtoonManage[id]) delete webtoonManage[id];
-                save(); updateUI();
                 return;
             }
             if(confirm("삭제하시겠습니까?")) {
@@ -13396,6 +13414,19 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             const [y, m] = months[0].split('-');
             return ` <span class="font-normal" style="color:#94a3b8">(${y.slice(2)}.${m})</span>`;
         }
+        // 웹툰 카드의 '자기 장르' 색: 제목이 같은 원작(웹툰 아닌 작품)의 장르 색. 원작이 없으면 웹툰 장르 색
+        function webtoonOriginGenreColor(w) {
+            const norm = t => String(t || '').replace(CONTRACT_BROKEN_SUFFIX, '').trim().toLowerCase();
+            const key = norm(w.title);
+            const orig = key ? masterWorks.find(x => x.id !== w.id && x.genre && !x.genre.includes('웹툰') && norm(x.title) === key) : null;
+            return getGenreColor(orig ? orig.genre : w.genre);
+        }
+        function webtoonOriginGenreIndex(w) {
+            const norm = t => String(t || '').replace(CONTRACT_BROKEN_SUFFIX, '').trim().toLowerCase();
+            const key = norm(w.title);
+            const orig = key ? masterWorks.find(x => x.id !== w.id && x.genre && !x.genre.includes('웹툰') && norm(x.title) === key) : null;
+            return Math.max(0, genreList.findIndex(g => g.name === (orig ? orig.genre : w.genre)));
+        }
         function webtoonCardHTML(w) {
             const info = webtoonManage[w.id] || {};
             const charGuideDate = getWebtoonCharGuideDate(w.id);
@@ -13440,7 +13471,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                 ? (pubName ? `${studioName} (${pubName})` : studioName)
                 : (pubName ? `(${pubName})` : '');
 
-            return `<div onclick="openWebtoonManageModal('${w.id}')" data-gi="${Math.max(0, genreList.findIndex(g => g.name === w.genre))}" style="background-color:#ffffff; --pen:${penColor || '#E3D5B5'}" class="rounded-xl border border-slate-200 p-4 cursor-pointer hover:shadow-md hover:border-emerald-300 transition-all relative group overflow-hidden">
+            return `<div onclick="openWebtoonManageModal('${w.id}')" data-gi="${webtoonOriginGenreIndex(w)}" style="background-color:#ffffff; --pen:${penColor || '#E3D5B5'}; --gc:${webtoonOriginGenreColor(w) || '#E3D5B5'}" class="rounded-xl border border-slate-200 p-4 cursor-pointer hover:shadow-md hover:border-emerald-300 transition-all relative group overflow-hidden">
                     ${headerBlock}
                     <div style="background-color:${bodyBg}" class="-mx-4 -mb-4 px-4 pb-4 pt-2.5 mt-1.5 rounded-b-xl">
                     <div class="space-y-1.5 text-[13px]">
@@ -13464,7 +13495,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             if (!container) return;
             updateWebtoonViewTabsUI();
             // 계약 파기한 작품은 '계약 파기' 보기에서만 보인다 (전체 보기·필명 별로 보기 등에서는 빠짐)
-            const brokenWorks = masterWorks.filter(w => w.genre && w.genre.includes('웹툰') && w.contractBroken && !w.removedBroken);
+            const brokenWorks = masterWorks.filter(w => w.genre && w.genre.includes('웹툰') && w.contractBroken);
             const allWebtoonWorks = masterWorks.filter(w => w.genre && w.genre.includes('웹툰') && !w.contractBroken);
             const totalBadge = document.getElementById('webtoon-total-count');
             if (totalBadge) totalBadge.textContent = allWebtoonWorks.length;
@@ -14183,7 +14214,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                         ${penDateRow}
                     </div>`;
             }
-            return `<div onclick="openWorkManageModal('${w.id}')" data-gi="${Math.max(0, genreList.findIndex(g => g.name === w.genre))}" style="background-color:#ffffff; --pen:${genreColor || '#E3D5B5'}" class="rounded-xl border border-slate-200 p-4 cursor-pointer hover:shadow-md hover:border-emerald-300 transition-all relative group overflow-hidden">
+            return `<div onclick="openWorkManageModal('${w.id}')" data-gi="${Math.max(0, genreList.findIndex(g => g.name === w.genre))}" style="background-color:#ffffff; --pen:${genreColor || '#E3D5B5'}; --gc:${genreColor || '#E3D5B5'}" class="rounded-xl border border-slate-200 p-4 cursor-pointer hover:shadow-md hover:border-emerald-300 transition-all relative group overflow-hidden">
                     ${headerBlock}
                     <div style="background-color:${bodyBg}" class="-mx-4 -mb-4 px-4 pb-4 pt-2.5 mt-1.5 rounded-b-xl">
                     <div class="space-y-1.5 text-[13px]">
@@ -23193,7 +23224,9 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             if(currentEditTaskId) {
                 const idx = taskSchedules[dateStr].findIndex(t => t.id === currentEditTaskId);
                 if(idx > -1) {
-                    taskSchedules[dateStr][idx] = { id: currentEditTaskId, date: dateStr, workId, category, memo, isCompleted };
+                    const old = taskSchedules[dateStr][idx];
+                    taskSchedules[dateStr][idx] = { ...old, id: currentEditTaskId, date: dateStr, workId, category, memo, isCompleted };
+                    if (old.workId !== workId) { delete taskSchedules[dateStr][idx].isAutoManuscript; delete taskSchedules[dateStr][idx].extraId; }
                 }
             } else {
                 taskSchedules[dateStr].push({
@@ -23381,6 +23414,18 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             } catch(err) {}
         }
 
+        // 스케줄 관리에서 자동 등록된 '완고 입고' 카드를 옮기면 작품(외전) 정보의 완고 입고일도 같이 바꾼다
+        function syncManuscriptDateFromTask(item) {
+            if (!item || !item.isAutoManuscript || !item.workId || !item.date) return;
+            const w = masterWorks.find(x => x.id === item.workId);
+            if (!w) return;
+            if (item.extraId) {
+                const ex = (w.extras || []).find(e => e.id === item.extraId);
+                if (ex) ex.manuscriptDate = item.date;
+            } else {
+                w.manuscriptDate = item.date;
+            }
+        }
         function handleTaskDrop(e, cell) {
             e.preventDefault(); cell.classList.remove('cal-drag-over');
             const targetDate = cell.dataset.date;
@@ -23396,6 +23441,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                     
                     if(!taskSchedules[targetDate]) taskSchedules[targetDate] = [];
                     taskSchedules[targetDate].push(item);
+                    syncManuscriptDateFromTask(item);
                     save(); renderTaskCalendar();
                 }
             } catch(err) {}
@@ -23457,6 +23503,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                 const data = JSON.parse(e.dataTransfer.getData('text/plain'));
                 if (data.type !== 'task') return;
                 if (moveScheduleItem(taskSchedules, data, targetDate, targetId, insertAfter)) {
+                    syncManuscriptDateFromTask((taskSchedules[targetDate] || []).find(x => x.id === data.id));
                     save(); renderTaskCalendar();
                 }
             } catch(err) {}

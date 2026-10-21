@@ -13414,6 +13414,13 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             const [y, m] = months[0].split('-');
             return ` <span class="font-normal" style="color:#94a3b8">(${y.slice(2)}.${m})</span>`;
         }
+        // 웹툰 카드의 '자기 장르' 색: 제목이 같은 원작(웹툰 아닌 작품)의 장르 색. 원작이 없으면 웹툰 장르 색
+        function webtoonOriginGenreColor(w) {
+            const norm = t => String(t || '').replace(CONTRACT_BROKEN_SUFFIX, '').trim().toLowerCase();
+            const key = norm(w.title);
+            const orig = key ? masterWorks.find(x => x.id !== w.id && x.genre && !x.genre.includes('웹툰') && norm(x.title) === key) : null;
+            return getGenreColor(orig ? orig.genre : w.genre);
+        }
         function webtoonCardHTML(w) {
             const info = webtoonManage[w.id] || {};
             const charGuideDate = getWebtoonCharGuideDate(w.id);
@@ -13458,7 +13465,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                 ? (pubName ? `${studioName} (${pubName})` : studioName)
                 : (pubName ? `(${pubName})` : '');
 
-            return `<div onclick="openWebtoonManageModal('${w.id}')" data-gi="${Math.max(0, genreList.findIndex(g => g.name === w.genre))}" style="background-color:#ffffff; --pen:${penColor || '#E3D5B5'}; --gc:${getGenreColor(w.genre) || '#E3D5B5'}" class="rounded-xl border border-slate-200 p-4 cursor-pointer hover:shadow-md hover:border-emerald-300 transition-all relative group overflow-hidden">
+            return `<div onclick="openWebtoonManageModal('${w.id}')" data-gi="${Math.max(0, genreList.findIndex(g => g.name === w.genre))}" style="background-color:#ffffff; --pen:${penColor || '#E3D5B5'}; --gc:${webtoonOriginGenreColor(w) || '#E3D5B5'}" class="rounded-xl border border-slate-200 p-4 cursor-pointer hover:shadow-md hover:border-emerald-300 transition-all relative group overflow-hidden">
                     ${headerBlock}
                     <div style="background-color:${bodyBg}" class="-mx-4 -mb-4 px-4 pb-4 pt-2.5 mt-1.5 rounded-b-xl">
                     <div class="space-y-1.5 text-[13px]">

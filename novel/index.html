@@ -2492,16 +2492,16 @@ function onManuscriptCopy(e) {
     // 문단 밖에 떨어진 글(부분 선택)도 문단으로 감쌈
     [...t.content.childNodes].forEach(n => { if (n.nodeType === 3 || (n.nodeType === 1 && !/^(P|DIV)$/.test(n.tagName))) { const p = document.createElement('p'); n.replaceWith(p); p.appendChild(n); } });
     t.content.querySelectorAll('p, div').forEach(p => { p.removeAttribute('data-fold'); p.removeAttribute('data-fold-x'); p.style.margin = '0'; if (!p.textContent.trim() && !p.querySelector('br')) p.innerHTML = '<br>'; });
-    // 한글이 확실히 읽도록 예전(워드 시절) 방식으로 다시 씀: 글자색은 <font color="#RRGGBB">, 굵게·기울임·밑줄·취소선은 <b><i><u><s> 태그, 형광은 배경색 span
+    // 한글이 읽도록 단순한 모양으로 다시 씀: 글자마다 span 하나 + style(색은 #RRGGBB), 문단은 간격 0
     const hex = c => { const m = /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i.exec(c || ''); return m ? '#' + [m[1], m[2], m[3]].map(v => (+v).toString(16).padStart(2, '0')).join('').toUpperCase() : (/^#[0-9a-f]{3,6}$/i.test(c || '') ? c.toUpperCase() : ''); };
     const run = (node, f) => [...node.childNodes].map(n => {
         if (n.nodeType === 3) {
             let h = esc(n.data);
             if (!h) return '';
-            if (f.s) h = `<s>${h}</s>`; if (f.u) h = `<u>${h}</u>`; if (f.i) h = `<i>${h}</i>`; if (f.b) h = `<b>${h}</b>`;
-            if (f.c) h = `<font color="${f.c}">${h}</font>`;
-            if (f.bg) h = `<span style="background-color:${f.bg}">${h}</span>`;
-            return h;
+            // 한글 XHTML 읽기는 <font>를 못 읽어서, 꾸밈은 모두 span 하나의 style로 (색은 #RRGGBB)
+            const st = [f.c && `color:${f.c}`, f.bg && `background-color:${f.bg}`, f.b && 'font-weight:bold', f.i && 'font-style:italic',
+                (f.u || f.s) && `text-decoration:${[f.u && 'underline', f.s && 'line-through'].filter(Boolean).join(' ')}`].filter(Boolean).join(';');
+            return st ? `<span style="${st}">${h}</span>` : h;
         }
         if (n.nodeType !== 1) return '';
         if (n.tagName === 'BR') return '<br/>';

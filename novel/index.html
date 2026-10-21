@@ -2492,7 +2492,13 @@ function onManuscriptCopy(e) {
     // 문단 밖에 떨어진 글(부분 선택)도 문단으로 감쌈
     [...t.content.childNodes].forEach(n => { if (n.nodeType === 3 || (n.nodeType === 1 && !/^(P|DIV)$/.test(n.tagName))) { const p = document.createElement('p'); n.replaceWith(p); p.appendChild(n); } });
     t.content.querySelectorAll('p, div').forEach(p => { p.removeAttribute('data-fold'); p.removeAttribute('data-fold-x'); p.style.margin = '0'; if (!p.textContent.trim() && !p.querySelector('br')) p.innerHTML = '<br>'; });
-    const html = t.innerHTML;
+    // 한글은 rgb(…) 색을 거꾸로(파랑↔빨강) 읽어서, 색은 모두 #RRGGBB로 바꿔 넘김 (+ font color도 같이)
+    const hex = c => { const m = /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i.exec(c || ''); return m ? '#' + [m[1], m[2], m[3]].map(v => (+v).toString(16).padStart(2, '0')).join('') : c; };
+    t.content.querySelectorAll('[style]').forEach(n => {
+        if (n.style.color) { const c = hex(n.style.color); n.style.color = c; if (n.tagName === 'SPAN') { const f = document.createElement('font'); f.setAttribute('color', c); f.append(...n.childNodes); n.appendChild(f); } }
+        if (n.style.backgroundColor) n.style.backgroundColor = hex(n.style.backgroundColor);
+    });
+    const html = t.innerHTML.replace(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*[\d.]+\s*)?\)/gi, m => hex(m));
     const text = [...t.content.querySelectorAll('p, div')].map(p => p.textContent).join('\r\n');
     e.clipboardData.setData('text/html', `<html><head><meta charset="utf-8"></head><body>${html}</body></html>`);
     e.clipboardData.setData('text/plain', text);

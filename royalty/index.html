@@ -12552,7 +12552,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             // 외전 섹션 숨김
             const extrasSec = document.getElementById('extras-section');
             if (extrasSec) extrasSec.classList.add('hidden');
-            document.getElementById('new-work-title').value = '';
+            document.getElementById('new-work-title').value = ''; try { updateNewWorkPriorHint(); } catch (e) {}
             document.getElementById('new-work-publisher').value = '';
             document.getElementById('new-work-studio').value = '';
             const spReset = document.getElementById('new-work-settlement-publisher'); if (spReset) spReset.value = '';
@@ -12651,7 +12651,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
 
         function _fillWorkForm(w) {
             document.getElementById('new-work-genre').value = w.genre;
-            document.getElementById('new-work-title').value = w.title;
+            document.getElementById('new-work-title').value = w.title; try { updateNewWorkPriorHint(); } catch (e) {}
             document.getElementById('new-work-publisher').value = w.publisher !== '-' ? w.publisher : '';
             document.getElementById('new-work-studio').value = w.studio !== '-' ? w.studio : '';
             const spFill = document.getElementById('new-work-settlement-publisher');
@@ -13360,6 +13360,34 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
         }
         // 이 작품에 월별 정산(monthlyData)에 금액이 처음 찍힌 달을 'YY.MM' 형식으로 반환 (MG 입금월 표시용)
         // → 정산 관리에서 실제로 금액을 입력한 달을 기준으로 표시 (수동 입력한 advanceDate는 표시에 사용하지 않음)
+        // 같은 제목으로 예전에 계약 파기한 작품(들)과 거기서 받은 정산 합계 — 새 계약과 헷갈리지 않게 안내용
+        function priorBrokenContracts(title, excludeId) {
+            const norm = t => String(t || '').replace(CONTRACT_BROKEN_SUFFIX, '').trim().toLowerCase();
+            const key = norm(title);
+            if (!key) return [];
+            return masterWorks.filter(x => x.contractBroken && x.id !== excludeId && norm(x.title) === key).map(x => {
+                let sum = 0;
+                Object.values(monthlyData).forEach(d => { sum += Number(d && d[x.id]) || 0; });
+                return { work: x, income: sum, mg: x.advanceAmount ? Number(x.advanceAmount) : 0 };
+            });
+        }
+        function priorBrokenText(list) {
+            const income = list.reduce((a, b) => a + b.income, 0), mg = list.reduce((a, b) => a + b.mg, 0);
+            const parts = [];
+            if (mg) parts.push(`MG ${mg.toLocaleString()}만원`);
+            if (income) parts.push(`정산 ₩ ${formatCurrency(income)} 받음`);
+            return parts.length ? parts.join(' · ') : '받은 금액 없음';
+        }
+        function updateNewWorkPriorHint() {
+            const inp = document.getElementById('new-work-title'); if (!inp) return;
+            let el = document.getElementById('new-work-prior-hint');
+            if (!el) { el = document.createElement('div'); el.id = 'new-work-prior-hint'; el.className = 'hidden text-[12px] mt-1.5 ml-1 font-medium'; el.style.color = '#b45309'; inp.closest('.relative').insertAdjacentElement('afterend', el); }
+            const list = priorBrokenContracts(inp.value, document.getElementById('work-editing-id')?.value || '');
+            if (!list.length) { el.classList.add('hidden'); el.textContent = ''; return; }
+            el.textContent = `※ 이전 계약(파기)에서 ${priorBrokenText(list)} — 새 계약은 따로 관리돼요.`;
+            el.classList.remove('hidden');
+        }
+        document.addEventListener('input', e => { if (e.target && e.target.id === 'new-work-title') updateNewWorkPriorHint(); });
         function getMgDepositLabel(workId) {
             const months = Object.keys(monthlyData)
                 .filter(k => monthlyData[k] && monthlyData[k][workId] && Number(monthlyData[k][workId]) !== 0)
@@ -13419,7 +13447,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                         <div class="flex gap-2"><span class="w-[86px] shrink-0" style="color:${webtoonCardSettings.labelColor1}">웹툰 스튜디오</span><span style="color:${webtoonCardSettings.valueColors.studio}">${studioText}</span></div>
                         <div class="flex gap-2"><span class="w-[86px] shrink-0" style="color:${webtoonCardSettings.labelColor1}">계약일</span><span style="color:${webtoonCardSettings.valueColors.contract}">${w.contractDate || ''}</span></div>
                         <div class="flex gap-2"><span class="w-[86px] shrink-0" style="color:${webtoonCardSettings.labelColor1}">RS / 비율</span><span style="color:${webtoonCardSettings.valueColors.rsrate}">${rsRateText}</span></div>
-                        <div class="flex gap-2"><span class="w-[86px] shrink-0" style="color:${webtoonCardSettings.labelColor1}">MG</span><span style="color:${webtoonCardSettings.valueColors.mg}">${w.advanceAmount ? Number(w.advanceAmount).toLocaleString() + '만원' : ''}${getMgDepositLabel(w.id)}</span></div>
+                        <div class="flex gap-2"><span class="w-[86px] shrink-0" style="color:${webtoonCardSettings.labelColor1}">MG</span><span style="color:${webtoonCardSettings.valueColors.mg}">${w.advanceAmount ? Number(w.advanceAmount).toLocaleString() + '만원' : ''}${getMgDepositLabel(w.id)}</span></div>${(() => { const pl = w.contractBroken ? [] : priorBrokenContracts(w.title, w.id); return pl.length ? `<div class="prior-broken-row text-[11px] font-medium" style="color:#b45309">※ 이전 계약(파기) ${priorBrokenText(pl)}</div>` : ''; })()}
                     </div>
                     <div class="border-t border-slate-100 my-2"></div>
                     <div class="space-y-1.5 text-[13px]">

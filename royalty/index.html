@@ -675,6 +675,9 @@ body.theme-spiral .grid.grid-cols-7:has(+ :is(#publish-cal-body, :is(#task-calen
         body.theme-label :is(#workmanage-list [onclick^="openWorkManageModal"], #webtoon-manage-list [onclick^="openWebtoonManageModal"]) span[style*="color:#1e293b"] { color: var(--lb-ink) !important; }
         /* 작품 관리·웹툰 관리 카드 안쪽: 흰 본문 → 투명, 필명 띠·장르 뱃지·구분선 → 스킨 테두리 */
         body.theme-label :is(#workmanage-list [onclick^="openWorkManageModal"], #webtoon-manage-list [onclick^="openWebtoonManageModal"]) div[style*="background-color:#ffffff"] { background-color: transparent !important; }
+        /* 카드 본문(종이 부분): 출간작 구분 색(보라 등)과 상관없이 눈 편한 종이색. 색은 위쪽 머리띠에만 */
+        body.theme-label #webtoon-manage-list [onclick^="openWebtoonManageModal"] > .rounded-b-xl { background-color: #FBF6E9 !important; }
+        body.theme-label #workmanage-list [onclick^="openWorkManageModal"] > .rounded-b-xl { background-color: #EEECE8 !important; }
         body.theme-label :is(#workmanage-list [onclick^="openWorkManageModal"], #webtoon-manage-list [onclick^="openWebtoonManageModal"]) div[style*="background-color:rgba"] { border-radius: 0 !important; border-top: 1.4px dashed var(--lb-dash); border-bottom: 1.4px dashed var(--lb-dash); }
         body.theme-label :is(#workmanage-list [onclick^="openWorkManageModal"], #webtoon-manage-list [onclick^="openWebtoonManageModal"]) span[style*="background-color"] { border: 1.4px dashed var(--lb-dash); border-radius: 6px !important; color: var(--lb-ink) !important; }
         body.theme-label :is(#workmanage-list [onclick^="openWorkManageModal"], #webtoon-manage-list [onclick^="openWebtoonManageModal"]) .border-t { border-top: 1.4px dashed var(--lb-dash) !important; }
@@ -13041,8 +13044,8 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
         function renderMasterWorksList() {
             const container = document.getElementById('master-works-by-genre-container'), tabsContainer = document.getElementById('library-tabs'), badge = document.getElementById('total-works-badge');             const tabs = ['전체', ...genreList.map(g => g.name)];
             tabsContainer.innerHTML = tabs.map(t => `<button onclick="switchLibraryTab('${t}')" class="px-3 py-1.5 text-xs font-bold rounded-lg transition-all mb-1 ${currentLibraryTab === t ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-400 hover:bg-slate-50'}">${t}</button>`).join('');
-            container.innerHTML = ""; // 계약 파기 작품은 '계약 파기' 목록에서만 보인다 — 여기서 지우면 파기 기록·받은 MG 수입이 같이 사라지므로 등록 목록에서는 뺀다
-            let worksToShow = (currentLibraryTab === '전체' ? [...masterWorks] : masterWorks.filter(w => w.genre === currentLibraryTab)).filter(w => !w.contractBroken);
+            container.innerHTML = ""; // 계약 파기 작품을 삭제하면 목록에서만 숨기고(removedBroken) 받은 금액은 총합에 남긴다
+            let worksToShow = (currentLibraryTab === '전체' ? [...masterWorks] : masterWorks.filter(w => w.genre === currentLibraryTab)).filter(w => !w.removedBroken);
             const sortOrder = ['BL 장편', '현로 장편', '현로 초단', 'BL 초단', '웹툰'];
             worksToShow.sort((a,b) => {
                 const idxA = sortOrder.indexOf(a.genre), idxB = sortOrder.indexOf(b.genre);
@@ -13163,7 +13166,23 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             if (worksTab && worksTab.classList.contains('active')) fitWorksPanelsHeight();
         });
         function deleteWork(id) {
-            if (masterWorks.find(x => x.id === id)?.contractBroken) { alert("계약 파기한 작품은 여기서 삭제할 수 없어요. (파기 기록과 받은 MG 수입이 같이 사라져요)"); return; }
+            const bw = masterWorks.find(x => x.id === id);
+            // 계약 파기 작품: 작품은 목록에서 지우되, 받은 MG 등 정산 금액은 총합에 그대로 남긴다
+            if (bw?.contractBroken) {
+                if (!confirm(`'${bw.title}'을(를) 삭제하시겠습니까?
+
+· 작품 등록·계약 파기 목록에서 사라져요.
+· 받은 MG 등 정산 금액은 수입 총합에 그대로 남아요.`)) return;
+                bw.removedBroken = true;
+                const extraIds0 = (bw.extras || []).map(e => e.id);
+                Object.keys(taskSchedules).forEach(date => {
+                    taskSchedules[date] = taskSchedules[date].filter(t => !(t.workId === id) && !(t.extraId && extraIds0.includes(t.extraId)));
+                    if (taskSchedules[date].length === 0) delete taskSchedules[date];
+                });
+                if (webtoonManage[id]) delete webtoonManage[id];
+                save(); updateUI();
+                return;
+            }
             if(confirm("삭제하시겠습니까?")) {
                 // 본편 + 외전의 자동 태스크 모두 제거
                 const w = masterWorks.find(x => x.id === id);
@@ -13408,7 +13427,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             if (!container) return;
             updateWebtoonViewTabsUI();
             // 계약 파기한 작품은 '계약 파기' 보기에서만 보인다 (전체 보기·필명 별로 보기 등에서는 빠짐)
-            const brokenWorks = masterWorks.filter(w => w.genre && w.genre.includes('웹툰') && w.contractBroken);
+            const brokenWorks = masterWorks.filter(w => w.genre && w.genre.includes('웹툰') && w.contractBroken && !w.removedBroken);
             const allWebtoonWorks = masterWorks.filter(w => w.genre && w.genre.includes('웹툰') && !w.contractBroken);
             const totalBadge = document.getElementById('webtoon-total-count');
             if (totalBadge) totalBadge.textContent = allWebtoonWorks.length;

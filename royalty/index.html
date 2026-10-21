@@ -678,8 +678,8 @@ body.theme-spiral .grid.grid-cols-7:has(+ :is(#publish-cal-body, :is(#task-calen
         /* 카드 본문(종이 부분): 출간작 구분 색(보라 등)과 상관없이 눈 편한 종이색. 색은 위쪽 머리띠에만 */
         body.theme-label #webtoon-manage-list [onclick^="openWebtoonManageModal"] > div.rounded-b-xl[style*="background-color"][style*="background-color"] { background-color: #FFFDF5 !important; }
         body.theme-label #workmanage-list [onclick^="openWorkManageModal"] > div.rounded-b-xl[style*="background-color"][style*="background-color"] { background-color: #F6F5F3 !important; }
-        /* 작품 관리·웹툰 관리 카드 윗부분: 그 작품의 장르 색(--gc)을 흰색과 섞은 파스텔로. 카드 바탕은 아이보리 */
-        body.theme-label :is(#webtoon-manage-list, #workmanage-list) [onclick^="open"] > .rounded-t-xl, body.theme-label :is(#webtoon-manage-list, #workmanage-list) [onclick^="open"] > div[style*="background-color:rgba"] { background-color: color-mix(in srgb, var(--gc, #E3D5B5) 55%, #fff) !important; background-image: none !important; }
+        /* 작품 관리·웹툰 관리 카드 윗부분: 카드 바탕의 파스텔(분홍·노랑·연두·하늘, 라이브러리 카드와 같은 팔레트)을 그대로 보이게 */
+        body.theme-label :is(#webtoon-manage-list, #workmanage-list) [onclick^="open"] > .rounded-t-xl, body.theme-label :is(#webtoon-manage-list, #workmanage-list) [onclick^="open"] > div[style*="background-color:rgba"] { background-color: transparent !important; background-image: none !important; }
         body.theme-label :is(#webtoon-manage-list, #workmanage-list) [onclick^="open"] { background-color: #FFFDF7 !important; background-image: none !important; }
         body.theme-label :is(#workmanage-list [onclick^="openWorkManageModal"], #webtoon-manage-list [onclick^="openWebtoonManageModal"]) div[style*="background-color:rgba"] { border-radius: 0 !important; border-top: 1.4px dashed var(--lb-dash); border-bottom: 1.4px dashed var(--lb-dash); }
         body.theme-label :is(#workmanage-list [onclick^="openWorkManageModal"], #webtoon-manage-list [onclick^="openWebtoonManageModal"]) span[style*="background-color"] { border: 1.4px dashed var(--lb-dash); border-radius: 6px !important; color: var(--lb-ink) !important; }
@@ -13421,6 +13421,12 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             const orig = key ? masterWorks.find(x => x.id !== w.id && x.genre && !x.genre.includes('웹툰') && norm(x.title) === key) : null;
             return getGenreColor(orig ? orig.genre : w.genre);
         }
+        function webtoonOriginGenreIndex(w) {
+            const norm = t => String(t || '').replace(CONTRACT_BROKEN_SUFFIX, '').trim().toLowerCase();
+            const key = norm(w.title);
+            const orig = key ? masterWorks.find(x => x.id !== w.id && x.genre && !x.genre.includes('웹툰') && norm(x.title) === key) : null;
+            return Math.max(0, genreList.findIndex(g => g.name === (orig ? orig.genre : w.genre)));
+        }
         function webtoonCardHTML(w) {
             const info = webtoonManage[w.id] || {};
             const charGuideDate = getWebtoonCharGuideDate(w.id);
@@ -13465,7 +13471,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                 ? (pubName ? `${studioName} (${pubName})` : studioName)
                 : (pubName ? `(${pubName})` : '');
 
-            return `<div onclick="openWebtoonManageModal('${w.id}')" data-gi="${Math.max(0, genreList.findIndex(g => g.name === w.genre))}" style="background-color:#ffffff; --pen:${penColor || '#E3D5B5'}; --gc:${webtoonOriginGenreColor(w) || '#E3D5B5'}" class="rounded-xl border border-slate-200 p-4 cursor-pointer hover:shadow-md hover:border-emerald-300 transition-all relative group overflow-hidden">
+            return `<div onclick="openWebtoonManageModal('${w.id}')" data-gi="${webtoonOriginGenreIndex(w)}" style="background-color:#ffffff; --pen:${penColor || '#E3D5B5'}; --gc:${webtoonOriginGenreColor(w) || '#E3D5B5'}" class="rounded-xl border border-slate-200 p-4 cursor-pointer hover:shadow-md hover:border-emerald-300 transition-all relative group overflow-hidden">
                     ${headerBlock}
                     <div style="background-color:${bodyBg}" class="-mx-4 -mb-4 px-4 pb-4 pt-2.5 mt-1.5 rounded-b-xl">
                     <div class="space-y-1.5 text-[13px]">

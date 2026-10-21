@@ -2519,8 +2519,9 @@ function onManuscriptCopy(e) {
         const inner = run(p, {}); return `<p style="margin-top:0;margin-bottom:0"${al}>${inner.replace(/<br\/>$/, '') || '&#160;'}</p>`; // 한글은 XHTML로 읽어서 &nbsp; 대신 &#160;, <br/>
     }).join('\r\n');
     const text = [...t.content.querySelectorAll('p, div')].map(p => p.textContent).join('\r\n');
-    // <html><body>로 감싸지 않음: 브라우저가 클립보드용 껍데기를 따로 씌우는데, 겹치면 한글이 HTML을 못 읽음
-    e.clipboardData.setData('text/html', html);
+    // 브라우저가 직접 복사할 때처럼 맨 앞에 글자 인코딩(utf-8) 표시를 붙임 — 이게 없으면 한글이 한국어를 옛 인코딩으로 읽다가 통째로 실패함
+    // (<html><body>로 감싸지는 않음: 브라우저가 클립보드용 껍데기를 따로 씌움)
+    e.clipboardData.setData('text/html', `<meta charset='utf-8'>${html}`);
     e.clipboardData.setData('text/plain', text);
     e.preventDefault();
     if (e.type === 'cut' && ed.getAttribute('contenteditable') === 'true') document.execCommand('delete');

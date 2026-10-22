@@ -2262,7 +2262,11 @@ window.manualFirebasePush = async function () {
             clearTimeout(_deleteToastTimer);
             hideDeleteToast();
             const data = window.getCurrentBoard().data;
-            const row = data.find(r => r.id === _deletedCardCache.rowId);
+            let row = data.find(r => r.id === _deletedCardCache.rowId);
+            if (!row) { // 마지막 파트를 지워서 줄까지 없어졌으면 그 자리에 줄을 되살림
+                row = { id: _deletedCardCache.rowId, title: '', color: 'gray', cards: [] };
+                data.splice(Math.min(_deletedCardCache.rowIdx ?? data.length, data.length), 0, row);
+            }
             if (row) {
                 row.cards.splice(_deletedCardCache.cardIdx, 0, _deletedCardCache.card);
                 renderAll();
@@ -4353,11 +4357,13 @@ window.manualFirebasePush = async function () {
                 if (idx !== -1) {
                     pushHistory();
                     const [removed] = r.cards.splice(idx, 1);
+                    const rowIdx = data.indexOf(r);
                     if(window.activeCardId === id) window.activeCardId = null;
                     renderAll();
                     window.triggerSave();
                     // 토스트로 되돌리기 제공
                     showDeleteToast(removed, r.id, idx);
+                    if (_deletedCardCache) _deletedCardCache.rowIdx = rowIdx;
                     return;
                 }
             }
@@ -4702,7 +4708,17 @@ window.manualFirebasePush = async function () {
             if (window.lucide) window.lucide.createIcons({ el: palette });
         }
 
+        // 파트(카드)를 다 지우거나 다른 줄로 옮겨서 빈 줄이 되면 그 줄은 없앰 (줄이 하나뿐이면 남김)
+        function pruneEmptyRows() {
+            const b = window.getCurrentBoard && window.getCurrentBoard();
+            if (!b || !Array.isArray(b.data) || b.data.length < 2) return false;
+            const before = b.data.length;
+            b.data = b.data.filter(r => (r.cards || []).length);
+            if (!b.data.length) b.data = [{ id: generateId(), title: '', color: 'gray', cards: [] }];
+            return b.data.length !== before;
+        }
         function renderAll() {
+            if (pruneEmptyRows()) setTimeout(() => window.triggerSave && window.triggerSave(), 0);
             renderBoardList();
             renderBoard();
             if (window.activeMainTab === 'character') renderCharacterPage();

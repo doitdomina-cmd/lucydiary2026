@@ -9842,8 +9842,16 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
         }
 
 
-        function deletePublishWork(id) {
-            if (!confirm('이 작품을 출간 일정 및 작품 목록에서 삭제하시겠습니까?')) return;
+        async function deletePublishWork(id) {
+            const rec = getWorkSettleRecord(id);
+            let wipe = false;
+            if (rec.months) {
+                const w0 = masterWorks.find(w => w.id === id);
+                const choice = await askSettleKeepChoice(w0 ? w0.title : '작품', rec);
+                if (!choice) return;
+                wipe = choice === 'wipe';
+            } else if (!confirm('이 작품을 출간 일정 및 작품 목록에서 삭제하시겠습니까?')) return;
+            if (wipe) Object.keys(monthlyData).forEach(ym => { if (monthlyData[ym] && id in monthlyData[ym]) delete monthlyData[ym][id]; });
             Object.keys(taskSchedules).forEach(date => {
                 taskSchedules[date] = taskSchedules[date].filter(t => !(t.workId === id && t.isAutoManuscript));
                 if (taskSchedules[date].length === 0) delete taskSchedules[date];
@@ -13168,6 +13176,33 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             const worksTab = document.getElementById('tab-works');
             if (worksTab && worksTab.classList.contains('active')) fitWorksPanelsHeight();
         });
+        // 작품에 쌓인 정산 기록 (삭제 시 남길지 물어보기 위해)
+        function getWorkSettleRecord(id) {
+            let total = 0, months = 0;
+            Object.values(monthlyData).forEach(d => { const a = Number(d && d[id]) || 0; if (a) { total += a; months++; } });
+            return { total, months };
+        }
+        // 정산 기록이 있는 작품 삭제 선택창: 'keep'(기록 남김) / 'wipe'(기록까지 삭제) / null(취소)
+        function askSettleKeepChoice(title, rec) {
+            return new Promise(resolve => {
+                const ov = document.createElement('div');
+                ov.style.cssText = 'position:fixed;inset:0;background:rgba(30,25,20,.45);z-index:100000;display:flex;align-items:center;justify-content:center;padding:16px;';
+                const box = document.createElement('div');
+                box.style.cssText = 'background:#fffdf7;border-radius:14px;max-width:380px;width:100%;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.25);font-family:inherit;color:#3b342c;';
+                const esc = t => String(t).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+                box.innerHTML = `<div style="font-weight:800;font-size:15px;margin-bottom:6px;">'${esc(title)}' 삭제</div>
+                    <div style="font-size:13px;color:#6b6258;margin-bottom:14px;">이 작품에 정산 기록이 <b>₩${formatCurrency(rec.total)}</b> (${rec.months}개월) 있어요. 어떻게 할까요?</div>
+                    <button data-c="keep" style="display:block;width:100%;text-align:left;padding:11px 13px;margin-bottom:8px;border-radius:10px;border:1.5px solid #d9cfb8;background:#fff8e1;cursor:pointer;font-size:13px;line-height:1.45;"><b>정산 기록은 남기고, 작품만 삭제</b><br><span style="color:#8a7f70;font-size:12px;">받은 금액은 수입 총합에 그대로 남아요.</span></button>
+                    <button data-c="wipe" style="display:block;width:100%;text-align:left;padding:11px 13px;margin-bottom:8px;border-radius:10px;border:1.5px solid #e5b9b9;background:#fdeeee;cursor:pointer;font-size:13px;line-height:1.45;"><b style="color:#b42318;">정산 기록까지 모두 삭제</b><br><span style="color:#8a7f70;font-size:12px;">수입 총합에서도 빠지고 되돌릴 수 없어요.</span></button>
+                    <button data-c="cancel" style="display:block;width:100%;padding:10px;border-radius:10px;border:1.5px solid #ddd6c8;background:#fff;cursor:pointer;font-size:13px;font-weight:700;">취소</button>`;
+                const done = v => { document.removeEventListener('keydown', onKey, true); ov.remove(); resolve(v); };
+                const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); done(null); } };
+                box.querySelectorAll('button').forEach(b => b.onclick = () => done(b.dataset.c === 'cancel' ? null : b.dataset.c));
+                ov.addEventListener('click', e => { if (e.target === ov) done(null); });
+                document.addEventListener('keydown', onKey, true);
+                ov.appendChild(box); document.body.appendChild(ov);
+            });
+        }
         // 계약 파기 작품 삭제 선택창: 'keep'(카드·금액 남기고 작품 등록에서만 삭제) / 'wipe'(카드·금액까지 모두 삭제) / null(취소)
         function askBrokenDeleteChoice(title) {
             return new Promise(resolve => {
@@ -13210,7 +13245,11 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                 });
                 return;
             }
-            if(confirm("삭제하시겠습니까?")) {
+            const rec = getWorkSettleRecord(id);
+            const proceed = rec.months
+                ? askSettleKeepChoice((bw && bw.title) || '작품', rec).then(c => { if (c === 'wipe') Object.keys(monthlyData).forEach(ym => { if (monthlyData[ym] && id in monthlyData[ym]) delete monthlyData[ym][id]; }); return !!c; })
+                : Promise.resolve(confirm("삭제하시겠습니까?"));
+            proceed.then(ok => { if (!ok) return;
                 // 본편 + 외전의 자동 태스크 모두 제거
                 const w = masterWorks.find(x => x.id === id);
                 const extraIds = (w?.extras || []).map(e => e.id);
@@ -13226,7 +13265,7 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
                 purgeOrphanSchedules();   // 집필 관리 글자수 등 작품과 연결된 일정도 함께 제거
                 if (webtoonManage[id]) delete webtoonManage[id];   // 웹툰 관리 카드 데이터도 함께 제거
                 save(); updateUI(); 
-            } 
+            });
         }
         function openGenreManager() { renderGenreManagerList(); try { fillCalDesignInline('works'); } catch (e) {} document.getElementById('genre-manager-modal').classList.add('open'); }
         function closeGenreManager() { document.getElementById('genre-manager-modal').classList.remove('open'); editingGenreIndex = null; document.getElementById('new-genre-input').value = ''; document.getElementById('new-genre-color').value = '#cbd5e1'; document.getElementById('btn-add-update-genre').innerText = '추가'; document.getElementById('btn-add-update-genre').onclick = addNewGenre; }
@@ -21393,14 +21432,21 @@ body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.the
             // 5) 연도별 정산 요약
             lines.push('=== 연도별 정산 요약 ===');
             const byYear = {};
+            const workIdSet = new Set(masterWorks.map(w => String(w.id)));
+            let orphanTotal = 0, orphanCount = 0;   // 작품 목록에 없는 id의 기록 (삭제된 작품 등)
             Object.entries(monthlyData).forEach(([mKey, d]) => {
                 const yr = mKey.split('-')[0];
-                const sum = Object.values(d).reduce((s, v) => s + (Number(v) || 0), 0);
-                byYear[yr] = (byYear[yr] || 0) + sum;
+                Object.entries(d).forEach(([wId, v]) => {
+                    const amt = Number(v) || 0;
+                    if (!amt) return;
+                    if (workIdSet.has(String(wId))) byYear[yr] = (byYear[yr] || 0) + amt;
+                    else { orphanTotal += amt; orphanCount++; }
+                });
             });
             const yearKeys = Object.keys(byYear).sort();
             if (!yearKeys.length) lines.push('(없음)');
             yearKeys.forEach(yr => lines.push(`- ${yr}년: ₩${formatCurrency(byYear[yr])}`));
+            if (orphanCount) lines.push(`(참고) 작품 목록에 없는 정산 기록 ${orphanCount}건 ₩${formatCurrency(orphanTotal)} 은 위 합계에 포함하지 않음 — 삭제된 작품이거나 중복 기록일 수 있음`);
             lines.push('');
 
             // 6) 전체 요약

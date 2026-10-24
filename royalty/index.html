@@ -4951,10 +4951,10 @@ body.theme-cozy #year-timeline-content[data-card="retro"] #year-timeline-body [t
 /* 코지: 집필 달력 기간 막대 안 글씨를 키운다 */
 body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar, body.theme-cozy #write-calendar-body[data-card="cozy"] .write-span-bar > span { font-size: 13px !important; }
 /* 패시브 기간 막대: 일반 막대보다 낮고 가늘게, 쓴 글자수만큼 앞에서부터 색이 차오른다 (모든 테마 공통) */
-body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive { background: color-mix(in srgb, var(--sc) 22%, #FFFFFF) !important; background-image: none !important; border-width: 1px !important; border-radius: 7px !important; box-shadow: none !important; outline: 0 !important; margin: 0 !important; min-height: 0 !important; padding: 0 !important; filter: none !important; }
+body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive { background: var(--pt, color-mix(in srgb, var(--sc) 22%, #FFFFFF)) !important; background-image: none !important; border-width: 1px !important; border-radius: 7px !important; box-shadow: none !important; outline: 0 !important; margin: 0 !important; min-height: 0 !important; padding: 0 !important; filter: none !important; }
 body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive::before, body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive::after { display: none !important; }
 body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive > span { font-size: 9.5px !important; line-height: 1 !important; padding: 0 6px 0 10px !important; }
-body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .wsp-fill { background: var(--vc, var(--sc)) !important; }
+body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .wsp-fill { background: var(--pf, var(--vc, var(--sc))) !important; }
 /* ═══ GAMING END ═══ */
     
         /* ── 참고일정(연재 일정 계산기) ── */
@@ -8467,7 +8467,7 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                     </div>
                     <div>
                         <label class="text-sm font-bold text-slate-600 block mb-1">작품 연결 (선택)</label>
-                        <select id="span-work-select" onchange="updateSpanConfirmBtn(); updateSpanWorkInfoPanel();" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:border-amber-400"></select>
+                        <select id="span-work-select" onchange="updateSpanConfirmBtn(); updateSpanWorkInfoPanel(); updateSpanPreview();" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:border-amber-400"></select>
                     </div>
                 </div>
 
@@ -8487,6 +8487,8 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                         <input type="date" id="span-end-input" oninput="updateSpanPreview()" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:border-amber-400">
                     </div>
                 </div>
+
+                <div id="span-passive-info" style="display:none;" class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm text-slate-600"></div>
 
                 <div id="span-daily-wrap">
                     <div class="flex items-center justify-between mb-1.5">
@@ -21725,7 +21727,7 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
         let currentEditSpanId = null;
         let currentSpanColor = '#E2D1A0';
         const SPAN_LANE_H = 24; // 막대 한 줄 높이(px)
-        const SPAN_PASSIVE_H = 16; // 패시브 막대 한 줄 높이(px) — 일반 막대보다 낮게, 맨 아래에
+        const SPAN_PASSIVE_H = 18; // 패시브 막대 한 줄 높이(px) — 일반 막대보다 낮게, 맨 아래에
 
         // 날짜 문자열(YYYY-MM-DD) 유틸 — 시간대 밀림 방지를 위해 문자열로 직접 조립
         function spanDateAdd(dateStr, days) {
@@ -21803,6 +21805,26 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
             return days;
         }
 
+        // 패시브 막대: 연결한 작품의 목표 글자수 ÷ 기간의 집필일(쉬는 날 뺀 일수) = 하루 분량
+        function passiveStats(span) {
+            const totalDays = Math.max(1, spanDayDiff(span.startDate, span.endDate) + 1);
+            const [sy, sm, sd] = span.startDate.split('-').map(Number);
+            const restSet = span.restMode === 'days' ? new Set(span.restWeekdays || []) : null;
+            const restPerWeek = Math.min(7, Math.max(0, Number(span.restPerWeek) || 0));
+            const restEveryN = (!restSet && restPerWeek > 0) ? Math.round(7 / restPerWeek) : null;
+            const midBreaks = Array.isArray(span.midBreaks) ? span.midBreaks.filter(b => b && b.start && b.end) : [];
+            const flags = [], workIdx = [];
+            let work = 0;
+            for (let i = 0; i < totalDays; i++) {
+                const dt = new Date(sy, sm - 1, sd + i), ds = getYYYYMMDD(dt);
+                const rest = midBreaks.some(b => ds >= b.start && ds <= b.end) || (restSet ? restSet.has(dt.getDay()) : (restEveryN ? ((i + 1) % restEveryN === 0) : false));
+                flags.push(rest); workIdx.push(work);
+                if (!rest) work++;
+            }
+            const total = span.workId ? (resolveWorkItem(span.workId).goalWithSpace || 0) : 0;
+            return { totalDays, workDays: work, restDays: totalDays - work, flags, workIdx, total, daily: work ? total / work : 0 };
+        }
+
         // 기간·휴일·하루 집필량으로 총 일수 / 집필 가능 일수 / 총 글자수 계산
         // 종류가 '집필'이 아니면(교정·휴식·기타) 쉬는 날도 글자수도 따지지 않고 기간만 센다
         function calcSpanStats(span) {
@@ -21869,24 +21891,35 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
             rest:     { label: '휴식',      icon: '☁︎', hint: '쉬는 기간으로만 표시합니다.', rest: false, chars: false },
             trip:     { label: '여행',      icon: '✿︎', hint: '기간만 표시합니다.', rest: false, chars: false },
             synopsis: { label: '시놉/기획', icon: '✧︎', hint: '기간만 표시합니다. (시놉시스·기획 작업 등)', rest: false, chars: false },
-            etc:      { label: '기타',      icon: '♪︎', hint: '기간만 표시합니다. (자료조사·미팅 등)', rest: false, chars: false },
-            passive:  { label: '패시브',    icon: '✎︎', hint: '카드 없이 막대 하나만 둡니다. 연결한 작품에 쓴 글자수(시작일부터, 미리 쓴 것 포함)만큼 막대가 앞에서부터 차올라요. 하루 목표 글자수 기준이에요.', rest: false, chars: false, passive: true,
-                      iconHtml: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-0.12em;"><path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 013 3L8 19z"/><path d="M14.5 6.5l3 3"/></svg>' }   // iconHtml: 글꼴에 따라 컬러 이모지로 바뀌지 않게 선으로 그린 연필
+            passive:  { label: '패시브',    icon: '✎︎', hint: '카드 없이 낮은 막대 하나만 둡니다. 연결한 작품의 목표 글자수를 기간(쉬는 날 뺀 일수)으로 나눠, 시작일부터 쓴 글자수(미리 쓴 것 포함)만큼 앞에서부터 색이 차올라요.', rest: true, chars: false, passive: true,
+                      iconHtml: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-0.12em;"><path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 013 3L8 19z"/><path d="M14.5 6.5l3 3"/></svg>' },   // iconHtml: 글꼴에 따라 컬러 이모지로 바뀌지 않게 선으로 그린 연필
+            etc:      { label: '기타',      icon: '♪︎', hint: '기간만 표시합니다. (자료조사·미팅 등)', rest: false, chars: false, hidden: true }
+
         };
         let currentSpanType = 'write';
 
         function renderSpanTypeGroup() {
             const g = document.getElementById('span-type-group');
             if (!g) return;
-            g.innerHTML = Object.entries(SPAN_TYPES).map(([key, t]) => {
+            g.innerHTML = Object.entries(SPAN_TYPES).filter(([key, t]) => !t.hidden || key === currentSpanType).map(([key, t]) => {
                 const on = currentSpanType === key;
-                return `<button type="button" onclick="setSpanType('${key}')"
+                return `<button type="button" onclick="onSpanTypeClick('${key}')"
                     class="py-2.5 rounded-xl border text-xs font-bold transition-colors"
                     style="${on ? 'background:#f59e0b; border-color:#f59e0b; color:#fff;' : 'background:#f8fafc; border-color:#e2e8f0; color:#64748b;'}">
                     ${t.iconHtml || t.icon} ${t.label}</button>`;
             }).join('');
             const hint = document.getElementById('span-type-hint');
             if (hint) hint.textContent = SPAN_TYPES[currentSpanType].hint;
+        }
+
+        // 종류 버튼을 눌렀을 때: 패시브는 쉬는 날 없음이 기본
+        function onSpanTypeClick(type) {
+            if (type === 'passive' && currentSpanType !== 'passive') {
+                currentSpanRestWeekdays = [];
+                document.getElementById('span-rest-input').value = 0;
+                setSpanRestMode('count');
+            }
+            setSpanType(type);
         }
 
         function setSpanType(type) {
@@ -21900,11 +21933,11 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                 el.style.visibility = shown ? 'visible' : 'hidden';
                 el.style.pointerEvents = shown ? '' : 'none';
             };
-            setShown('span-daily-wrap', conf.chars || conf.passive);   // 글자수는 집필·패시브에만
-            const drw = document.getElementById('span-dailyrange-wrap');
-            if (drw) drw.style.display = conf.passive ? 'none' : '';   // 구간별 글자수는 패시브에 안 씀
-            const dIn = document.getElementById('span-daily-input');
-            if (conf.passive && dIn && String(dIn.value) === '8000') dIn.value = 1000;   // 패시브 기본 하루 1천자
+            setShown('span-daily-wrap', conf.chars);   // 글자수는 집필에만
+            const dw = document.getElementById('span-daily-wrap');
+            if (dw) dw.style.display = conf.passive ? 'none' : '';   // 패시브는 하루 집필량을 직접 안 정한다
+            const pinfo = document.getElementById('span-passive-info');
+            if (pinfo) pinfo.style.display = conf.passive ? '' : 'none';
             setShown('span-rest-section', conf.rest);  // 쉬는 날은 집필·교정에
             const midBreakPanel = document.getElementById('span-midbreak-panel');
             if (midBreakPanel) midBreakPanel.style.visibility = conf.rest ? 'visible' : 'hidden';   // 중간 휴식도 집필·교정에만
@@ -22353,11 +22386,20 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                 : `쉬는 날 <b class="text-slate-700">${st.restDays}일</b>`;
 
             if (t.passive) {
-                const dly = Number(document.getElementById('span-daily-input').value) || 0;
+                const wsel = document.getElementById('span-work-select').value;
+                const ps = passiveStats({ startDate: start, endDate: end, workId: wsel, restMode: currentSpanRestMode, restWeekdays: currentSpanRestWeekdays, restPerWeek: document.getElementById('span-rest-input').value, midBreaks: currentSpanMidBreaks });
+                const pinfo = document.getElementById('span-passive-info');
+                if (pinfo) {
+                    pinfo.innerHTML = !wsel
+                        ? '<span class="text-slate-400">작품을 연결하면 그 작품의 목표 글자수로 하루 분량을 계산해요.</span>'
+                        : (ps.total
+                            ? `총 <b class="text-slate-700">${ps.total.toLocaleString()}자</b> · <b class="text-slate-700">${ps.workDays}일</b> 동안<br><span class="text-base font-bold text-amber-600">하루 약 ${Math.ceil(ps.daily).toLocaleString()}자씩</span> 쓰면 돼요`
+                            : '<span class="text-rose-500 font-bold">연결한 작품에 목표 글자수가 없어요.</span> 작품 정보에서 목표 글자수를 먼저 넣어주세요.');
+                }
                 el.innerHTML = `${t.iconHtml || t.icon} <b class="text-slate-700">${t.label}</b> 막대
-                    &nbsp;·&nbsp; 기간 <b class="text-slate-700">${st.totalDays}일</b>
-                    &nbsp;·&nbsp; 하루 <b class="text-amber-600">${dly.toLocaleString()}자</b><br>
-                    <span class="text-xs text-slate-400">연결한 작품에 시작일부터 쓴 글자수만큼 막대가 채워져요. (총 ${(dly * st.totalDays).toLocaleString()}자 분량)</span>`;
+                    &nbsp;·&nbsp; 기간 <b class="text-slate-700">${ps.totalDays}일</b>
+                    &nbsp;·&nbsp; 쉬는 날 <b class="text-slate-700">${ps.restDays}일</b>
+                    &nbsp;·&nbsp; 집필 <b class="text-slate-700">${ps.workDays}일</b>`;
                 return;
             }
             // 교정: 쉬는 날은 계산하되 글자수는 표시하지 않는다
@@ -22588,7 +22630,15 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                     headText: `${sType.icon} ${(['edit', 'synopsis', 'rest'].includes(s.type || 'write') && spanTitle !== sType.label) ? sType.label + (spanTitle || spanWork ? ' · ' : '') : ''}${spanTitle}${spanTitle && spanWork ? ' · ' : ''}${spanWork}`,
                     statText: st.noChars ? daysTxt : `${daysTxt} · ${st.totalChars.toLocaleString()}자${cumText}`
                 };
-                if (sType.passive) { p.info.statText = ''; p.info.label = p.info.headText; }
+                if (sType.passive) {
+                    // 패시브: 제목 옆에 (쓴 글자수/총 글자수), 막대는 그 비율만큼 시작일부터 채운다
+                    const ps = passiveStats(s);
+                    let written = 0;
+                    try { written = s.workId ? writerGetWorkWrittenSince(s.workId, s.startDate) : 0; } catch (e) {}
+                    p.ps = ps; p.written = written;
+                    p.info.statText = ps.total ? `${written.toLocaleString()}/${ps.total.toLocaleString()}자` : `${written.toLocaleString()}자`;
+                    p.info.label = `${p.info.headText} (${p.info.statText})`;
+                }
                 else p.info.label = `${p.info.headText} · ${p.info.statText}`;
             });
 
@@ -22644,11 +22694,8 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                 // 이 달력 화면 안에 실제 시작일/종료일이 들어와 있는지 (밖이면 잘린 모양으로 표시)
                 const startsIn = startsInView(s);
                 const endsInView = s.endDate <= lastDate;
-                // 패시브: 시작일부터 쓴 글자수 ÷ 하루 목표 = 앞에서부터 채울 날 수 (미리 쓴 분량은 다음 날짜에 미리 칠해진다)
-                let coveredDays = 0;
-                if (sType.passive && s.workId) {
-                    try { coveredDays = writerGetWorkWrittenSince(s.workId, s.startDate) / Math.max(1, Number(s.dailyChars) || 1000); } catch (e) {}
-                }
+                // 패시브: 쓴 글자수 ÷ 하루 분량 = 앞에서부터 채울 집필일 수 (쉬는 날은 건너뜀, 미리 쓴 분량은 다음 날짜에 미리 칠해진다)
+                const coveredDays = (sType.passive && p.ps && p.ps.daily > 0) ? p.written / p.ps.daily : 0;
 
                 // 주 단위로 잘라서 각각 막대를 그림
                 for (let r = Math.floor(p.si/7); r <= Math.floor(p.ei/7); r++) {
@@ -22695,13 +22742,24 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                     else segText = `↪ ${sType.icon} ${p.info.typeTag ? p.info.typeTag + ((spanTitle || spanWork) ? ' · ' : '') : ''}${spanTitle || spanWork}`;
                     let fillHtml = '';
                     if (sType.passive) {
-                        let sumFrac = 0;
+                        // 칸마다 채워진 정도를 구해, 이어지는 칸은 하나의 덩어리로 합쳐 그린다
+                        const n = segEnd - segStart + 1, runs = [];
                         for (let ci = segStart; ci <= segEnd; ci++) {
                             const off = spanDayDiff(s.startDate, cells[ci].dataset.date);
-                            sumFrac += Math.max(0, Math.min(1, coveredDays - off));
+                            const ps = p.ps;
+                            const frac = (off < 0 || off >= ps.totalDays || ps.flags[off]) ? 0 : Math.max(0, Math.min(1, coveredDays - ps.workIdx[off]));
+                            if (frac <= 0) continue;
+                            const k = ci - segStart, last = runs[runs.length - 1];
+                            if (last && Math.abs(last.end - k) < 1e-6) last.end = k + frac; else runs.push({ start: k, end: k + frac });
                         }
                         bar.classList.add('wsp-passive');
-                        fillHtml = `<i class="wsp-fill" style="position:absolute; left:0; top:0; bottom:0; width:${(sumFrac / (segEnd - segStart + 1) * 100).toFixed(2)}%; background:var(--vc);"></i>`;
+                        fillHtml = runs.map(r => `<i class="wsp-fill" style="position:absolute; left:${(r.start / n * 100).toFixed(2)}%; top:0; bottom:0; width:${((r.end - r.start) / n * 100).toFixed(2)}%;"></i>`).join('');
+                        // 회색 계열은 노랗게 변하지 않게 진짜 회색으로, 나머지는 같은 색의 연한 바탕 + 선명한 채움
+                        const base = spanColorSolid(s.color), cm = /^#?([0-9a-f]{6})$/i.exec(base || '');
+                        let gray = false;
+                        if (cm) { const v = [0, 2, 4].map(o => parseInt(cm[1].slice(o, o + 2), 16) / 255); gray = Math.max(...v) - Math.min(...v) < 0.07; }
+                        bar.style.setProperty('--pt', gray ? '#EDEDEF' : `color-mix(in srgb, ${base} 22%, #FFFFFF)`);
+                        bar.style.setProperty('--pf', gray ? '#B9BAC0' : spanColorVivid(s.color));
                     }
                     const segHtml = sType.iconHtml ? segText.split(sType.icon).join(sType.iconHtml) : segText;
                     bar.innerHTML = fillHtml + `<span style="position:relative; padding:0 10px 0 16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${segHtml}</span>`;

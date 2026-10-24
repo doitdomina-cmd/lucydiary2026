@@ -21819,6 +21819,7 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
         }
 
         // 패시브 막대: 연결한 작품의 목표 글자수 ÷ 기간의 집필일(쉬는 날 뺀 일수) = 하루 분량
+        const PASSIVE_DEFAULT_CHARS = 14000;
         function passiveStats(span) {
             const totalDays = Math.max(1, spanDayDiff(span.startDate, span.endDate) + 1);
             const [sy, sm, sd] = span.startDate.split('-').map(Number);
@@ -21834,7 +21835,8 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                 flags.push(rest); workIdx.push(work);
                 if (!rest) work++;
             }
-            const total = span.workId ? (resolveWorkItem(span.workId).goalWithSpace || 0) : 0;
+            // 작품을 연결하지 않으면(초단 미리 잡아두기 등) 기본 14,000자로 계산한다
+            const total = span.workId ? (resolveWorkItem(span.workId).goalWithSpace || 0) : PASSIVE_DEFAULT_CHARS;
             return { totalDays, workDays: work, restDays: totalDays - work, flags, workIdx, total, daily: work ? total / work : 0 };
         }
 
@@ -22411,8 +22413,8 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
             const start = document.getElementById('span-start-input').value;
             const wsel = document.getElementById('span-work-select').value;
             const n = parseInt(document.getElementById('span-passive-daily-input').value) || 0;
-            if (!start || !wsel || n <= 0) return;
-            const total = resolveWorkItem(wsel).goalWithSpace || 0;
+            if (!start || n <= 0) return;
+            const total = wsel ? (resolveWorkItem(wsel).goalWithSpace || 0) : PASSIVE_DEFAULT_CHARS;
             if (!total) return;
             const need = Math.ceil(total / n);
             const ps = passiveStats({ startDate: start, endDate: spanDateAdd(start, 3650), workId: wsel, restMode: currentSpanRestMode, restWeekdays: currentSpanRestWeekdays, restPerWeek: document.getElementById('span-rest-input').value, midBreaks: currentSpanMidBreaks });
@@ -22464,10 +22466,8 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                 const ps = passiveStats({ startDate: start, endDate: end, workId: wsel, restMode: currentSpanRestMode, restWeekdays: currentSpanRestWeekdays, restPerWeek: document.getElementById('span-rest-input').value, midBreaks: currentSpanMidBreaks });
                 const pinfo = document.getElementById('span-passive-info');
                 if (pinfo) {
-                    pinfo.innerHTML = !wsel
-                        ? '<span class="text-slate-400">작품을 연결하면 그 작품의 목표 글자수로 하루 분량을 계산해요.</span>'
-                        : (ps.total
-                            ? `총 <b class="text-slate-700">${ps.total.toLocaleString()}자</b> · <b class="text-slate-700">${ps.workDays}일</b> 동안<br><span class="text-base font-bold text-amber-600">하루 약 ${Math.ceil(ps.daily).toLocaleString()}자씩</span> 쓰면 돼요`
+                    pinfo.innerHTML = (ps.total
+                            ? `${!wsel ? '<span class="text-slate-400 text-xs">작품을 연결하지 않아 기본 14,000자로 계산해요.</span><br>' : ''}총 <b class="text-slate-700">${ps.total.toLocaleString()}자</b> · <b class="text-slate-700">${ps.workDays}일</b> 동안<br><span class="text-base font-bold text-amber-600">하루 약 ${Math.ceil(ps.daily).toLocaleString()}자씩</span> 쓰면 돼요`
                             : '<span class="text-rose-500 font-bold">연결한 작품에 목표 글자수가 없어요.</span> 작품 정보에서 목표 글자수를 먼저 넣어주세요.');
                 }
                 el.innerHTML = `${t.iconHtml || t.icon} <b class="text-slate-700">${t.label}</b> 막대
@@ -22518,7 +22518,6 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
             const endDate = document.getElementById('span-end-input').value;
             if (!startDate || !endDate) { alert('시작일과 종료일을 입력해주세요.'); return; }
             if (endDate < startDate) { alert('종료일이 시작일보다 빠릅니다.'); return; }
-            if (currentSpanType === 'passive' && !document.getElementById('span-work-select').value) { alert('패시브 막대는 글자수를 셀 작품을 연결해야 해요.'); return; }
 
             const data = {
                 title,   // 비워두면 그냥 빈 채로 저장 (종류 이름으로 자동 채우지 않음)

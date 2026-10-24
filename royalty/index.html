@@ -8484,11 +8484,24 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                     </div>
                     <div>
                         <label class="text-sm font-bold text-slate-600 block mb-1">종료일</label>
-                        <input type="date" id="span-end-input" oninput="updateSpanPreview()" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:border-amber-400">
+                        <input type="date" id="span-end-input" oninput="onSpanEndManual()" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:border-amber-400">
                     </div>
                 </div>
 
                 <div id="span-passive-info" style="display:none;" class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm text-slate-600"></div>
+
+                <div id="span-passive-daily" style="display:none;">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label class="text-sm font-bold text-slate-600">하루에 쓸 글자수로 종료일 맞추기</label>
+                        <div class="flex items-center gap-1.5">
+                            <input type="number" id="span-passive-daily-input" min="0" step="500" placeholder="예) 2000" oninput="onSpanPassiveDailyInput()" class="w-28 p-2 bg-slate-50 rounded-lg border border-slate-200 text-sm text-right outline-none focus:border-amber-400">
+                            <span class="text-sm text-slate-500">자</span>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-1.5">
+                        <button type="button" onclick="setSpanPassiveDaily(500)" class="px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 text-xs font-bold text-slate-500 hover:bg-amber-50">500자</button><button type="button" onclick="setSpanPassiveDaily(1000)" class="px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 text-xs font-bold text-slate-500 hover:bg-amber-50">1,000자</button><button type="button" onclick="setSpanPassiveDaily(1500)" class="px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 text-xs font-bold text-slate-500 hover:bg-amber-50">1,500자</button><button type="button" onclick="setSpanPassiveDaily(2000)" class="px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 text-xs font-bold text-slate-500 hover:bg-amber-50">2,000자</button><button type="button" onclick="setSpanPassiveDaily(3000)" class="px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 text-xs font-bold text-slate-500 hover:bg-amber-50">3,000자</button><button type="button" onclick="setSpanPassiveDaily(4000)" class="px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 text-xs font-bold text-slate-500 hover:bg-amber-50">4,000자</button><button type="button" onclick="setSpanPassiveDaily(5000)" class="px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 text-xs font-bold text-slate-500 hover:bg-amber-50">5,000자</button>
+                    </div>
+                </div>
 
                 <div id="span-daily-wrap">
                     <div class="flex items-center justify-between mb-1.5">
@@ -21938,6 +21951,9 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
             if (dw) dw.style.display = conf.passive ? 'none' : '';   // 패시브는 하루 집필량을 직접 안 정한다
             const pinfo = document.getElementById('span-passive-info');
             if (pinfo) pinfo.style.display = conf.passive ? '' : 'none';
+            const pdaily = document.getElementById('span-passive-daily');
+            if (pdaily) pdaily.style.display = conf.passive ? '' : 'none';
+            if (!conf.passive) { spanPassiveAuto = false; const pi = document.getElementById('span-passive-daily-input'); if (pi) pi.value = ''; }
             setShown('span-rest-section', conf.rest);  // 쉬는 날은 집필·교정에
             const midBreakPanel = document.getElementById('span-midbreak-panel');
             if (midBreakPanel) midBreakPanel.style.visibility = conf.rest ? 'visible' : 'hidden';   // 중간 휴식도 집필·교정에만
@@ -22389,7 +22405,36 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
             if (!st || !en || !st.value) return;
             en.value = spanDateAdd(st.value, 7);
         }
+        // 패시브: 하루에 쓸 글자수를 고르면 (목표 글자수 ÷ 하루 글자수)만큼의 집필일이 차는 날을 종료일로 자동 설정
+        let spanPassiveAuto = false;
+        function spanPassiveFitEnd() {
+            const start = document.getElementById('span-start-input').value;
+            const wsel = document.getElementById('span-work-select').value;
+            const n = parseInt(document.getElementById('span-passive-daily-input').value) || 0;
+            if (!start || !wsel || n <= 0) return;
+            const total = resolveWorkItem(wsel).goalWithSpace || 0;
+            if (!total) return;
+            const need = Math.ceil(total / n);
+            const ps = passiveStats({ startDate: start, endDate: spanDateAdd(start, 3650), workId: wsel, restMode: currentSpanRestMode, restWeekdays: currentSpanRestWeekdays, restPerWeek: document.getElementById('span-rest-input').value, midBreaks: currentSpanMidBreaks });
+            for (let i = 0; i < ps.totalDays; i++) {
+                if (!ps.flags[i] && ps.workIdx[i] === need - 1) { document.getElementById('span-end-input').value = spanDateAdd(start, i); return; }
+            }
+        }
+        function onSpanPassiveDailyInput() {
+            spanPassiveAuto = (parseInt(document.getElementById('span-passive-daily-input').value) || 0) > 0;
+            updateSpanPreview();
+        }
+        function setSpanPassiveDaily(n) {
+            document.getElementById('span-passive-daily-input').value = n;
+            onSpanPassiveDailyInput();
+        }
+        function onSpanEndManual() {   // 종료일을 직접 고치면 자동 맞춤을 끈다
+            spanPassiveAuto = false;
+            const pi = document.getElementById('span-passive-daily-input'); if (pi) pi.value = '';
+            updateSpanPreview();
+        }
         function updateSpanPreview() {
+            if (spanPassiveAuto && currentSpanType === 'passive') spanPassiveFitEnd();
             const start = document.getElementById('span-start-input').value;
             const end = document.getElementById('span-end-input').value;
             const el = document.getElementById('span-preview');

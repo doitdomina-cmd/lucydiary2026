@@ -22753,13 +22753,22 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                             if (last && Math.abs(last.end - k) < 1e-6) last.end = k + frac; else runs.push({ start: k, end: k + frac });
                         }
                         bar.classList.add('wsp-passive');
-                        fillHtml = runs.map(r => `<i class="wsp-fill" style="position:absolute; left:${(r.start / n * 100).toFixed(2)}%; top:0; bottom:0; width:${((r.end - r.start) / n * 100).toFixed(2)}%;"></i>`).join('');
-                        // 회색 계열은 노랗게 변하지 않게 진짜 회색으로, 나머지는 같은 색의 연한 바탕 + 선명한 채움
+                        // 회색 계열은 노랗게 변하지 않게 진짜 연회색으로, 나머지는 같은 색의 연한 바탕 + 선명한 채움
                         const base = spanColorSolid(s.color), cm = /^#?([0-9a-f]{6})$/i.exec(base || '');
                         let gray = false;
                         if (cm) { const v = [0, 2, 4].map(o => parseInt(cm[1].slice(o, o + 2), 16) / 255); gray = Math.max(...v) - Math.min(...v) < 0.07; }
-                        bar.style.setProperty('--pt', gray ? '#EDEDEF' : `color-mix(in srgb, ${base} 22%, #FFFFFF)`);
-                        bar.style.setProperty('--pf', gray ? '#B9BAC0' : spanColorVivid(s.color));
+                        const pt = gray ? '#F2F2F4' : `color-mix(in srgb, ${base} 22%, #FFFFFF)`;
+                        const pf = gray ? '#C9CAD0' : spanColorVivid(s.color);
+                        // 스킨이 막대 배경을 덮어써도 바탕·채움 색은 그대로 보이게 인라인으로 고정
+                        bar.style.setProperty('background', pt, 'important');
+                        bar.style.setProperty('background-image', 'none', 'important');
+                        // 쉬는 날 칸은 빗금으로 표시 (건너뛰고 채운다는 걸 알 수 있게)
+                        let restHtml = '';
+                        for (let ci = segStart; ci <= segEnd; ci++) {
+                            const off = spanDayDiff(s.startDate, cells[ci].dataset.date);
+                            if (off >= 0 && off < p.ps.totalDays && p.ps.flags[off]) restHtml += `<i class="wsp-rest" style="position:absolute; left:${((ci - segStart) / n * 100).toFixed(2)}%; top:0; bottom:0; width:${(100 / n).toFixed(2)}%; background:repeating-linear-gradient(135deg, rgba(0,0,0,.09) 0 2px, transparent 2px 6px) !important;"></i>`;
+                        }
+                        fillHtml = restHtml + runs.map(r => `<i class="wsp-fill" style="position:absolute; left:${(r.start / n * 100).toFixed(2)}%; top:0; bottom:0; width:${((r.end - r.start) / n * 100).toFixed(2)}%; background:${pf} !important;"></i>`).join('');
                     }
                     const segHtml = sType.iconHtml ? segText.split(sType.icon).join(sType.iconHtml) : segText;
                     bar.innerHTML = fillHtml + `<span style="position:relative; padding:0 10px 0 16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${segHtml}</span>`;

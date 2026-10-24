@@ -5426,8 +5426,8 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                             </div>
 
                             <!-- 등록/수정 폼 -->
-                            <div class="glass-card p-8 scroll-invisible" id="work-form-card" style="overflow-y: auto;">
-                            <div class="space-y-4">
+                            <div class="glass-card p-8" id="work-form-card" style="display: flex; flex-direction: column;">
+                            <div class="space-y-4 scroll-invisible" id="work-form-scroll" style="flex: 1 1 auto; min-height: 0; overflow-y: auto;">
                                     <div id="work-form-title-area" class="flex items-center gap-2 mb-2">
                                         <span class="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center shadow-md text-xs" id="work-form-icon"><i class="fa-solid fa-plus"></i></span>
                                         <span class="font-bold text-slate-700 text-base" id="work-form-label">신규 작품 등록</span>
@@ -8439,14 +8439,14 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                     <div class="flex items-center justify-between gap-2 bg-slate-50 rounded-xl pl-3 pr-2 py-2">
                         <span class="text-xs font-bold text-slate-500">공포</span>
                         <div class="flex items-center gap-1">
-                            <input type="number" id="swi-goal-withspace" onchange="swiUpdateGoal('withspace')" class="w-20 bg-transparent text-right font-bold text-slate-700 text-sm outline-none">
+                            <input type="number" id="swi-goal-withspace" oninput="swiUpdateGoal('withspace', false)" onchange="swiUpdateGoal('withspace', true)" class="w-20 bg-transparent text-right font-bold text-slate-700 text-sm outline-none">
                             <span class="text-xs text-slate-400 shrink-0">자</span>
                         </div>
                     </div>
                     <div class="flex items-center justify-between gap-2 bg-slate-50 rounded-xl pl-3 pr-2 py-2">
                         <span class="text-xs font-bold text-slate-500">공미</span>
                         <div class="flex items-center gap-1">
-                            <input type="number" id="swi-goal-nospace" onchange="swiUpdateGoal('nospace')" class="w-20 bg-transparent text-right font-bold text-slate-700 text-sm outline-none">
+                            <input type="number" id="swi-goal-nospace" oninput="swiUpdateGoal('nospace', false)" onchange="swiUpdateGoal('nospace', true)" class="w-20 bg-transparent text-right font-bold text-slate-700 text-sm outline-none">
                             <span class="text-xs text-slate-400 shrink-0">자</span>
                         </div>
                     </div>
@@ -22217,54 +22217,71 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
             const panel = document.getElementById('span-workinfo-panel');
             if (!panel) return;
             const workId = document.getElementById('span-work-select').value;
-            const w = masterWorks.find(x => x.id === workId);
+            const r = workId ? resolveWorkItem(workId) : null;
+            const w = r && r.work;
             if (!w) { panel.style.visibility = 'hidden'; return; }
+            const ex = r.extra;   // 외전을 골랐으면 그 외전의 글자수·날짜를 보여주고 고친다
             panel.style.visibility = 'visible';
 
-            document.getElementById('swi-title').textContent = w.title || '(제목 없음)';
+            document.getElementById('swi-title').textContent = ex ? `${w.title || '(제목 없음)'} · ${ex.name || '외전'}` : (w.title || '(제목 없음)');
             const genreCol = getGenreColor(w.genre);
             const genreBadge = document.getElementById('swi-genre-badge');
-            genreBadge.textContent = w.genre || '-';
+            genreBadge.textContent = ex ? `${w.genre || '-'} · 외전` : (w.genre || '-');
             genreBadge.style.background = hexToRgba(genreCol, 0.16);
             genreBadge.style.color = genreCol;
             document.getElementById('swi-header').style.background = `linear-gradient(135deg, ${mixWithWhite(genreCol, 0.65)}, ${mixWithWhite(genreCol, 0.9)})`;
             document.getElementById('swi-publisher').textContent = w.publisher || '-';
-            document.getElementById('swi-manuscript-date').value = w.manuscriptDate || '';
-            document.getElementById('swi-goal-withspace').value = w.goalWithSpace || '';
-            document.getElementById('swi-goal-nospace').value = w.goalNoSpace || '';
+            const tgt = ex || w;
+            document.getElementById('swi-manuscript-date').value = tgt.manuscriptDate || '';
+            document.getElementById('swi-goal-withspace').value = tgt.goalWithSpace || '';
+            document.getElementById('swi-goal-nospace').value = tgt.goalNoSpace || '';
 
             const pendingBox = document.getElementById('swi-pending');
             const dateInput = document.getElementById('swi-publish-date');
             const monthInput = document.getElementById('swi-pending-month');
-            pendingBox.checked = !!w.isPending;
-            if (w.isPending) {
-                dateInput.classList.add('hidden'); dateInput.value = '';
-                monthInput.classList.remove('hidden'); monthInput.value = w.pendingMonth || '';
-            } else {
-                dateInput.classList.remove('hidden'); dateInput.value = w.publishDate || '';
+            const pendLabel = pendingBox.closest('label');
+            if (ex) {
+                // 외전은 출간 예정(날짜 미정) 표시가 없다
+                pendingBox.checked = false; if (pendLabel) pendLabel.style.display = 'none';
+                dateInput.classList.remove('hidden'); dateInput.value = ex.publishDate || '';
                 monthInput.classList.add('hidden'); monthInput.value = '';
+            } else {
+                if (pendLabel) pendLabel.style.display = '';
+                pendingBox.checked = !!w.isPending;
+                if (w.isPending) {
+                    dateInput.classList.add('hidden'); dateInput.value = '';
+                    monthInput.classList.remove('hidden'); monthInput.value = w.pendingMonth || '';
+                } else {
+                    dateInput.classList.remove('hidden'); dateInput.value = w.publishDate || '';
+                    monthInput.classList.add('hidden'); monthInput.value = '';
+                }
             }
         }
 
-        // 기간 일정 모달의 작품 정보 패널 — 목표 글자수 수정 (집필 목표 모달의 wwiUpdateGoal과 동일한 동작)
-        function swiUpdateGoal(field) {
+        // 기간 일정 모달의 작품 정보 패널 — 목표 글자수 수정 (본편·외전 모두)
+        // 입력하는 동안(commit=false)에는 화면 계산만 바로 갱신하고, 입력을 마치면(commit=true) 저장한다
+        function swiUpdateGoal(field, commit) {
             const workId = document.getElementById('span-work-select').value;
-            const w = masterWorks.find(x => x.id === workId);
-            if (!w) return;
+            const r = workId ? resolveWorkItem(workId) : null;
+            const tgt = r && (r.extra || r.work);
+            if (!tgt) return;
             const withSpaceEl = document.getElementById('swi-goal-withspace');
             const noSpaceEl = document.getElementById('swi-goal-nospace');
             if (field === 'withspace') {
                 const v = Math.max(0, parseInt(withSpaceEl.value) || 0);
-                w.goalWithSpace = v;
-                if (v > 0) { w.goalNoSpace = Math.round(v * NOSPACE_TO_WITHSPACE_RATIO); noSpaceEl.value = w.goalNoSpace; }
+                tgt.goalWithSpace = v;
+                if (v > 0) { tgt.goalNoSpace = Math.round(v * NOSPACE_TO_WITHSPACE_RATIO); noSpaceEl.value = tgt.goalNoSpace; }
             } else {
                 const v = Math.max(0, parseInt(noSpaceEl.value) || 0);
-                w.goalNoSpace = v;
-                if (v > 0) { w.goalWithSpace = Math.round(v / NOSPACE_TO_WITHSPACE_RATIO); withSpaceEl.value = w.goalWithSpace; }
+                tgt.goalNoSpace = v;
+                if (v > 0) { tgt.goalWithSpace = Math.round(v / NOSPACE_TO_WITHSPACE_RATIO); withSpaceEl.value = tgt.goalWithSpace; }
             }
+            try { updateSpanPreview(); } catch (e) {}   // 패시브의 '하루 약 N자' 안내 등을 바로 갱신
+            if (!commit) return;
             save();
             if (typeof updateWriteVolumeInfo === 'function') updateWriteVolumeInfo();
             updateUI();
+            try { renderWriteCalendar(); } catch (e) {}
         }
         function swiTogglePending(checkbox) {
             const dateInput = document.getElementById('swi-publish-date');
@@ -22280,8 +22297,14 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
         }
         function swiUpdatePublishDate() {
             const workId = document.getElementById('span-work-select').value;
-            const w = masterWorks.find(x => x.id === workId);
-            if (!w) return;
+            const r = workId ? resolveWorkItem(workId) : null;
+            if (!r || !r.work) return;
+            if (r.extra) {
+                r.extra.publishDate = document.getElementById('swi-publish-date').value || '';
+                save(); updateUI();
+                return;
+            }
+            const w = r.work;
             const isPending = document.getElementById('swi-pending').checked;
             w.isPending = isPending;
             w.pendingMonth = isPending ? (document.getElementById('swi-pending-month').value || '') : '';
@@ -22291,12 +22314,18 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
         }
         function swiUpdateManuscriptDate() {
             const workId = document.getElementById('span-work-select').value;
-            const w = masterWorks.find(x => x.id === workId);
-            if (!w) return;
-            const oldDate = w.manuscriptDate;
+            const r = workId ? resolveWorkItem(workId) : null;
+            if (!r || !r.work) return;
             const newDate = document.getElementById('swi-manuscript-date').value || '';
-            w.manuscriptDate = newDate;
-            syncManuscriptTaskSchedule(w, oldDate, newDate);
+            if (r.extra) {
+                const oldMD = r.extra.manuscriptDate;
+                r.extra.manuscriptDate = newDate;
+                syncExtraManuscriptTask(r.work, r.extra, oldMD, newDate);
+            } else {
+                const oldDate = r.work.manuscriptDate;
+                r.work.manuscriptDate = newDate;
+                syncManuscriptTaskSchedule(r.work, oldDate, newDate);
+            }
             save();
             updateUI();
         }
@@ -22757,8 +22786,8 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                         const base = spanColorSolid(s.color), cm = /^#?([0-9a-f]{6})$/i.exec(base || '');
                         let gray = false;
                         if (cm) { const v = [0, 2, 4].map(o => parseInt(cm[1].slice(o, o + 2), 16) / 255); gray = Math.max(...v) - Math.min(...v) < 0.07; }
-                        const pt = gray ? '#F2F2F4' : `color-mix(in srgb, ${base} 22%, #FFFFFF)`;
-                        const pf = gray ? '#C9CAD0' : spanColorVivid(s.color);
+                        const pt = gray ? '#F4F0E7' : `color-mix(in srgb, ${base} 16%, #FFFFFF)`;
+                        const pf = gray ? '#D8D8DC' : `color-mix(in srgb, ${spanColorVivid(s.color)} 55%, #FFFFFF)`;
                         // 스킨이 막대 배경을 덮어써도 바탕·채움 색은 그대로 보이게 인라인으로 고정
                         bar.style.setProperty('background', pt, 'important');
                         bar.style.setProperty('background-image', 'none', 'important');
@@ -22766,7 +22795,7 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                         let restHtml = '';
                         for (let ci = segStart; ci <= segEnd; ci++) {
                             const off = spanDayDiff(s.startDate, cells[ci].dataset.date);
-                            if (off >= 0 && off < p.ps.totalDays && p.ps.flags[off]) restHtml += `<i class="wsp-rest" style="position:absolute; left:${((ci - segStart) / n * 100).toFixed(2)}%; top:0; bottom:0; width:${(100 / n).toFixed(2)}%; background:repeating-linear-gradient(135deg, rgba(0,0,0,.09) 0 2px, transparent 2px 6px) !important;"></i>`;
+                            if (off >= 0 && off < p.ps.totalDays && p.ps.flags[off]) restHtml += `<i class="wsp-rest" style="position:absolute; left:${((ci - segStart) / n * 100).toFixed(2)}%; top:0; bottom:0; width:${(100 / n).toFixed(2)}%; background:repeating-linear-gradient(135deg, rgba(0,0,0,.06) 0 2px, transparent 2px 6px) !important;"></i>`;
                         }
                         fillHtml = restHtml + runs.map(r => `<i class="wsp-fill" style="position:absolute; left:${(r.start / n * 100).toFixed(2)}%; top:0; bottom:0; width:${((r.end - r.start) / n * 100).toFixed(2)}%; background:${pf} !important;"></i>`).join('');
                     }

@@ -18111,7 +18111,7 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
         }
 
         // 코지 테마: 큰 영문 월 이름 + 이번 달 목표 합계 + 다음 집필 일정 D-day (출간 일정·스케줄 관리와 같은 분위기)
-        function renderWriteCozyHero(monthGoalSum, pendingSum) {
+        function renderWriteCozyHero(monthGoalSum, pendingSum, goalTip, expectTip) {
             const box = document.getElementById('write-cozy-hero');
             if (!box) return;
             if (!document.body.classList.contains('theme-cozy')) { box.innerHTML = ''; return; }
@@ -18135,7 +18135,7 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
             }
             box.innerHTML = `<div class="left"><div class="eyebrow">writing plan</div>
                 <div class="row"><span class="mname">${MN[m]}</span><span class="yr">${y}</span></div></div>
-                <div class="chips"><span class="chip">♥ 이번 달 목표 ${(monthGoalSum || 0).toLocaleString()}자</span><span class="chip" title="이번 달 목표 + 아직 카드로 확정 안 된 기간 일정 예상 글자수">✎ 예상 목표 ${((monthGoalSum || 0) + (pendingSum || 0)).toLocaleString()}자</span>${nx ? `<span class="chip">다음 집필 · ${escapeHtml(nxLabel)} <b>${diff === 0 ? 'D-Day' : 'D-' + diff}</b></span>` : ''}</div>`;
+                <div class="chips"><span class="chip" title="${escapeHtml(goalTip || '이번 달 목표')}">♥ 이번 달 목표 ${(monthGoalSum || 0).toLocaleString()}자</span><span class="chip" title="${escapeHtml(expectTip || '이번 달 목표 + 아직 카드로 확정 안 된 기간 일정 예상 글자수')}">✎ 예상 목표 ${((monthGoalSum || 0) + (pendingSum || 0)).toLocaleString()}자</span>${nx ? `<span class="chip">다음 집필 · ${escapeHtml(nxLabel)} <b>${diff === 0 ? 'D-Day' : 'D-' + diff}</b></span>` : ''}</div>`;
         }
 
         function renderWriteCalendar() {
@@ -18354,18 +18354,25 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                 const cy = writeCalDate.getFullYear(), cm = writeCalDate.getMonth();
                 const moStr = `${cy}-${String(cm+1).padStart(2,'0')}`;
                 let monthGoalSum = 0;
+                // 마우스를 올리면 작품별로 몇 자인지 보이게 작품별 합계도 모은다
+                const goalByWork = {}, pendByWork = {};
+                const workLabel = (wid, fallback) => { const r = wid ? resolveWorkItem(wid) : null; return (r && r.work && r.displayTitle) || fallback || '(작품 연결 안 함)'; };
+                const addTo = (obj, key, n) => { if (n > 0) obj[key] = (obj[key] || 0) + n; };
+                const tipText = (head, obj) => { const rows = Object.entries(obj).sort((a, b) => b[1] - a[1]); return rows.length ? head + '\n' + rows.map(([k, v]) => `· ${k}  ${v.toLocaleString()}자`).join('\n') : head + '\n(없음)'; };
                 Object.entries(writeSchedules).forEach(([dateStr, schedules]) => {
                     if (!dateStr.startsWith(moStr)) return;
                     schedules.forEach(s => {
                         if (!s.category) {
                             if (!isScheduleWorkValid(s.workId)) return;   // 삭제된 작품의 글자수는 합계 제외
                             monthGoalSum += Number(s.goal) || 0;
+                            addTo(goalByWork, workLabel(s.workId), Number(s.goal) || 0);
                         }
                     });
                 });
                 const el = document.getElementById('write-month-goal-sum');
                 if (el) el.textContent = monthGoalSum.toLocaleString() + '자';
-                try { renderWriteCozyHero(monthGoalSum); } catch (e) { console.error(e); }
+                const goalTip = tipText('이번 달 목표 (작품별)', goalByWork);
+                try { renderWriteCozyHero(monthGoalSum, 0, goalTip); } catch (e) { console.error(e); }
 
                 // [NEW] 아직 카드로 확정 안 된 '기간 일정'이 이 달에 걸쳐 있으면, 그만큼을 '예정'으로 따로 보여준다
                 // (달력에 카드가 하나도 없어서 확정 합계가 0으로 보여도, 사실 기간 일정으로는 이미 잡혀있는 경우가 있어서)
@@ -18390,12 +18397,31 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                             if (d < overlapStart || d > overlapEnd) continue;
                             const dt = new Date(sy, sm - 1, sd + i);
                             const isRest = restSet ? restSet.has(dt.getDay()) : (restEveryN ? ((i + 1) % restEveryN === 0) : false);
-                            if (!isRest) pendingSum += spanDailyCharsOn(s, d);
+                            if (!isRest) { const dc = spanDailyCharsOn(s, d); pendingSum += dc; addTo(pendByWork, workLabel(s.workId, s.title), dc); }
                         }
+                    });
+                    // 패시브 막대도 예상에 넣는다 (하루 분량 × 이 달의 집필일)
+                    writeSpans.filter(s => (s.type || 'write') === 'passive').forEach(s => {
+                        const overlapStart = s.startDate < monthStartDate ? monthStartDate : s.startDate;
+                        const overlapEnd = s.endDate > monthEndDate ? monthEndDate : s.endDate;
+                        if (overlapStart > overlapEnd) return;
+                        const ps = passiveStats(s);
+                        if (!ps.total || !ps.workDays) return;
+                        let n = 0;
+                        for (let i = 0; i < ps.totalDays; i++) {
+                            const d = spanDateAdd(s.startDate, i);
+                            if (d < overlapStart || d > overlapEnd || ps.flags[i]) continue;
+                            n++;
+                        }
+                        const amt = Math.round(ps.total * n / ps.workDays);
+                        pendingSum += amt;
+                        addTo(pendByWork, workLabel(s.workId, s.title || '패시브') + ' (패시브)', amt);
                     });
                     const pendingEl = document.getElementById('write-month-pending-sum');
                     if (pendingEl) pendingEl.textContent = pendingSum > 0 ? `(예정 ${pendingSum.toLocaleString()}자)` : '';
-                    try { renderWriteCozyHero(monthGoalSum, pendingSum); } catch (e) {}
+                    const expectObj = Object.assign({}, goalByWork);
+                    Object.entries(pendByWork).forEach(([k, v]) => { expectObj[k] = (expectObj[k] || 0) + v; });
+                    try { renderWriteCozyHero(monthGoalSum, pendingSum, goalTip, tipText('예상 목표 (확정 + 예정 + 패시브)', expectObj)); } catch (e) {}
                 } catch (e) {}
 
                 // [NEW] 스케줄이 아예 없는 날 * 6000자 예상 가용 글자수 표시

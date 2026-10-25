@@ -20593,11 +20593,13 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
             const trackH0 = TL_BAND_GAP + laneCount * TL_BAR_H + (laneCount - 1) * TL_BAR_GAP + Math.max(0, activeBands - 1) * TL_BAND_GAP;
             // 패시브는 아주 얇은 막대로, 다른 줄들 맨 아래에 따로 모아 둔다 (제목은 막대 오른쪽에 작게)
             const TL_PASSIVE_H = 15, TL_PASSIVE_PITCH = 19;
+            const pFontCss = document.body.classList.contains('app-font-on') ? 'var(--app-font)' : TL_FONT;   // 패시브 글씨는 사용자가 정한 본문 글꼴을 따른다
             const passiveItems = drawItems.filter(it => it.group === 'passive');
             passiveItems.forEach(it => {
                 const t = `${it.title || it.workName || '패시브'} · ${it.days}일`;
                 it.pLabel = t;
-                const lw = measLine(t, 10, 700, 0.2);
+                measCtx.font = `700 10px ${getComputedStyle(document.body).fontFamily}`;
+                const lw = measCtx.measureText(t).width + t.length * 0.2 + 10;
                 it.pInside = it.w >= lw + 38;   // 막대가 충분히 길면 글씨를 안에 넣고, 짧으면 오른쪽(또는 왼쪽)에 쓴다
                 it.pLabelSide = (it.x + it.w + 6 + lw > totalW) ? 'left' : 'right';
                 it.packX = (it.pInside || it.pLabelSide !== 'left') ? it.x : it.x - lw - 6;
@@ -20704,9 +20706,9 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                     track += `<div title="${tip}" ${click}
                             style="position:absolute; left:${it.x + 1}px; top:${pTop}px; width:${Math.max(3, it.w - 2)}px; height:${TL_PASSIVE_H}px; border-radius:4px; box-sizing:border-box; overflow:hidden;
                                    background:color-mix(in srgb, ${pCol} 45%, #FFFFFF); border:1px solid color-mix(in srgb, ${pCol} 70%, #FFFFFF); cursor:grab;">
-                            ${it.pInside ? `<span style="position:absolute; left:${Math.min(14, hw + 2)}px; right:${Math.min(14, hw + 2)}px; top:0; line-height:${TL_PASSIVE_H - 2}px; font-size:10px; font-weight:700; color:#475569; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:center; pointer-events:none;">${it.pLabel}</span>` : ''}
+                            ${it.pInside ? `<span style="position:absolute; left:${Math.min(14, hw + 2)}px; right:${Math.min(14, hw + 2)}px; top:0; line-height:${TL_PASSIVE_H - 2}px; font-family:${pFontCss}; font-size:10px; font-weight:700; color:#475569; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:center; pointer-events:none;">${it.pLabel}</span>` : ''}
                             ${resizeHandles}</div>
-                          ${it.pInside ? '' : `<div title="${tip}" ${click} style="position:absolute; ${pPos} top:${pTop}px; height:${TL_PASSIVE_H}px; line-height:${TL_PASSIVE_H}px; font-size:10px; font-weight:700; color:#64748b; white-space:nowrap; cursor:grab;">${it.pLabel}</div>`}`;
+                          ${it.pInside ? '' : `<div title="${tip}" ${click} style="position:absolute; ${pPos} top:${pTop}px; height:${TL_PASSIVE_H}px; line-height:${TL_PASSIVE_H}px; font-family:${pFontCss}; font-size:10px; font-weight:700; color:#64748b; white-space:nowrap; cursor:grab;">${it.pLabel}</div>`}`;
                     return;
                 }
                 track += `<div title="${tip}" ${click} data-ri="${[...String(it.spanId || it.workId || it.title || '')].reduce((h, ch) => h + ch.charCodeAt(0), 0) % 4}" data-short="${((it.endIdx - it.startIdx + 1) <= 16 || it.w < 100) ? 1 : 0}" ${(isSpan && typeof it.color === 'string' && it.color.indexOf('gradient') > -1) ? 'data-pat="1"' : ''}

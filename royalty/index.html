@@ -18159,7 +18159,7 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
             }
             box.innerHTML = `<div class="left"><div class="eyebrow">writing plan</div>
                 <div class="row"><span class="mname">${MN[m]}</span><span class="yr">${y}</span></div></div>
-                <div class="chips"><span class="chip" title="${escapeHtml(goalTip || '이번 달 목표')}">♥ 이번 달 목표 ${(monthGoalSum || 0).toLocaleString()}자</span><span class="chip" title="${escapeHtml(expectTip || '이번 달 목표 + 아직 카드로 확정 안 된 기간 일정 예상 글자수')}">✎ 예상 목표 ${((monthGoalSum || 0) + (pendingSum || 0)).toLocaleString()}자</span>${nx ? `<span class="chip">다음 집필 · ${escapeHtml(nxLabel)} <b>${diff === 0 ? 'D-Day' : 'D-' + diff}</b></span>` : ''}</div>`;
+                <div class="chips"><span class="chip" data-tip="${escapeHtml(goalTip || '이번 달 목표')}">♥ 이번 달 목표 ${(monthGoalSum || 0).toLocaleString()}자</span><span class="chip" data-tip="${escapeHtml(expectTip || '이번 달 목표 + 아직 카드로 확정 안 된 기간 일정 예상 글자수')}">✎ 예상 목표 ${((monthGoalSum || 0) + (pendingSum || 0)).toLocaleString()}자</span>${nx ? `<span class="chip">다음 집필 · ${escapeHtml(nxLabel)} <b>${diff === 0 ? 'D-Day' : 'D-' + diff}</b></span>` : ''}</div>`;
         }
 
         function renderWriteCalendar() {
@@ -26001,6 +26001,28 @@ window.rsRefresh = () => { works = refSchedWorks; renderColors(); fillWorkSel();
 updateEps(); render(); renderWorks();
 
 })();
+
+        // 집필 관리 상단 칩: 마우스를 올리면 바로 뜨는 말풍선 (브라우저 기본 툴팁은 1초 넘게 걸려서 직접 만듦)
+        (function () {
+            let tipEl = null;
+            const hide = () => { if (tipEl) { tipEl.remove(); tipEl = null; } };
+            document.addEventListener('mouseover', (e) => {
+                const t = e.target.closest && e.target.closest('[data-tip]');
+                if (!t) { hide(); return; }
+                if (tipEl && tipEl._src === t) return;
+                hide();
+                tipEl = document.createElement('div');
+                tipEl._src = t;
+                tipEl.textContent = t.getAttribute('data-tip');
+                tipEl.style.cssText = 'position:fixed; z-index:99999; max-width:340px; white-space:pre-line; background:#3b342d; color:#fff; font-size:13px; line-height:1.55; padding:9px 13px; border-radius:10px; box-shadow:0 6px 18px rgba(0,0,0,.28); pointer-events:none;';
+                document.body.appendChild(tipEl);
+                const r = t.getBoundingClientRect();
+                const w = tipEl.offsetWidth;
+                tipEl.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + 'px';
+                tipEl.style.top = (r.bottom + 8) + 'px';
+            });
+            document.addEventListener('scroll', hide, true);
+        })();
 </script>
 </body>
 </html>

@@ -19996,6 +19996,7 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
         // 🟢 [NEW] 연간 타임라인 — 그 해의 작업 일정과 쉬는 구간을 가로로 길게 한눈에
         // ════════════════════════════════════════════════════════
         let timelineYear = new Date().getFullYear();
+        let timelineGuide = null;   // 막대를 끌고 있는 동안만 쓰는 세로 안내선 { startIdx, endIdx }
         const TL_PAD = 10;        // 좌우 여백
         const TL_BAR_H = 68;      // 막대 하나 높이 (제목 + 일수 + 글자수 세 줄)
         const TL_BAR_GAP = 6;     // 겹칠 때 아래로 밀리는 간격
@@ -20638,6 +20639,12 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
             // ── 8) 통합 트랙 — 위에서부터 집필 일정 / 교정 일정 / 내가 만든 기간 일정
             let track = `<div style="position:relative; width:${fullW}px; height:${trackH}px;">${gridLines(trackH)}`;
             if (hasToday) track += `<div style="position:absolute; left:${todayX}px; top:0; height:${trackH}px; width:2px; background:#f43f5e; opacity:.25;"></div>`;
+            // 막대를 끌고 있을 때: 시작일·종료일에 맞춘 긴 세로선 (다른 일정의 날짜와 맞춰 보라고). 놓으면 사라진다
+            if (timelineGuide) {
+                const gs = Math.max(0, timelineGuide.startIdx), ge = Math.min(daysInYear, timelineGuide.endIdx + 1);
+                track += `<div style="position:absolute; left:${xOf(gs)}px; top:0; height:${trackH}px; width:0; border-left:2px dashed #0ea5e9; opacity:.75; z-index:6; pointer-events:none;"></div>
+                          <div style="position:absolute; left:${xOf(ge)}px; top:0; height:${trackH}px; width:0; border-left:2px dashed #f43f5e; opacity:.85; z-index:6; pointer-events:none;"></div>`;
+            }
 
             // 줄 오른쪽 끝에 그 줄의 합계를 적는다 (집필 계획 / 내가 만든 집필 기간 일정은 글자수, 휴식 등은 일수로)
             const bandTotal = (bandIdx, color, unit) => {
@@ -23022,6 +23029,7 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
             const changed = span.startDate !== ns || span.endDate !== ne;
             if (changed) { span.startDate = ns; span.endDate = ne; }
             st.moved = true;
+            timelineGuide = { startIdx: tlDayIndex(span.startDate, timelineYear), endIdx: tlDayIndex(span.endDate, timelineYear) };
             document.body.style.cursor = 'grabbing';
 
             // 드래그 중 지금 며칠로 옮겨지는 중인지 커서 옆에 작게 보여준다
@@ -23053,6 +23061,7 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
             timelineSpanMoveState = null;
             if (!st) return;
 
+            timelineGuide = null;
             if (st.moved) { save(); renderYearTimeline(); }
             else openWriteSpanModal(st.spanId, null, true);   // 옮기지 않았으면 그냥 클릭 → 편집 창 (뒤 달력도 그 달로)
         }
@@ -23110,6 +23119,7 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
             if (span.startDate === ns && span.endDate === ne) return;
             span.startDate = ns; span.endDate = ne;
             st.moved = true;
+            timelineGuide = { startIdx: tlDayIndex(span.startDate, timelineYear), endIdx: tlDayIndex(span.endDate, timelineYear) };
 
             let badge = document.getElementById('tl-drag-date-badge');
             if (!badge) {
@@ -23137,6 +23147,7 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
 
             const st = timelineSpanResizeState;
             timelineSpanResizeState = null;
+            timelineGuide = null;
             if (st && st.moved) { save(); renderYearTimeline(); } else if (st) openWriteSpanModal(st.spanId, null, true);   // 끌지 않고 그냥 눌렀으면 편집 창
         }
 

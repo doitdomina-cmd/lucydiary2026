@@ -5079,6 +5079,10 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
 #tab-refsched .rs-vitem:hover{background:#fff}
 #tab-refsched .rs-vitem b{font-size:14px}
 #tab-refsched .rs-vitem .vdot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+
+        /* 누적 수익 칸: 점선 테두리 + 파스텔 형광펜 + 진한 글씨 (모든 테마 공통, 글자 크기는 그대로) */
+        body #genre-sheets-container td.cum-col { font-weight: 800 !important; color: #3F7A5E !important; background-color: #FFFDF5 !important; background-image: linear-gradient(transparent 50%, rgba(190,228,200,.7) 50%, rgba(190,228,200,.7) 78%, transparent 78%) !important; background-repeat: no-repeat !important; background-position: center !important; background-size: 74% 100% !important; outline: 1.6px dashed #86B79C !important; outline-offset: -4px !important; }
+        body #genre-sheets-container th.cum-col { color: #3F7A5E !important; font-weight: 800 !important; }
 </style>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/galmuri@2.40.3/dist/galmuri.css">
 </head>
@@ -12911,7 +12915,7 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
             if (currentYear === 'total') {
                 if (currentGenreTab === '종합') {
                     const section = document.createElement('div'); section.innerHTML = `<h4 class="text-sm font-bold text-slate-500 mb-4 pl-2 border-l-4" style="border-color:var(--primary)">전체 기간 장르별 정산 요약</h4>`;
-                    let html = `<div class="sheet-wrapper"><div class="spreadsheet-container"><table class="sheet-table"><thead><tr>${getStickyHeader()}<th style="min-width:130px; font-weight:700; font-size:0.85rem;" class="grand-total-cell">누적 수익</th><th style="min-width:120px; font-weight:700; font-size:0.85rem;" class="grand-total-cell">추정 매출</th>` + years.map(y => `<th class="text-center">${y}년</th>`).join('') + `</tr></thead><tbody>`;
+                    let html = `<div class="sheet-wrapper"><div class="spreadsheet-container"><table class="sheet-table"><thead><tr>${getStickyHeader()}<th style="min-width:130px; font-weight:700; font-size:0.85rem;" class="grand-total-cell cum-col">누적 수익</th><th style="min-width:120px; font-weight:700; font-size:0.85rem;" class="grand-total-cell">추정 매출</th>` + years.map(y => `<th class="text-center">${y}년</th>`).join('') + `</tr></thead><tbody>`;
                     let grandTotal = 0, grandSales = 0, yearTotals = {}; years.forEach(y => yearTotals[y] = 0);
                     genreList.forEach(gObj => {
                         const isWebtoonG = gObj.name && gObj.name.includes('웹툰');
@@ -12919,9 +12923,9 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                         masterWorks.filter(w => w.genre === gObj.name).forEach(w => { let wCum = 0; years.forEach(y => { for(let m=1; m<=12; m++) { const val = (monthlyData[`${y}-${String(m).padStart(2,'0')}`] || {})[w.id] || 0; gYearly[y] += val; gCumulative += val; wCum += val; } }); if (!isWebtoonG) gSales += calculateGrossSales(wCum, w.rate); });
                         grandTotal += gCumulative; if (!isWebtoonG) grandSales += gSales; years.forEach(y => yearTotals[y] += gYearly[y]);
                         const salesCellG = isWebtoonG ? `<td class="text-right pr-2 text-slate-400 text-sm" style="background:#fafafa;">-</td>` : `<td class="text-right pr-2 text-slate-500 text-sm" style="background:#fafafa;">${currencySymbol}${formatCurrency(gSales)}</td>`;
-                        html += `<tr><td class="sticky-col pl-6 font-bold text-slate-700">${gObj.name}</td><td class="text-center font-bold text-[0.85rem] grand-total-cell" style="background:#f1f5f9; border-color:#e2e8f0;">${currencySymbol}${formatCurrency(gCumulative)}</td>${salesCellG}` + years.map(y => `<td class="text-right pr-2 text-slate-500 text-sm">${currencySymbol}${formatCurrency(gYearly[y])}</td>`).join('') + `</tr>`;
+                        html += `<tr><td class="sticky-col pl-6 font-bold text-slate-700">${gObj.name}</td><td class="text-center font-bold text-[0.85rem] grand-total-cell cum-col" style="background:#f1f5f9; border-color:#e2e8f0;">${currencySymbol}${formatCurrency(gCumulative)}</td>${salesCellG}` + years.map(y => `<td class="text-right pr-2 text-slate-500 text-sm">${currencySymbol}${formatCurrency(gYearly[y])}</td>`).join('') + `</tr>`;
                     });
-                    html += `</tbody></table></div></div><div class="sheet-footer-outer"><div class="sheet-footer-inner"><table class="sheet-table"><tbody><tr class="bg-slate-100/50"><td class="sticky-col text-center font-bold text-slate-600 text-sm">총합</td><td class="text-center font-bold text-[0.85rem] grand-total-cell">${currencySymbol}${formatCurrency(grandTotal)}</td><td class="text-right pr-2 font-bold grand-total-cell">${currencySymbol}${formatCurrency(grandSales)}</td>` + years.map(y => `<td class="text-right pr-2 font-bold grand-total-cell">${currencySymbol}${formatCurrency(yearTotals[y])}</td>`).join('') + `</tr></tbody></table></div></div>`;
+                    html += `</tbody></table></div></div><div class="sheet-footer-outer"><div class="sheet-footer-inner"><table class="sheet-table"><tbody><tr class="bg-slate-100/50"><td class="sticky-col text-center font-bold text-slate-600 text-sm">총합</td><td class="text-center font-bold text-[0.85rem] grand-total-cell cum-col">${currencySymbol}${formatCurrency(grandTotal)}</td><td class="text-right pr-2 font-bold grand-total-cell">${currencySymbol}${formatCurrency(grandSales)}</td>` + years.map(y => `<td class="text-right pr-2 font-bold grand-total-cell">${currencySymbol}${formatCurrency(yearTotals[y])}</td>`).join('') + `</tr></tbody></table></div></div>`;
                     section.innerHTML += html; container.appendChild(section);
                 } else {
                     const genre = currentGenreTab, gWorks = sortedWorks(masterWorks.filter(w => w.genre === genre && !w.contractBroken && w.title.toLowerCase().includes(searchTerm)));
@@ -12941,7 +12945,7 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                         const rateTxt = (currentGenreTab !== '웹툰' && w.rate) ? ` | ${w.rate}%` : '';
                         const wSales = calculateGrossSales(wCumulative, w.rate); totalSalesAll += wSales;
                         const salesCell = showSalesCol ? `<td class="text-right pr-2 text-slate-500 text-sm" style="background:#fafafa;">${currencySymbol}${formatCurrency(wSales)}</td>` : '';
-                        html += `<tr><td class="sticky-col pl-6" style="min-width:156px;overflow:hidden;"><div class="font-bold text-slate-700 text-sm truncate w-full mb-1" title="${w.title}">${w.title}</div><div class="text-[11px] text-slate-400 flex items-center"><span class="sheet-pub-name">${(currentGenreTab === '웹툰' ? (w.studio || '-') : w.publisher)}${rateTxt} | </span>${dateDisplay}${advHtml}</div></td><td class="text-center font-bold text-[0.85rem] grand-total-cell" style="background:#f1f5f9; border-color:#e2e8f0;">${currencySymbol}${formatCurrency(wCumulative)}</td>${salesCell}` + years.map(y => `<td class="text-right pr-2 text-slate-600 text-sm">${currencySymbol}${formatCurrency(wYearly[y])}</td>`).join('') + `</tr>`;
+                        html += `<tr><td class="sticky-col pl-6" style="min-width:156px;overflow:hidden;"><div class="font-bold text-slate-700 text-sm truncate w-full mb-1" title="${w.title}">${w.title}</div><div class="text-[11px] text-slate-400 flex items-center"><span class="sheet-pub-name">${(currentGenreTab === '웹툰' ? (w.studio || '-') : w.publisher)}${rateTxt} | </span>${dateDisplay}${advHtml}</div></td><td class="text-center font-bold text-[0.85rem] grand-total-cell cum-col" style="background:#f1f5f9; border-color:#e2e8f0;">${currencySymbol}${formatCurrency(wCumulative)}</td>${salesCell}` + years.map(y => `<td class="text-right pr-2 text-slate-600 text-sm">${currencySymbol}${formatCurrency(wYearly[y])}</td>`).join('') + `</tr>`;
                     });
                     // 계약 파기 작품은 줄로는 안 보이지만 총합에는 들어간다
                     masterWorks.filter(w => w.genre === genre && w.contractBroken).forEach(w => {
@@ -12950,7 +12954,7 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                         totalCumulative += wCum; totalSalesAll += calculateGrossSales(wCum, w.rate);
                     });
                     const salesFootTotal = showSalesCol ? `<td class="text-right pr-2 font-bold grand-total-cell">${currencySymbol}${formatCurrency(totalSalesAll)}</td>` : '';
-                    html += `</tbody></table></div></div><div class="sheet-footer-outer"><div class="sheet-footer-inner"><table class="sheet-table"><tbody><tr class="bg-slate-100/50"><td class="sticky-col text-center font-bold text-slate-600 text-sm" style="width:156px;min-width:156px;">총합</td><td class="text-center font-bold grand-total-cell">${currencySymbol}${formatCurrency(totalCumulative)}</td>${salesFootTotal}` + years.map(y => `<td class="text-right pr-2 font-bold grand-total-cell">${currencySymbol}${formatCurrency(totalYearly[y])}</td>`).join('') + `</tr></tbody></table></div></div>`;
+                    html += `</tbody></table></div></div><div class="sheet-footer-outer"><div class="sheet-footer-inner"><table class="sheet-table"><tbody><tr class="bg-slate-100/50"><td class="sticky-col text-center font-bold text-slate-600 text-sm" style="width:156px;min-width:156px;">총합</td><td class="text-center font-bold grand-total-cell cum-col">${currencySymbol}${formatCurrency(totalCumulative)}</td>${salesFootTotal}` + years.map(y => `<td class="text-right pr-2 font-bold grand-total-cell">${currencySymbol}${formatCurrency(totalYearly[y])}</td>`).join('') + `</tr></tbody></table></div></div>`;
                     html += brokenWorksNoteHTML(genre, null);
                     section.innerHTML += html; container.appendChild(section);
                 }
@@ -20644,9 +20648,11 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                     </div>`;
 
                 // 기간 일정 막대 양쪽 끝의 얇은 손잡이 — 잡고 늘리거나 줄이면 그쪽 날짜만 바뀐다
-                const resizeHandles = isSpan ? `
-                    <div onmousedown="startTimelineSpanResize(event, '${it.spanId}', 'start')" ontouchstart="startTimelineSpanResize(event, '${it.spanId}', 'start')" title="시작일 조절" style="position:absolute; left:0; top:0; width:14px; height:100%; cursor:ew-resize;"></div>
-                    <div onmousedown="startTimelineSpanResize(event, '${it.spanId}', 'end')" ontouchstart="startTimelineSpanResize(event, '${it.spanId}', 'end')" title="종료일 조절" style="position:absolute; right:0; top:0; width:14px; height:100%; cursor:ew-resize;"></div>
+                // 작은 막대는 손잡이가 몸통을 다 덮어 클릭이 안 되므로, 막대 폭에 맞춰 손잡이를 줄이고 아주 작으면 없앤다
+                const hw = Math.min(14, Math.floor(Math.max(0, it.w - 2) * 0.22));
+                const resizeHandles = (isSpan && hw >= 4) ? `
+                    <div onmousedown="startTimelineSpanResize(event, '${it.spanId}', 'start')" ontouchstart="startTimelineSpanResize(event, '${it.spanId}', 'start')" title="시작일 조절" style="position:absolute; left:0; top:0; width:${hw}px; height:100%; cursor:ew-resize;"></div>
+                    <div onmousedown="startTimelineSpanResize(event, '${it.spanId}', 'end')" ontouchstart="startTimelineSpanResize(event, '${it.spanId}', 'end')" title="종료일 조절" style="position:absolute; right:0; top:0; width:${hw}px; height:100%; cursor:ew-resize;"></div>
                 ` : '';
 
                 track += `<div title="${tip}" ${click} data-ri="${[...String(it.spanId || it.workId || it.title || '')].reduce((h, ch) => h + ch.charCodeAt(0), 0) % 4}" data-short="${((it.endIdx - it.startIdx + 1) <= 16 || it.w < 100) ? 1 : 0}" ${(isSpan && typeof it.color === 'string' && it.color.indexOf('gradient') > -1) ? 'data-pat="1"' : ''}
@@ -22956,7 +22962,7 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
             const st = timelineSpanMoveState;
             if (!st) return;
             const p = pointerXY(e);
-            if (!st.moved && Math.abs(p.x - st.x0) < 4) return;
+            if (!st.moved && Math.abs(p.x - st.x0) < 7) return;   // 손이 살짝 떨려도 클릭으로 인정
             e.preventDefault();
 
             const deltaPx = p.x - st.x0;
@@ -23084,7 +23090,7 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
 
             const st = timelineSpanResizeState;
             timelineSpanResizeState = null;
-            if (st && st.moved) { save(); renderYearTimeline(); }
+            if (st && st.moved) { save(); renderYearTimeline(); } else if (st) openWriteSpanModal(st.spanId, null, true);   // 끌지 않고 그냥 눌렀으면 편집 창
         }
 
         // 커서 아래에 있는 날짜 칸의 날짜를 찾는다.

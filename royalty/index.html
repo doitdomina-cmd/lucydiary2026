@@ -20091,8 +20091,33 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
         }
         function wiRenameScenario() {
             const cur = _wiCurrentScenario(); if (!cur) return;
-            const nm = prompt('가정표 이름', cur.name); if (nm === null) return;
-            cur.name = nm.trim() || cur.name; save(true); renderTimelineWhatIfPanel();
+            // PC 앱(Electron)에서는 prompt() 가 동작하지 않아서 직접 만든 작은 입력 창을 쓴다
+            appAskText('가정표 이름', cur.name, nm => {
+                cur.name = nm.trim() || cur.name; save(true); renderTimelineWhatIfPanel();
+            });
+        }
+        function appAskText(title, def, onOk) {
+            const old = document.getElementById('app-ask-text'); if (old) old.remove();
+            const ov = document.createElement('div');
+            ov.id = 'app-ask-text';
+            ov.style.cssText = 'position:fixed; inset:0; z-index:999999; background:rgba(0,0,0,.35); display:flex; align-items:center; justify-content:center;';
+            ov.innerHTML = `<div style="background:#fff; border-radius:14px; padding:20px 22px; width:min(92vw,340px); box-shadow:0 10px 30px rgba(0,0,0,.25); font-family:inherit;">
+                <div data-k="title" style="font-weight:800; font-size:14px; color:#334155; margin-bottom:10px;"></div>
+                <input type="text" style="width:100%; box-sizing:border-box; padding:9px 11px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:14px; font-family:inherit; outline:none;">
+                <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:14px;">
+                    <button type="button" data-k="no" style="padding:7px 14px; border-radius:8px; border:1px solid #cbd5e1; background:#fff; font-weight:700; cursor:pointer; font-family:inherit;">취소</button>
+                    <button type="button" data-k="ok" style="padding:7px 16px; border-radius:8px; border:0; background:#b45309; color:#fff; font-weight:800; cursor:pointer; font-family:inherit;">확인</button>
+                </div></div>`;
+            ov.querySelector('[data-k="title"]').textContent = title;
+            const inp = ov.querySelector('input'); inp.value = def || '';
+            const close = () => ov.remove();
+            const ok = () => { const v = inp.value; close(); onOk(v); };
+            ov.querySelector('[data-k="ok"]').onclick = ok;
+            ov.querySelector('[data-k="no"]').onclick = close;
+            ov.addEventListener('mousedown', e => { if (e.target === ov) close(); });
+            inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); ok(); } else if (e.key === 'Escape') close(); });
+            document.body.appendChild(ov);
+            inp.focus(); inp.select();
         }
         function wiDeleteScenario() {
             const cur = _wiCurrentScenario(); if (!cur) return;

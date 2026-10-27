@@ -118,6 +118,7 @@ header .spacer { flex: 1; }
 .selbar { flex-wrap: wrap; max-width: calc(100vw - 8px); }
 .selbar .tb { min-width: 30px; height: 30px; }
 .selbar .br { flex-basis: 100%; height: 0; }
+.selbar .s2 { display: none; }
 .selbar .dot { width: 18px; height: 18px; border-radius: 50%; margin: 0 2px; box-shadow: 0 0 0 1px rgba(0,0,0,.12); flex: none; }
 
 /* ===== 메인 레이아웃 ===== */
@@ -1442,6 +1443,12 @@ nav.mtabs { display: none; }
     /* 폰 집필모드 서식 바: 진하게 · 검정/빨강/파랑/보라/초록 · 형광펜 · 접기/비슷한 표현/한글로만 */
     body.focus-mode #selbar [data-cmd="italic"], body.focus-mode #selbar [data-cmd="underline"], body.focus-mode #selbar [data-cmd="strikeThrough"],
     body.focus-mode #selbar [data-fc="#e8710a"], body.focus-mode #selbar [data-fc="#80868b"] { display: none; }
+    /* 작게: 글자색·형광펜을 한 줄로, 버튼 크기 줄임 */
+    body.focus-mode #selbar { padding: 2px 4px; gap: 0; border-radius: 8px; }
+    body.focus-mode #selbar .b1 { display: none; }
+    body.focus-mode #selbar .s2 { display: block; }
+    body.focus-mode #selbar .tb { min-width: 26px; height: 26px; padding: 0 4px; }
+    body.focus-mode #selbar .dot { width: 17px; height: 17px; margin: 0 1.5px; }
     body.focus-mode .focus-exit .fx-long { display: none; } body.focus-mode .focus-exit .fx-short { display: inline; }
     body.focus-mode .manuscript { padding: 10px 12px 40vh; font-size: calc(var(--ed-size, 16px) * var(--ed-zoom, 1) * var(--fzph, 1.5)); line-height: 1.75; }
     body.focus-mode .epane-foot { padding-bottom: calc(6px + env(safe-area-inset-bottom)); }
@@ -2682,7 +2689,7 @@ function buildSelbar() {
         <button class="tb" data-cmd="underline"><u>가</u></button><button class="tb" data-cmd="strikeThrough"><s>가</s></button>
         <span class="sep" style="width:1px;height:18px;background:var(--line);margin:0 3px"></span>
         ${FORE_COLORS.map(c => `<button class="dot" style="background:${c}" data-fc="${c}" title="글자색"></button>`).join('')}
-        <span class="br"></span>
+        <span class="br b1"></span><span class="sep s2" style="width:1px;height:18px;background:var(--line);margin:0 3px"></span>
         ${HILITES.map(c => `<button class="dot" style="background:${c}" data-hl="${c}" title="형광펜"></button>`).join('')}
         <button class="tb" data-hl="transparent" title="형광펜 지우기" style="font-size:11px">✕</button>
         <span class="br"></span>
@@ -2712,9 +2719,11 @@ function updateSelbar() {
     bar.classList.remove('hidden');
     const coarse = matchMedia('(pointer: coarse)').matches;
     const bw = bar.offsetWidth, bh = bar.offsetHeight;
-    let top = coarse ? r.bottom + 12 : r.top - bh - 8;
-    if (top < 4) top = r.bottom + 8;
-    if (top + bh > innerHeight - 4) top = r.top - bh - 8;
+    // 폰: 선택 부분 위쪽(안드로이드 기본 복사 메뉴 위)에 띄움. 자리가 없으면 아래쪽(선택 손잡이 아래)
+    const vh = (window.visualViewport && visualViewport.height) || innerHeight;
+    let top = coarse ? r.top - bh - 64 : r.top - bh - 8;
+    if (top < 4) top = coarse ? r.bottom + 40 : r.bottom + 8;
+    if (top + bh > vh - 4) top = Math.max(4, r.top - bh - 8);
     bar.style.top = Math.max(4, top) + 'px';
     bar.style.left = Math.max(4, Math.min(innerWidth - bw - 4, r.left + r.width / 2 - bw / 2)) + 'px';
 }

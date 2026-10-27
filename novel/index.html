@@ -3292,14 +3292,36 @@ $('#mtabs').addEventListener('click', e => {
 })();
 /* 원고만 보기 */
 applyFzPh();
+/* 집필모드를 켜고 끌 때 글자 크기·여백이 바뀌어도 보던(쓰던) 자리가 그대로 보이게: 커서 있는 문단(없으면 화면 맨 위 문단)을 기억했다가 다시 맞춤 */
+function focusAnchor() {
+    const wrap = $(`.epane[data-pane="${WL().activeEditor}"] .ed-wrap[data-scroll]`) || $('.ed-wrap[data-scroll]'); if (!wrap) return null;
+    const ed = $('.manuscript', wrap); if (!ed) return null;
+    const kids = [...ed.children]; if (!kids.length) return null;
+    const wt = wrap.getBoundingClientRect().top, sel = getSelection();
+    let idx = -1;
+    if (sel && sel.rangeCount && sel.anchorNode && ed.contains(sel.anchorNode)) {
+        let n = sel.anchorNode; while (n && n.parentNode !== ed) n = n.parentNode;
+        idx = kids.indexOf(n);
+    }
+    if (idx < 0) idx = Math.max(0, kids.findIndex(k => k.getBoundingClientRect().bottom > wt + 2));
+    const off = Math.max(0, Math.min(kids[idx].getBoundingClientRect().top - wt, wrap.clientHeight * 0.5));
+    return { id: wrap.dataset.scroll, idx, off };
+}
+function focusRestore(a) {
+    if (!a) return;
+    const wrap = $(`.ed-wrap[data-scroll="${a.id}"]`); const ed = wrap && $('.manuscript', wrap); const k = ed && ed.children[a.idx]; if (!k) return;
+    wrap.scrollTop += k.getBoundingClientRect().top - wrap.getBoundingClientRect().top - a.off;
+}
 function toggleFocus(on) {
     const want = on ?? !document.body.classList.contains('focus-mode');
+    const anchor = focusAnchor();
+    setTimeout(() => focusRestore(anchor), 0); setTimeout(() => focusRestore(anchor), 250);
     document.body.classList.toggle('focus-mode', want);
     applyFzPh();
     renderFocusStrips();
     document.body.classList.remove('reveal');
     $('#btn-focus').classList.toggle('on', want);
-    if (want) { pref.mtab = 'editor'; renderHeader(); toast(isPhone() ? '집필모드 · 오른쪽 아래 ✕ 닫기로 끝내요' : '원고만 보기 · 화면 맨 위로 마우스를 올리면 메뉴가 나와요 (Esc로 끝내기)'); }
+    if (want) { pref.mtab = 'editor'; renderHeader(); focusRestore(anchor); toast(isPhone() ? '집필모드 · 오른쪽 아래 ✕ 닫기로 끝내요' : '원고만 보기 · 화면 맨 위로 마우스를 올리면 메뉴가 나와요 (Esc로 끝내기)'); }
 }
 $('#btn-focus').addEventListener('click', () => toggleFocus());
 $('#btn-focus-ph').addEventListener('click', () => toggleFocus());

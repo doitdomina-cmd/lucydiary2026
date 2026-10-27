@@ -1344,6 +1344,7 @@ body.focus-mode #col-tree, body.focus-mode #col-synop, body.focus-mode #col-note
 body.focus-mode .focus-exit { display: block; font-size: 11px; padding: 5px 10px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); color: var(--muted); opacity: .5; }
 body.focus-mode .focus-exit:hover { opacity: 1; }
 .focus-copy { display: none; }
+.focus-undo { display: none; }
 body.focus-mode .focus-copy { display: block; font-size: 11px; padding: 5px 10px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); color: var(--muted); opacity: .7; }
 .focus-dock { display: none; }
 body.focus-mode .focus-dock { display: flex; gap: 6px; position: fixed; right: 14px; bottom: 40px; z-index: 61; }
@@ -1442,6 +1443,9 @@ nav.mtabs { display: none; }
     body.focus-mode main { height: 100%; }
     body.focus-mode.kb-open main { height: 100%; }
     body.focus-mode .pomo-ask { display: none !important; }
+    /* 폰 집필모드: 맨 오른쪽 위에 되돌리기 · 다시 실행 */
+    body.focus-mode .focus-undo { display: flex; gap: 6px; position: fixed; top: calc(6px + env(safe-area-inset-top)); right: 8px; z-index: 61; }
+    body.focus-mode .focus-undo button { width: 36px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 999px; background: var(--paper); border: 1px solid var(--line); color: var(--muted); font-size: 16px; }
     /* 폰 집필모드 서식 바: 진하게 · 검정/빨강/파랑/보라/초록 · 형광펜 · 접기/비슷한 표현/한글로만 */
     body.focus-mode #selbar [data-cmd="italic"], body.focus-mode #selbar [data-cmd="underline"], body.focus-mode #selbar [data-cmd="strikeThrough"],
     body.focus-mode #selbar [data-fc="#e8710a"] { display: none; }
@@ -1609,6 +1613,7 @@ nav.mtabs { display: none; }
     <button id="mtab-focus" class="mt-focus" title="집필모드 (원고만 보기)"><i class="ic ic-maximize-2"></i>집필</button>
 </nav>
 
+<div class="focus-undo" id="focus-undo"><button data-cmd="undo" title="되돌리기"><i class="ic ic-undo-2"></i></button><button data-cmd="redo" title="다시 실행"><i class="ic ic-redo-2"></i></button></div>
 <div class="reveal-zone" id="reveal-zone"></div>
 <div class="focus-dock"><button data-fv="top" title="원고 위에 참고 메모판 (세로로 긴 화면에 좋아요)">⬒ 위 메모판</button><button data-fv="bottom" title="원고 아래에 노트">⬓ 아래 노트</button><button class="focus-copy" id="focus-copy" title="이 화 전체 복사">복사</button><button class="focus-exit" id="focus-exit"><span class="fx-long">원고만 보기 끝내기 (Esc)</span><span class="fx-short">✕ 닫기</span></button></div>
 <div class="selbar hidden" id="selbar"></div>
@@ -3392,6 +3397,8 @@ $('.focus-dock').addEventListener('click', e => {
     $(sel).addEventListener('change', e => { const s2 = e.target.closest('[data-fscol]'); if (!s2) return; const c = (pref.focusCols || ['work', 'folder', 'doc', 'prev']).slice(); c[+s2.dataset.fscol] = s2.value; pref.focusCols = c; savePref(); renderFocusStrips(); });
 });
 $('#focus-exit').addEventListener('click', () => toggleFocus(false));
+['mousedown', 'pointerdown', 'touchstart'].forEach(ev => $('#focus-undo').addEventListener(ev, e => e.preventDefault(), { passive: false })); // 키보드·커서 그대로
+$('#focus-undo').addEventListener('click', e => { const b = e.target.closest('button[data-cmd]'); if (b) runCmd(b.dataset.cmd); });
 $('#focus-copy').addEventListener('click', () => {
     const ep = get(activeDocId()); if (!ep) { toast('열린 회차가 없어요.'); return; }
     const plain = blocksToPlain(applyLineRules(toBlocks(ep.body), lineRules()));

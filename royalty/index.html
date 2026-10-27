@@ -18416,9 +18416,11 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                         const restSet = s.restMode === 'days' ? new Set(s.restWeekdays || []) : null;
                         const restPerWeek = Math.min(7, Math.max(0, Number(s.restPerWeek) || 0));
                         const restEveryN = (!restSet && restPerWeek > 0) ? Math.round(7 / restPerWeek) : null;
+                        const midBr = (Array.isArray(s.midBreaks) ? s.midBreaks : []).filter(b => b && b.start && b.end);
                         for (let i = 0; i < totalDays; i++) {
                             const d = spanDateAdd(s.startDate, i);
                             if (d < overlapStart || d > overlapEnd) continue;
+                            if (midBr.some(b => d >= b.start && d <= b.end)) continue;   // 중간 휴식 기간은 집필일이 아니다
                             const dt = new Date(sy, sm - 1, sd + i);
                             const isRest = restSet ? restSet.has(dt.getDay()) : (restEveryN ? ((i + 1) % restEveryN === 0) : false);
                             if (!isRest) { const dc = spanDailyCharsOn(s, d); pendingSum += dc; addTo(pendByWork, workLabel(s.workId, s.title), dc); }
@@ -21903,10 +21905,12 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
             const restSet = span.restMode === 'days' ? new Set(span.restWeekdays || []) : null;
             const restPerWeek = Math.min(7, Math.max(0, Number(span.restPerWeek) || 0));
             const restEveryN = (!restSet && restPerWeek > 0) ? Math.round(7 / restPerWeek) : null;
+            const _midBr = (Array.isArray(span.midBreaks) ? span.midBreaks : []).filter(b => b && b.start && b.end);
             let sum = 0;
             for (let i = 0; i < totalDays; i++) {
                 const d = spanDateAdd(span.startDate, i);
                 if (d < overlapStart || d > overlapEnd) continue;
+                if (_midBr.some(b => d >= b.start && d <= b.end)) continue;   // 중간 휴식 기간
                 const dt = new Date(sy, sm - 1, sd + i);
                 const isRest = restSet ? restSet.has(dt.getDay()) : (restEveryN ? ((i + 1) % restEveryN === 0) : false);
                 if (!isRest) sum += spanDailyCharsOn(span, d);
@@ -21924,10 +21928,12 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
             const restSet = span.restMode === 'days' ? new Set(span.restWeekdays || []) : null;
             const restPerWeek = Math.min(7, Math.max(0, Number(span.restPerWeek) || 0));
             const restEveryN = (!restSet && restPerWeek > 0) ? Math.round(7 / restPerWeek) : null;
+            const _midBr = (Array.isArray(span.midBreaks) ? span.midBreaks : []).filter(b => b && b.start && b.end);
             let days = 0;
             for (let i = 0; i < totalDays; i++) {
                 const d = spanDateAdd(span.startDate, i);
                 if (d < overlapStart || d > overlapEnd) continue;
+                if (_midBr.some(b => d >= b.start && d <= b.end)) continue;   // 중간 휴식 기간
                 const dt = new Date(sy, sm - 1, sd + i);
                 const isRest = restSet ? restSet.has(dt.getDay()) : (restEveryN ? ((i + 1) % restEveryN === 0) : false);
                 if (!isRest) days++;

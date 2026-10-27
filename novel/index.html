@@ -2561,7 +2561,7 @@ function pasteRichHtml(html) {
         for (const n of node.childNodes) {
             if (n.nodeType === 3) {
                 const t = n.data.replace(/[\r\n]+/g, ' ');
-                if (!t) continue;
+                if (!t || (!/[^ \t]/.test(t) && !paras[paras.length - 1].length)) continue; // 문단 사이 줄바꿈 글자가 빈 문단이 되지 않게
                 const st = [];
                 if (f.color) st.push('color: ' + f.color);
                 if (f.bg) st.push('background-color: ' + f.bg);
@@ -2585,6 +2585,9 @@ function pasteRichHtml(html) {
             if (/^(S|STRIKE|DEL)$/.test(tag) || /line-through/.test(td)) g.strike = true;
             const block = BLOCK.test(tag);
             if (block) brk();
+            // 가운데·오른쪽 정렬은 문단에 남김 (예: 가운데 정렬한 * * *)
+            const al = (cs.textAlign || n.getAttribute('align') || '').toLowerCase();
+            if (block && /^(center|right)$/.test(al)) paras[paras.length - 1].al = al;
             walk(n, g);
             if (block) brk();
         }
@@ -2593,7 +2596,7 @@ function pasteRichHtml(html) {
     if (!styled) return null;
     while (paras.length > 1 && !paras[paras.length - 1].length) paras.pop();
     if (paras.length === 1) return paras[0].join(''); // 한 줄이면 지금 문단 안에 그대로
-    return paras.map(p => `<p>${p.join('').trim() ? p.join('') : '<br>'}</p>`).join('');
+    return paras.map(p => `<p${p.al ? ` style="text-align: ${p.al}"` : ''}>${p.join('').trim() ? p.join('') : '<br>'}</p>`).join('');
 }
 
 let treeTimer = null;

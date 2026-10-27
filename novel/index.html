@@ -115,7 +115,11 @@ header .spacer { flex: 1; }
 
 /* 선택 영역 위에 뜨는 서식 도구 */
 .selbar { position: fixed; z-index: 90; display: flex; align-items: center; gap: 2px; padding: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 6px 18px rgba(0,0,0,.18); }
+.selbar { flex-wrap: wrap; max-width: calc(100vw - 8px); }
 .selbar .tb { min-width: 30px; height: 30px; }
+.selbar .fore-row { display: none; width: 100%; align-items: center; gap: 2px; padding-top: 3px; margin-top: 2px; border-top: 1px solid var(--line); }
+.selbar.fore-open .fore-row { display: flex; }
+.selbar .fore-row .dot { width: 22px; height: 22px; }
 .selbar .dot { width: 18px; height: 18px; border-radius: 50%; margin: 0 2px; box-shadow: 0 0 0 1px rgba(0,0,0,.12); flex: none; }
 
 /* ===== 메인 레이아웃 ===== */
@@ -2675,18 +2679,22 @@ function openPalette(anchor, kind) {
 function buildSelbar() {
     $('#selbar').innerHTML = `<button class="tb" data-cmd="bold"><b>가</b></button><button class="tb" data-cmd="italic"><i>가</i></button>
         <button class="tb" data-cmd="underline"><u>가</u></button><button class="tb" data-cmd="strikeThrough"><s>가</s></button>
+        <button class="tb" data-fore-toggle title="글자색"><b style="color:#d93025;border-bottom:3px solid #d93025;line-height:1">A</b></button>
         <span class="sep" style="width:1px;height:18px;background:var(--line);margin:0 3px"></span>
         ${HILITES.map(c => `<button class="dot" style="background:${c}" data-hl="${c}" title="형광펜"></button>`).join('')}
         <button class="tb" data-hl="transparent" title="형광펜 지우기" style="font-size:11px">✕</button>
         <span class="sep" style="width:1px;height:18px;background:var(--line);margin:0 3px"></span>
         <button class="tb small" data-fold title="고른 단락 접기"><i class="ic ic-fold-vertical"></i> 접기</button>
         <button class="tb small" data-syn title="비슷한 표현 추천"><i class="ic ic-sparkles"></i> 비슷한 표현</button>
-        <button class="tb small" data-hwpx title="고른 부분을 색·서식 그대로 한글 파일(.hwpx)로 저장 → 한글에서 열어 복사하면 색이 살아요"><i class="ic ic-file-down"></i> 한글로</button>`;
+        <button class="tb small" data-hwpx title="고른 부분을 색·서식 그대로 한글 파일(.hwpx)로 저장 → 한글에서 열어 복사하면 색이 살아요"><i class="ic ic-file-down"></i> 한글로</button>
+        <div class="fore-row"><small style="color:var(--muted);margin:0 4px">글자색</small>${FORE_COLORS.map(c => `<button class="dot" style="background:${c}" data-fc="${c}" title="글자색"></button>`).join('')}</div>`;
 }
 $('#selbar').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.cmd) runCmd(b.dataset.cmd);
     if (b.dataset.hl) runCmd('hiliteColor', b.dataset.hl);
+    if (b.dataset.fc) runCmd('foreColor', b.dataset.fc);
+    if (b.hasAttribute('data-fore-toggle')) { $('#selbar').classList.toggle('fore-open'); updateSelbar(); }
     if (b.hasAttribute('data-fold')) foldSelection();
     if (b.hasAttribute('data-syn')) synFromSelection();
     if (b.hasAttribute('data-hwpx')) hwpxFromSelection();

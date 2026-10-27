@@ -6369,6 +6369,19 @@ document.addEventListener('compositionend', e => {
     const ed = e.target.closest && e.target.closest('.manuscript[contenteditable="true"]');
     if (ed) setTimeout(() => tryAutoReplace(ed), 0);
 }, true);
+// 폰 한글 키보드(Gboard·삼성)는 마침표를 '조합 입력'으로 넘겨서 위 길들에 안 걸림 → 어떤 입력이든 잠깐 뒤 커서 앞을 한 번 더 확인
+// 조합 중이면 곧바로 바꾸지 않고, 입력이 잠깐 멈췄을 때(마침표 뒤 멈춤) 바꿈
+let arTimer = 0;
+document.addEventListener('input', e => {
+    if (replacing) return;
+    const ed = e.target.closest && e.target.closest('.manuscript[contenteditable="true"]'); if (!ed) return;
+    if (/^(delete|history)/.test(e.inputType || '')) return;
+    clearTimeout(arTimer);
+    arTimer = setTimeout(() => {
+        if (replacing || document.activeElement !== ed && !ed.contains(document.activeElement)) return;
+        tryAutoReplace(ed);
+    }, imeComposing ? 350 : 40);
+}, true);
 // 입력기(한글 IME)가 마침표를 'insertText'가 아닌 방식으로 넘겨도 자동 치환이 되도록, 키를 뗀 뒤에도 한 번 더 확인
 document.addEventListener('keyup', e => {
     if (replacing || imeComposing) return;

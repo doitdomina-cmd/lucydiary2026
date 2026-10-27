@@ -2721,10 +2721,12 @@ function updateSelbar() {
     // 폰: 선택 부분 위쪽(안드로이드 기본 복사 메뉴 위)에 띄움. 자리가 없으면 아래쪽(선택 손잡이 아래)
     const vh = (window.visualViewport && visualViewport.height) || innerHeight;
     if (coarse) {
-        // 폰: 선택 위치와 상관없이 화면 가운데(가로) · 위쪽에 고정. 선택한 글자를 가리면 화면 아래쪽(키보드 위)으로
-        let top = 16;
-        if (r.bottom > top - 6 && r.top < top + bh + 6) top = Math.max(16, vh - bh - 16);
-        bar.style.top = top + 'px';
+        // 폰: 가로는 화면 가운데, 세로는 선택한 글자 바로 위(안드로이드 복사 메뉴 위). 위에 자리가 없으면 맨 위 16px, 그것도 글자를 가리면 아래쪽
+        const minTop = 16;
+        let top = r.top - bh - 60;
+        if (top < minTop) top = r.top - bh - 4 >= minTop ? minTop : r.bottom + 40;
+        if (top + bh > vh - 4) top = Math.max(minTop, r.top - bh - 8);
+        bar.style.top = Math.max(minTop, top) + 'px';
         bar.style.left = Math.max(4, (innerWidth - bw) / 2) + 'px';
         return;
     }

@@ -2488,6 +2488,14 @@ function onManuscriptCopy(e) {
     const sel = getSelection(); if (!sel.rangeCount || sel.isCollapsed) return;
     const box = document.createElement('div');
     for (let i = 0; i < sel.rangeCount; i++) box.appendChild(sel.getRangeAt(i).cloneContents());
+    const rc = richCopyOf(box);
+    e.clipboardData.setData('text/html', rc.html);
+    e.clipboardData.setData('text/plain', rc.text);
+    e.preventDefault();
+    if (e.type === 'cut' && ed.getAttribute('contenteditable') === 'true') document.execCommand('delete');
+}
+// 원고 조각(box)을 한글·워드·원고에 색이 살아서 붙는 클립보드 내용(html·text)으로
+function richCopyOf(box) {
     const t = document.createElement('template'); t.innerHTML = sanitizeHtml(box.innerHTML);
     t.content.querySelectorAll('img').forEach(n => n.remove());
     let ps = [...t.content.querySelectorAll('p, div')];
@@ -2524,10 +2532,7 @@ function onManuscriptCopy(e) {
     const text = [...t.content.querySelectorAll('p, div')].map(p => p.textContent).join('\r\n');
     // 한글의 'XHTML' 읽기는 XML 규칙대로 읽음: 조각 전체가 뿌리 하나(<div>)로 감싸져 있어야 하고, 닫히지 않는 태그(<meta …>)가 있으면 안 됨
     // (<html><body>는 브라우저가 클립보드용 껍데기로 따로 씌움)
-    e.clipboardData.setData('text/html', `<div>${html}</div>`);
-    e.clipboardData.setData('text/plain', text);
-    e.preventDefault();
-    if (e.type === 'cut' && ed.getAttribute('contenteditable') === 'true') document.execCommand('delete');
+    return { html: `<div>${html}</div>`, text };
 }
 document.addEventListener('copy', onManuscriptCopy);
 document.addEventListener('cut', onManuscriptCopy);
@@ -3331,7 +3336,14 @@ $('.focus-dock').addEventListener('click', e => {
 $('#focus-exit').addEventListener('click', () => toggleFocus(false));
 $('#focus-copy').addEventListener('click', () => {
     const ep = get(activeDocId()); if (!ep) { toast('열린 회차가 없어요.'); return; }
-    copyText(blocksToPlain(applyLineRules(toBlocks(ep.body), lineRules())), `'${ep.title}'을(를)`);
+    const plain = blocksToPlain(applyLineRules(toBlocks(ep.body), lineRules()));
+    // 색·굵게 등은 html로 같이 담음 (원고·한글·워드에 붙이면 색이 살고, 글자만 받는 곳엔 규칙 적용한 글자만 붙음)
+    const box = document.createElement('div'); box.innerHTML = stripExcluded(ep.body);
+    const rc = richCopyOf(box);
+    if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+        navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([rc.html], { type: 'text/html' }), 'text/plain': new Blob([plain], { type: 'text/plain' }) })])
+            .then(() => toast(`'${ep.title}'을(를) 색까지 복사했어요.`)).catch(() => copyText(plain, `'${ep.title}'을(를)`));
+    } else copyText(plain, `'${ep.title}'을(를)`);
 });
 $('#reveal-zone').addEventListener('mouseenter', () => document.body.classList.add('reveal'));
 ['header', '.toolbar'].forEach(s => $(s).addEventListener('mouseleave', e => {

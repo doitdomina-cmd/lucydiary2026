@@ -3407,7 +3407,9 @@ $('.focus-dock').addEventListener('click', e => {
     $(sel).addEventListener('change', e => { const s2 = e.target.closest('[data-fscol]'); if (!s2) return; const c = (pref.focusCols || ['work', 'folder', 'doc', 'prev']).slice(); c[+s2.dataset.fscol] = s2.value; pref.focusCols = c; savePref(); renderFocusStrips(); });
 });
 $('#focus-exit').addEventListener('click', () => toggleFocus(false));
-['mousedown', 'pointerdown', 'touchstart'].forEach(ev => $('#focus-undo').addEventListener(ev, e => e.preventDefault(), { passive: false })); // 키보드·커서 그대로
+['mousedown', 'pointerdown'].forEach(ev => $('#focus-undo').addEventListener(ev, e => e.preventDefault())); // 키보드·커서 그대로
+// 폰: touchstart를 막으면 click도 같이 사라져서, 손을 뗄 때(touchend) 직접 실행하고 click은 막음
+$('#focus-undo').addEventListener('touchend', e => { const b = e.target.closest('button[data-cmd]'); if (!b) return; e.preventDefault(); runCmd(b.dataset.cmd); }, { passive: false });
 $('#focus-undo').addEventListener('click', e => { const b = e.target.closest('button[data-cmd]'); if (b) runCmd(b.dataset.cmd); });
 $('#focus-copy').addEventListener('click', () => {
     const ep = get(activeDocId()); if (!ep) { toast('열린 회차가 없어요.'); return; }

@@ -2503,7 +2503,9 @@ function onManuscriptCopy(e) {
     const sel = getSelection(); if (!sel.rangeCount || sel.isCollapsed) return;
     const box = document.createElement('div');
     for (let i = 0; i < sel.rangeCount; i++) box.appendChild(sel.getRangeAt(i).cloneContents());
+    if (copyAll) box.querySelectorAll('.foldbar, [data-fold-x]').forEach(n => n.remove()); // 접기 막대와, 내보내기에서 뺀 단락은 복사에서 뺌
     const rc = richCopyOf(box);
+    if (copyAll) rc.text = copyAll.text;
     e.clipboardData.setData('text/html', rc.html);
     e.clipboardData.setData('text/plain', rc.text);
     e.preventDefault();
@@ -2549,12 +2551,7 @@ function richCopyOf(box) {
     // (<html><body>는 브라우저가 클립보드용 껍데기로 따로 씌움)
     return { html: `<div>${html}</div>`, text };
 }
-let copyPayload = null; // 집필모드 복사 버튼이 실을 내용
-document.addEventListener('copy', e => {
-    if (!copyPayload) return;
-    e.clipboardData.setData('text/html', copyPayload.html); e.clipboardData.setData('text/plain', copyPayload.text);
-    e.preventDefault(); e.stopImmediatePropagation(); copyPayload = null;
-}, true);
+let copyAll = null; // 집필모드 복사 버튼: 원고 전체를 '진짜로 골라서' 복사할 때 쓰는 값 (드래그 후 Ctrl+C와 똑같은 길)
 document.addEventListener('copy', onManuscriptCopy);
 document.addEventListener('cut', onManuscriptCopy);
 
@@ -3401,12 +3398,17 @@ $('#focus-copy').addEventListener('click', () => {
     // 색·굵게 등은 html로 같이 담음 (원고·한글·워드에 붙이면 색이 살고, 글자만 받는 곳엔 규칙 적용한 글자만 붙음)
     const box = document.createElement('div'); box.innerHTML = stripExcluded(ep.body);
     const rc = richCopyOf(box);
-    // 브라우저의 비동기 복사(clipboard.write)는 html을 자기 식으로 다시 써서(<meta> 등) 한글이 문단 간격을 따로 넣음 →
-    // 원고를 드래그해 복사할 때와 똑같이 '복사' 이벤트에서 우리 html을 그대로 실음
-    copyPayload = { html: rc.html, text: plain };
-    let ok = false; try { ok = document.execCommand('copy'); } catch (_) {}
-    const used = copyPayload === null; copyPayload = null;
-    if (ok && used) toast(`'${ep.title}'을(를) 색까지 복사했어요.`);
+    // 원고 전체를 진짜로 골라서 복사: 드래그해서 Ctrl+C 할 때와 똑같은 길을 타서 한글에서도 똑같이 붙음
+    const ed = $$(`.manuscript[data-id="${ep.id}"]`).find(e => e.offsetParent);
+    let ok = false;
+    if (ed) {
+        const sel = getSelection(), saved = []; for (let k = 0; k < sel.rangeCount; k++) saved.push(sel.getRangeAt(k).cloneRange());
+        copyAll = { text: plain };
+        try { sel.selectAllChildren(ed); ok = document.execCommand('copy'); } catch (_) {}
+        copyAll = null;
+        sel.removeAllRanges(); saved.forEach(r => sel.addRange(r));
+    }
+    if (ok) toast(`'${ep.title}'을(를) 색까지 복사했어요.`);
     else copyText(plain, `'${ep.title}'을(를)`);
 });
 $('#reveal-zone').addEventListener('mouseenter', () => document.body.classList.add('reveal'));

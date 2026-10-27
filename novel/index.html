@@ -1443,12 +1443,10 @@ nav.mtabs { display: none; }
     /* 폰 집필모드 서식 바: 진하게 · 검정/빨강/파랑/보라/초록 · 형광펜 · 접기/비슷한 표현/한글로만 */
     body.focus-mode #selbar [data-cmd="italic"], body.focus-mode #selbar [data-cmd="underline"], body.focus-mode #selbar [data-cmd="strikeThrough"],
     body.focus-mode #selbar [data-fc="#e8710a"], body.focus-mode #selbar [data-fc="#80868b"] { display: none; }
-    /* 작게: 글자색·형광펜을 한 줄로, 버튼 크기 줄임 */
-    body.focus-mode #selbar { padding: 2px 4px; gap: 0; border-radius: 8px; }
-    body.focus-mode #selbar .b1 { display: none; }
-    body.focus-mode #selbar .s2 { display: block; }
-    body.focus-mode #selbar .tb { min-width: 26px; height: 26px; padding: 0 4px; }
-    body.focus-mode #selbar .dot { width: 17px; height: 17px; margin: 0 1.5px; }
+    /* 세 줄(글자색 / 형광펜 / 접기·비슷한 표현·한글로), 누르기 쉽게 간격 넓게 */
+    body.focus-mode #selbar { padding: 5px 8px; gap: 2px 0; border-radius: 10px; }
+    body.focus-mode #selbar .tb { min-width: 32px; height: 28px; padding: 0 6px; }
+    body.focus-mode #selbar .dot { width: 20px; height: 20px; margin: 4px 6px; }
     body.focus-mode .focus-exit .fx-long { display: none; } body.focus-mode .focus-exit .fx-short { display: inline; }
     body.focus-mode .manuscript { padding: 10px 12px 40vh; font-size: calc(var(--ed-size, 16px) * var(--ed-zoom, 1) * var(--fzph, 1.5)); line-height: 1.75; }
     body.focus-mode .epane-foot { padding-bottom: calc(6px + env(safe-area-inset-bottom)); }
@@ -2721,10 +2719,11 @@ function updateSelbar() {
     const bw = bar.offsetWidth, bh = bar.offsetHeight;
     // 폰: 선택 부분 위쪽(안드로이드 기본 복사 메뉴 위)에 띄움. 자리가 없으면 아래쪽(선택 손잡이 아래)
     const vh = (window.visualViewport && visualViewport.height) || innerHeight;
-    let top = coarse ? r.top - bh - 64 : r.top - bh - 8;
-    if (top < 4) top = coarse ? r.bottom + 40 : r.bottom + 8;
-    if (top + bh > vh - 4) top = Math.max(4, r.top - bh - 8);
-    bar.style.top = Math.max(4, top) + 'px';
+    const minTop = coarse ? 16 : 4;
+    let top = coarse ? r.top - bh - 60 : r.top - bh - 8;
+    if (top < minTop) top = coarse && r.top - bh - 4 >= minTop ? minTop : (coarse ? r.bottom + 40 : r.bottom + 8);
+    if (top + bh > vh - 4) top = Math.max(minTop, r.top - bh - 8);
+    bar.style.top = Math.max(minTop, top) + 'px';
     bar.style.left = Math.max(4, Math.min(innerWidth - bw - 4, r.left + r.width / 2 - bw / 2)) + 'px';
 }
 // 드래그해서 고른 부분만의 글자 수: 위쪽 바(1화 옆)와 원고 창 아래 줄에, 고른 동안에만

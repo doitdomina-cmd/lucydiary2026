@@ -5181,16 +5181,21 @@ function reviseMode() {
 }
 function toggleRevise() {
     const W = WL();
-    if (reviseMode()) { setWL(W => { W.editorN = 1; W.activeEditor = 0; W.panes[1].pageView = false; }); renderAll(); return; } // 끌 때 오른쪽 쪽 보기도 꺼 둠
+    if (reviseMode()) { // 끌 때 오른쪽 쪽 보기도 끄고, 퇴고 때문에 닫았던 바인더·시놉·노트·캐릭터 칸을 원래대로 되돌림
+        setWL(W => { W.editorN = 1; W.activeEditor = 0; W.panes[1].pageView = false; if (W.reviseSaved) { const { hideOutline, ...sh } = W.reviseSaved; W.show = { ...W.show, ...sh }; W.hideOutline = hideOutline; delete W.reviseSaved; } });
+        renderAll(); renderHeader(); return;
+    }
     const id = W.panes[W.activeEditor]?.active;
     if (!id || get(id)?.kind !== 'episode') { toast('퇴고할 회차를 먼저 열어 주세요.'); return; }
     setWL(W => {
         W.editorN = 2; W.activeEditor = 0;
+        // 퇴고 중엔 왼쪽 원고 + 오른쪽 쪽 보기만: 바인더·시놉·캐릭터·노트·트릿 칸은 잠시 닫음 (PC)
+        if (!isPhone()) { W.reviseSaved = { tree: !!W.show.tree, synop: !!W.show.synop, notes: !!W.show.notes, chars: !!W.show.chars, hideOutline: !!W.hideOutline }; W.show = { ...W.show, tree: false, synop: false, notes: false, chars: false }; W.hideOutline = true; }
         const add = p => { if (p.single) p.tabs = [id]; else if (!p.tabs.includes(id)) p.tabs.push(id); p.active = id; };
         add(W.panes[0]); add(W.panes[1]);
         W.panes[0].pageView = false; W.panes[1].pageView = true;
     });
-    renderAll();
+    renderAll(); renderHeader();
 }
 $('#btn-revise').addEventListener('click', toggleRevise);
 $('#btn-syn').addEventListener('click', () => {

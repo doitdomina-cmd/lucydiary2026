@@ -6403,6 +6403,12 @@ function twCaretPos() {
     const ed = (sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement))?.closest?.('.manuscript[contenteditable="true"]');
     if (!ed || !sel.isCollapsed || !ed.contains(document.activeElement) && document.activeElement !== ed) return null;
     const r = sel.getRangeAt(0).cloneRange(); let rect = r.getClientRects()[0];
+    // 줄 끝에 걸쳐 있는 닫는 따옴표·문장부호 바로 앞에서는 브라우저가 커서를 다음 줄 맨 앞으로 계산할 때가 있음 → 앞 글자 오른쪽 끝에 그림
+    { const n0 = sel.anchorNode, o0 = sel.anchorOffset;
+      if (rect && n0.nodeType === 3 && o0 > 0 && /[”’」』)\]}.,!?…]/.test(n0.data[o0] || '') && n0.data[o0 - 1] !== '\n') {
+        const q = document.createRange(); q.setStart(n0, o0 - 1); q.setEnd(n0, o0); const pb = q.getClientRects()[0];
+        if (pb && pb.width && rect.top >= pb.bottom - 2) rect = { left: pb.right, top: pb.top, height: pb.height, width: 0 };
+      } }
     if (!rect || (!rect.width && !rect.height)) {
         const n = sel.anchorNode, o = sel.anchorOffset;
         if (n.nodeType === 3 && n.length) { const q = document.createRange(); if (o > 0) { q.setStart(n, o - 1); q.setEnd(n, o); const b = q.getClientRects()[0]; if (b) rect = { left: b.right, top: b.top, height: b.height }; } else { q.setStart(n, 0); q.setEnd(n, 1); const b = q.getClientRects()[0]; if (b) rect = { left: b.left, top: b.top, height: b.height }; } }
@@ -6435,6 +6441,11 @@ function applyTypewriter() {
 }
 document.addEventListener('input', e => { if (e.target.closest && e.target.closest('.manuscript')) { twUpdateCaret(true); } else if (/^(insert|delete)/.test(e.inputType || '') ) twUpdateCaret(true); }, true);
 document.addEventListener('selectionchange', () => twUpdateCaret(false));
+// 한글 조합·따옴표 자동 닫기처럼 커서가 입력 직후 한 번 더 움직일 때 막대가 낡은 자리에 남지 않게, 입력 뒤 한 박자 늦게 다시 맞춤
+['compositionstart', 'compositionupdate', 'compositionend', 'beforeinput', 'keyup'].forEach(ev => document.addEventListener(ev, e => {
+    if (!(e.target.closest && e.target.closest('.manuscript'))) return;
+    requestAnimationFrame(() => twUpdateCaret(false)); setTimeout(() => twUpdateCaret(false), 80);
+}, true));
 window.addEventListener('scroll', () => twUpdateCaret(false), true);
 window.addEventListener('resize', () => twUpdateCaret(false));
 document.addEventListener('focusout', () => setTimeout(() => twUpdateCaret(false), 50));

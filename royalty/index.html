@@ -24639,10 +24639,11 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                     total += Math.round(ps.total * n / ps.workDays);
                 }
             });
-            // 계약·출간 작수는 'BL 장편'·'현로 장편'만 센다
-            const main = (masterWorks || []).filter(w => w.genre === 'BL 장편' || w.genre === '현로 장편');
-            const contracts = main.filter(w => w.contractDate && String(w.contractDate).startsWith(ys + '-')).length;
-            const published = main.filter(w => !w.isPending && w.publishDate && String(w.publishDate).startsWith(ys + '-')).length;
+            // 계약 = 그 해에 출간일이 잡혀 있는 작품, 출간 = 그 중 출간일이 이미 지난 작품 ('BL 장편'·'현로 장편'만)
+            const todayStr = (() => { const n = new Date(); return n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0'); })();
+            const planned = (masterWorks || []).filter(w => (w.genre === 'BL 장편' || w.genre === '현로 장편') && !w.isPending && w.publishDate && String(w.publishDate).startsWith(ys + '-'));
+            const contracts = planned.length;
+            const published = planned.filter(w => w.publishDate <= todayStr).length;
             return { goal: Math.round(total), contracts, published };
         }
         try { if (typeof require !== 'undefined') { require('electron').ipcRenderer.on('goal-sync-request', () => syncGoalWidget()); } } catch (e) {}

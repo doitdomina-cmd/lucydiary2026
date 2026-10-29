@@ -216,6 +216,8 @@
         body.theme-spiral aside h1 i { display: none; }
         body.theme-spiral .sp-w { display: inline-block; white-space: nowrap; } body.theme-spiral .sp-ch { display: inline-block; transform: translateY(var(--y, 0)) rotate(var(--r, 0deg)) scale(var(--s, 1)); }
         /* 앱 글꼴(설정에서 고른 글씨체): 입력칸·버튼도 같은 글씨체를 따라가게 */
+        body .tab-content { zoom: var(--app-fs, 1); }
+        body aside nav { zoom: var(--menu-fs, 1); }
         body.app-font-on { font-family: var(--app-font); }
         body.app-font-on button, body.app-font-on input, body.app-font-on select, body.app-font-on textarea { font-family: inherit; }
         /* 메뉴 글꼴: 왼쪽 메뉴(아이콘 글꼴은 그대로)만 따로 */
@@ -7196,10 +7198,12 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                             <div>
                                 <p class="text-xs font-bold text-slate-400 uppercase mb-1.5">본문 글꼴 <span class="font-normal normal-case text-slate-300">· 화면 전체 글씨체</span></p>
                                 <div id="app-font-picker" class="grid grid-cols-4 gap-1"></div>
+                                <div class="flex items-center gap-2 mt-2"><span class="text-xs font-bold text-slate-400 shrink-0">글자 크기</span><input id="app-fs-range" type="range" min="70" max="150" step="5" value="100" oninput="setFontScale('app_fs_v1', this.value)" class="flex-1"><span id="app-fs-label" class="text-xs font-bold text-slate-500 w-10 text-right">100%</span><button type="button" onclick="setFontScale('app_fs_v1', 100)" class="text-xs text-slate-400 underline">기본</button></div>
                             </div>
                             <div>
                                 <p class="text-xs font-bold text-slate-400 uppercase mb-1.5">메뉴 글꼴 <span class="font-normal normal-case text-slate-300">· 왼쪽 메뉴만 따로</span></p>
                                 <div id="menu-font-picker" class="grid grid-cols-4 gap-1"></div>
+                                <div class="flex items-center gap-2 mt-2"><span class="text-xs font-bold text-slate-400 shrink-0">글자 크기</span><input id="menu-fs-range" type="range" min="70" max="150" step="5" value="100" oninput="setFontScale('menu_fs_v1', this.value)" class="flex-1"><span id="menu-fs-label" class="text-xs font-bold text-slate-500 w-10 text-right">100%</span><button type="button" onclick="setFontScale('menu_fs_v1', 100)" class="text-xs text-slate-400 underline">기본</button></div>
                             </div>
                         </div>
                     </div>
@@ -7257,6 +7261,7 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                     <div>
                         <p class="text-xs font-bold text-slate-400 uppercase mb-1">위젯 글꼴 <span class="font-normal normal-case text-slate-300">(위젯 · 미니창 · 브리핑 · 뽀모도로 · 계산기 한꺼번에)</span></p>
                         <div id="widget-font-picker" class="flex flex-wrap gap-1.5"></div>
+                                <div class="flex items-center gap-2 mt-2"><span class="text-xs font-bold text-slate-400 shrink-0">글자 크기</span><input id="widget-fs-range" type="range" min="80" max="140" step="5" value="100" oninput="setWidgetFontScale(this.value)" class="flex-1"><span id="widget-fs-label" class="text-xs font-bold text-slate-500 w-10 text-right">100%</span><button type="button" onclick="setWidgetFontScale(100)" class="text-xs text-slate-400 underline">기본</button></div>
                     </div></div>
                                 <div style="display:none"><!-- 배경/글자 색상 (화면에서 숨김: 다른 코드가 입력칸을 참조) -->
                     <div>
@@ -9104,7 +9109,7 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
             {
                 try {
                     try { localStorage.setItem('lastModified_v6', new Date().toISOString()); } catch(e) {}
-                    const dataToSave = { settingsPresets, uiTheme: { theme: activeTheme, customColor: localStorage.getItem('custom_color_v6') || '', bgMain: document.documentElement.style.getPropertyValue('--bg-main').trim() || localStorage.getItem('bg_main_v6') || '', appFont: localStorage.getItem('app_font_v1') || '', menuFont: localStorage.getItem('menu_font_v1') || '' },
+                    const dataToSave = { settingsPresets, uiTheme: { theme: activeTheme, customColor: localStorage.getItem('custom_color_v6') || '', bgMain: document.documentElement.style.getPropertyValue('--bg-main').trim() || localStorage.getItem('bg_main_v6') || '', appFont: localStorage.getItem('app_font_v1') || '', menuFont: localStorage.getItem('menu_font_v1') || '', appFs: localStorage.getItem('app_fs_v1') || '', menuFs: localStorage.getItem('menu_fs_v1') || '' },
                         masterWorks, monthlyData, years, publisherData, analysisData, 
                         publisherSortOrder, publisherCardSortOrder, publisherViewMode, genreList, genreBadgeOpacity, tableFontSettings, crosshairSettings,
                         writeSchedules, writeSpans, timelineScenarios, writeVolumes, writeMergedVolumeWorks, taskSchedules, contacts, penNames, widgetSettingsData, ddayCardDesigns, ddayCardFonts, modalDesign, calCardDesigns, calCardFonts, calCardSizes, writeCardSettings, taskCardSettings, taskColors: TASK_COLORS, taskCategoryList, writeColors: WRITE_COLORS, writeCategoryList,
@@ -9204,7 +9209,7 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                     if (u.customColor) localStorage.setItem('custom_color_v6', u.customColor);
                     if (u.bgMain) { localStorage.setItem('bg_main_v6', u.bgMain); try { setPageBackgroundColor(u.bgMain); } catch (e) {} }
                     if (typeof u.appFont === 'string' || typeof u.menuFont === 'string') {
-                        try { if (typeof u.appFont === 'string') localStorage.setItem('app_font_v1', u.appFont); if (typeof u.menuFont === 'string') localStorage.setItem('menu_font_v1', u.menuFont); applyAppFont(); } catch (e) {}
+                        try { if (typeof u.appFont === 'string') localStorage.setItem('app_font_v1', u.appFont); if (typeof u.menuFont === 'string') localStorage.setItem('menu_font_v1', u.menuFont); if (typeof u.appFs === 'string') localStorage.setItem('app_fs_v1', u.appFs); if (typeof u.menuFs === 'string') localStorage.setItem('menu_fs_v1', u.menuFs); applyAppFont(); } catch (e) {}
                     }
                 } else if (!isNodeEnvironment && Array.isArray(parsed.masterWorks) && parsed.masterWorks.length > 0) {
                     // 웹에서 처음 데이터를 받았는데 테마 정보가 아직 없다 → 웹의 현재 테마를 한 번 올려서 PC앱도 따라오게 한다
@@ -10340,6 +10345,13 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                 return `<button type="button" onclick="${fn}('${x[0]}')" class="px-1 py-0.5 rounded-md border text-[11px] leading-tight ${on ? 'border-2 bg-slate-50 font-bold' : 'border-slate-200 text-slate-600'}" style="${x[0] ? 'font-family:' + x[2] + ';' : ''}${on ? 'border-color:var(--primary);' : ''}">${label}</button>`;
             }).join('');
         }
+        function _fsGet(k) { const v = parseFloat(_fontGet(k)); return (v >= 0.7 && v <= 1.5) ? v : 1; }
+        function setFontScale(key, pct) {
+            const v = Math.min(150, Math.max(70, Number(pct) || 100)) / 100;
+            try { localStorage.setItem(key, v === 1 ? '' : String(v)); } catch (e) {}
+            applyAppFont();
+            clearTimeout(setFontScale._t); setFontScale._t = setTimeout(() => { try { save(true); } catch (e) {} }, 400);
+        }
         function applyAppFont() {
             const bodyId = _fontGet('app_font_v1'), menuId = _fontGet('menu_font_v1');
             const bc = _fontCss(bodyId), mc = _fontCss(menuId), root = document.documentElement.style;
@@ -10348,6 +10360,14 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
             try { if (typeof isNodeEnvironment !== 'undefined' && isNodeEnvironment) require('electron').ipcRenderer.send('app-font-css', bc ? bc + ", 'Pretendard', sans-serif" : ''); } catch (e) {}
             document.body.classList.toggle('menu-font-on', !!mc);
             root.setProperty('--menu-font', mc ? mc + ", 'Pretendard', sans-serif" : '');
+            // 글자 크기(배율): 본문은 각 탭 내용, 메뉴는 왼쪽 메뉴 전체를 같은 비율로 키우고 줄인다
+            const afs = _fsGet('app_fs_v1'), mfs = _fsGet('menu_fs_v1');
+            root.setProperty('--app-fs', String(afs)); root.setProperty('--menu-fs', String(mfs));
+            [['app-fs-range', 'app-fs-label', afs], ['menu-fs-range', 'menu-fs-label', mfs]].forEach(([r, l, v]) => {
+                const re = document.getElementById(r), le = document.getElementById(l);
+                if (re && document.activeElement !== re) re.value = Math.round(v * 100);
+                if (le) le.textContent = Math.round(v * 100) + '%';
+            });
             _fontPicker('app-font-picker', bodyId, 'setAppFont', '테마 기본');
             _fontPicker('menu-font-picker', menuId, 'setMenuFont', '본문과 같게');
         }
@@ -11916,9 +11936,21 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
             ['galmuri', '갈무리 (픽셀)', "'Galmuri11', sans-serif"],
             ['neodgm', '네오둥근모 (오락실)', "'NeoDunggeunmo', sans-serif"]
         ];
+        function setWidgetFontScale(pct) {
+            const v = Math.min(140, Math.max(80, Number(pct) || 100)) / 100;
+            widgetSettingsData.widgetFontScale = v;
+            const l = document.getElementById('widget-fs-label'); if (l) l.textContent = Math.round(v * 100) + '%';
+            const r = document.getElementById('widget-fs-range'); if (r && document.activeElement !== r) r.value = Math.round(v * 100);
+            clearTimeout(setWidgetFontScale._t);
+            setWidgetFontScale._t = setTimeout(() => {
+                try { save(true); } catch (e) {}
+                try { if (typeof require !== 'undefined') require('electron').ipcRenderer.send('widget-update-settings', { widgetFontScale: v }); } catch (e) {}
+            }, 250);
+        }
         function renderWidgetFontPicker() {
             const box = document.getElementById('widget-font-picker'); if (!box) return;
             const cur = (widgetSettingsData && widgetSettingsData.widgetFont) || '';
+            { const fv = (widgetSettingsData && widgetSettingsData.widgetFontScale) || 1; const r = document.getElementById('widget-fs-range'), l = document.getElementById('widget-fs-label'); if (r && document.activeElement !== r) r.value = Math.round(fv * 100); if (l) l.textContent = Math.round(fv * 100) + '%'; }
             box.innerHTML = WIDGET_FONTS.map(([id, name, css]) => {
                 const on = id === cur;
                 return `<button type="button" onclick="setWidgetFont('${id}')" class="px-3 py-1.5 rounded-lg border text-[13px] ${on ? 'font-bold' : 'text-slate-600'}" style="${css ? 'font-family:' + css + ';' : ''}${on ? 'border-color:#10b981; box-shadow:0 0 0 2px rgba(16,185,129,.25); background:#ecfdf5;' : 'border-color:#e2e8f0; background:#fff;'}">${name}</button>`;

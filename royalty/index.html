@@ -20486,13 +20486,36 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
             const pendingWriteSpans = spans.filter(sp => (sp.span.type || 'write') === 'write' && !confirmedSpanIds.has(sp.span.id));
             const contractSpans = pendingWriteSpans.filter(sp => sp.span.workId && !confirmedWorkIds.has(sp.span.workId));
             const freeSpans = pendingWriteSpans.filter(sp => !sp.span.workId);
-            const contractWorkCount = new Set(contractSpans.map(sp => sp.span.workId)).size;
-            const freeWorkCount = freeSpans.length;   // 자유작은 연결된 작품이 없어 하나로 묶을 수 없으니, 기간 일정 하나당 1개로 센다
+            // 패시브 기간 일정과 초단편에 연결된 집필 기간 일정은 위 막대·표에는 안 그리지만, 계약작/자유작 목표에는 포함한다
+            const exContractIds = new Set(), exFreeCount = { n: 0 };
+            let exContractChars = 0, exContractDays = 0, exFreeChars = 0, exFreeDays = 0;
+            {
+                const yS = `${y}-01-01`, yE = `${y}-12-31`;
+                tlSpans().filter(sp => sp.startDate <= yE && sp.endDate >= yS).forEach(sp => {
+                    const t = sp.type || 'write';
+                    const cs = sp.startDate < yS ? yS : sp.startDate, ce = sp.endDate > yE ? yE : sp.endDate;
+                    if (t === 'passive') {
+                        const ps = passiveStats(sp);
+                        if (!ps.total || !ps.workDays) return;
+                        let n = 0;
+                        for (let i = 0; i < ps.totalDays; i++) { const d = spanDateAdd(sp.startDate, i); if (d >= cs && d <= ce && !ps.flags[i]) n++; }
+                        const chars = Math.round(ps.total * n / ps.workDays);
+                        if (sp.workId) { exContractChars += chars; exContractDays += n; if (!confirmedWorkIds.has(sp.workId) && !contractSpans.some(c => c.span.workId === sp.workId)) exContractIds.add(sp.workId); }
+                        else { exFreeChars += chars; exFreeDays += n; exFreeCount.n++; }
+                    } else if (t === 'write' && sp.workId && tlIsExcludedWork(sp.workId) && !confirmedSpanIds.has(sp.id)) {
+                        const st = calcSpanStats({ ...sp, startDate: cs, endDate: ce });
+                        exContractChars += st.totalChars; exContractDays += Number(st.workDays) || 0;
+                        exContractIds.add(sp.workId);
+                    }
+                });
+            }
+            const contractWorkCount = new Set(contractSpans.map(sp => sp.span.workId)).size + exContractIds.size;
+            const freeWorkCount = freeSpans.length + exFreeCount.n;   // 자유작은 연결된 작품이 없어 하나로 묶을 수 없으니, 기간 일정 하나당 1개로 센다
 
-            const contractChars = contractSpans.reduce((n, sp) => n + sp.stats.totalChars, 0);
-            const contractWriteDays = contractSpans.reduce((n, sp) => n + (Number(sp.stats.workDays) || 0), 0);
-            const freeChars = freeSpans.reduce((n, sp) => n + sp.stats.totalChars, 0);
-            const freeWriteDays = freeSpans.reduce((n, sp) => n + (Number(sp.stats.workDays) || 0), 0);
+            const contractChars = contractSpans.reduce((n, sp) => n + sp.stats.totalChars, 0) + exContractChars;
+            const contractWriteDays = contractSpans.reduce((n, sp) => n + (Number(sp.stats.workDays) || 0), 0) + exContractDays;
+            const freeChars = freeSpans.reduce((n, sp) => n + sp.stats.totalChars, 0) + exFreeChars;
+            const freeWriteDays = freeSpans.reduce((n, sp) => n + (Number(sp.stats.workDays) || 0), 0) + exFreeDays;
 
             // 집필일 = 실제로 쓴(카드 있는) 날 + 아직 카드는 없지만 집필형 기간 일정에서 쉬는 날 빼고 남는 날
             const confirmedWriteDays = items.filter(it => it.kind === 'work').reduce((n, it) => n + (Number(it.days) || 0), 0);

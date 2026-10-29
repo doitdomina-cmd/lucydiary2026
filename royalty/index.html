@@ -5218,9 +5218,6 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                 <button onclick="exportAllSettlementRecords()" id="sidebar-export-settlement-btn" class="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all border border-white/10" title="정산 기록 전체 내보내기 (전체 연도, 텍스트 파일)">
                     <i class="fa-solid fa-sack-dollar text-base"></i>
                 </button>
-                <button onclick="toggleBriefFromSidebar()" id="sidebar-brief-btn" class="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all border border-white/10" title="오늘의 브리핑" style="opacity:0.5; display:none;">
-                    <i class="fa-solid fa-user-tie text-base"></i>
-                </button>
                 <button onclick="openSettingsPanel()" class="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all border border-white/10" title="설정">
                     <i class="fa-solid fa-gear text-base"></i>
                 </button>
@@ -7271,7 +7268,7 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                     </div></div>
                                 <div><!-- 위젯 글꼴 -->
                     <div>
-                        <p class="text-xs font-bold text-slate-400 uppercase mb-1">위젯 글꼴 <span class="font-normal normal-case text-slate-300">(위젯 · 미니창 · 브리핑 · 뽀모도로 · 계산기 한꺼번에)</span></p>
+                        <p class="text-xs font-bold text-slate-400 uppercase mb-1">위젯 글꼴 <span class="font-normal normal-case text-slate-300">(위젯 · 미니창 · 목표 · 뽀모도로 · 계산기 한꺼번에)</span></p>
                         <div id="widget-font-picker" class="flex flex-wrap gap-1.5"></div>
                                 <div class="flex items-center gap-2 mt-2"><span class="text-xs font-bold text-slate-400 shrink-0">글자 크기</span><input id="widget-fs-range" type="range" min="80" max="140" step="5" value="100" oninput="setWidgetFontScale(this.value)" class="flex-1"><span id="widget-fs-label" class="text-xs font-bold text-slate-500 w-10 text-right">100%</span><button type="button" onclick="setWidgetFontScale(100)" class="text-xs text-slate-400 underline">기본</button></div>
                     </div></div>
@@ -7431,21 +7428,37 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                             </div>
                             </div>
                     </div></div>
-                            <div><!-- 브리핑 자동 실행 -->
+                            <div><!-- 목표 위젯 -->
                     <div>
-                        <p class="text-xs font-bold text-slate-400 uppercase mb-1.5">📋 오늘의 브리핑</p>
+                        <p class="text-xs font-bold text-slate-400 uppercase mb-1.5">🎯 목표 위젯</p>
                         <div class="wset-rows">
                             <div class="wset-row">
-                                <span title="프로그램 켤 때마다 브리핑 창 자동 표시" class="text-sm text-slate-600 font-medium">시작 시 자동 실행</span>
-                                <button onclick="toggleBriefAutoOpen()" id="brief-auto-open-btn" class="px-4 py-1.5 rounded-lg text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all">확인 중...</button>
+                                <span class="text-sm text-slate-600 font-medium">목표 위젯 표시</span>
+                                <button onclick="toggleGoalWindow()" id="goal-toggle-btn" class="px-4 py-1.5 rounded-lg text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all">확인 중...</button>
+                            </div>
+                            <div class="wset-row">
+                                <span title="PC를 켜면 목표 위젯도 같이 떠요" class="text-sm text-slate-600 font-medium">윈도우 켜질 때 자동 실행</span>
+                                <input type="checkbox" id="goal-autostart" onchange="saveWindowAutoStart()" class="wset-pill">
                             </div>
                             <div class="wset-row">
                                 <span class="text-sm text-slate-600 font-medium">위치 고정</span>
-                                <button onclick="toggleBriefLock()" id="brief-lock-btn" class="px-4 py-1.5 rounded-lg text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all">해제</button>
+                                <button onclick="toggleGoalLock()" id="goal-lock-btn" class="px-4 py-1.5 rounded-lg text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all">해제</button>
                             </div>
                             <div class="wset-row">
-                                <span title="꺼두면 사이드바 하단에 브리핑 버튼이 보이지 않아요" class="text-sm text-slate-600 font-medium">사이드바에 아이콘 표시</span>
-                                <button onclick="toggleBriefSidebarIcon()" id="brief-sidebar-icon-btn" class="px-4 py-1.5 rounded-lg text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all">확인 중...</button>
+                                <span class="text-sm text-slate-600 font-medium"><span id="goal-y1-label">올해</span> 글자수 목표</span>
+                                <span class="flex items-center gap-1"><input type="number" id="goal-g1" min="0" step="10000" placeholder="1000000" onchange="saveGoalSettings()" class="w-20 py-1 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-right outline-none"><span class="text-xs text-slate-400">자</span></span>
+                            </div>
+                            <div class="wset-row">
+                                <span class="text-sm text-slate-600 font-medium pl-3">계약</span>
+                                <span class="flex items-center gap-1"><input type="number" id="goal-c1" min="0" placeholder="--" onchange="saveGoalSettings()" class="w-14 py-1 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-right outline-none"><span class="text-xs text-slate-400">작</span></span>
+                            </div>
+                            <div class="wset-row">
+                                <span class="text-sm text-slate-600 font-medium"><span id="goal-y2-label">내년</span> 글자수 목표</span>
+                                <span class="flex items-center gap-1"><input type="number" id="goal-g2" min="0" step="10000" placeholder="1200000" onchange="saveGoalSettings()" class="w-20 py-1 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-right outline-none"><span class="text-xs text-slate-400">자</span></span>
+                            </div>
+                            <div class="wset-row">
+                                <span class="text-sm text-slate-600 font-medium pl-3">계약</span>
+                                <span class="flex items-center gap-1"><input type="number" id="goal-c2" min="0" placeholder="--" onchange="saveGoalSettings()" class="w-14 py-1 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-right outline-none"><span class="text-xs text-slate-400">작</span></span>
                             </div>
                         </div>
                     </div></div>
@@ -8838,11 +8851,6 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                 openSettleImport: () => ipcRenderer.send('settle-import-open'),
                 hideCalcWidget: () => ipcRenderer.send('calc-widget-hide'),
                 calcWidgetIsVisible: () => ipcRenderer.invoke('calc-widget-is-visible'),
-                openBriefWindow: () => ipcRenderer.send('brief-window-open'),
-                hideBriefWindow: () => ipcRenderer.send('brief-window-hide'),
-                briefWindowIsVisible: () => ipcRenderer.invoke('brief-window-is-visible'),
-                getBriefAutoOpen: () => ipcRenderer.invoke('get-brief-auto-open'),
-                setBriefAutoOpen: (flag) => ipcRenderer.send('set-brief-auto-open', flag),
                 saveContractFile: (name, data) => ipcRenderer.invoke('save-contract-file', { name, data }),
                 openContractFile: (fileName) => ipcRenderer.invoke('open-contract-file', fileName),
                 deleteContractFile: (fileName) => ipcRenderer.invoke('delete-contract-file', fileName),
@@ -11261,7 +11269,6 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
 
         // ── memo-editor 이벤트 바인딩 (DOMContentLoaded 후) ──
         document.addEventListener('DOMContentLoaded', () => {
-            applyBriefSidebarIconVis();
             const editor = document.getElementById('memo-editor');
             if (!editor) return;
             editor.addEventListener('input', meAutoSave);
@@ -11437,8 +11444,7 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
             try { renderThemeDesignButtons(); } catch (e) {}
             try { switchSettingsTab(localStorage.getItem('settingsTab_v1') || 'look'); } catch (e) { switchSettingsTab('look'); }
             updateWidgetToggleBtn();
-            updateBriefAutoOpenBtn();
-            updateBriefSidebarIconBtn();
+            loadGoalSettingsUI();
             updateMiniWindowToggleBtn();
             loadPomoSettingsUI();
             restoreWidgetSettingsUI();
@@ -11484,50 +11490,6 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                     updateWidgetToggleBtn();
                 }
             } catch(e) {}
-        }
-
-        // ════ 브리핑 자동 실행 설정 ════
-        async function updateBriefAutoOpenBtn() {
-            const btn = document.getElementById('brief-auto-open-btn');
-            if (!btn) return;
-            try {
-                if (window.electronAPI && window.electronAPI.getBriefAutoOpen) {
-                    const on = await window.electronAPI.getBriefAutoOpen();
-                    btn.textContent = on ? '켜짐 ✅' : '꺼짐';
-                    btn.className = `px-4 py-1.5 rounded-lg text-xs font-bold transition-all ml-3 shrink-0 ${on ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'}`;
-                } else {
-                    btn.textContent = '(Electron 전용)';
-                    btn.disabled = true;
-                }
-            } catch(e) { btn.textContent = '(Electron 전용)'; btn.disabled = true; }
-        }
-        async function toggleBriefAutoOpen() {
-            try {
-                if (window.electronAPI && window.electronAPI.getBriefAutoOpen) {
-                    const cur = await window.electronAPI.getBriefAutoOpen();
-                    window.electronAPI.setBriefAutoOpen(!cur);
-                    updateBriefAutoOpenBtn();
-                }
-            } catch(e) {}
-        }
-
-        // ════ 사이드바 브리핑 아이콘 표시 여부 (설정에서만 켜고 끔) ════
-        function briefSidebarIconOn() { return localStorage.getItem('brief_sidebar_icon_v6') === '1'; }
-        function applyBriefSidebarIconVis() {
-            const btn = document.getElementById('sidebar-brief-btn');
-            if (btn) btn.style.display = briefSidebarIconOn() ? 'flex' : 'none';
-        }
-        function updateBriefSidebarIconBtn() {
-            const btn = document.getElementById('brief-sidebar-icon-btn');
-            if (!btn) return;
-            const on = briefSidebarIconOn();
-            btn.textContent = on ? '켜짐 ✅' : '꺼짐';
-            btn.className = `px-4 py-1.5 rounded-lg text-xs font-bold transition-all ml-3 shrink-0 ${on ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'}`;
-        }
-        function toggleBriefSidebarIcon() {
-            localStorage.setItem('brief_sidebar_icon_v6', briefSidebarIconOn() ? '0' : '1');
-            applyBriefSidebarIconVis();
-            updateBriefSidebarIconBtn();
         }
 
         // ════ 공미 ↔ 공포 글자수 계산기 ════
@@ -11933,7 +11895,7 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                 b.style.boxShadow = on ? '0 0 0 2px rgba(16,185,129,.25)' : '';
             });
         }
-        // 위젯 글꼴: 위젯·미니창·브리핑·뽀모도로·계산기가 모두 이 글꼴을 쓴다 ('' = 디자인 기본)
+        // 위젯 글꼴: 위젯·미니창·목표·뽀모도로·계산기가 모두 이 글꼴을 쓴다 ('' = 디자인 기본)
         const WIDGET_FONTS = [
             ['', '디자인 기본', ''],
             ['gowundodum', '고운돋움', "'Gowun Dodum', sans-serif"],
@@ -24541,25 +24503,6 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
             save(); writerMiniRenderTable(); writerMiniUpdateStats();
         }
 
-        // ══ 사이드바 브리핑 버튼 ══════════════════════════════
-        async function toggleBriefFromSidebar() {
-            if (!window.electronAPI) return;
-            try {
-                const v = await window.electronAPI.briefWindowIsVisible();
-                if (v) window.electronAPI.hideBriefWindow();
-                else window.electronAPI.openBriefWindow();
-                setTimeout(updateSidebarBriefBtnState, 300);
-            } catch(_) {}
-        }
-        async function updateSidebarBriefBtnState() {
-            if (!window.electronAPI) return;
-            try {
-                const v = await window.electronAPI.briefWindowIsVisible();
-                const btn = document.getElementById('sidebar-brief-btn');
-                if (btn) { btn.title = v ? '브리핑 닫기' : '오늘의 브리핑'; btn.style.opacity = v ? '1' : '0.5'; }
-            } catch(_) {}
-        }
-
         // ══ 설정 패널: 미니창 표시 토글 (예전엔 사이드바에 따로 아이콘이 있었는데, 설정 안으로만 옮김) ══
         async function toggleMiniWindowSetting() {
             if (!window.electronAPI) return;
@@ -24606,18 +24549,19 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                 pomoLocked = await ipcRenderer.invoke('pomo-is-locked');
                 updatePomoLockBtn();
                 miniLocked = await ipcRenderer.invoke('mini-is-locked'); _lockBtn('mini-lock-btn', miniLocked);
-                briefLocked = await ipcRenderer.invoke('brief-is-locked'); _lockBtn('brief-lock-btn', briefLocked);
+                goalLocked = await ipcRenderer.invoke('goal-is-locked'); _lockBtn('goal-lock-btn', goalLocked);
+                document.getElementById('goal-autostart').checked = !!a.goal;
             } catch (_) {}
             updatePomoToggleBtn();
         }
-        let miniLocked = false, briefLocked = false;
+        let miniLocked = false, goalLocked = false;
         function _lockBtn(id, on) {
             const btn = document.getElementById(id); if (!btn) return;
             btn.textContent = on ? '잠금 중' : '해제';
             btn.className = `px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${on ? 'bg-amber-100 text-amber-700 border border-amber-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'}`;
         }
         function toggleMiniLock() { if (!ipcRenderer) return; miniLocked = !miniLocked; ipcRenderer.send('mini-set-locked', miniLocked); _lockBtn('mini-lock-btn', miniLocked); }
-        function toggleBriefLock() { if (!ipcRenderer) return; briefLocked = !briefLocked; ipcRenderer.send('brief-set-locked', briefLocked); _lockBtn('brief-lock-btn', briefLocked); }
+        function toggleGoalLock() { if (!ipcRenderer) return; goalLocked = !goalLocked; ipcRenderer.send('goal-set-locked', goalLocked); _lockBtn('goal-lock-btn', goalLocked); }
         let pomoLocked = false;
         function togglePomoLock() {
             if (!ipcRenderer) return;
@@ -24646,7 +24590,8 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
             if (!ipcRenderer) return;
             ipcRenderer.send('set-window-autostart', {
                 pomo: document.getElementById('pomo-autostart').checked,
-                mini: document.getElementById('mini-autostart').checked
+                mini: document.getElementById('mini-autostart').checked,
+                goal: document.getElementById('goal-autostart').checked
             });
         }
         async function togglePomoWindow() {
@@ -24665,6 +24610,43 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                 btn.textContent = v ? '숨기기' : '보이기';
                 btn.className = 'px-4 py-1.5 rounded-lg text-xs font-bold transition-all ' + (v ? 'bg-rose-50 text-rose-500 hover:bg-rose-100 border border-rose-200' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200');
             } catch (_) {}
+        }
+
+        // ══ 설정 패널: 목표 위젯 (표시 / 자동 실행 / 위치 고정 + 연간 글자수 목표) ══
+        async function toggleGoalWindow() {
+            if (!ipcRenderer) return;
+            try {
+                const v = await ipcRenderer.invoke('goal-widget-is-visible');
+                ipcRenderer.send(v ? 'goal-widget-hide' : 'goal-widget-open');
+                setTimeout(updateGoalToggleBtn, 300);
+            } catch (_) {}
+        }
+        async function updateGoalToggleBtn() {
+            const btn = document.getElementById('goal-toggle-btn');
+            if (!btn) return;
+            if (!ipcRenderer) { btn.textContent = '(Electron 전용)'; btn.disabled = true; return; }
+            try {
+                const v = await ipcRenderer.invoke('goal-widget-is-visible');
+                btn.textContent = v ? '숨기기' : '보이기';
+                btn.className = 'px-4 py-1.5 rounded-lg text-xs font-bold transition-all ' + (v ? 'bg-rose-50 text-rose-500 hover:bg-rose-100 border border-rose-200' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200');
+            } catch (_) {}
+        }
+        async function loadGoalSettingsUI() {
+            updateGoalToggleBtn();
+            const y = new Date().getFullYear();
+            const l1 = document.getElementById('goal-y1-label'), l2 = document.getElementById('goal-y2-label');
+            if (l1) l1.textContent = y + '년'; if (l2) l2.textContent = (y + 1) + '년';
+            if (!ipcRenderer) return;
+            try {
+                const c = await ipcRenderer.invoke('goal-get-settings');
+                const set = (id, v) => { const el = document.getElementById(id); if (el && document.activeElement !== el) el.value = (v === 0 || v === '' || v == null) ? '' : v; };
+                set('goal-g1', c.g1); set('goal-c1', c.c1); set('goal-g2', c.g2); set('goal-c2', c.c2);
+            } catch (_) {}
+        }
+        function saveGoalSettings() {
+            if (!ipcRenderer) return;
+            const v = id => document.getElementById(id).value.trim();
+            ipcRenderer.send('goal-set-settings', { g1: v('goal-g1'), c1: v('goal-c1'), g2: v('goal-g2'), c2: v('goal-c2') });
         }
 
         function writerUpdateTime(val) {

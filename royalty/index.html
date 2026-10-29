@@ -24620,9 +24620,13 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
 
         // 목표 위젯에 보낼 숫자를 앱 데이터에서 자동 계산: 그 해 글자수 목표(확정 카드 + 아직 카드 없는 집필·패시브 기간 일정) + 계약일이 그 해인 작품 수
         function computeYearGoal(y) {
-            // 연간 집필 일정 위쪽 요약의 '확정 목표'와 같은 값 (달력에 찍힌 집필 카드 글자수 합계)
+            // 그 해 달력에 찍힌 집필 카드 글자수 합계
             const ys = String(y);
-            const total = buildYearTimelineData(y).totalChars;
+            let total = 0;   // 달성(쓴 글자수)에는 초단편도 들어가므로, 목표도 초단편 카드까지 전부 더한다 (연간 일정의 확정 목표는 초단편을 뺀 값)
+            Object.entries(tlSched()).forEach(([ds, list]) => {
+                if (!ds.startsWith(y + '-')) return;
+                (list || []).forEach(s => { if (!s.category && isScheduleWorkValid(s.workId)) total += Number(s.goal) || 0; });
+            });
             // 계약 = 그 해에 출간일이 잡혀 있는 작품, 출간 = 그 중 출간일이 이미 지난 작품 ('BL 장편'·'현로 장편'만)
             const todayStr = (() => { const n = new Date(); return n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0'); })();
             const planned = (masterWorks || []).filter(w => (w.genre === 'BL 장편' || w.genre === '현로 장편') && (w.isPending ? String(w.pendingMonth || '').startsWith(ys + '-') : (w.publishDate && String(w.publishDate).startsWith(ys + '-'))));

@@ -20229,12 +20229,13 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
             const daysInYear = tlDaysInYear(y);
 
             // ── 1) 그 해 집필 카드들을 작품별로 모은다
+            let excludedChars = 0;
             const groups = {};
             Object.entries(tlSched()).forEach(([dateStr, list]) => {
                 if (!dateStr.startsWith(`${y}-`)) return;
                 (list || []).forEach(s => {
                     if (!isScheduleWorkValid(s.workId)) return;
-                    if (tlIsExcludedWork(s.workId)) return;   // 초단편 제외
+                    if (tlIsExcludedWork(s.workId)) { if (!s.category) excludedChars += Number(s.goal) || 0; return; }   // 초단편은 막대·표에는 안 그리고 목표 글자수에만 더한다
                     if (!groups[s.workId]) groups[s.workId] = { days: new Set(), chars: 0, cats: {}, dayChars: {}, editDays: new Set() };
                     const g = groups[s.workId];
                     if (s.category) {
@@ -20448,7 +20449,7 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
             });
 
             // 확정 목표 글자수 = 달력에 찍힌 집필 카드 전부 (막대에서 뺀 '조금씩 쓰는 구간'도 포함)
-            const totalChars = works.reduce((n, w) => n + (Number(w.totalChars) || 0), 0);
+            const totalChars = works.reduce((n, w) => n + (Number(w.totalChars) || 0), 0) + excludedChars;
             const busyDays = busy.filter(Boolean).length;
 
             return { y, daysInYear, items, works, spans, restSegs, midBreakSegs, busy, busyDays, monthly, totalChars };

@@ -24620,25 +24620,12 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
 
         // 목표 위젯에 보낼 숫자를 앱 데이터에서 자동 계산: 그 해 글자수 목표(확정 카드 + 아직 카드 없는 집필·패시브 기간 일정) + 계약일이 그 해인 작품 수
         function computeYearGoal(y) {
-            const ys = String(y), yStart = ys + '-01-01', yEnd = ys + '-12-31';
-            let total = 0;
-            Object.entries(writeSchedules || {}).forEach(([ds, list]) => {
-                if (!ds.startsWith(ys + '-')) return;
-                (list || []).forEach(s => { if (!s.category && isScheduleWorkValid(s.workId)) total += Number(s.goal) || 0; });
-            });
-            const confirmed = new Set();
-            Object.values(writeSchedules || {}).forEach(list => (list || []).forEach(s => { if (s.spanId) confirmed.add(s.spanId); }));
-            (writeSpans || []).forEach(sp => {
-                const t = sp.type || 'write';
-                if (t === 'write' && !confirmed.has(sp.id)) total += spanCharsInRange(sp, yStart, yEnd);
-                else if (t === 'passive') {
-                    const ps = passiveStats(sp);
-                    if (!ps.total || !ps.workDays) return;
-                    let n = 0;
-                    for (let i = 0; i < ps.totalDays; i++) { const d = spanDateAdd(sp.startDate, i); if (d >= yStart && d <= yEnd && !ps.flags[i]) n++; }
-                    total += Math.round(ps.total * n / ps.workDays);
-                }
-            });
+            // 연간 집필 일정 위쪽 요약의 '자유작까지 확정 시 목표'와 같은 값: 확정(카드) 글자수 + 아직 카드 안 된 집필형 기간 일정(계약작·자유작) 예상 글자수
+            const d = buildYearTimelineData(y);
+            const confirmedSpanIds = new Set();
+            Object.values(tlSched()).forEach(list => (list || []).forEach(s => { if (s.spanId) confirmedSpanIds.add(s.spanId); }));
+            const pend = d.spans.filter(sp => (sp.span.type || 'write') === 'write' && !confirmedSpanIds.has(sp.span.id));
+            const total = d.totalChars + pend.reduce((n, sp) => n + (Number(sp.stats.totalChars) || 0), 0);
             // 계약 = 그 해에 출간일이 잡혀 있는 작품, 출간 = 그 중 출간일이 이미 지난 작품 ('BL 장편'·'현로 장편'만)
             const todayStr = (() => { const n = new Date(); return n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0'); })();
             const planned = (masterWorks || []).filter(w => (w.genre === 'BL 장편' || w.genre === '현로 장편') && !w.isPending && w.publishDate && String(w.publishDate).startsWith(ys + '-'));

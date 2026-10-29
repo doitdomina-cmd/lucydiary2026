@@ -7444,22 +7444,6 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                                 <span class="text-sm text-slate-600 font-medium">위치 고정</span>
                                 <button onclick="toggleGoalLock()" id="goal-lock-btn" class="px-4 py-1.5 rounded-lg text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all">해제</button>
                             </div>
-                            <div class="wset-row">
-                                <span class="text-sm text-slate-600 font-medium"><span id="goal-y1-label">올해</span> 글자수 목표</span>
-                                <span class="flex items-center gap-1"><input type="number" id="goal-g1" min="0" step="10000" placeholder="1000000" onchange="saveGoalSettings()" class="w-20 py-1 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-right outline-none"><span class="text-xs text-slate-400">자</span></span>
-                            </div>
-                            <div class="wset-row">
-                                <span class="text-sm text-slate-600 font-medium pl-3">계약</span>
-                                <span class="flex items-center gap-1"><input type="number" id="goal-c1" min="0" placeholder="--" onchange="saveGoalSettings()" class="w-14 py-1 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-right outline-none"><span class="text-xs text-slate-400">작</span></span>
-                            </div>
-                            <div class="wset-row">
-                                <span class="text-sm text-slate-600 font-medium"><span id="goal-y2-label">내년</span> 글자수 목표</span>
-                                <span class="flex items-center gap-1"><input type="number" id="goal-g2" min="0" step="10000" placeholder="1200000" onchange="saveGoalSettings()" class="w-20 py-1 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-right outline-none"><span class="text-xs text-slate-400">자</span></span>
-                            </div>
-                            <div class="wset-row">
-                                <span class="text-sm text-slate-600 font-medium pl-3">계약</span>
-                                <span class="flex items-center gap-1"><input type="number" id="goal-c2" min="0" placeholder="--" onchange="saveGoalSettings()" class="w-14 py-1 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-right outline-none"><span class="text-xs text-slate-400">작</span></span>
-                            </div>
                         </div>
                     </div></div>
                         </div>
@@ -9126,6 +9110,7 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
         }
         function runSave(silent = false) {
             saveTimeout = null; _savePendingSilent = null;
+            try { syncGoalWidget(); } catch (e) {}
             {
                 try {
                     try { localStorage.setItem('lastModified_v6', new Date().toISOString()); } catch(e) {}
@@ -24631,22 +24616,44 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                 btn.className = 'px-4 py-1.5 rounded-lg text-xs font-bold transition-all ' + (v ? 'bg-rose-50 text-rose-500 hover:bg-rose-100 border border-rose-200' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200');
             } catch (_) {}
         }
-        async function loadGoalSettingsUI() {
-            updateGoalToggleBtn();
-            const y = new Date().getFullYear();
-            const l1 = document.getElementById('goal-y1-label'), l2 = document.getElementById('goal-y2-label');
-            if (l1) l1.textContent = y + '년'; if (l2) l2.textContent = (y + 1) + '년';
-            if (!ipcRenderer) return;
-            try {
-                const c = await ipcRenderer.invoke('goal-get-settings');
-                const set = (id, v) => { const el = document.getElementById(id); if (el && document.activeElement !== el) el.value = (v === 0 || v === '' || v == null) ? '' : v; };
-                set('goal-g1', c.g1); set('goal-c1', c.c1); set('goal-g2', c.g2); set('goal-c2', c.c2);
-            } catch (_) {}
+        function loadGoalSettingsUI() { updateGoalToggleBtn(); syncGoalWidget(); }
+
+        // 목표 위젯에 보낼 숫자를 앱 데이터에서 자동 계산: 그 해 글자수 목표(확정 카드 + 아직 카드 없는 집필·패시브 기간 일정) + 계약일이 그 해인 작품 수
+        function computeYearGoal(y) {
+            const ys = String(y), yStart = ys + '-01-01', yEnd = ys + '-12-31';
+            let total = 0;
+            Object.entries(writeSchedules || {}).forEach(([ds, list]) => {
+                if (!ds.startsWith(ys + '-')) return;
+                (list || []).forEach(s => { if (!s.category && isScheduleWorkValid(s.workId)) total += Number(s.goal) || 0; });
+            });
+            const confirmed = new Set();
+            Object.values(writeSchedules || {}).forEach(list => (list || []).forEach(s => { if (s.spanId) confirmed.add(s.spanId); }));
+            (writeSpans || []).forEach(sp => {
+                const t = sp.type || 'write';
+                if (t === 'write' && !confirmed.has(sp.id)) total += spanCharsInRange(sp, yStart, yEnd);
+                else if (t === 'passive') {
+                    const ps = passiveStats(sp);
+                    if (!ps.total || !ps.workDays) return;
+                    let n = 0;
+                    for (let i = 0; i < ps.totalDays; i++) { const d = spanDateAdd(sp.startDate, i); if (d >= yStart && d <= yEnd && !ps.flags[i]) n++; }
+                    total += Math.round(ps.total * n / ps.workDays);
+                }
+            });
+            const contracts = (masterWorks || []).filter(w => w.contractDate && String(w.contractDate).startsWith(ys + '-')).length;
+            return { goal: Math.round(total), contracts };
         }
-        function saveGoalSettings() {
+        let _goalSyncT = null;
+        function syncGoalWidget() {
             if (!ipcRenderer) return;
-            const v = id => document.getElementById(id).value.trim();
-            ipcRenderer.send('goal-set-settings', { g1: v('goal-g1'), c1: v('goal-c1'), g2: v('goal-g2'), c2: v('goal-c2') });
+            clearTimeout(_goalSyncT);
+            _goalSyncT = setTimeout(() => {
+                try {
+                    if (typeof timelineWhatIf !== 'undefined' && timelineWhatIf && timelineWhatIf.on) return;   // 가정표를 보는 동안은 실제 데이터가 아님
+                    const y = new Date().getFullYear();
+                    const a = computeYearGoal(y), b = computeYearGoal(y + 1);
+                    ipcRenderer.send('goal-set-settings', { g1: a.goal, c1: a.contracts, g2: b.goal, c2: b.contracts });
+                } catch (e) {}
+            }, 800);
         }
 
         function writerUpdateTime(val) {

@@ -24633,7 +24633,13 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
             const planned = (masterWorks || []).filter(w => (w.genre === 'BL 장편' || w.genre === '현로 장편') && (w.isPending ? String(w.pendingMonth || '').startsWith(ys + '-') : (w.publishDate && String(w.publishDate).startsWith(ys + '-'))));
             const contracts = planned.length;
             const published = planned.filter(w => !w.isPending && w.publishDate <= todayStr).length;
-            return { goal: Math.round(total), contracts, published };
+            // 오늘 이후(내일부터)에 남은 집필 계획 글자수 — 위젯이 '올해 목표 = 실제 쓴 양 + 남은 계획'으로 쓴다
+            let remaining = 0;
+            Object.entries(tlSched()).forEach(([ds, list]) => {
+                if (ds <= todayStr || !ds.startsWith(ys + '-')) return;
+                (list || []).forEach(s => { if (!s.category && isScheduleWorkValid(s.workId)) remaining += Number(s.goal) || 0; });
+            });
+            return { goal: Math.round(total), remaining: Math.round(remaining), contracts, published };
         }
         try { if (typeof require !== 'undefined') { require('electron').ipcRenderer.on('goal-sync-request', () => syncGoalWidget()); } } catch (e) {}
         setTimeout(() => { try { syncGoalWidget(); } catch (e) {} }, 5000);
@@ -24647,7 +24653,7 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                     if (typeof timelineWhatIf !== 'undefined' && timelineWhatIf && timelineWhatIf.on) return;   // 가정표를 보는 동안은 실제 데이터가 아님
                     const y = new Date().getFullYear();
                     const a = computeYearGoal(y), b = computeYearGoal(y + 1);
-                    ipcRenderer.send('goal-set-settings', { g1: a.goal, c1: a.contracts, p1: a.published, g2: b.goal, c2: b.contracts, p2: b.published });
+                    ipcRenderer.send('goal-set-settings', { g1: a.goal, r1: a.remaining, rDate: new Date().toDateString(), c1: a.contracts, p1: a.published, g2: b.goal, c2: b.contracts, p2: b.published });
                 } catch (e) {}
             }, 800);
         }

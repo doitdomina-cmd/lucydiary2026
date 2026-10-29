@@ -5281,6 +5281,21 @@ body.theme-cozy.theme-galaxy #theme-card-grid .theme-card { background: rgba(255
 body.theme-cozy.theme-galaxy #theme-card-grid .theme-card:hover { background: rgba(226,193,110,.12); }
 body.theme-cozy.theme-galaxy #theme-card-grid .theme-card.active { background: rgba(226,193,110,.16); border-color: var(--gx-gold); box-shadow: 0 0 14px rgba(226,193,110,.3); }
 body.theme-cozy.theme-galaxy #theme-card-grid .tc-name, body.theme-cozy.theme-galaxy #theme-card-grid .theme-card.active .tc-name { color: var(--gx-gold2); }
+/* 월별 정산 시트·장르 탭 */
+body.theme-cozy.theme-galaxy :is(.spreadsheet-container, table.sheet-table, .sheet-table tr, .sheet-table td.sticky-col, .sheet-table td.genre-total-row, .sheet-table td.grand-total-cell, .sheet-footer-outer, .sheet-table thead th) { background: rgba(255,255,255,.04) !important; color: var(--gx-ink) !important; }
+body.theme-cozy.theme-galaxy .sheet-table thead th { background: rgba(226,193,110,.16) !important; color: var(--gx-gold2) !important; }
+body.theme-cozy.theme-galaxy .sheet-table :is(td.genre-total-row, td.grand-total-cell, td.sticky-col.text-center), body.theme-cozy.theme-galaxy .sheet-footer-outer { background: rgba(226,193,110,.1) !important; }
+body.theme-cozy.theme-galaxy .sheet-table td { border-color: rgba(226,193,110,.16) !important; }
+body.theme-cozy.theme-galaxy .sheet-table td.sticky-col.font-bold { color: var(--gx-gold2) !important; }
+body.theme-cozy.theme-galaxy button.genre-tab-btn { background: rgba(255,255,255,.06) !important; color: var(--gx-ink) !important; border: 1px solid rgba(226,193,110,.4) !important; }
+body.theme-cozy.theme-galaxy button.genre-tab-btn.active { background: linear-gradient(180deg,#F0D78C,#D9B658) !important; color: #0B1630 !important; }
+body.theme-cozy.theme-galaxy #tab-refsched :is(.card, .tabs, .btn, button) { background: rgba(255,255,255,.06) !important; color: var(--gx-ink) !important; border-color: rgba(226,193,110,.3) !important; }
+body.theme-cozy.theme-galaxy #tab-refsched :is(b, .phase, .result, button) { color: var(--gx-ink) !important; }
+body.theme-cozy.theme-galaxy #tab-refsched button.on { background: rgba(226,193,110,.25) !important; color: var(--gx-gold2) !important; }
+/* 씰 장식: 메뉴 맨 아래, 큰 제목 옆 (그림은 galaxySeals() 가 무작위로 고름) */
+body.theme-cozy.theme-galaxy #sidebar nav::after { content: ''; display: block; width: 84px; height: 84px; margin: 18px auto 10px; background: var(--gx-s1) center / contain no-repeat; opacity: .8; filter: drop-shadow(0 2px 6px rgba(0,0,0,.5)); pointer-events: none; }
+body.theme-cozy.theme-galaxy :is(.cozy-pubhero .left .row, .cozy-hero .left .title)::after { content: ''; display: inline-block; width: 46px; height: 46px; margin-left: 14px; vertical-align: middle; background: var(--gx-s2) center / contain no-repeat; opacity: .85; filter: drop-shadow(0 2px 5px rgba(0,0,0,.5)); }
+@media (max-width: 767px) { body.theme-cozy.theme-galaxy :is(.cozy-pubhero .left .row, .cozy-hero .left .title)::after { width: 34px; height: 34px; margin-left: 8px; } }
 
 /* ═══ GALAXY END ═══ */
 </style>
@@ -10473,6 +10488,7 @@ body.theme-cozy.theme-galaxy #theme-card-grid .tc-name, body.theme-cozy.theme-ga
             } catch (e) { console.error(e); }
         }
         function applyThemeClass(theme) {
+            try { galaxySeals(); } catch (e) {}
             [...document.body.classList].filter(c => c.startsWith('theme-') || c.startsWith('cozyv-')).forEach(c => document.body.classList.remove(c));
             ['cozy-variant-style', 'skin-style'].forEach(id => { const o = document.getElementById(id); if (o) o.remove(); });
             const t = THEME_LIST.find(x => x.id === theme);
@@ -10643,7 +10659,14 @@ body.theme-cozy.theme-galaxy #theme-card-grid .tc-name, body.theme-cozy.theme-ga
         function setTheme(theme) { if (REMOVED_THEMES.indexOf(theme) >= 0 || (theme !== 'custom' && !THEME_LIST.some(x => x.id === theme))) theme = 'cozy'; try { if (window.event && /^(click|input|keydown|change)$/.test(window.event.type)) setTimeout(() => save(true), 0); } catch (e) {} try { applyDdayDesign(); applyModalDesign(); } catch (e) {} const _wasCozy = document.body.classList.contains('theme-cozy'); _cozyLaunchSig = ''; activeTheme = theme; localStorage.setItem('theme_v6', theme); document.querySelectorAll('.theme-dot').forEach(d => { d.classList.remove('active'); if(d.dataset.theme === theme) d.classList.add('active'); }); if (theme === 'custom') { setCustomTheme(localStorage.getItem('custom_color_v6') || '#b07d7d'); } else { applyThemeClass(theme); document.body.style.removeProperty('--primary'); document.body.style.removeProperty('--primary-light'); } if (_wasCozy !== themeIsCozy(theme)) setTimeout(() => { try { updateUI(); } catch (e) {} }, 0); updateDashboardStats(); }
         function setCustomTheme(color) { try { if (window.event && /^(click|input|keydown|change)$/.test(window.event.type)) setTimeout(() => save(true), 0); } catch (e) {} const _wasCozy = document.body.classList.contains('theme-cozy'); activeTheme = 'custom'; localStorage.setItem('theme_v6', 'custom'); localStorage.setItem('custom_color_v6', color); document.querySelectorAll('.theme-dot').forEach(d => d.classList.remove('active')); document.getElementById('custom-theme-dot').classList.add('active'); document.getElementById('custom-theme-dot').style.backgroundColor = color; applyThemeClass('cozy-custom'); document.documentElement.style.setProperty('--primary', color); const r = parseInt(color.substr(1,2), 16), g = parseInt(color.substr(3,2), 16), b = parseInt(color.substr(5,2), 16); document.documentElement.style.setProperty('--primary-light', `rgba(${r},${g},${b},0.1)`); setTimeout(() => { try { updateUI(); } catch (e) {} }, 0); updateDashboardStats(); }
         function setPageBackgroundColor(color) { try { if (window.event && /^(click|input|keydown|change)$/.test(window.event.type)) setTimeout(() => save(true), 0); } catch (e) {} document.documentElement.style.setProperty('--bg-main', color); localStorage.setItem('bg_main_v6', color); }
-        function switchTab(tabName) { 
+        // 은하 잉크: 씰 그림을 무작위로 골라 CSS 변수로 (메뉴 맨 아래·제목 옆에서 씀)
+        function galaxySeals() {
+            const b = document.body; if (!b) return;
+            const pick = [];
+            while (pick.length < 3) { const n = Math.floor(Math.random() * 24); if (!pick.includes(n)) pick.push(n); }
+            pick.forEach((n, i) => b.style.setProperty('--gx-s' + (i + 1), 'url(seals/seal' + String(n).padStart(2, '0') + '.png)'));
+        }
+        function switchTab(tabName) { try { galaxySeals(); } catch (e) {} 
             document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active')); 
             document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active')); 
             document.getElementById(`nav-${tabName}`).classList.add('active'); 

@@ -24639,8 +24639,11 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                     total += Math.round(ps.total * n / ps.workDays);
                 }
             });
-            const contracts = (masterWorks || []).filter(w => w.contractDate && String(w.contractDate).startsWith(ys + '-')).length;
-            return { goal: Math.round(total), contracts };
+            // 계약·출간 작수는 'BL 장편'·'현로 장편'만 센다
+            const main = (masterWorks || []).filter(w => w.genre === 'BL 장편' || w.genre === '현로 장편');
+            const contracts = main.filter(w => w.contractDate && String(w.contractDate).startsWith(ys + '-')).length;
+            const published = main.filter(w => !w.isPending && w.publishDate && String(w.publishDate).startsWith(ys + '-')).length;
+            return { goal: Math.round(total), contracts, published };
         }
         try { if (typeof require !== 'undefined') { require('electron').ipcRenderer.on('goal-sync-request', () => syncGoalWidget()); } } catch (e) {}
         setTimeout(() => { try { syncGoalWidget(); } catch (e) {} }, 5000);
@@ -24654,7 +24657,7 @@ body #write-calendar-body .write-span-bar.wsp-passive.wsp-passive.wsp-passive .w
                     if (typeof timelineWhatIf !== 'undefined' && timelineWhatIf && timelineWhatIf.on) return;   // 가정표를 보는 동안은 실제 데이터가 아님
                     const y = new Date().getFullYear();
                     const a = computeYearGoal(y), b = computeYearGoal(y + 1);
-                    ipcRenderer.send('goal-set-settings', { g1: a.goal, c1: a.contracts, g2: b.goal, c2: b.contracts });
+                    ipcRenderer.send('goal-set-settings', { g1: a.goal, c1: a.contracts, p1: a.published, g2: b.goal, c2: b.contracts, p2: b.published });
                 } catch (e) {}
             }, 800);
         }

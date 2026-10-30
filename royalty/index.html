@@ -6139,7 +6139,7 @@ body.theme-cozy.theme-galaxy :is(#master-works-by-genre-container > div, #tab-wo
 body.theme-cozy.theme-galaxy #master-works-by-genre-container > div[data-gv="yellow"]:nth-child(n)::before { background: repeating-linear-gradient(180deg, transparent 0 7px, rgba(255,255,255,.14) 7px 8px), linear-gradient(90deg, #F5DE78, #F9EBA6 45%, #EAD060) !important; }
 body.theme-cozy.theme-galaxy :is(#master-works-by-genre-container > div, #tab-workmanage div.rounded-xl.border.cursor-pointer, #tab-webtoon div.rounded-xl.border.cursor-pointer)[data-gv="purple"] { --gb: #BDA6E0; }
 body.theme-cozy.theme-galaxy #master-works-by-genre-container > div[data-gv="purple"]:nth-child(n)::before { background: repeating-linear-gradient(180deg, transparent 0 7px, rgba(255,255,255,.14) 7px 8px), linear-gradient(90deg, #BDA6E0, #D4C5EC 45%, #B096D8) !important; }
-body.theme-cozy.theme-galaxy :is(#tab-workmanage, #tab-webtoon) div.rounded-xl.border.cursor-pointer[data-gv] > div.mb-1.py-1\.5:not(#_):not(#__) { background-color: color-mix(in srgb, var(--gb) 62%, #fff) !important; }
+body.theme-cozy.theme-galaxy :is(#tab-workmanage, #tab-webtoon) div.rounded-xl.border.cursor-pointer > div.mb-1.py-1\.5:not(#_):not(#__) { background: color-mix(in srgb, var(--gb, var(--gc, #EEAAB6)) 62%, #fff) !important; }
 
 /* ═══ GALAXY END ═══ */
 </style>
@@ -10516,11 +10516,22 @@ body.theme-cozy.theme-galaxy :is(#tab-workmanage, #tab-webtoon) div.rounded-xl.b
             return (_cozyMuteCache[hex] = '#' + rgb.map(v => v.toString(16).padStart(2, '0')).join(''));
         }
         // 빈티지 테마: 장르별 고정색 (현로 장편 분홍 · BL 장편 하늘 · BL 초단 연두 · 현로 초단 노랑 · 웹툰 보라)
-        const GV_MAP = { '현로 장편': ['pink', '#F2A9BE'], 'BL 장편': ['sky', '#9FCBEA'], 'BL 초단': ['green', '#A9D9A0'], '현로 초단': ['yellow', '#F5DE78'], '웹툰': ['purple', '#BDA6E0'] };
-        function gvKey(name) { const e = GV_MAP[String(name || '').trim()]; return e ? e[0] : ''; }
+        const GV_MAP = { pink: '#F2A9BE', sky: '#9FCBEA', green: '#A9D9A0', yellow: '#F5DE78', purple: '#BDA6E0' };
+        function gvKey(name) {
+            const t = String(name || '').replace(/[\s ​]+/g, '').toLowerCase();
+            if (!t) return '';
+            if (t.includes('웹툰')) return 'purple';
+            const bl = t.includes('bl') || t.includes('비엘'), ro = t.includes('현로') || t.includes('현대로맨스');
+            const long = t.includes('장편'), short = t.includes('초단') || t.includes('단편');
+            if (bl && long) return 'sky';
+            if (bl && short) return 'green';
+            if (ro && long) return 'pink';
+            if (ro && short) return 'yellow';
+            return '';
+        }
         function gvKeyIdx(i) { const g = genreList[i]; return g ? gvKey(g.name) : ''; }
         function getGenreColor(genreName) {
-            if (document.body && document.body.classList.contains('theme-galaxy') && GV_MAP[genreName]) return GV_MAP[genreName][1];
+            if (document.body && document.body.classList.contains('theme-galaxy') && gvKey(genreName)) return GV_MAP[gvKey(genreName)];
             const genre = genreList.find(g => g.name === genreName);
             const base = (genre && genre.color) ? genre.color : '#cbd5e1';
             return (document.body && document.body.classList.contains('theme-cozy')) ? cozyMuteColor(base) : base;

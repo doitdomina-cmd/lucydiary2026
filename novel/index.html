@@ -9479,7 +9479,8 @@ document.addEventListener('click', e => { const c = e.target.closest && e.target
 /* =====================================================================
    뽀모 집필 기록
    - 교시(집필 시간) 동안 늘어난 글자 수(공백 포함)를 저절로 셈. 어느 작품·회차든 상관없이 0자부터
-   - 교시가 끝나면 저절로 휴식, 다음 교시는 버튼으로 시작 (휴식이 길면 '식사'로 기록)
+   - 교시가 끝나면 저절로 휴식, 휴식이 끝나면 저절로 다음 교시 (휴식이 길면 '식사'로 기록)
+   - 단, 하루 교시를 다 채웠거나 직전 교시에 한 글자도 안 썼으면(자리 비움) 휴식 끝에서 멈추고 버튼으로 시작
    - 교시마다 목표 = (하루 목표 − 지금까지 쓴 것) ÷ 남은 교시
    - 날짜별 기록(아이템 pomo_YYYY-MM-DD)은 구글 로그인하면 기기끼리 같이 봄
    - 돌아가는 중인 상태는 이 기기에 기억 (새로고침해도 이어짐)
@@ -9509,13 +9510,14 @@ function classTarget(d, n) {
     const left = Math.max(1, (d.planned || pomoSet().pomoClasses) - (n - 1));
     return Math.max(0, Math.ceil(((d.goal || 0) - dayCum(d)) / left));
 }
-function pomoStart() {
+// at: 교시 시작 시각 (자동으로 이어갈 땐 휴식이 끝난 시각 — 탭이 뒤에 있어 늦게 알아채도 시간이 밀리지 않게)
+function pomoStart(at) {
     const r = pomoRun(); if (r.phase === 'work') return;
-    const dk = dayKeyOf(Date.now()), d = pomoDay(dk, true);
+    const t = at || Date.now(), dk = dayKeyOf(t), d = pomoDay(dk, true);
     if (!d.classes.length) { d.goal = pomoSet().pomoGoal; d.planned = pomoSet().pomoClasses; d.startTotal = grandAll(); touch(d); }
     const n = d.classes.length + 1;
-    setPomoRun({ phase: 'work', n, dk, start: Date.now(), base: grandAll(), target: classTarget(d, n) });
-    toast(`${n}교시 시작! 목표 ${fmt(classTarget(d, n))}자`);
+    setPomoRun({ phase: 'work', n, dk, start: t, base: grandAll(), target: classTarget(d, n) });
+    toast(`${at ? '휴식 끝! ' : ''}${n}교시 시작! 목표 ${fmt(classTarget(d, n))}자`);
 }
 function pomoPause() { const r = pomoRun(); if (r.phase !== 'work' || r.paused) return; setPomoRun({ ...r, paused: true, pausedAt: Date.now() }); }
 function pomoResume() { const r = pomoRun(); if (r.phase !== 'work' || !r.paused) return; const n = { ...r, start: r.start + (Date.now() - r.pausedAt) }; delete n.paused; delete n.pausedAt; setPomoRun(n); }
@@ -9540,13 +9542,29 @@ function pomoBeep() {
         [0, .25, .5].forEach((t, i) => { const o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = i === 2 ? 880 : 660; g.gain.setValueAtTime(.0001, ac.currentTime + t); g.gain.exponentialRampToValueAtTime(.2, ac.currentTime + t + .02); g.gain.exponentialRampToValueAtTime(.0001, ac.currentTime + t + .22); o.connect(g).connect(ac.destination); o.start(ac.currentTime + t); o.stop(ac.currentTime + t + .25); });
     } catch (e) {}
 }
-// 1초마다: 교시가 끝났는지, 휴식이 끝났는지 보고 화면 숫자만 바꿈
-setInterval(() => {
-    const r = pomoRun(), S = pomoSet();
-    if (r.phase === 'work' && !r.paused && Date.now() >= r.start + S.pomoWork * 60000) pomoEndClass(true);
-    if (r.phase === 'rest' && !r.restDone && Date.now() >= r.restStart + S.pomoRest * 60000) { r.restDone = true; savePref(); pomoBeep(); toast('휴식 끝! 다음 교시를 시작해 볼까요? 🍅'); renderPomoAll(); }
+// 휴식 끝에서 저절로 다음 교시로 갈지: 하루 교시를 다 채웠거나 직전 교시가 0자(자리 비움)면 멈춤
+function pomoAutoNext(r) {
+    const d = pomoDay(r.dk, false); if (!d || !d.classes.length) return true;
+    if (d.classes.length >= (d.planned || pomoSet().pomoClasses)) return false;
+    return (d.classes[d.classes.length - 1].written || 0) > 0;
+}
+// 교시/휴식이 끝났는지 확인. 탭이 뒤에 있거나 잠자기에서 깨어나 늦게 확인해도
+// 원래 끝났어야 할 시각 기준으로 차례대로 따라잡음 (교시 끝 → 휴식 → 다음 교시 …)
+function pomoCheck() {
+    for (let i = 0; i < 50; i++) {
+        const r = pomoRun(), S = pomoSet(), now = Date.now();
+        if (r.phase === 'work' && !r.paused && now >= r.start + S.pomoWork * 60000) { pomoEndClass(true); continue; }
+        if (r.phase === 'rest' && !r.restDone && now >= r.restStart + S.pomoRest * 60000) {
+            if (pomoAutoNext(r)) { pomoStart(r.restStart + S.pomoRest * 60000); pomoBeep(); continue; }
+            r.restDone = true; savePref(); pomoBeep(); toast('휴식 끝! 다음 교시를 시작해 볼까요? 🍅'); renderPomoAll();
+        }
+        break;
+    }
     pomoTick();
-}, 1000);
+}
+// 1초마다 확인하고 화면 숫자만 바꿈. 탭으로 돌아오면 바로 한 번 더
+setInterval(pomoCheck, 1000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) pomoCheck(); });
 
 /* ---- 하루 기록 줄: 교시 + 사이 휴식/식사 ---- */
 function pomoRows(d, withLive) {

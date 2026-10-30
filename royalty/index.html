@@ -6104,6 +6104,13 @@ body.theme-cozy.theme-galaxy .tab-content div.bg-slate-100:has(> button.bg-white
 body.theme-cozy.theme-galaxy .tab-content div.bg-slate-100:has(> button.bg-white) > button.bg-white * { color: #FFFFFF !important; }
 /* 대시보드 맨 위 카드 4개: 아래 레이스 제거 */
 body.theme-cozy.theme-galaxy #tab-dashboard > div[class*="lg:grid-cols-4"] > * { background: var(--gx-rule), radial-gradient(ellipse at 20% 0%, #FFFEFD, transparent 60%), linear-gradient(160deg, #FFFAF9, #FBEBEC) !important; padding-bottom: 20px; }
+/* 합계 줄 맨 왼쪽 칸도 한 줄 선 (위 표와 같은 위치에서 이어지게) */
+body.theme-cozy.theme-galaxy #tab-records .sheet-footer-inner .sheet-table td:first-child, body.theme-cozy.theme-galaxy #tab-records .sheet-footer-inner .sheet-table td.sticky-col { border-right: 1px solid #E6AEB7 !important; border-left: 0 !important; }
+body.theme-cozy.theme-galaxy #tab-records .sheet-footer-inner .sheet-table { border-collapse: separate !important; border-spacing: 0 !important; }
+body.theme-cozy.theme-galaxy #tab-records .sheet-footer-outer { border-top: 1px solid #E6AEB7 !important; }
+/* 바깥 틀을 진짜 테두리로: 표 선이 틀까지 맞닿게 */
+body.theme-cozy.theme-galaxy #tab-records .sheet-wrapper { border: 1px solid #E3A0A9 !important; border-bottom: 0 !important; border-image: none !important; border-radius: 12px 12px 0 0 !important; overflow: hidden; }
+body.theme-cozy.theme-galaxy #tab-records .sheet-footer-outer { border: 1px solid #E3A0A9 !important; border-top: 1px solid #E6AEB7 !important; border-image: none !important; border-radius: 0 0 12px 12px !important; overflow: hidden; }
 
 /* ═══ GALAXY END ═══ */
 </style>
@@ -25275,6 +25282,23 @@ body.theme-cozy.theme-galaxy #tab-dashboard > div[class*="lg:grid-cols-4"] > * {
             if (top + th > window.innerHeight - 8) top = e.clientY - th - 14;
             tip.style.left = Math.max(8, left) + 'px'; tip.style.top = Math.max(8, top) + 'px';
         }
+
+        // 보기 필터(출간작만/출간 예정/필명 별 등)를 켜면 이름 옆 숫자도 보이는 작품 수로
+        (function () {
+            const wrap = (fnName, listId, badgeId, getFilter, cardSel) => {
+                const orig = window[fnName]; if (typeof orig !== 'function') return;
+                window[fnName] = function () {
+                    const r = orig.apply(this, arguments);
+                    try {
+                        const f = getFilter(), b = document.getElementById(badgeId), c = document.getElementById(listId);
+                        if (b && c && f && f !== 'all' && f !== 'broken') { const ids = new Set(); c.querySelectorAll(cardSel).forEach(e => ids.add(e.getAttribute('onclick'))); b.textContent = ids.size; }
+                    } catch (e) {}
+                    return r;
+                };
+            };
+            wrap('renderWebtoonManage', 'webtoon-manage-list', 'webtoon-total-count', () => webtoonViewFilter, '[onclick^="openWebtoonManageModal"]');
+            wrap('renderWorkManage', 'workmanage-list', 'workmanage-total-count', () => workManageViewFilter, '[onclick^="openWorkManageModal"]');
+        })();
         function writerGetYYYYMMDD(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
         function writerGetKoreanDate(d) { return `${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일`; }
 

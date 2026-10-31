@@ -351,6 +351,14 @@ body.pane-resizing.gut-row, body.pane-resizing.gut-row * { cursor: row-resize !i
 .spl-fix:hover { border-color: var(--accent); background: var(--accent-soft); }
 .spl-ign { border: 1px solid var(--line); border-radius: 6px; padding: 3px 9px; font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; justify-content: center; }
 .spl-ign:hover { color: var(--danger); border-color: var(--danger); }
+.dp-opt { display: block; width: 100%; text-align: left; white-space: pre-wrap; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel2); font-size: 13.5px; line-height: 1.7; font-family: var(--ed-font); color: var(--text); cursor: pointer; }
+.dp-opt:hover { border-color: var(--accent); background: var(--accent-soft); }
+.dp-n { display: inline-block; font: 700 11px/1.4 sans-serif; color: var(--accent); background: var(--accent-soft); border-radius: 4px; padding: 1px 6px; margin-right: 6px; vertical-align: 1px; }
+.dp-run, .dp-note { color: var(--muted); font-size: 12px; line-height: 1.6; display: flex; align-items: center; gap: 8px; }
+.dp-spin { flex: none; width: 12px; height: 12px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: dpspin .8s linear infinite; }
+@keyframes dpspin { to { transform: rotate(360deg); } }
+.dp-ok { color: var(--accent); font-size: 12px; font-weight: 700; }
+#btn-polish.has-res { color: var(--accent); font-weight: 700; }
 .spl-empty { color: var(--muted); font-size: 12px; text-align: center; padding: 30px 10px; line-height: 1.7; }
 @media (max-width: 700px) { .spl { left: 8px; right: 8px; top: auto; width: auto; height: 46vh; bottom: calc(62px + env(safe-area-inset-bottom)); } }
 .plc-list { display: flex; gap: 12px; flex-wrap: wrap; }
@@ -885,7 +893,7 @@ kbd { font: 12px/1.4 ui-monospace, monospace; background: var(--panel2); border:
 .pop button[disabled] { opacity: .35; cursor: default; }
 .tl-whole-text { white-space: pre-wrap; color: var(--muted); line-height: 1.6; max-height: 220px; overflow-y: auto; }
 @media (max-width: 760px) { .sb-bmenu { opacity: 1; } }
-.selbar.in-synop [data-fold], .selbar.in-synop [data-syn] { display: none; }
+.selbar.in-synop [data-fold], .selbar.in-synop [data-syn], .selbar.in-synop [data-polish] { display: none; }
 .sq-box { background: var(--accent-soft); border-radius: 10px; padding: 10px 12px; }
 .sq-box label.check { margin-top: 0; }
 /* 작품 기획 */
@@ -1560,6 +1568,7 @@ nav.mtabs { display: none; }
  <button class="tb small" id="btn-rename" title="이름 바꾸기 모드: 인물 이름을 조사까지 맞춰 한 번에 바꿔요"><i class="ic ic-replace"></i> 이름 바꾸기</button>
  <button class="tb small keep-sel" id="btn-spell" title="맞춤법 점검 (오른쪽 옆 창)"><i class="ic ic-spell-check"></i> 맞춤법</button>
     <button class="tb small keep-sel" id="btn-syn" title="원고에서 고른 말의 비슷한 표현 · 고른 게 없으면 반복 표현 옆 창"><i class="ic ic-repeat"></i> 비슷한 표현</button>
+ <button class="tb small keep-sel" id="btn-polish" title="다듬기: 원고에서 고른 문장을 퇴고해서 깔끔하고 자연스러운 두 가지 안으로 (AI) · 고른 게 없으면 결과 옆 창"><i class="ic ic-sparkles"></i> 다듬기</button>
     <button class="tb small" id="btn-hl" title="작품 전체의 형광펜 목록"><i class="ic ic-highlighter"></i> 형광펜</button>
     <button class="tb small" id="btn-folds" title="작품 전체에서 접어 둔 단락 목록"><i class="ic ic-fold-vertical"></i> 접기 목록</button>
     <button class="tb small" id="btn-planner" title="회차 흐름 · 타임라인 · 복선"><i class="ic ic-chart-gantt"></i> 타임라인</button>
@@ -2710,6 +2719,7 @@ function buildSelbar() {
         <div class="sb-b s2">${sep}</div><div class="sb-b">${HILITES.map(c => `<button class="dot" style="background:${c}" data-hl="${c}" title="형광펜"></button>`).join('')}
         <button class="tb" data-hl="transparent" title="형광펜 지우기" style="font-size:11px">✕</button></div></div>
         <div class="sb-c"><button class="tb small" data-fold title="고른 단락 접기"><i class="ic ic-fold-vertical"></i> 접기</button>
+        <button class="tb small" data-polish title="고른 문장을 퇴고해서 두 가지 안으로 다듬기 (AI)"><i class="ic ic-sparkles"></i> 다듬기</button>
         <button class="tb small" data-syn title="비슷한 표현 추천"><i class="ic ic-sparkles"></i> 비슷한 표현</button>
         <button class="tb small" data-hwpx title="고른 부분을 색·서식 그대로 한글 파일(.hwpx)로 저장 → 한글에서 열어 복사하면 색이 살아요"><i class="ic ic-file-down"></i> 한글로</button></div>`;
 }
@@ -2721,6 +2731,7 @@ $('#selbar').addEventListener('click', e => {
     if (b.dataset.fc) runCmd('foreColor', b.dataset.fc);
     if (b.hasAttribute('data-fold')) foldSelection();
     if (b.hasAttribute('data-syn')) synFromSelection();
+    if (b.hasAttribute('data-polish')) polishFromSelection();
     if (b.hasAttribute('data-hwpx')) hwpxFromSelection();
 });
 function updateSelbar() {
@@ -5158,11 +5169,13 @@ function closeSidePanels(keep) {
     if (keep !== 'repeat' && typeof closeRepeatPanel === 'function') closeRepeatPanel();
     if (keep !== 'hl' && typeof closeHlPanel === 'function') closeHlPanel();
     if (keep !== 'fold' && typeof closeFoldPanel === 'function') closeFoldPanel();
+    if (keep !== 'polish' && typeof closePolishPanel === 'function') closePolishPanel();
 }
 $('#btn-folds').addEventListener('click', openFoldList);
 // 원고에서 고른 글자가 풀리지 않게 (맞춤법·비슷한 표현 버튼)
 $$('.keep-sel').forEach(b => b.addEventListener('mousedown', e => e.preventDefault()));
 $('#btn-spell').addEventListener('click', () => openSpellPanel());
+$('#btn-polish').addEventListener('click', () => polishFromSelection(true));
 $('#btn-rename').addEventListener('click', () => toggleRename());
 $('#btn-fb').addEventListener('click', () => openFeedback());
 // 퇴고 보기: 지금 회차를 왼쪽 원고 + 오른쪽 쪽 보기로. 이미 퇴고 보기면 한 창으로 돌아감
@@ -6301,6 +6314,129 @@ function fbFindInDoc(text) {
         wrap.scrollTop += rr.top - wr.top - wr.height / 3; return;
     }
     toast('원고에서 그 문장을 찾지 못했어요. 이미 고쳤을 수도 있어요.');
+}
+
+/* ───────── 다듬기: 고른 문장을 AI가 퇴고·윤문해서 두 가지 안으로. 오른쪽 옆 창에 쌓이고, 다른 걸 해도 계속 돌아감 ───────── */
+const dpJobs = []; let dpPanel = null, dpSeq = 0;
+function dpTextMap(ed) { // 원고의 글자 노드들을 이어 붙인 글 (접기 막대 같은 화면용 글자는 뺌)
+    const nodes = []; let full = '';
+    const w = document.createTreeWalker(ed, NodeFilter.SHOW_TEXT);
+    for (let n = w.nextNode(); n; n = w.nextNode()) { if (n.parentElement && n.parentElement.closest('.foldbar')) continue; nodes.push({ n, at: full.length }); full += n.data; }
+    return { nodes, full };
+}
+function dpIndexOf(map, node, off) { const f = map.nodes.find(x => x.n === node); return f ? f.at + off : -1; }
+function dpFind(ed, job) { // 문장을 원고에서 다시 찾음 (여러 곳이면 처음 골랐던 자리에 가까운 곳)
+    const map = dpTextMap(ed); let best = -1;
+    for (let i = map.full.indexOf(job.raw); i >= 0; i = map.full.indexOf(job.raw, i + 1)) if (best < 0 || Math.abs(i - job.idx) < Math.abs(best - job.idx)) best = i;
+    if (best < 0) return null;
+    const pos = (at, end) => { for (const x of map.nodes) { const len = x.n.data.length; if (at >= x.at && (end ? at <= x.at + len : at < x.at + len)) return [x.n, at - x.at]; } return null; };
+    const a = pos(best, false), b = pos(best + job.raw.length, true); if (!a || !b) return null;
+    const r = document.createRange(); r.setStart(a[0], a[1]); r.setEnd(b[0], b[1]); return r;
+}
+function dpSelText(range) { // AI에 보낼 글: 문단 사이는 줄바꿈
+    const frag = range.cloneContents(), leaf = [...frag.querySelectorAll('p, div')].filter(el => !el.querySelector('p, div'));
+    return (leaf.length ? leaf.map(el => el.textContent).join('\n') : frag.textContent).replace(/ /g, ' ').trim();
+}
+function polishFromSelection(fromToolbar) {
+    const sel = getSelection();
+    const node = sel && sel.rangeCount && sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
+    const ed = node && node.closest && node.closest('.manuscript[data-id]');
+    if (!ed || sel.isCollapsed) { if (fromToolbar) { openPolishPanel(); return; } toast('다듬을 문장을 원고에서 먼저 드래그해서 골라 주세요.'); return; }
+    const range = sel.getRangeAt(0).cloneRange(), raw = range.toString();
+    if (!raw.trim()) { toast('다듬을 문장을 원고에서 먼저 드래그해서 골라 주세요.'); return; }
+    if (raw.length > 3000) { toast('한 번에 3000자까지만 다듬을 수 있어요. 조금 줄여서 골라 주세요.'); return; }
+    const dup = dpJobs.find(j => j.docId === ed.dataset.id && j.raw === raw && j.state !== 'err' && j.applied < 0); // 같은 문장이 이미 다듬는 중이거나 결과가 있으면 새로 시키지 않고 옆 창만 보여 줌
+    if (dup) { openPolishPanel(); return; }
+    if (!aiReady()) { toast('다듬기는 AI 키가 필요해요. 설정에서 넣어 주세요.'); openSettings('ai'); return; }
+    if (ed.getAttribute('contenteditable') !== 'true') { toast('잠긴 문서예요. 먼저 잠금을 풀어 주세요.'); return; }
+    // 앞뒤 문단은 말투·흐름을 맞추기 위한 참고용
+    const kids = [...ed.children].filter(k => !k.classList.contains('foldbar'));
+    let bi = kids.findIndex(k => k.contains(range.startContainer)), ai = kids.findIndex(k => k.contains(range.endContainer));
+    const txt = k => (k ? k.textContent.trim() : '').slice(-300);
+    const before = bi > 0 ? txt(kids[bi - 1]) : '', after = ai >= 0 && kids[ai + 1] ? (kids[ai + 1].textContent.trim()).slice(0, 300) : '';
+    const map = dpTextMap(ed);
+    const job = { id: ++dpSeq, docId: ed.dataset.id, raw, text: dpSelText(range), range, idx: Math.max(0, dpIndexOf(map, range.startContainer, range.startOffset)), before, after, state: 'run', results: [], err: '', applied: -1 };
+    dpJobs.unshift(job); if (dpJobs.length > 30) { const k = dpJobs.map(j => j.state).lastIndexOf('done'); dpJobs.splice(k >= 0 ? k : dpJobs.length - 1, 1); }
+    $('#selbar').classList.add('hidden');
+    openPolishPanel(); dpRun(job);
+}
+async function dpRun(job) {
+    job.state = 'run'; job.err = ''; job.results = []; renderPolishPanel(); dpBadge();
+    const prompt = `너는 한국 웹소설 전문 편집자야. 작가가 고른 [대상] 부분을 퇴고해서 깔끔하고 자연스럽게 다듬어 줘.
+규칙:
+- 뜻·사건·정보·시점, 인물의 말투와 글의 분위기는 그대로 둬. 없던 내용을 지어내지 마.
+- 군더더기, 어색한 호응, 겹치는 표현, 어색한 조사·어미, 맞춤법·띄어쓰기를 바로잡아.
+- 서로 방향이 다른 2가지 안을 줘. 1안은 원문에 가깝게 살짝만 다듬은 것, 2안은 더 매끄럽고 생생하게 고친 것.
+- 대사의 따옴표와 문단 나눔(줄바꿈)은 원문 그대로 유지하고, 분량은 원문과 비슷하게(±20%).
+- [앞 문맥]과 [뒤 문맥]은 흐름을 보기 위한 참고용이야. 고치지 말고 [대상]만 고쳐서 돌려줘.
+- 설명 없이, 다듬은 글 2개를 JSON 문자열 배열로만 답해.
+${job.before ? `\n[앞 문맥]\n${job.before}\n` : ''}
+[대상]
+${job.text}
+${job.after ? `\n[뒤 문맥]\n${job.after}\n` : ''}`;
+    try {
+        const out = await aiJson(prompt, 'best', Math.min(6000, 600 + job.text.length * 4));
+        const list = (Array.isArray(out) ? out : Array.isArray(out && out.versions) ? out.versions : Object.values(out || {})).map(x => String(x == null ? '' : typeof x === 'object' ? (x.text || '') : x).trim()).filter(x => x && x !== job.text);
+        if (!list.length) throw Object.assign(new Error('empty'), { code: 'empty' });
+        job.results = [...new Set(list)].slice(0, 2); job.state = 'done';
+    } catch (err) {
+        job.state = 'err';
+        job.err = err && err.code === 'quota' ? aiQuotaMsg(err) : err && err.code === 'empty' ? 'AI가 다듬은 글을 주지 않았어요. 다시 눌러 주세요.' : (AI_ERR_MSG[err && err.code] || '답을 받지 못했어요. 잠시 뒤 다시 눌러 주세요.');
+    }
+    renderPolishPanel(); dpBadge();
+    if (job.state === 'done' && !dpPanel) toast('다듬기 결과가 나왔어요.', '보기', openPolishPanel);
+}
+function dpBadge() { const b = $('#btn-polish'); if (!b) return; const done = dpJobs.filter(j => j.state === 'done').length, run = dpJobs.filter(j => j.state === 'run').length; b.classList.toggle('has-res', !!done); b.innerHTML = `<i class="ic ic-sparkles"></i> 다듬기${run ? ' …' : done ? ` (${done})` : ''}`; }
+function openPolishPanel() {
+    closeSidePanels('polish');
+    if (!dpPanel) {
+        dpPanel = document.createElement('aside'); dpPanel.className = 'spl dpl'; document.body.appendChild(dpPanel);
+        dpPanel.addEventListener('mousedown', e => { if (e.target.closest('button')) e.preventDefault(); });
+        dpPanel.addEventListener('click', onPolishClick);
+    }
+    renderPolishPanel();
+}
+function closePolishPanel() { dpPanel?.remove(); dpPanel = null; }
+function renderPolishPanel() {
+    if (!dpPanel) return;
+    const keep = $('.spl-list', dpPanel)?.scrollTop || 0, run = dpJobs.filter(j => j.state === 'run').length;
+    const short = t => { const o = t.replace(/\s+/g, ' ').trim(); return o.length > 70 ? o.slice(0, 70) + '…' : o; };
+    const card = (j, n) => `<div class="spl-card dp-card" data-job="${j.id}" style="cursor:default">
+        <div class="spl-top"><span class="spl-num">${String(n).padStart(2, '0')}</span><span class="spl-ctx" title="${esc(j.raw)}">${esc(short(j.raw))}</span><span class="spl-cat">${j.state === 'run' ? '다듬는 중' : j.state === 'err' ? '실패' : j.applied >= 0 ? '적용함' : '완료'}</span></div>
+        ${j.state === 'run' ? '<div class="dp-run"><span class="dp-spin"></span>다듬고 있어요. 다른 걸 해도 계속 돌아가요.</div>'
+            : j.state === 'err' ? `<div class="dp-note">${esc(j.err)}</div>`
+            : j.applied >= 0 ? `<div class="dp-ok">✓ ${j.applied + 1}안으로 바꿨어요</div><div class="dp-note">되돌리려면 원고에서 Ctrl+Z (폰은 위쪽 ↶)</div>`
+            : j.results.map((t, i) => `<button class="dp-opt" data-dp="apply" data-i="${i}" title="누르면 원고의 이 부분이 이 글로 바뀌어요"><span class="dp-n">${i + 1}안</span>${esc(t)}</button>`).join('')}
+        <div class="spl-btns">${j.state !== 'run' ? '<button class="spl-ign" data-dp="goto" title="원고에서 이 문장으로 가기">위치 보기</button>' : ''}${j.state === 'done' || j.state === 'err' ? '<button class="spl-ign" data-dp="again" title="같은 문장을 다시 다듬기">다시 받기</button>' : ''}<button class="spl-ign" data-dp="del">지우기</button></div></div>`;
+    dpPanel.innerHTML = `<div class="spl-head"><b>다듬기</b><span class="spl-count">${dpJobs.length ? `${dpJobs.length}개${run ? ` · ${run}개 다듬는 중` : ''}` : ''}</span><span style="flex:1"></span><button class="mini" data-dp="close" title="닫기">✕</button></div>
+        <div class="spl-ai"><span class="spl-msg">원고에서 문장을 드래그하고 <b>다듬기</b>를 누르면, 퇴고한 두 가지 안이 여기 떠요. 마음에 드는 안을 누르면 바로 바뀌어요.</span></div>
+        <div class="spl-list">${dpJobs.map((j, i) => card(j, dpJobs.length - i)).join('') || '<div class="spl-empty">아직 없어요.<br>원고에서 문장을 드래그해서 <b>다듬기</b>를 눌러 보세요.</div>'}</div>`;
+    $('.spl-list', dpPanel).scrollTop = keep;
+}
+function onPolishClick(e) {
+    const t = e.target.closest('button'); if (!t || !t.dataset.dp) return;
+    if (t.dataset.dp === 'close') { closePolishPanel(); return; }
+    const job = dpJobs.find(j => j.id === +t.closest('.dp-card')?.dataset.job); if (!job) return;
+    const ed = () => $(`.ed-wrap[data-scroll] .manuscript[data-id="${job.docId}"]`);
+    const locate = ed0 => { const live = job.range && job.range.startContainer.isConnected && ed0.contains(job.range.startContainer) && !job.range.collapsed && job.range.toString() === job.raw; return live ? job.range : dpFind(ed0, job); };
+    if (t.dataset.dp === 'del') { dpJobs.splice(dpJobs.indexOf(job), 1); renderPolishPanel(); dpBadge(); return; }
+    if (t.dataset.dp === 'again') { dpRun(job); return; }
+    const ed0 = ed(); if (!ed0) { toast('그 회차를 원고 창에 열어 주세요.'); return; }
+    const r = locate(ed0);
+    if (t.dataset.dp === 'goto') {
+        if (!r) { toast('원고에서 그 문장을 찾지 못했어요. 이미 고쳤을 수도 있어요.'); return; }
+        const wrap = ed0.closest('.ed-wrap'); if (wrap) { const rr = r.getBoundingClientRect(), wr = wrap.getBoundingClientRect(); wrap.scrollTop += rr.top - wr.top - wr.height / 3; }
+        ed0.focus({ preventScroll: true }); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); return;
+    }
+    if (t.dataset.dp === 'apply') {
+        const text = job.results[+t.dataset.i]; if (!text) return;
+        if (ed0.getAttribute('contenteditable') !== 'true') { toast('잠긴 문서예요. 먼저 잠금을 풀어 주세요.'); return; }
+        if (!r) { toast('원고에서 그 문장을 찾지 못했어요. 이미 고쳤을 수도 있어요.'); return; }
+        ed0.focus({ preventScroll: true }); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+        let out = text; if (smartOn()) out = out.split('\n').map(l => curlyText(l)).join('\n');
+        if (!out.includes('\n')) document.execCommand('insertText', false, out); else document.execCommand('insertHTML', false, textToHtml(out));
+        job.applied = +t.dataset.i; renderPolishPanel(); dpBadge(); toast('바꿨어요. 되돌리기(Ctrl+Z)로 되돌릴 수 있어요.');
+    }
 }
 
 /* ───────── 원고 커서: 잘 보이는 핑크 막대 ───────── */

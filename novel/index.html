@@ -1566,7 +1566,6 @@ nav.mtabs { display: none; }
  <button class="tb small" id="btn-revise" title="퇴고 보기: 왼쪽 원고 · 오른쪽 쪽 보기 (다시 누르면 원래대로)"><i class="ic ic-file-pen-line"></i> 퇴고</button>
  <button class="tb small keep-sel" id="btn-polish" title="다듬기: 원고에서 고른 문장을 퇴고해서 깔끔하고 자연스러운 두 가지 안으로 (AI) · 고른 게 없으면 결과 옆 창"><i class="ic ic-sparkles"></i> 다듬기</button>
  <button class="tb small" id="btn-fb" title="피드백: PD 6명의 눈으로 이 회차를 읽고 독자 댓글까지 받아봐요 (AI)"><i class="ic ic-sparkles"></i> 피드백</button>
- <button class="tb small" id="btn-rename" title="이름 바꾸기 모드: 인물 이름을 조사까지 맞춰 한 번에 바꿔요"><i class="ic ic-replace"></i> 이름 바꾸기</button>
  <button class="tb small keep-sel" id="btn-spell" title="맞춤법 점검 (오른쪽 옆 창)"><i class="ic ic-spell-check"></i> 맞춤법</button>
     <button class="tb small keep-sel" id="btn-syn" title="원고에서 고른 말의 비슷한 표현 · 고른 게 없으면 반복 표현 옆 창"><i class="ic ic-repeat"></i> 비슷한 표현</button>
     <button class="tb small" id="btn-hl" title="작품 전체의 형광펜 목록"><i class="ic ic-highlighter"></i> 형광펜</button>
@@ -5176,7 +5175,6 @@ $('#btn-folds').addEventListener('click', openFoldList);
 $$('.keep-sel').forEach(b => b.addEventListener('mousedown', e => e.preventDefault()));
 $('#btn-spell').addEventListener('click', () => openSpellPanel());
 $('#btn-polish').addEventListener('click', () => polishFromSelection(true));
-$('#btn-rename').addEventListener('click', () => toggleRename());
 $('#btn-fb').addEventListener('click', () => openFeedback());
 // 퇴고 보기: 지금 회차를 왼쪽 원고 + 오른쪽 쪽 보기로. 이미 퇴고 보기면 한 창으로 돌아감
 function reviseMode() {
@@ -5932,13 +5930,12 @@ function rnOpen() {
     el.addEventListener('click', e => { const t = e.target.closest('[data-rn]'); if (!t) return; if (t.dataset.rn === 'go') rnApply(); else if (t.dataset.rn === 'undo') rnUndo(); else if (t.dataset.rn === 'off') rnClose(); });
     const grid = $('#editor-grid');
     if (grid && !rn.obs) { rn.obs = new MutationObserver(() => { if (rn.on) rnSchedulePaint(); }); rn.obs.observe(grid, { childList: true, subtree: true, characterData: true }); }
-    $('#btn-rename')?.classList.add('on');
     rnRefresh(); (rn.oldN ? $('#rn-new') : $('#rn-old'))?.focus();
 }
 function rnClose() {
     const applied = rn.done;
     rn.on = false; rn.undo = null; rn.done = 0; rn.josa = 0; rn.oldN = ''; rn.newN = '';
-    $('#rn-panel')?.remove(); $('#btn-rename')?.classList.remove('on');
+    $('#rn-panel')?.remove();
     if (rn.obs) { rn.obs.disconnect(); rn.obs = null; }
     rnPaint();
     if (applied) toast('이름 바꾸기를 마쳤어요. 바뀐 내용은 그대로 적용돼 있어요.');
@@ -9069,7 +9066,9 @@ function openSettings(focus) {
  <label class="check"><input type="checkbox" data-opt="nativeSpell" ${S.nativeSpell === true ? 'checked' : ''}> 윈도우(브라우저) 맞춤법 검사도 같이 쓰기 <small style="color:var(--muted)">(인물 이름·맞는 말에도 줄이 생길 수 있어요)</small></label>
             <label class="check"><input type="checkbox" data-opt="aiAuto" ${S.aiAuto === true ? 'checked' : ''}> AI 맞춤법 자동 검사 <small style="color:var(--muted)">(연 회차를 뒤에서 한 번씩 읽고, 새로 쓴 문단도 몇 초 뒤 검사)</small> ${aiReady() ? '' : '<small style="color:var(--danger)">— 아래에 AI 키를 넣어야 돌아가요</small>'}</label>
             <label class="check"><input type="checkbox" data-opt="crisp" ${S.crisp !== false ? 'checked' : ''}> 원고 글자 진하게 <small style="color:var(--muted)">(명조체 가로획이 흐리거나 끊겨 보일 때)</small></label>
-            </div><div data-sp="etc"><label id="set-ai">AI 표현 추천 <small>(비슷한 표현에서 ‘AI 추천’을 쓸 때)</small></label>
+            </div><div data-sp="etc"><label>이름 바꾸기 <small>(인물 이름을 조사까지 맞춰 한 번에 바꿔요)</small></label>
+                <button class="btn" data-x="rename" style="margin:2px 0 8px"><i class="ic ic-replace"></i> 이름 바꾸기 모드 열기</button>
+                <label id="set-ai">AI 표현 추천 <small>(비슷한 표현에서 ‘AI 추천’을 쓸 때)</small></label>
             ${synSample ? '<p class="modal-note" style="margin:0">지금은 Claude 미리보기 화면이라 키 없이 바로 돼요. GitHub 주소에서 쓰려면 아래에 키를 넣어 주세요.</p>' : ''}
             <div class="seg" style="margin:4px 0 6px">${Object.entries(AI_PROVIDERS).map(([k, v]) => `<button class="${(pref.aiProvider || 'gemini') === k ? 'on' : ''}" data-aip="${k}">${v.name}</button>`).join('')}</div>
             <div class="ai-key"><input type="password" data-aikey placeholder="여기에 키를 붙여 넣으세요" value="${esc(pref.aiKey || '')}" autocomplete="off" spellcheck="false"><button class="btn" data-x="aitest">연결 확인</button></div>
@@ -9093,6 +9092,7 @@ function openSettings(focus) {
         const t = e.target.closest('button'); if (e.target === bg || t?.dataset.x === 'close') { bg.remove(); return; }
         if (!t) return;
         if (t.dataset.x === 'typo') { bg.remove(); typoModal(); return; }
+        if (t.dataset.x === 'rename') { bg.remove(); if (!rn.on) rnOpen(); return; }
         if (t.dataset.stab) { tab = t.dataset.stab; render(); return; }
         if (t.dataset.mfont != null) { pref.menuFont = t.dataset.mfont; savePref(); applyPref(); render(); return; }
         if (t.dataset.hfont != null) { pref.homeFont = t.dataset.hfont; savePref(); applyPref(); render(); return; }

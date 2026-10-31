@@ -7817,17 +7817,14 @@ var repeatTimer = null;
 function scheduleRepeat() { clearTimeout(repeatTimer); repeatTimer = setTimeout(refreshRepeat, 700); }
 document.addEventListener('input', e => { if (e.target.closest && e.target.closest('.manuscript')) scheduleRepeat(); });
 
-/* ---- AI 추천 (Claude 미리보기에서만) ---- */
-let synSample;
-const synSampleReady = (window.claude && window.claude.use ? window.claude.use('sample').catch(() => null) : Promise.resolve(null)).then(s => (synSample = s));
-/* AI 키: Claude 미리보기에서는 Claude가 바로, 그 밖(GitHub 주소 등)에서는 설정에 넣은 키로 부름
+/* AI 키: 설정에 넣은 키로 부름
    키는 이 기기(브라우저)에만 저장하고 동기화·백업 파일에는 넣지 않음 */
 const AI_PROVIDERS = {
     gemini: { name: 'Gemini (구글, 무료)', keyUrl: 'https://aistudio.google.com/apikey', hint: '구글 AI Studio에서 정산 앱과 같은 구글 계정으로 무료 키를 만들 수 있어요.' },
     claude: { name: 'Claude (사용한 만큼 결제)', keyUrl: 'https://console.anthropic.com/settings/keys', hint: 'Claude 구독과는 별개예요. Anthropic 콘솔에서 크레딧을 충전하고 키를 만들어야 해요. (추천 한 번에 1원 안팎)' }
 };
 const aiKey = () => (pref.aiKey || '').trim();
-const aiReady = () => !!synSample || !!aiKey();
+const aiReady = () => !!aiKey();
 const aiErr = (code, msg) => Object.assign(new Error(msg || code), { code });
 function parseJsonLoose(t) {
     t = String(t || '').replace(/```(?:json)?/g, '');
@@ -7844,7 +7841,6 @@ function markGeminiExhausted(model, msg) {
 }
 // tier: 'best' = 좋은 모델 먼저(하루 무료 횟수 적음), 'lite' = 가벼운 모델 먼저(무료 횟수 넉넉, 자동 검사용)
 async function aiJson(prompt, tier = 'best', maxTokens = 500) {
-    if (synSample) return synSample.json(prompt, { modelTier: 'quick' });
     const key = aiKey(); if (!key) throw aiErr('no_key');
     const fail = async r => { const t = await r.text(); return aiErr(r.status === 429 ? 'rate_limited' : /credit|billing|quota/i.test(t) && r.status !== 401 ? 'credit' : [400, 401, 403].includes(r.status) ? 'bad_key' : 'http', t.slice(0, 300)); };
     if ((pref.aiProvider || 'gemini') === 'gemini') {
@@ -7938,12 +7934,12 @@ function openSynPop(ed, range, match) {
             aiBox.innerHTML = `<div class="syn-none">${(e && (e.code === 'quota' ? aiQuotaMsg(e) : AI_ERR_MSG[e.code])) || 'AI 추천을 받지 못했어요.'}</div>`;
         }
     };
-    synSampleReady.then(s => {
+    (() => {
         if (!pop.isConnected) return;
         if (!aiReady()) { aiBox.innerHTML = `<hr><div class="syn-none">설정에 AI 키를 넣으면 여기서 바로 AI가 문맥에 맞게 추천해 줘요.</div><button class="syn-more" data-syn-set><i class="ic ic-settings"></i> AI 키 넣으러 가기</button>`; return; }
         if (sugg.length) aiBox.innerHTML = '<hr><button class="syn-more" data-syn-ai><i class="ic ic-sparkles"></i> AI에게 문맥에 맞는 표현 더 받기</button>';
         else runAI();
-    });
+    })();
     pop.addEventListener('click', ev => {
         if (ev.target.closest('[data-syn-ai]')) { runAI(); return; }
         if (ev.target.closest('[data-syn-set]')) { closePop(); openSettings('ai'); return; }
@@ -9067,7 +9063,6 @@ function openSettings(focus) {
             <label class="check"><input type="checkbox" data-opt="aiAuto" ${S.aiAuto === true ? 'checked' : ''}> AI 맞춤법 자동 검사 <small style="color:var(--muted)">(연 회차를 뒤에서 한 번씩 읽고, 새로 쓴 문단도 몇 초 뒤 검사)</small> ${aiReady() ? '' : '<small style="color:var(--danger)">— 아래에 AI 키를 넣어야 돌아가요</small>'}</label>
             <label class="check"><input type="checkbox" data-opt="crisp" ${S.crisp !== false ? 'checked' : ''}> 원고 글자 진하게 <small style="color:var(--muted)">(명조체 가로획이 흐리거나 끊겨 보일 때)</small></label>
             </div><div data-sp="etc"><label id="set-ai">AI 표현 추천 <small>(비슷한 표현에서 ‘AI 추천’을 쓸 때)</small></label>
-            ${synSample ? '<p class="modal-note" style="margin:0">지금은 Claude 미리보기 화면이라 키 없이 바로 돼요. GitHub 주소에서 쓰려면 아래에 키를 넣어 주세요.</p>' : ''}
             <div class="seg" style="margin:4px 0 6px">${Object.entries(AI_PROVIDERS).map(([k, v]) => `<button class="${(pref.aiProvider || 'gemini') === k ? 'on' : ''}" data-aip="${k}">${v.name}</button>`).join('')}</div>
             <div class="ai-key"><input type="password" data-aikey placeholder="여기에 키를 붙여 넣으세요" value="${esc(pref.aiKey || '')}" autocomplete="off" spellcheck="false"><button class="btn" data-x="aitest">연결 확인</button></div>
             <p class="modal-note" style="margin:4px 0 0">${AI_PROVIDERS[pref.aiProvider || 'gemini'].hint} <a href="${AI_PROVIDERS[pref.aiProvider || 'gemini'].keyUrl}" target="_blank" rel="noopener">키 만들러 가기 ↗</a><br>키는 이 기기에만 저장돼요. (동기화·백업 파일에는 안 들어가요)</p>
@@ -9102,8 +9097,7 @@ function openSettings(focus) {
             try {
                 if (!aiKey()) throw aiErr('no_key');
                 delete pref.aiExhausted; savePref(); // 예전에 '다 썼다'고 기억한 것도 지우고 진짜로 물어봄
-                const keep = synSample; synSample = null; // 키 자체를 확인
-                let list; try { list = await aiJson('다음 표현과 비슷한 한국어 표현 2개를 JSON 문자열 배열로만 답해: "미간을 찌푸렸다"', 'lite'); } finally { synSample = keep; }
+                const list = await aiJson('다음 표현과 비슷한 한국어 표현 2개를 JSON 문자열 배열로만 답해: "미간을 찌푸렸다"', 'lite');
                 out.textContent = '연결됐어요 ✓ 예: ' + (Array.isArray(list) ? list.slice(0, 2).join(', ') : '');
                 out.className = 'ai-test modal-note ok';
             } catch (err) { out.textContent = (err.code === 'quota' ? aiQuotaMsg(err) : AI_ERR_MSG[err.code] || 'AI에 연결하지 못했어요.') + (err.code === 'http' ? ' ' + (err.message || '') : ''); out.className = 'ai-test modal-note err'; }

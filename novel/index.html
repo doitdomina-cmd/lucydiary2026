@@ -585,7 +585,6 @@ a.mini { text-decoration: none; color: inherit; display: inline-flex; align-item
 .fb-chart { width: 100%; height: auto; color: var(--text, #333); }
 .fb-ev { display: block; color: var(--muted); } .fb-open { margin-top: 5px; padding: 4px 8px; border-radius: 6px; background: color-mix(in srgb, var(--accent) 9%, transparent); color: var(--accent); font-size: 12px; }
 .fb-wide { width: 100%; margin-top: 6px; }
-.ctp { top: auto; height: auto; max-height: calc(100vh - 120px); width: min(460px, calc(100vw - 24px)); }
 @media (max-width: 700px) { .spl.fbk { width: auto; height: 72vh; } }
 body.tw-ov .manuscript[contenteditable="true"] { caret-color: transparent; }
 #tw-caret { position: fixed; z-index: 60; pointer-events: none; background: #EC6A93; opacity: .55; border-radius: 1px; mix-blend-mode: multiply; animation: twBlink 1.05s steps(1) infinite; }
@@ -2231,7 +2230,6 @@ function renderEditors() {
     scheduleLiveSpell();
 }
 // 분할 창 너비 조절 (기기별 저장)
-function paneSplitKeys(n) { return n === 2 ? [['c2', 2]] : n === 3 ? [['c3', 3]] : n === 4 ? [['c4', 2], ['r4', 2]] : []; }
 function paneFr(key, len) { const a = pref.paneSplit && pref.paneSplit[key]; return Array.isArray(a) && a.length === len && a.every(x => x > 0) ? a : Array(len).fill(1); }
 function applyPaneSplit() {
     const grid = $('#editor-grid'), n = WL().editorN;
@@ -6603,69 +6601,6 @@ function spellScan(ed) {
     // 기본 규칙과 AI가 같은 곳을 찾으면 하나만 (겹치는 것도 앞의 것만)
     return out.filter((f, k) => !out.slice(0, k).some(o => o.node === f.node && o.start < f.end && f.start < o.end));
 }
-function openSpell(docId) {
-    const W = WL();
-    const id = docId || W.panes[W.activeEditor].active;
-    const ed = $(`.ed-wrap[data-scroll] .manuscript[data-id="${id}"]`);
-    if (!ed) { toast('점검할 회차를 원고 창에 열어 주세요.'); return; }
-    const bg = document.createElement('div'); bg.className = 'modal-bg spell-bg';
-    document.body.appendChild(bg);
-    let ignored = new Set();
-    const keyOf = f => f.wrong + '|' + f.before + '|' + f.after;
-    const list = () => { const ign = new Set(spellIgnored()); return spellScan(ed).filter(f => !ignored.has(keyOf(f)) && !ign.has(f.wrong)); };
-    bg.addEventListener('change', e => { if (e.target.matches('[data-live]')) { settings().liveSpell = e.target.checked; touch(settings()); refreshLiveSpell(); } });
-    const fixOne = f => {
-        if (ed.getAttribute('contenteditable') !== 'true') { toast('잠긴 문서예요. 먼저 잠금을 풀어 주세요.'); return false; }
-        ed.focus();
-        const r = document.createRange(); r.setStart(f.node, f.start); r.setEnd(f.node, f.end);
-        const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
-        document.execCommand('insertText', false, f.right);
-        return true;
-    };
-    const render = () => {
-        const fs = list();
-        bg.innerHTML = `<div class="modal wide"><div style="display:flex;align-items:center;margin-bottom:6px"><h3 style="margin:0;flex:1">✓ 맞춤법 1차 점검 — ${esc(get(id)?.title || '')}</h3><button class="mini" data-x="close">✕</button></div>
-            ${LIVE_SPELL_OK ? `<label class="check" style="margin:0 0 6px"><input type="checkbox" data-live ${liveSpellOn() ? 'checked' : ''}> 쓰는 동안 틀린 표기에 밑줄 긋기 <span class="modal-note" style="margin:0">— 밑줄을 누르면 그 자리에서 고를 수 있어요</span></label>` : ''}
-            ${spellIgnored().length ? `<div class="modal-note" style="margin:0 0 6px">항상 무시: ${spellIgnored().map((w, i) => `<button class="chip" data-unign="${i}" title="다시 점검하기">${esc(w.trim() || '공백')} ×</button>`).join(' ')}</div>` : ''}
-            <p class="modal-note" style="margin-top:0">맞춤법은 AI가 찾아요. 아래 버튼을 누르면 이 회차 원고가 AI로 보내지고, 찾은 곳에 밑줄이 그어져요.</p>
-            <div class="spell-ai">${aiReady() ? `<button class="btn" data-x="ai"><i class="ic ic-sparkles"></i> AI로 꼼꼼히 검사 (띄어쓰기·오타까지)</button><span class="modal-note">이 회차 원고가 AI로 보내져요</span>` : `<button class="btn" data-x="aiset"><i class="ic ic-sparkles"></i> AI 키 넣고 꼼꼼히 검사하기</button>`}<span class="spell-ai-msg modal-note"></span></div>
-            <div class="spell-bar"><span>${fs.length ? `고칠 곳 <b>${fs.length}</b>군데` : '아직 찾은 곳이 없어요. AI 검사를 눌러 보세요.'}</span><span style="flex:1"></span>${fs.length ? '<button class="btn primary" data-x="all">모두 고치기</button>' : ''}</div>
-            <div class="spell-list">${fs.map((f, i) => `<div class="spell-row"><button class="spell-ctx" data-go="${i}">…${esc(f.before)}<del>${esc(f.wrong)}</del><ins>${esc(f.right === ' ' ? '␣' : f.right === '' ? '(지움)' : f.right)}</ins>${esc(f.after)}…</button>
-                <small>${f.hint ? esc(f.hint) : esc(f.wrong) + ' → ' + esc(f.right)}</small>
-                <span class="spell-btns"><button class="mini" data-fix="${i}">고치기</button><button class="mini" data-ign="${i}">무시</button></span></div>`).join('')}</div></div>`;
-        bg._fs = fs;
-    };
-    render();
-    bg.addEventListener('mousedown', e => { if (e.target.closest('[data-fix], [data-x="all"], [data-go]')) e.preventDefault(); });
-    bg.addEventListener('click', e => {
-        const t = e.target.closest('button');
-        if (e.target === bg || t?.dataset.x === 'close') { bg.remove(); return; }
-        if (!t) return;
-        if (t.dataset.unign != null) { spellIgnored().splice(+t.dataset.unign, 1); touch(settings()); render(); refreshLiveSpell(); return; }
-        if (t.dataset.x === 'aiset') { bg.remove(); openSettings('ai'); return; }
-        if (t.dataset.x === 'ai') {
-            t.disabled = true; t.innerHTML = '<i class="ic ic-sparkles"></i> AI가 읽는 중… (몇 초~수십 초)';
-            aiSpellCheck(ed).then(n => { render(); refreshLiveSpell(); const m = $('.spell-ai-msg', bg); if (m) m.textContent = n ? `AI가 ${n}군데를 더 찾았어요.` : 'AI도 더 찾은 곳이 없어요.'; })
-                .catch(err => { render(); const m = $('.spell-ai-msg', bg); if (m) { m.textContent = (err.code === 'quota' ? aiQuotaMsg(err) : AI_ERR_MSG[err.code] || 'AI 검사를 하지 못했어요.'); m.style.color = 'var(--danger)'; } });
-            return;
-        }
-        const fs = bg._fs;
-        if (t.dataset.go != null) {
-            const f = fs[+t.dataset.go];
-            const r = document.createRange(); r.setStart(f.node, f.start); r.setEnd(f.node, f.end);
-            const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
-            (f.node.parentElement).scrollIntoView({ block: 'center' });
-            return;
-        }
-        if (t.dataset.fix != null) { if (fixOne(fs[+t.dataset.fix])) { render(); refreshLiveSpell(); } return; }
-        if (t.dataset.ign != null) { ignored.add(keyOf(fs[+t.dataset.ign])); render(); return; }
-        if (t.dataset.x === 'all') {
-            // 뒤에서부터 고쳐야 앞쪽 위치가 어긋나지 않음
-            [...fs].sort((a, b) => a.node === b.node ? b.start - a.start : (a.node.compareDocumentPosition(b.node) & Node.DOCUMENT_POSITION_FOLLOWING ? 1 : -1)).forEach(fixOne);
-            render(); refreshLiveSpell(); toast('모두 고쳤어요. Ctrl+Z로 하나씩 되돌릴 수 있어요.');
-        }
-    });
-}
 
 /* =====================================================================
    모바일 미리보기: 폰 화면 안에 독자가 보는 모습 그대로
@@ -9291,7 +9226,6 @@ function sbSynopRows(open) {
         + sbRow(pv(`plvc_${wid}`, PL_TABS.chrono, 'chrono'), open, 4, 'chart-gantt')
         + sbRow(pv(`plvf_${wid}`, '복선', 'foreshadow'), open, 4, 'flag');
 }
-function sbSafe(html) { const t = document.createElement('template'); t.innerHTML = sanitizeHtml(String(html || '')); return t.innerHTML; }
 function sbViewHtml(it) {
     if (sbBoard()) return `<div class="sbv-host" data-sbv-host="${it.id}"></div>`;
     const msg = IN_PREVIEW || !location.protocol.startsWith('http') ? '내 시놉 보드는 GitHub 주소에서 열었을 때 보여요.'

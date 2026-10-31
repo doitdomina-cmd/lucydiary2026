@@ -8141,7 +8141,9 @@ async function driveBackupNow() {
     // 최근 10개만 남기기
     const list = await driveList();
     for (const f of list.slice(DRIVE_KEEP)) await driveFetch(`https://www.googleapis.com/drive/v3/files/${f.id}`, { method: 'DELETE' }).catch(() => {});
-    pref.driveAt = Date.now(); pref.driveSig = backupSig(); savePref();
+    pref.driveAt = Date.now();
+    { const S = settings(); S.driveAt = pref.driveAt; touch(S); } // 다른 기기(폰 등)의 알림도 '방금 백업함'으로 알 수 있게 동기화되는 설정에도 남김
+    pref.driveSig = backupSig(); savePref(); // (설정을 고친 뒤의 값으로 기억해야 '바뀐 게 없음' 판단이 맞음)
     renderCloudBadge();
     return name;
 }
@@ -8159,7 +8161,7 @@ setInterval(maybeDriveBackup, 5 * 60 * 1000);
 // 마지막 드라이브 백업이 하루 넘었으면 '지금 백업' 알림 띄우기 (권한 창은 버튼을 눌러야 열 수 있어서)
 function driveNudge() {
     if (!cloud.user || document.getElementById('drv-nudge')) return;
-    const last = pref.driveAt || 0, day = 24 * 60 * 60 * 1000;
+    const last = Math.max(pref.driveAt || 0, settings().driveAt || 0), day = 24 * 60 * 60 * 1000; // 이 기기 기록과 다른 기기에서 한 백업 중 최근 것
     if (Date.now() - last < day || (pref.driveSnooze && Date.now() < pref.driveSnooze)) return;
     if (pref.driveSig && pref.driveSig === backupSig()) return; // 바뀐 게 없으면 묻지 않음
     const days = last ? Math.floor((Date.now() - last) / day) : 0;

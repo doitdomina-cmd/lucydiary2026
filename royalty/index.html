@@ -2704,6 +2704,8 @@ body.theme-cozy #month-detail-modal button.text-slate-400 { width: 34px; height:
         @media (max-width: 640px) { body.theme-cozy #month-detail-modal h3 { font-size: 1.05rem; } body.theme-cozy #month-detail-modal .modal-content { padding: 24px 20px; } }
 
         /* 스케줄·집필 달력 칸 카드: 복사·삭제 버튼(마우스 올릴 때만 보임)이 글자 자리를 차지하지 않게 글자 위로 띄움 */
+        #task-calendar-body .cal-selectable > .flex.items-start > .task-heart-btn { position: absolute; left: 2px; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 0; padding: 0; border: 0; background: transparent; cursor: pointer; z-index: 3; }
+        #task-calendar-body .cal-selectable > .flex.items-start > .task-heart-btn:hover { background: rgba(255,255,255,.35); border-radius: 999px; }
         body.theme-cozy :is(:is(#task-calendar-body, #rs-vcal-body), #write-calendar-body) .cal-selectable > .flex.items-start > button:nth-last-child(-n+2) { position: absolute; top: 3px; width: 17px; height: 17px; margin: 0 !important; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 999px; background: rgba(255,254,252,.94); box-shadow: 0 1px 3px rgba(60,45,25,.15); z-index: 2; }
         body.theme-cozy :is(:is(#task-calendar-body, #rs-vcal-body), #write-calendar-body) .cal-selectable > .flex.items-start > button:last-child { right: 3px; }
         body.theme-cozy :is(:is(#task-calendar-body, #rs-vcal-body), #write-calendar-body) .cal-selectable > .flex.items-start > button:nth-last-child(2) { right: 23px; }
@@ -10732,7 +10734,7 @@ body.theme-cozy.theme-galaxy :is(#publish-cal-body, #task-calendar-body, #write-
         let publishCalDate = new Date();
         function changePublishCalMonth(delta, toToday = false) {
             if (toToday) publishCalDate = new Date();
-            else publishCalDate.setMonth(publishCalDate.getMonth() + delta);
+            else (publishCalDate.setDate(1), publishCalDate.setMonth(publishCalDate.getMonth() + delta));
             renderPublishCal();
         }
 
@@ -19103,12 +19105,12 @@ body.theme-cozy.theme-galaxy :is(#publish-cal-body, #task-calendar-body, #write-
 
         function changeWriteMonth(delta, isToday = false) {
             if(isToday) writeCalDate = new Date();
-            else writeCalDate.setMonth(writeCalDate.getMonth() + delta);
+            else (writeCalDate.setDate(1), writeCalDate.setMonth(writeCalDate.getMonth() + delta));
             renderWriteCalendar();
         }
         function changeTaskMonth(delta, isToday = false) {
             if(isToday) taskCalDate = new Date();
-            else taskCalDate.setMonth(taskCalDate.getMonth() + delta);
+            else (taskCalDate.setDate(1), taskCalDate.setMonth(taskCalDate.getMonth() + delta));
             renderTaskCalendar();
         }
 
@@ -19712,10 +19714,9 @@ body.theme-cozy.theme-galaxy :is(#publish-cal-body, #task-calendar-body, #write-
 
                 const bgClass = t.isCompleted ? 'bg-slate-100' : 'bg-white';
                 
-                let completeIcon = t.isCompleted 
-                    ? `<button type="button" onclick="event.stopPropagation(); toggleTaskComplete('${t.id}', '${t.date}')" class="text-indigo-500 hover:text-slate-400 transition-colors mt-0.5 shrink-0" title="완료 취소"><i class="fa-solid fa-circle-check"></i></button>`
-                    : `<button type="button" onclick="event.stopPropagation(); toggleTaskComplete('${t.id}', '${t.date}')" class="opacity-0 group-hover/block:opacity-100 text-slate-300 hover:text-indigo-500 transition-opacity mt-0.5 shrink-0" title="완료 처리"><i class="fa-regular fa-circle-check"></i></button>`;
-                    
+                // 완료 표시는 카드 앞 하트(CSS ::before)가 맡는다 — 그 하트 위에 투명 버튼을 얹어 클릭으로 채우고/비운다
+                let completeIcon = `<button type="button" onclick="event.stopPropagation(); toggleTaskComplete('${t.id}', '${t.date}')" class="task-heart-btn" title="${t.isCompleted ? '완료 취소' : '완료 처리'}" aria-label="${t.isCompleted ? '완료 취소' : '완료 처리'}"></button>`;
+
                 let deleteBtn = `<button type="button" onclick="event.stopPropagation(); quickDeleteTask('${t.id}', '${t.date}')" class="cal-del-btn opacity-0 group-hover/block:opacity-100 text-slate-300 hover:text-rose-500 transition-opacity mt-0.5 ml-1 shrink-0 px-1" title="일정 삭제"><i class="fa-solid fa-xmark"></i></button>`;
                 // 우클릭 복제는 터치 기기에선 쓸 수 없어서, 탭으로 되는 복사 버튼을 같이 노출
                 let copyBtn = `<button type="button" onclick="event.stopPropagation(); duplicateTaskSchedule(event, '${t.id}', '${t.date}')" class="cal-copy-btn opacity-0 group-hover/block:opacity-100 text-slate-300 hover:text-indigo-500 transition-opacity mt-0.5 ml-1 shrink-0 px-1" title="이 일정 복사"><i class="fa-regular fa-copy"></i></button>`;
@@ -25499,7 +25500,7 @@ body.theme-cozy.theme-galaxy :is(#publish-cal-body, #task-calendar-body, #write-
         }
         function writerDatePickerMove(delta, event){
             if (event) event.stopPropagation();
-            writerPickerDate.setMonth(writerPickerDate.getMonth() + delta);
+            (writerPickerDate.setDate(1), writerPickerDate.setMonth(writerPickerDate.getMonth() + delta));
             renderWriterDatePicker();
         }
         function writerDatePickerJump(y, m, day){
@@ -25536,8 +25537,8 @@ body.theme-cozy.theme-galaxy :is(#publish-cal-body, #task-calendar-body, #write-
                 </div>
                 <div class="grid grid-cols-7 gap-1">${cells}</div>`;
         }
-        function writerCalPrev() { writerCalDate.setMonth(writerCalDate.getMonth()-1); writerRenderCalendar(); }
-        function writerCalNext() { writerCalDate.setMonth(writerCalDate.getMonth()+1); writerRenderCalendar(); }
+        function writerCalPrev() { (writerCalDate.setDate(1), writerCalDate.setMonth(writerCalDate.getMonth() -1)); writerRenderCalendar(); }
+        function writerCalNext() { (writerCalDate.setDate(1), writerCalDate.setMonth(writerCalDate.getMonth() +1)); writerRenderCalendar(); }
         function writerCalToday() { writerCalDate = new Date(); writerRenderCalendar(); }
 
         // ══ 월간 글자수 일괄 입력 (작품 미지정, 순수 글자수 기록) ══════════════════════════════

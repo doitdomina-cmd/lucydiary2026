@@ -1,4 +1,4 @@
-const CACHE_NAME = 'synop-app-v4';
+const CACHE_NAME = 'synop-app-v5';
 const ASSETS = ['./', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (event) => {

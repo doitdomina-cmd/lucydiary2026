@@ -6962,6 +6962,15 @@ html body.theme-candy.theme-cozy #webtoon-manage-list [onclick^="openWebtoonMana
 html body.theme-candy.theme-cozy :is(#task-calendar-body .cal-selectable, #task-dday-list > div, #publish-dday-list > div, #rs-vlist > div)::after,
 html body.theme-candy.theme-cozy #publish-cal-body [draggable="true"]::after,
 html body.theme-candy.theme-cozy :is(.cozy-pubhero .chips .chip, :is(#task-nav-pill, #write-nav-pill, #wc-nav-pill, #publish-cal-nav-row, #settle-head-right) button, aside button[class*="bg-white"], .cozy-hero .note .date, .cozy-launch-head .pill, .nav-btn.active)::after { display: none !important; content: none !important; }
+/* 집필 관리 제목만: 흰색 + 붉은색 줄무늬 */
+html body.theme-candy.theme-cozy #tab-write :is(.cozy-pubhero .yr, .cozy-pubhero .mname) { background-image: repeating-linear-gradient(135deg, #FFFFFF 0 9px, #F25A6E 9px 18px) !important; }
+/* ── 탭 묶음·작은 버튼: 입체 캔디 알약 ── */
+html body.theme-candy.theme-cozy :is(.tab-content, .modal-content) .flex.bg-slate-100.p-1 { background: #FFE3EE !important; border: 2px solid #F3C3DC !important; border-radius: 999px !important; box-shadow: 0 3px 0 #F6E3F0 !important; padding: 5px !important; gap: 4px !important; }
+html body.theme-candy.theme-cozy :is(.tab-content, .modal-content) .flex.bg-slate-100.p-1 > button { border-radius: 999px !important; border: 1.5px solid #F3C3DC !important; background: #FFF6FA !important; color: #8E5A7E !important; font-weight: 700; box-shadow: inset 0 -3px 3px #F6C9DDAA, 0 2px 0 #F3C3DC !important; margin-bottom: 0 !important; }
+html body.theme-candy.theme-cozy :is(.tab-content, .modal-content) .flex.bg-slate-100.p-1 > button:hover { background: #FFEAF3 !important; }
+html body.theme-candy.theme-cozy :is(.tab-content, .modal-content) .flex.bg-slate-100.p-1 > button:is(.bg-white, [class*="shadow-sm"]) { background: #FFEE9E !important; border-color: #E3C85A !important; color: #6A3F5A !important; box-shadow: inset 0 -3px 3px #F2DA78AA, 0 2px 0 #E3C85A !important; }
+html body.theme-candy.theme-cozy .tab-content button.text-red-500.bg-red-50 { background: #FFC9D6 !important; border: 1.5px solid #F08CA6 !important; color: #C0405F !important; border-radius: 999px !important; box-shadow: inset 0 -3px 3px #F5A9BCAA, 0 3px 0 #F08CA6 !important; }
+html body.theme-candy.theme-cozy .tab-content button.text-white[class*="rounded"]:not(.rounded-full.w-7):not([class*="absolute"]) { border: 1.5px solid #D9739F !important; box-shadow: inset 0 -3px 3px rgba(0,0,0,.08), 0 3px 0 #D9739F !important; }
 
 /* ═══ CANDY END ═══ */
 </style>
@@ -11444,11 +11453,14 @@ html body.theme-candy.theme-cozy :is(.cozy-pubhero .chips .chip, :is(#task-nav-p
                 const pat = x.createPattern(c, 'repeat'); _vinCache[col] = pat || col; return _vinCache[col];
             } catch (e) { return col; }
         }
+        const CANDY_PAL = [['#FFB9D3', '#E79BBB'], ['#A8E6D0', '#7CC4AB'], ['#D6C8F6', '#AD97DE'], ['#FFE98A', '#E3C85A'], ['#A9DDF3', '#7DB9DA'], ['#FFCFAE', '#E8A87C']];
+        function candyPal(genreName) { const i = genreList.findIndex(g => g.name === genreName); return CANDY_PAL[(i < 0 ? 0 : i) % CANDY_PAL.length]; }
         function chartBarStyle(genreName) {
             const sk = chartSkin(); if (!sk) return { backgroundColor: getGenrePastelColor(genreName), borderRadius: 4 };
+            if (sk.jelly) { const pl = candyPal(genreName); return { backgroundColor: pl[0], borderColor: pl[1], borderWidth: 2, borderRadius: 7, borderSkipped: false }; }   // 캔디: 말랑한 파스텔 네모 벽돌(조각마다 같은 모양)
             return { backgroundColor: sk.vintage ? chartVintageFill(genreName) : sk.crayon ? chartCrayonFill(genreName) : sk.pastel ? chartLabelFill(genreName) : sk.candy ? chartCandyFill(getGenreColor(genreName)) : hexToRgba(getGenreColor(genreName), sk.alpha), borderColor: sk.bcol || sk.ink, borderWidth: sk.bw, borderRadius: sk.radius, borderSkipped: false, ...(sk.bdash ? { borderWidth: 0, _dashEdge: true } : {}) };
         }
-        function chartSliceColor(genreName) { const sk = chartSkin(); return sk ? (sk.vintage ? chartVintageFill(genreName) : sk.crayon ? chartCrayonFill(genreName) : sk.pastel ? chartLabelFill(genreName) : sk.candy ? chartCandyFill(getGenreColor(genreName)) : hexToRgba(getGenreColor(genreName), sk.alpha)) : getGenrePastelColor(genreName); }
+        function chartSliceColor(genreName) { const sk = chartSkin(); if (sk && sk.jelly) return candyPal(genreName)[0]; return sk ? (sk.vintage ? chartVintageFill(genreName) : sk.crayon ? chartCrayonFill(genreName) : sk.pastel ? chartLabelFill(genreName) : sk.candy ? chartCandyFill(getGenreColor(genreName)) : hexToRgba(getGenreColor(genreName), sk.alpha)) : getGenrePastelColor(genreName); }
         // 게이밍 그래프: 장르 색의 색상(hue)은 그대로, 밝고 선명한 사탕 파스텔로 바꾸고 하얀 사선 줄무늬를 넣는다
         const _candyCache = {};
         function chartCandyFill(hex) {
@@ -26207,10 +26219,22 @@ html body.theme-candy.theme-cozy :is(.cozy-pubhero .chips .chip, :is(#task-nav-p
             }
             { const _sk = chartSkin(); if (_sk && _sk.vintage) { const _tr = chartTrack('#e2e8f0').toLowerCase(); bg = bg.map(cc => (typeof cc === 'string' && /^#[0-9a-f]{6}$/i.test(cc) && cc.toLowerCase() !== _tr) ? chartVintageHatch(chartVintageSoft(cc)) : cc); } }
             { const _sk = chartSkin(); if (_sk && _sk.dots) { const _tr = chartTrack('#e2e8f0').toLowerCase(); bg = bg.map(cc => (typeof cc === 'string' && /^#[0-9a-f]{6}$/i.test(cc) && cc.toLowerCase() !== _tr) ? chartCandyFill(cc) : cc); } }
+            let _jEdges = null;
+            { const _sk = chartSkin(); if (_sk && _sk.jelly) {   // 캔디: 말랑한 파스텔 + 같은 색 진한 테두리 (줄무늬·흰 윤기 없이 납작하게)
+                const _tr = chartTrack('#e2e8f0').toLowerCase(); _jEdges = [];
+                bg = bg.map(cc => {
+                    if (typeof cc !== 'string' || cc.toLowerCase() === _tr || !/^#[0-9a-f]{6}$/i.test(cc)) { _jEdges.push('#F3C3DC'); return '#FFE3EE'; }
+                    const r = parseInt(cc.slice(1, 3), 16) / 255, g = parseInt(cc.slice(3, 5), 16) / 255, b = parseInt(cc.slice(5, 7), 16) / 255;
+                    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; let h = 0;
+                    if (d) { h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h *= 60; if (h < 0) h += 360; }
+                    if (h > 255 && h < 330) h = 205 + (h - 255) * 0.25;
+                    _jEdges.push('hsl(' + Math.round(h) + ', 55%, 62%)'); return 'hsl(' + Math.round(h) + ', 78%, 80%)';
+                });
+            } }
             chartApplyDefaults();
             new Chart(canvas, {
                 type: 'doughnut',
-                data: { datasets: [{ data, backgroundColor: bg, borderWidth: chartSkin() ? 1.5 : 0, borderColor: chartSkin() ? (chartSkin().vintage ? 'rgba(196,128,140,.75)' : chartSkin().ink) : undefined }] },
+                data: { datasets: [{ data, backgroundColor: bg, borderWidth: _jEdges ? 2 : (chartSkin() ? 1.5 : 0), borderColor: _jEdges || (chartSkin() ? (chartSkin().vintage ? 'rgba(196,128,140,.75)' : chartSkin().ink) : undefined) }] },
                 options: {
                     cutout: '68%', responsive: true, maintainAspectRatio: false, layout: { padding: 2 },
                     plugins: {

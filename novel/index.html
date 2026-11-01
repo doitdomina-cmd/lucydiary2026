@@ -9272,19 +9272,28 @@ const SB_GENRE = { 'BL 장편': 'BL', '현로 장편': '현로', '현로 초단'
 function createSynopFor(wid, quiet) {
     const w = synopWin(), work = get(wid); if (!w || !work || typeof w.createNewBoard !== 'function') return false;
     const genre = SB_GENRE[ensurePlan(wid).genre] || '';
+    const prev = w.currentWorkspaceId, isCur = wid === curWorkId();
     try { w.createNewBoard({ title: work.title || '새 작품', genre }); } catch (e) { console.warn(e); return false; }
     const map = pref.synopMap || (pref.synopMap = {});
-    map[wid] = w.currentWorkspaceId; synopAutoId = w.currentWorkspaceId; savePref();
+    map[wid] = w.currentWorkspaceId;
+    // 지금 보고 있는 작품이 아니면 만든 뒤 보드 화면은 원래 보던 시놉으로 되돌림
+    if (!isCur && prev && prev !== w.currentWorkspaceId) { try { w.switchBoard(prev); } catch (e) { console.warn(e); } }
+    synopAutoId = w.currentWorkspaceId; savePref();
     if (work.needSynop) { delete work.needSynop; touch(work); }
     renderTree(); renderSbViews(); renderChars(true);
     if (!quiet) toast(`내 시놉 보드에도 ‘${work.title || '새 작품'}’ 시놉시스를 만들었어요.`);
     return true;
 }
+// 시놉 만들기가 밀려 있는 작품(needSynop)은 지금 보고 있는 작품이 아니어도, 시놉 보드 화면을 한 번도 안 열었어도 챙김 (보드 틀은 뒤에서 불러옴)
 setInterval(() => {
-    const wid = curWorkId(), work = get(wid);
-    if (!work || !work.needSynop || !synopWin()) return;
-    if (sbBoard()) { delete work.needSynop; touch(work); return; } // 이미 같은 이름이 있으면 그걸 씀
-    createSynopFor(wid);
+    const pending = works().filter(x => x.needSynop); if (!pending.length) return;
+    if (!synopWin()) { if (location.protocol.startsWith('http') && !IN_PREVIEW) ensureSynopFrame(); return; }
+    const w = synopWin(), map = pref.synopMap || {};
+    for (const work of pending) {
+        const has = (map[work.id] && w.workspaces.some(x => x.id === map[work.id])) || findSynopByTitle(w.workspaces, work.title);
+        if (has) { delete work.needSynop; touch(work); continue; } // 이미 같은 이름이 있으면 그걸 씀
+        createSynopFor(work.id); break; // 한 번에 하나씩
+    }
 }, 2000);
 document.addEventListener('click', e => { if (e.target.closest && e.target.closest('[data-sb-create]')) createSynopFor(curWorkId()); });
 $('#btn-synop-pick').addEventListener('click', () => { synopPicking = !synopPicking; lockSynopList(); });

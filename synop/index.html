@@ -1015,7 +1015,7 @@ body[data-theme="follow"] .theme-canvas ::placeholder { color: var(--pf-muted, #
                         <button id="board-meta-badge" onclick="window.openEditBoardMetaModal()" class="shrink-0 text-xs text-gray-400 hover:text-gray-600 bg-gray-50 rounded-full transition-colors" style="padding:5px 12px; white-space:nowrap; border:none;"></button>
                     </div>
 
-                    <div id="board-container" class="flex flex-col w-max min-w-full" style="gap:150px;">
+                    <div id="board-container" class="flex flex-col w-max min-w-full" style="gap:60px;">
                     </div>
                 </div>
             </div>
@@ -5543,6 +5543,9 @@ body:has(#synop-home.show) #synop-home-btn { display: none; }
         const embedded = window.self !== window.top;
         const native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
         if (embedded || native || !('serviceWorker' in navigator) || !/^https?:$/.test(location.protocol)) return;
+        // 새 서비스워커로 바뀌면 한 번만 다시 불러와서, 설치한 웹앱도 옛 화면에 머물지 않게
+        const hadController = !!navigator.serviceWorker.controller; let reloadedOnce = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => { if (!hadController || reloadedOnce) return; reloadedOnce = true; location.reload(); });
         window.addEventListener('load', () => {
             // 예전에 사이트 전체 범위로 등록돼 있던 sw.js 는 다른 웹앱과 겹치니 걷어낸다
             navigator.serviceWorker.getRegistrations().then(list => list.forEach(r => {

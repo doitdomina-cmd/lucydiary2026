@@ -35,12 +35,10 @@ button,input{font:inherit;color:inherit}button{cursor:pointer}
 .lead{margin:50px 0 14px;display:flex;align-items:baseline;justify-content:space-between;gap:12px}
 .lead h2{font-family:var(--serif);font-weight:400;font-size:21px;margin:0;letter-spacing:-.4px}
 .lead span{font-size:12px;color:var(--muted)}
-.cats{display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;margin-bottom:14px;padding-bottom:4px;scrollbar-width:none}.cats::-webkit-scrollbar{display:none}
+.cats{display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;margin-bottom:12px;padding-bottom:4px;scrollbar-width:none}.cats::-webkit-scrollbar{display:none}
 .cat{flex:1 0 auto;white-space:nowrap;border:1px solid var(--line);background:#fffaf2;border-radius:99px;padding:9px 15px;font-size:13.5px;font-weight:600;color:#7a6a5f}
 .cat:hover{background:#fbf0e8}
 .cat[aria-pressed=true]{background:#5c493f;border-color:#5c493f;color:#fff}
-.search{width:100%;border:1px solid var(--line);background:#fffdf8;border-radius:14px;padding:11px 15px;font-size:14px;outline:none;margin-bottom:10px}
-.search:focus{border-color:#cfaea3}.search::placeholder{color:#b3a699}
 .list{background:var(--card);border-radius:20px;box-shadow:var(--shadow);padding:6px 8px;max-height:520px;overflow:auto}
 .row{display:flex;gap:12px;align-items:baseline;width:100%;text-align:left;border:0;background:none;padding:13px 14px;border-radius:12px;font-size:14px;line-height:1.55;word-break:keep-all}
 .row+.row{border-top:1px dotted #eadfce;border-radius:0}
@@ -51,7 +49,7 @@ button,input{font:inherit;color:inherit}button{cursor:pointer}
 .toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,16px);background:#4d3f37;color:#fff;border-radius:99px;padding:9px 18px;font-size:12px;opacity:0;pointer-events:none;transition:.2s;z-index:9}
 .toast.show{opacity:1;transform:translate(-50%,0)}
 @media(max-width:560px){.wrap{padding-top:26px}.paper{padding:20px 14px 16px}.q{min-height:4.2em}.btn{padding:6px 9px;font-size:11.5px}.btns{gap:5px}.list{max-height:none}}
-@media print{body{background:#fff}.top p,.lead,.cats,.search,.list,.foot,.btns,.toast,.meta{display:none!important}.paper{box-shadow:none;border:1px solid #ddd}.paper:after{display:none}}
+@media print{body{background:#fff}.top p,.lead,.cats,.list,.foot,.btns,.toast,.meta{display:none!important}.paper{box-shadow:none;border:1px solid #ddd}.paper:after{display:none}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
 </style>
 </head>
@@ -67,7 +65,6 @@ button,input{font:inherit;color:inherit}button{cursor:pointer}
  </section>
  <div class="lead"><h2>질문 서랍</h2><span id="count"></span></div>
  <div class="cats" id="cats" role="group" aria-label="주제"></div>
- <input class="search" id="search" type="search" placeholder="전체 질문에서 검색" aria-label="질문 검색" autocomplete="off">
  <div class="list" id="list"></div>
  <p class="foot">답을 입력하거나 저장하는 기능은 없어요.<br>마음 가는 질문 하나만 골라 다이어리에 적어 보세요 ♡</p>
 </main>
@@ -87,7 +84,7 @@ function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');cle
 function show(q,isToday){cur=q;const c=CATEGORIES[q.ci];$('paper').style.setProperty('--cat',c.color);$('chip').textContent=c.icon+' '+c.name;$('q').textContent=q.text;$('meta').textContent=(isToday?'오늘의 질문 · ':'')+(ALL.indexOf(q)+1)+' / '+ALL.length}
 function pick(pool){const p=pool.filter(q=>q!==cur);return p[Math.floor(Math.random()*p.length)]}
 function tabs(){const h=$('cats');h.replaceChildren();[{n:'전체',k:-1}].concat(CATEGORIES.map((c,i)=>({n:SHORT[i]||c.name,k:i}))).forEach(x=>{const b=document.createElement('button');b.type='button';b.className='cat';b.textContent=x.n;b.setAttribute('aria-pressed',String(tab===x.k));b.onclick=()=>{tab=x.k;tabs();rows()};h.append(b)})}
-function rows(){const s=$('search').value.trim().toLowerCase();const l=ALL.filter(q=>(tab<0||q.ci===tab)&&(!s||q.text.toLowerCase().includes(s)));$('count').textContent=l.length+'개의 질문';const h=$('list');h.replaceChildren();
+function rows(){const l=ALL.filter(q=>tab<0||q.ci===tab);$('count').textContent=l.length+'개의 질문';const h=$('list');h.replaceChildren();
  if(!l.length){const p=document.createElement('p');p.className='none';p.textContent='찾는 질문이 없어요. 다른 단어로 검색해 보세요.';h.append(p);return}
  const f=document.createDocumentFragment();l.forEach((q,k)=>{const b=document.createElement('button');b.type='button';b.className='row';const n=document.createElement('b');n.textContent=String(k+1).padStart(2,'0');const t=document.createElement('span');t.textContent=q.text;b.append(n,t);b.onclick=()=>{show(q,false);window.scrollTo({top:0,behavior:'smooth'})};f.append(b)});h.append(f)}
 const now=new Date(),days=['일','월','화','수','목','금','토'];
@@ -96,7 +93,6 @@ $('again').onclick=()=>show(pick(ALL),false);
 $('same').onclick=()=>cur&&show(pick(ALL.filter(q=>q.ci===cur.ci)),false);
 $('todayBtn').onclick=()=>show(dailyQ(new Date()),true);
 $('copy').onclick=async()=>{if(!cur)return;try{await navigator.clipboard.writeText(cur.text);toast('질문을 복사했어요')}catch(e){toast('질문을 길게 눌러 복사해 주세요')}};
-$('search').oninput=rows;
 show(dailyQ(now),true);tabs();rows();
 </script>
 </body>

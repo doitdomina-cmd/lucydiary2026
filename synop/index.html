@@ -835,7 +835,8 @@ body[data-theme="follow"] .theme-canvas ::placeholder { color: var(--pf-muted, #
             <div style="display:flex; flex-direction:column; gap:16px;">
                 <div>
                     <label class="text-xs font-bold text-gray-500" style="display:block; margin-bottom:6px;">제목</label>
-                    <input id="new-board-title" type="text" placeholder="작품 제목" class="w-full text-sm outline-none border border-gray-200 rounded-lg" style="padding:9px 12px;">
+                    <input id="new-board-title" type="text" placeholder="작품 제목" class="w-full text-sm outline-none border border-gray-200 rounded-lg" style="padding:9px 12px;" onkeydown="if(event.key==='Enter'){event.preventDefault();window.confirmCreateBoard();}">
+                    <div id="new-board-err" style="display:none; color:#e11d48; font-size:12px; margin-top:6px;">제목을 입력해 주세요.</div>
                 </div>
                 <div>
                     <label class="text-xs font-bold text-gray-500" style="display:block; margin-bottom:6px;">장르</label>
@@ -3232,6 +3233,7 @@ window.manualFirebasePush = async function () {
             if (!modal) return;
             document.getElementById('new-board-title').value = '';
             document.getElementById('new-board-genre').value = 'BL';
+            document.getElementById('new-board-err').style.display = 'none';
             modal.style.display = 'flex';
             setTimeout(() => document.getElementById('new-board-title').focus(), 0);
         };
@@ -3243,7 +3245,8 @@ window.manualFirebasePush = async function () {
 
         window.confirmCreateBoard = () => {
             const title = document.getElementById('new-board-title').value.trim();
-            if (!title) return alert('제목을 입력해주세요.');
+            // PC 앱에서는 alert()가 안 뜰 수 있어서 창 안에 직접 안내
+            if (!title) { document.getElementById('new-board-err').style.display = 'block'; document.getElementById('new-board-title').focus(); return; }
             const genre = document.getElementById('new-board-genre').value;
             window.createNewBoard({ title, genre });
             window.closeNewBoardModal();

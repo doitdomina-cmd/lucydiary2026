@@ -482,6 +482,22 @@ body.sb-collapsed .sb-collapse-btn{left:0}
 .oy-nav{flex-wrap:nowrap;flex:none}@media(max-width:768px){.oy-head{flex-wrap:wrap}.oy-nav{width:100%;justify-content:flex-end}.oy-nav button{height:34px;padding:0 10px}}.oy-nav button{white-space:nowrap}.oy-kick{white-space:nowrap}
 .oy-nav button{border:1px solid var(--cz-line,var(--border));background:var(--surface);color:var(--text);border-radius:99px;min-width:36px;height:36px;padding:0 12px;cursor:pointer;font-family:inherit;font-size:14px}
 .oy-sub{font-size:12px;color:var(--t3);margin:0 0 12px}
+/* 월별 보기: 12달을 칸으로 (플래너의 '한눈에 보는 1년' 면처럼) */
+.ym-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:6px}
+@media(max-width:1100px){.ym-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:768px){.ym-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}}
+.ym-c{border:1px solid var(--cz-line,var(--border));background:var(--surface);border-radius:12px;padding:10px 12px 12px;min-height:150px;display:flex;flex-direction:column;gap:6px}
+.ym-c.now{box-shadow:0 0 0 2px var(--cz-accent,var(--primary,#8bb8a8))}
+.ym-h{display:flex;align-items:baseline;gap:6px}
+.ym-h b{font-size:20px;line-height:1;color:var(--cz-muted,var(--t3));font-weight:600}
+.ym-h small{font-size:10px;letter-spacing:1.5px;color:var(--t3);flex:1}
+.ym-h button{border:0;background:transparent;color:var(--t3);font-size:18px;line-height:1;cursor:pointer;padding:0 2px}
+.ym-h button:hover{color:var(--text)}
+.ym-it{display:flex;flex-direction:column;gap:1px;font-size:12.5px;line-height:1.45;color:var(--text);cursor:pointer;padding:3px 6px;border-radius:6px;border-left:3px solid var(--c,#EF805E);background:color-mix(in srgb,var(--c,#EF805E) 14%,transparent);word-break:keep-all;overflow-wrap:anywhere}
+.ym-it:hover{background:color-mix(in srgb,var(--c,#EF805E) 26%,transparent)}
+.ym-it .ym-d{font-size:11px;color:var(--t3);font-variant-numeric:tabular-nums}
+.ym-it.done{opacity:.5;text-decoration:line-through}
+.ym-empty{color:var(--t3);font-size:12px;opacity:.6}
 .oy-scroll{overflow:auto;border:1px solid var(--cz-line,var(--border));border-radius:14px;background:var(--surface);max-height:calc(100vh - 210px);-webkit-overflow-scrolling:touch}
 .oy-t{border-collapse:separate;border-spacing:0;min-width:1500px;width:100%;table-layout:fixed;font-size:10px}
 .oy-t th,.oy-t td{border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:0;vertical-align:top}
@@ -3669,7 +3685,7 @@ let activePid = null;
 let pjFilter = '';
 let viewDate = todStr();
 
-const titles = {oneyear:'1 Year',routinecal:'Routine Calendar',memories:'Memories',dream:'Dream Board',dreamArea:'Dream Board',today:'Today',diary:'Thanks Diary',calendar:'Monthly',todocal:'To Do',routine:'루틴 설정',life:'My Goals',overview:'Goals 요약',projects:'Projects',deadlines:'D-day',savings:'저축 관리',health:'건강 관리',settings:'설정',ledger:'가계부',insights:'회고 & 통계',journal:'Journal',timeline:'Roadmap',ledgerYear:'가계부'};
+const titles = {oneyear:'1 Year',yearmonth:'월별 보기',routinecal:'Routine Calendar',memories:'Memories',dream:'Dream Board',dreamArea:'Dream Board',today:'Today',diary:'Thanks Diary',calendar:'Monthly',todocal:'To Do',routine:'루틴 설정',life:'My Goals',overview:'Goals 요약',projects:'Projects',deadlines:'D-day',savings:'저축 관리',health:'건강 관리',settings:'설정',ledger:'가계부',insights:'회고 & 통계',journal:'Journal',timeline:'Roadmap',ledgerYear:'가계부'};
 
 
 // Manage 메뉴 접기/펼치기 (이 기기에 기억)
@@ -3688,12 +3704,12 @@ function go(p, pid, _fromPopstate){
   }
   document.querySelectorAll('.nav').forEach(e=>e.classList.remove('on'));
   if(['health','routine','insights'].includes(p)) applyManage(false);
-  const n=document.getElementById('nav-'+((p==='dreamArea'||p==='timeline'||p==='oneyear')?'dream':p==='routinecal'?'journal':(p==='ledgerYear'||p==='ledger'||p==='savings')?'money':p==='deadlines'?'calendar':p));
+  const n=document.getElementById('nav-'+((p==='dreamArea'||p==='timeline'||p==='oneyear'||p==='yearmonth')?'dream':p==='routinecal'?'journal':(p==='ledgerYear'||p==='ledger'||p==='savings')?'money':p==='deadlines'?'calendar':p));
   if(n) n.classList.add('on');
   const tbTitle=document.getElementById('tb-title');
   const topbar=document.querySelector('.topbar');
   const isMobile=window.innerWidth<=768;
-  const hideTopbarPages=['oneyear','routinecal','memories','settings','dream','dreamArea','ledger','today','calendar','todocal','diary','deadlines','health','savings','routine','insights','journal'];
+  const hideTopbarPages=['oneyear','yearmonth','routinecal','memories','settings','dream','dreamArea','ledger','today','calendar','todocal','diary','deadlines','health','savings','routine','insights','journal'];
 
   // 모바일에서는 항상 탑바 표시, 데스크탑에서만 hideTopbarPages 적용
   if(!isMobile && hideTopbarPages.includes(p)){
@@ -3928,6 +3944,28 @@ function renderOneYear(){
   }
   return h+'</tbody></table></div></div>';
 }
+// 월별 보기: 드림보드에서 날짜(디데이)를 넣은 꿈 + 1 Year의 기간 막대를 달마다 모아서 보여 줌
+function renderYearMonth(){
+  var y=oyYear,now=new Date(),MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var md=function(ds){return (+ds.slice(5,7))+'.'+(+ds.slice(8,10));};
+  var dreams=wishDeadlines().filter(function(d){return d.date&&d.date.slice(0,4)===String(y);});
+  var bars=oyBarsOf(y),total=dreams.length+bars.length;
+  var h='<div class="oy"><div class="oy-head"><div><div class="oy-kick">MONTHLY · 월별로 보는 한 해</div><h1>'+y+'</h1></div>'
+    +'<div class="oy-nav"><button type="button" class="oy-add" onclick="oyBar(null)" title="여행처럼 기간이 있는 일정 만들기">＋ 기간</button><button type="button" onclick="oyMove(-1)">‹</button><button type="button" onclick="oyMove(1)">›</button></div></div>'
+    +'<div class="oy-sub">드림보드에서 <b>날짜를 넣은 꿈</b>과 <b>＋ 기간</b>으로 만든 일정이 달마다 모여요 · 올해 '+total+'개</div><div class="ym-grid">';
+  for(var m=0;m<12;m++){
+    var mp=(m+1<10?'0':'')+(m+1),first=y+'-'+mp+'-01',lastDs=y+'-'+mp+'-'+String(new Date(y,m+1,0).getDate()).padStart(2,'0');
+    var its=[];
+    dreams.forEach(function(d){if(d.date.slice(5,7)!==mp)return;its.push({k:d.date,date:md(d.date),t:String(d.title||'').replace(/<[^>]*>/g,'').replace(/^♡\s*/,''),c:'#EF805E',done:d.done,on:"dlOpen('"+d.id+"')"});});
+    bars.forEach(function(b){if(!(b.start<=lastDs&&b.end>=first))return;
+      var rng=b.start===b.end?md(b.start):(b.start.slice(5,7)===b.end.slice(5,7)&&b.start.slice(0,4)===b.end.slice(0,4)?md(b.start)+' ~ '+(+b.end.slice(8,10)):md(b.start)+' ~ '+md(b.end));
+      its.push({k:b.start<first?first:b.start,date:rng,t:b.title,c:b.color,done:false,on:"oyBar('"+b.id+"')"});});
+    its.sort(function(a,b){return a.k.localeCompare(b.k);});
+    h+='<div class="ym-c'+(now.getFullYear()===y&&now.getMonth()===m?' now':'')+'"><div class="ym-h"><b>'+(m+1)+'</b><small>'+MN[m].toUpperCase()+'</small><button type="button" onclick="oyBar(null,\''+first+'\')" title="이 달에 기간 일정 만들기">＋</button></div>'
+      +(its.length?its.map(function(x){return '<div class="ym-it'+(x.done?' done':'')+'" style="--c:'+esc(x.c)+'" onclick="'+x.on+'"><span class="ym-d">'+x.date+'</span><span>'+esc(x.t)+'</span></div>';}).join(''):'<div class="ym-empty">—</div>')+'</div>';
+  }
+  return h+'</div></div>';
+}
 var oyZoom=1;
 (function(){
   var d0=0,z0=1,on=false;
@@ -3945,7 +3983,7 @@ var oyZoom=1;
   document.addEventListener('touchend',function(e){if(e.touches.length<2)on=false;},{passive:true});
 })();
 function dmTabs(){
-  return '<div class="rc-tabs dm-tabs"><button class="'+(page==='dream'?'on':'')+'" onclick="go(\'dream\')">Dream Board</button><button class="'+(page==='timeline'?'on':'')+'" onclick="go(\'timeline\')">Roadmap</button><button class="'+(page==='oneyear'?'on':'')+'" onclick="go(\'oneyear\')">1 Year</button></div>';
+  return '<div class="rc-tabs dm-tabs"><button class="'+(page==='dream'?'on':'')+'" onclick="go(\'dream\')">Dream Board</button><button class="'+(page==='timeline'?'on':'')+'" onclick="go(\'timeline\')">Roadmap</button><button class="'+(page==='oneyear'?'on':'')+'" onclick="go(\'oneyear\')">1 Year</button><button class="'+(page==='yearmonth'?'on':'')+'" onclick="go(\'yearmonth\')">월별 보기</button></div>';
 }
 function renderDream(){
   var D=dreamData();
@@ -4814,7 +4852,7 @@ function render(){
   // 현재 페이지를 body class로 반영 (페이지별 레이아웃 예외 처리용)
   document.body.className=document.body.className.replace(/\bpage-\S+/g,'').trim()+' page-'+page+((page==='projects'&&activePid)?' pj-detail':'');
   const div=document.createElement('div');
-  div.className='pc'+(page==='timeline'||page==='oneyear'?' pc-wide':'');
+  div.className='pc'+(page==='timeline'||page==='oneyear'||page==='yearmonth'?' pc-wide':'');
   if(page==='dream') div.innerHTML=dmTabs()+renderDream();
   else if(page==='routinecal') div.innerHTML=jrTabs()+'<div class="mem">'+rcView()+'</div>';
   else if(page==='dreamArea') div.innerHTML=renderDreamArea();
@@ -4837,6 +4875,7 @@ function render(){
   else if(page==='journal') div.innerHTML=jrTabs()+renderJournal();
   else if(page==='timeline') div.innerHTML=dmTabs()+renderTimeline();
   else if(page==='oneyear') div.innerHTML=dmTabs()+renderOneYear();
+  else if(page==='yearmonth') div.innerHTML=dmTabs()+renderYearMonth();
   el.innerHTML=''; el.appendChild(div);
   if(document.body.classList.contains('theme-spiral')){spiralDeco();try{spiralWobble();}catch(e){}}
   else if(document.body.classList.contains('theme-label')){spiralDeco();}

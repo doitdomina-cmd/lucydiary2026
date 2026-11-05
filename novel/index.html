@@ -1870,6 +1870,10 @@ body.th-spiral :is(.pk-state .ic, .fn-head > .ic, .board-head .wb-title .ic) { c
 .toast { position: fixed; left: 50%; bottom: 70px; transform: translateX(-50%); background: #23261f; color: #fff; padding: 8px 14px; border-radius: 8px; font-size: 12px; z-index: 200; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90vw; text-align: center; }
 .toast.show { opacity: .94; }
 
+/* 새 판 알림 */
+.update-bar { position: fixed; left: 50%; bottom: calc(70px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 400; display: flex; align-items: center; gap: 8px; padding: 7px 8px 7px 16px; border-radius: 999px; background: #2b2a26; color: #fff; font-size: 13px; box-shadow: 0 8px 24px rgba(0,0,0,.25); white-space: nowrap; }
+.update-bar button { background: #b8e986; color: #23261f; font-weight: 700; border-radius: 999px; padding: 5px 12px; font-size: 12.5px; }
+.update-bar .ub-x { background: transparent; color: rgba(255,255,255,.7); padding: 5px 8px; }
 /* ===== 원고만 보기 ===== */
 .focus-exit { display: none; }
 .focus-exit .fx-short { display: none; }
@@ -11155,7 +11159,32 @@ async function copyPomoReport(box) {
     cloudInit();
     loadBackupDir().then(() => setTimeout(maybeFolderBackup, 15000));
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-        navigator.serviceWorker.register('novel-sw.js').catch(() => {});
+        navigator.serviceWorker.register('novel-sw.js').then(reg => { try { reg.update(); } catch (_) {} }).catch(() => {});
+    }
+    // 새 판 알림: 폰 웹앱처럼 켜 둔 채로 쓰면 새 판이 올라와도 화면이 그대로라서, 가끔 서버의 판과 견줘 보고 다르면 「새로 고침」을 띄움
+    if (location.protocol.startsWith('http')) {
+        const bigScript = list => list.sort((a, b) => b.length - a.length)[0] || '';
+        const mine = bigScript([...document.querySelectorAll('script:not([src])')].map(x => x.textContent));
+        let shown = false, last = 0;
+        const check = async () => {
+            if (shown || Date.now() - last < 60000) return; last = Date.now();
+            try {
+                const r = await fetch(location.pathname, { cache: 'no-store' }); if (!r.ok) return;
+                const t = await r.text(), theirs = bigScript([...t.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]));
+                if (theirs.length > 1000 && mine.length > 1000 && theirs !== mine) showUpdateBar();
+            } catch (_) {}
+        };
+        const showUpdateBar = () => {
+            if (shown) return; shown = true;
+            const bar = document.createElement('div'); bar.className = 'update-bar';
+            bar.innerHTML = '<span>새 판이 나왔어요</span><button type="button">새로 고침</button><button type="button" class="ub-x" title="나중에">✕</button>';
+            document.body.appendChild(bar);
+            bar.querySelector('button').onclick = async () => { try { await saveLocal(); } catch (_) {} try { await flushCloud(); } catch (_) {} location.reload(); };
+            bar.querySelector('.ub-x').onclick = () => bar.remove();
+        };
+        setTimeout(check, 8000);
+        setInterval(check, 15 * 60000);
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
     }
 })();
 </script>

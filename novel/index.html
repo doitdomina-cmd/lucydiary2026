@@ -6329,7 +6329,17 @@ function noticeConflict(main, copy, mineCopied) {
 // 원고 충돌 규칙 (어느 쪽 글도 잃지 않게)
 //  - 지금 이 창에서 쓰는 중이면: 이쪽 글은 그대로, 상대 글은 사본으로
 //  - 쓰는 중이 아니면: 더 나중에 고친 쪽이 본문, 진 쪽이 자기 글을 사본으로 남김
-function receiveItem(r) {
+// 다른 기기 · 다른 창에서 화이트보드가 바뀌어 들어오면 이 기기의 되돌리기 기록을 비움 (되돌리다 남이 고친 걸 덮어쓰지 않게)
+function wbRemoteGuard(r) {
+    if (!r || (r.kind !== 'note' && r.kind !== 'wbframe') || r.by === tabId) return;
+    if (typeof wbHist === 'undefined' || r.workId !== wbHist.work) { try { localStorage.removeItem('wb-undo:' + r.workId); } catch (_) {} return; }
+    if (!wbHist.undo.length && !wbHist.redo.length) return;
+    wbHist.undo = []; wbHist.redo = [];
+    try { localStorage.removeItem('wb-undo:' + r.workId); } catch (_) {}
+    clearTimeout(wbRemoteGuard._t); wbRemoteGuard._t = setTimeout(() => toast('다른 기기에서 화이트보드가 바뀌어서, 이 기기의 되돌리기 기록은 비웠어요.'), 300);
+}
+function receiveItem(r) { const ok = receiveItemRaw(r); if (ok) wbRemoteGuard(r); return ok; }
+function receiveItemRaw(r) {
     normalize(r);
     const local = items[r.id];
     if (!local) { items[r.id] = r; seenRev[r.id] = r.rev; return true; }

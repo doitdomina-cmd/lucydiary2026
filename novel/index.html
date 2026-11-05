@@ -776,6 +776,9 @@ body.th-spiral .fullboard .wb-chips .chip[data-f="*"]::after { border-left: 2px 
 @media (hover: none) { .wfr-head button { opacity: .8; } }
 .wfr-head button:hover { background: rgba(255,255,255,.75); color: #000; }
 .wfr-dot { width: 13px; height: 13px; border-radius: 50%; background: var(--fc); box-shadow: 0 0 0 1.5px rgba(0,0,0,.25); }
+.wb-frpal { display: grid; grid-template-columns: repeat(4, 30px); gap: 7px; padding: 4px; }
+.wb-frpal .swatch { width: 30px; height: 30px; border-radius: 9px; box-shadow: 0 0 0 1px rgba(0,0,0,.14); }
+.wb-frpal .swatch.on { box-shadow: 0 0 0 2.5px var(--accent); }
 .wfr-resize { position: absolute; right: 0; bottom: 0; width: 22px; height: 22px; cursor: nwse-resize; touch-action: none; border-radius: 0 0 16px 0; background: linear-gradient(135deg, transparent 55%, rgba(0,0,0,.18) 55%); }
 body.th-spiral .wb-frame { border: 2.5px solid var(--sp-ink); box-shadow: 4px 5px 0 rgba(31,45,39,.25); }
 body.th-spiral .wfr-title { font-family: 'Single Day', 'Gaegu', cursive; font-weight: 400; font-size: 20px; }
@@ -1794,7 +1797,8 @@ body.th-airmail .fullboard .bh-tools [data-b="close"], body.th-airmail .planner 
 #board-head .wb-wide, body:is(.th-label, .th-polaroid) #board-head .wb-wide, body.th-spiral #board-head .wb-wide { background: var(--accent); color: #fff; border: 1px solid var(--accent); padding: 0 13px; font-size: 12px; font-weight: 700; gap: 5px; }
 #board-head .wb-wide .ic { width: 13px; height: 13px; }
 #board-head .wb-wide:hover, body:is(.th-label, .th-polaroid) #board-head .wb-wide:hover { background: color-mix(in srgb, var(--accent) 85%, #000); color: #fff; border-color: transparent; }
-body:is(.th-label, .th-polaroid) #board-head .wb-wide { border: 1.5px solid var(--accent); outline: 1.5px dashed rgba(255,255,255,.75); outline-offset: -4px; }
+body:is(.th-label, .th-polaroid) #board-head .wb-wide { background: var(--lb-mint); color: #2f7350; border: 1.5px dashed rgba(80,150,110,.55); outline: 0; }
+body:is(.th-label, .th-polaroid) #board-head .wb-wide:hover { background: color-mix(in srgb, var(--lb-mint) 70%, #9fd3b4); color: #245c40; border-color: rgba(60,130,90,.7); }
 body.th-spiral #board-head .wb-wide { background: var(--sp-mint2); color: var(--sp-ink); border: 2px solid var(--sp-ink); }
 body.th-spiral #board-head .wb-wide:hover { background: #6dd2ab; color: var(--sp-ink); }
 /* ===== 새 화면 테마 — 끝 ===== */
@@ -4626,7 +4630,7 @@ function drawBoard(mode) {
 }
 /* 묶음 상자 (넓게 보기에서만): 'wbframe' 아이템 { title, gx, gy, w, h, color }
    - 머리를 끌면 상자와 안에 든 포스트잇이 같이 움직임 · 오른쪽 아래를 끌면 크기 조절 */
-const WB_FRAME_COLORS = ['#f6d6d9', '#d6ecdf', '#d8e4f6', '#fbe9bd', '#e5daf3', '#e7e3db'];
+const WB_FRAME_COLORS = ['#f6d6d9', '#fbe0cc', '#fbe9bd', '#d6ecdf', '#d3ecee', '#d8e4f6', '#e5daf3', '#e7e3db']; // 분홍 · 살구 · 노랑 · 민트 · 아쿠아 · 하늘 · 라벤더 · 베이지
 const framesOfWork = () => ofWork('wbframe');
 function frameHtml(f) {
     return `<div class="wb-frame" data-frame="${f.id}" style="left:${f.gx}px;top:${f.gy}px;width:${f.w}px;height:${f.h}px;--fc:${esc(f.color || WB_FRAME_COLORS[0])}">
@@ -4648,7 +4652,11 @@ function addFrame(mode) {
 function frameClick(e) {
     const b = e.target.closest('[data-fr]'); if (!b) return;
     const f = get(b.closest('[data-frame]')?.dataset.frame); if (!f) return;
-    if (b.dataset.fr === 'color') { wbPush(); f.color = WB_FRAME_COLORS[(WB_FRAME_COLORS.indexOf(f.color) + 1) % WB_FRAME_COLORS.length]; touch(f); b.closest('.wb-frame').style.setProperty('--fc', f.color); }
+    if (b.dataset.fr === 'color') {
+        const box = b.closest('.wb-frame');
+        const pop = showPop(b, `<div class="swatches wb-frpal">${WB_FRAME_COLORS.map(c => `<button class="swatch ${c === f.color ? 'on' : ''}" style="background:${c}" data-fc="${c}" title="상자 색"></button>`).join('')}</div>`);
+        pop.addEventListener('click', ev => { const c = ev.target.closest('[data-fc]')?.dataset.fc; if (!c) return; closePop(); if (c === f.color) return; wbPush(); f.color = c; touch(f); box.style.setProperty('--fc', c); });
+    }
     if (b.dataset.fr === 'del') {
         wbPush(); f.deleted = true; touch(f); renderNotes();
         toast('묶음 상자를 지웠어요. 안의 메모는 그대로예요.', '되돌리기', () => { f.deleted = false; touch(f); renderNotes(); });

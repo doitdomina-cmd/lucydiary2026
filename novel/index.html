@@ -638,12 +638,22 @@ body.tw-ov .manuscript[contenteditable="true"] { caret-color: transparent; }
 .board-wrap.bg-cork { background-color: #e9dcc3; background-image: radial-gradient(rgba(120,85,40,.22) 1px, transparent 1.5px); }
 .board-inner { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; }
 .wb-lines { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; z-index: 0; }
-.wb-ln line { stroke: #5e6b63; stroke-width: 1.4; }
+.wb-ln line { stroke: #5e6b63; stroke-width: 1.6; }
 .wb-ln line.hit { stroke: transparent; stroke-width: 16; pointer-events: stroke; cursor: pointer; }
 .wb-ln circle { fill: #5e6b63; }
 .wb-ln rect { fill: #fff; stroke: #c9d0ca; stroke-width: 1; }
 .wb-ln text { font-size: 12px; fill: #3d4a42; font-family: var(--note-font, 'Pretendard', sans-serif); }
-.wb-ln.on line:not(.hit) { stroke: var(--accent); stroke-width: 2.4; } .wb-ln.on circle { fill: var(--accent); }
+.wb-ln.on line:not(.hit), .wb-ln.on circle { filter: drop-shadow(0 0 2px rgba(47,125,109,.9)) drop-shadow(0 0 4px rgba(47,125,109,.5)); }
+.wb-linepop { width: 300px; max-width: calc(100vw - 30px); white-space: normal; padding: 2px; }
+.wb-linepop .grp { font-size: 11px; color: var(--muted); padding: 9px 2px 4px; font-weight: 700; }
+.wb-lcolors { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 2px; }
+.pop .wb-lcolors button { width: 24px; height: 24px; padding: 0; border-radius: 50%; border: 2px solid var(--panel); box-shadow: 0 0 0 1px rgba(0,0,0,.15); }
+.pop .wb-lcolors button.on { box-shadow: 0 0 0 2px #2f7d6d; }
+.wb-lopts { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 4px; }
+.pop .wb-lopts button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px 5px; border: 1px solid var(--line); border-radius: 8px; text-align: center; font-size: 11px; }
+.pop .wb-lopts button.on { border-color: #2f7d6d; background: color-mix(in srgb, #2f7d6d 10%, var(--panel)); color: #2f7d6d; font-weight: 700; }
+.wb-lrow { display: flex; gap: 4px; margin-top: 8px; border-top: 1px solid var(--line); padding-top: 6px; }
+.pop .wb-lrow button { width: auto; flex: 1; text-align: center; font-size: 12px; }
 .wb-ln.dim { opacity: .15; }
 .wb-temp { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 6 5; }
 .pi { position: absolute; border-radius: 3px 3px 6px 6px; color: #2b2a26; display: flex; flex-direction: column; border: 1.5px solid transparent; transition: opacity .15s, transform .15s;
@@ -735,7 +745,7 @@ body.tw-ov .manuscript[contenteditable="true"] { caret-color: transparent; }
     .wf-fmt .wb-fsz { min-width: 18px; font-size: 12px; }
     .wf-fmt .wb-sw { width: 14px; height: 14px; }
     .wf-topics { gap: 3px; }
-    .wf-topics button { flex-direction: row; gap: 4px; min-width: 0; padding: 3px 7px 3px 3px; border-radius: 999px; font-size: 11px; border-width: 1px; }
+    .wf-topics button { flex: 1 1 auto; max-width: none; flex-direction: row; gap: 4px; min-width: 0; padding: 3px 7px 3px 3px; border-radius: 999px; font-size: 11px; border-width: 1px; }
     .wf-topics button b { width: 20px; height: 20px; flex: none; }
     .wf-topics button b .ic { width: 12px !important; height: 12px !important; }
     .fullboard .board-head { grid-template-columns: minmax(0, 1fr); gap: 2px; padding: 4px 8px; }
@@ -4123,23 +4133,43 @@ function wbEdge(b, tx, ty) {
     const t = Math.min(dx ? (b.w / 2) / Math.abs(dx) : Infinity, dy ? (b.h / 2) / Math.abs(dy) : Infinity);
     return { x: cx + dx * t, y: cy + dy * t };
 }
+const WB_LINE_COLORS = ['#5e6b63', '#23261f', '#2f8a6a', '#3a6fb5', '#8a5a9e', '#d0455b', '#e07b39', '#d98a00'];
+const WB_LINE_STYLES = [['solid', '기본 선'], ['dash', '점선'], ['dot', '동글 점선'], ['bold', '굵은 선']];
+const WB_LINE_ARROWS = [['none', '화살표 없음'], ['end', '한쪽 화살표'], ['both', '양쪽 화살표']];
+function wbLineStyle(l) {
+    const c = /^#[0-9a-f]{6}$/i.test(l.c || '') ? l.c : WB_LINE_COLORS[0], st = l.st || 'solid';
+    const w = st === 'bold' ? 3.4 : 1.6;
+    const dash = st === 'dash' ? '9 6' : st === 'dot' ? '0.1 6' : '';
+    return { c, w, css: `stroke:${c};stroke-width:${w}px;${dash ? `stroke-dasharray:${dash};` : ''}${st === 'dot' ? 'stroke-linecap:round;stroke-width:' + (w + 1.4) + 'px;' : ''}`, ar: l.ar || 'none' };
+}
+// 선 모양 미리 보기 (작은 그림)
+function wbLineIcon(st, ar, c = '#3d4a42') {
+    const L = wbLineStyle({ st, c }), id = 'wbi' + st + ar;
+    const mk = `<marker id="${id}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="${c}"/></marker>`;
+    return `<svg width="44" height="14" viewBox="0 0 44 14"><defs>${mk}</defs><line x1="5" y1="7" x2="39" y2="7" style="${L.css}" ${ar === 'end' || ar === 'both' ? `marker-end="url(#${id})"` : ''} ${ar === 'both' ? `marker-start="url(#${id})"` : ''}/></svg>`;
+}
 function wbDrawLines(mode, temp) {
     const world = wbWorld(mode); if (!world) return;
     const svg = $('svg.wb-lines', world); if (!svg) return;
     const boxes = {};
     $$('.pi', world).forEach(el => { boxes[el.dataset.note] = { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight }; });
     let out = '';
+    const markers = {};
     notesOfWork().forEach(n => (n.links || []).forEach(l => {
         const a = boxes[n.id], b = boxes[l.to], m = get(l.to); if (!a || !b || !m) return;
         const p = wbEdge(a, b.x + b.w / 2, b.y + b.h / 2), q = wbEdge(b, a.x + a.w / 2, a.y + a.h / 2);
         const dim = !(wbMatch(n) || wbMatch(m)) ? ' dim' : '';
         const key = n.id + '|' + l.to, on = wbSel.link === key ? ' on' : '';
-        out += `<g class="wb-ln${dim}${on}" data-link="${key}"><line class="hit" x1="${p.x}" y1="${p.y}" x2="${q.x}" y2="${q.y}"/><line x1="${p.x}" y1="${p.y}" x2="${q.x}" y2="${q.y}"/><circle cx="${p.x}" cy="${p.y}" r="3.5"/><circle cx="${q.x}" cy="${q.y}" r="3.5"/>`;
+        const L = wbLineStyle(l), mid = 'wbar' + L.c.slice(1) + (L.w > 2 ? 'b' : '');
+        if (L.ar !== 'none' && !markers[mid]) markers[mid] = `<marker id="${mid}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="${L.w > 2 ? 13 : 10}" markerHeight="${L.w > 2 ? 13 : 10}" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="${L.c}"/></marker>`;
+        const mEnd = L.ar !== 'none' ? ` marker-end="url(#${mid})"` : '', mStart = L.ar === 'both' ? ` marker-start="url(#${mid})"` : '';
+        out += `<g class="wb-ln${dim}${on}" data-link="${key}"><line class="hit" x1="${p.x}" y1="${p.y}" x2="${q.x}" y2="${q.y}"/><line x1="${p.x}" y1="${p.y}" x2="${q.x}" y2="${q.y}" style="${L.css}"${mEnd}${mStart}/>`
+            + (L.ar === 'both' ? '' : `<circle cx="${p.x}" cy="${p.y}" r="3.5" style="fill:${L.c}"/>`) + (L.ar === 'none' ? `<circle cx="${q.x}" cy="${q.y}" r="3.5" style="fill:${L.c}"/>` : '');
         if (l.t) { const mx = (p.x + q.x) / 2, my = (p.y + q.y) / 2; out += `<text x="${mx}" y="${my}" text-anchor="middle" dominant-baseline="central">${esc(l.t)}</text>`; }
         out += '</g>';
     }));
     if (temp) out += `<line class="wb-temp" x1="${temp.x1}" y1="${temp.y1}" x2="${temp.x2}" y2="${temp.y2}"/>`;
-    svg.innerHTML = out;
+    svg.innerHTML = `<defs>${Object.values(markers).join('')}</defs>` + out;
     // 선 글자 뒤에 바탕 깔기
     $$('text', svg).forEach(t => { try { const bb = t.getBBox(); const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect'); r.setAttribute('x', bb.x - 5); r.setAttribute('y', bb.y - 2); r.setAttribute('width', bb.width + 10); r.setAttribute('height', bb.height + 4); r.setAttribute('rx', 8); t.before(r); } catch (_) {} });
 }
@@ -4366,22 +4396,41 @@ function wbLinkPop(mode, key, cx, cy) {
     const l = (n.links || []).find(x => x.to === to); if (!l) return;
     wbSel.link = key; wbSel[mode] = null; wbDrawLines(mode); wbPlaceBar(mode);
     $$('.pi.sel', wbWorld(mode)).forEach(el => el.classList.remove('sel'));
-    const pop = showPop(null, `<div class="wb-tagnew" style="padding:2px 2px 6px"><input placeholder="선 위 글자 (예: 짝사랑, 원수)" maxlength="24" value="${esc(l.t || '')}"><button class="btn primary" data-l="save">적기</button></div>
-        <button data-l="del" class="danger">선 지우기</button>`, { left: cx - 100, right: cx + 100, top: cy, bottom: cy + 6 });
-    const inp = $('input', pop);
-    const save = () => { closePop(); wbPush(); l.t = inp.value.trim(); touch(n); renderNotes(); };
+    const body = () => {
+        const L = wbLineStyle(l), st = l.st || 'solid';
+        return `<div class="wb-linepop">
+        <div class="wb-tagnew"><input placeholder="선 위 글자 (예: 짝사랑, 원수)" maxlength="24" value="${esc(l.t || '')}"><button class="btn primary" data-l="save">적기</button></div>
+        <div class="grp">색</div><div class="wb-lcolors">${WB_LINE_COLORS.map(c => `<button class="${c === L.c ? 'on' : ''}" data-lc="${c}" style="background:${c}" title="선 색"></button>`).join('')}</div>
+        <div class="grp">선 모양</div><div class="wb-lopts">${WB_LINE_STYLES.map(([k, nm]) => `<button class="${st === k ? 'on' : ''}" data-ls="${k}">${wbLineIcon(k, 'none')}<span>${nm}</span></button>`).join('')}</div>
+        <div class="grp">화살표</div><div class="wb-lopts">${WB_LINE_ARROWS.map(([k, nm]) => `<button class="${L.ar === k ? 'on' : ''}" data-la="${k}">${wbLineIcon(st === 'bold' ? 'bold' : 'solid', k)}<span>${nm}</span></button>`).join('')}</div>
+        <div class="wb-lrow">${L.ar === 'end' ? '<button data-l="flip">⇄ 화살표 방향 바꾸기</button>' : ''}<button data-l="del" class="danger">선 지우기</button></div></div>`;
+    };
+    const pop = showPop(null, body(), { left: cx - 140, right: cx + 140, top: cy, bottom: cy + 6 });
+    const redraw = () => { ['col', 'full'].forEach(m => wbDrawLines(m)); const t = $('input', pop).value; pop.innerHTML = body(); $('input', pop).value = t; };
+    const setL = fn => { wbPush(); fn(l); touch(n); pref.wbLineLast = { c: l.c, st: l.st, ar: l.ar }; savePref(); redraw(); };
+    const save = () => { closePop(); wbPush(); l.t = $('input', pop).value.trim(); touch(n); renderNotes(); };
     pop.addEventListener('click', e => {
-        const a = e.target.closest('[data-l]')?.dataset.l; if (!a) return;
+        const b = e.target.closest('[data-lc], [data-ls], [data-la], [data-l]'); if (!b) return;
+        if (b.dataset.lc) { setL(x => { x.c = b.dataset.lc; }); return; }
+        if (b.dataset.ls) { setL(x => { x.st = b.dataset.ls; }); return; }
+        if (b.dataset.la) { setL(x => { x.ar = b.dataset.la; }); return; }
+        const a = b.dataset.l;
         if (a === 'save') save();
         if (a === 'del') { closePop(); wbPush(); n.links = n.links.filter(x => x.to !== to); touch(n); wbSel.link = null; renderNotes(); }
+        if (a === 'flip') {
+            const m = get(to); if (!m) return;
+            closePop(); wbPush();
+            n.links = n.links.filter(x => x.to !== to); touch(n);
+            m.links = [...(m.links || []).filter(x => x.to !== n.id), { ...l, to: n.id }]; touch(m);
+            wbSel.link = m.id + '|' + n.id; renderNotes();
+        }
     });
-    inp.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); save(); } });
-    if (matchMedia('(pointer: fine)').matches) inp.focus();
+    pop.addEventListener('keydown', e => { if (e.target.matches('input') && e.key === 'Enter' && !e.isComposing) { e.preventDefault(); save(); } });
 }
 function wbLink(a, b) {
     if (!a || !b || a.id === b.id) return false;
     if ((a.links || []).some(l => l.to === b.id) || (b.links || []).some(l => l.to === a.id)) return false;
-    a.links = [...(a.links || []), { to: b.id, t: '' }]; touch(a);
+    a.links = [...(a.links || []), { to: b.id, t: '', ...(pref.wbLineLast || {}) }]; touch(a);
     return true;
 }
 

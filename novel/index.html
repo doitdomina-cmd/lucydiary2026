@@ -4436,10 +4436,10 @@ function wbSnap(w = curWorkId()) {
 }
 function wbSame(a, b) { const ka = Object.keys(a), kb = Object.keys(b); return ka.length === kb.length && ka.every(k => a[k] === b[k]); }
 // 되돌리기 기록은 작품 데이터로 저장('wbhist_작품id' 아이템) → 클라우드로 기기끼리 같이 씀
-//  - 걸음마다 '바뀐 메모만' 남겨 작게 (작품마다 최근 30걸음 · 100KB까지, 넘으면 오래된 것부터 버림 · 메모 60개 보드 40걸음이 약 15KB)
+//  - 걸음마다 '바뀐 메모만' 남겨 작게 (작품마다 최근 40걸음 · 200KB까지, 넘으면 오래된 것부터 버림 · 메모 60개 보드 40걸음이 약 15KB)
 //  - 2초 모았다가 한 번에 올림 (연달아 고쳐도 클라우드에는 한 번)
 //  - 어느 기기에서 한 일이든 같은 기록에 쌓이고, 되돌리기는 보드에서 마지막으로 한 일을 되돌림
-const WB_HIST_MAX = 30, WB_HIST_BYTES = 100000, WB_HIST_WAIT = 2000;
+const WB_HIST_MAX = 40, WB_HIST_BYTES = 200000, WB_HIST_WAIT = 2000;
 const wbHistId = w => 'wbhist_' + w;
 // 기록 = 한 줄로 늘어선 보드 상태들: [지난 상태들 …, 지금, … 다시 하기로 갈 상태들]
 //  저장할 때는 이웃한 두 상태 사이에 '바뀐 메모만' 남김 (지금보다 앞쪽은 앞 상태 값, 뒤쪽은 뒤 상태 값)
@@ -4603,7 +4603,7 @@ function drawBoard(mode) {
     wbApplyStyle();
     const list = notesOfWork();
     if (wbSel[mode] && !get(wbSel[mode])) wbSel[mode] = null;
-    const frames = mode === 'full' && wbLay(mode) === 'free' ? framesOfWork() : [];
+    const frames = mode === 'full' && wbLay(mode) === 'free' && wbFilter === '*' ? framesOfWork() : []; // 묶음 상자는 넓게 보기 · 원래대로 · 주제 「전체」일 때만
     world.innerHTML = frames.map(frameHtml).join('') + '<svg class="wb-lines"></svg>' + list.map(n => piHtml(n, mode)).join('');
     $$('textarea', world).forEach(autoGrow);
     view._wbShown = !!view.clientWidth;
@@ -5079,7 +5079,7 @@ function wbHeadClick(e, mode) {
     if (b === 'add') addNote(mode);
     if (b === 'add-img') { $('#file-img').dataset.forBoard = mode; $('#file-img').click(); }
     if (b === 'add-char') wbCharPop(bt, mode);
-    if (b === 'add-frame') { if (wbLay(mode) === 'topic') { wbSetLay('free'); renderNotes(); } addFrame(mode); }
+    if (b === 'add-frame') { if (wbLay(mode) === 'topic' || wbFilter !== '*') { wbSetLay('free'); wbFilter = '*'; renderNotes(); } addFrame(mode); }
     if (b === 'png') wbExportPng(mode);
     if (b === 'undo' || b === 'redo') wbUndo(b === 'redo');
     if (b === 'style') wbStylePop(bt);

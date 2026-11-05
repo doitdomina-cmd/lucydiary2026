@@ -1387,11 +1387,11 @@ nav.mtabs button .ic { width: 20px; height: 20px; }
 .wcard.pol { position: relative; background: #fffdf9; border: 0; border-radius: 3px; padding: 10px 10px 12px; min-height: 0; gap: 0; transform: rotate(var(--rot, -1.5deg)); box-shadow: 0 1px 2px rgba(60,40,30,.16), 0 8px 18px rgba(90,60,40,.14); }
 .wcard.pol:hover, .wcard.pol:focus-visible { transform: rotate(0) translateY(-5px); box-shadow: 0 2px 3px rgba(60,40,30,.16), 0 14px 26px rgba(90,60,40,.2); }
 .pol-tape { position: absolute; top: -9px; left: 50%; width: 56px; height: 17px; margin-left: -28px; background: rgba(222,205,170,.7); transform: rotate(-3deg); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
-.pol-ph { position: relative; aspect-ratio: 1; border-radius: 1px; padding: 9px 10px; display: flex; flex-direction: column; gap: 6px; overflow: hidden; background: linear-gradient(160deg, color-mix(in srgb, var(--gc) 75%, #fff), color-mix(in srgb, var(--gc) 30%, #fff)); box-shadow: inset 0 0 0 1px rgba(0,0,0,.05); }
+.pol-ph { position: relative; aspect-ratio: 5 / 3; border-radius: 1px; padding: 9px 10px; display: flex; flex-direction: column; gap: 6px; overflow: hidden; background: linear-gradient(160deg, color-mix(in srgb, var(--gc) 75%, #fff), color-mix(in srgb, var(--gc) 30%, #fff)); box-shadow: inset 0 0 0 1px rgba(0,0,0,.05); }
 .pol-ph > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 30%; }
 .pol-ph .wc-top { position: relative; z-index: 1; }
 .pol-ph.has-cover .wc-genre, .pol-ph.has-cover .wc-status, .pol-ph.has-cover .wc-more { background: rgba(255,253,249,.88); }
-.pol-big { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; padding: 0 6px 10px; font: 700 31px/1.25 var(--home-font, 'Gaegu'), 'Nanum Myeongjo', cursive; color: color-mix(in srgb, var(--gi, #5a4a40) 90%, #2b2420); overflow-wrap: anywhere; word-break: keep-all; transform: rotate(-3deg); }
+.pol-big { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; padding: 0 6px 4px; font: 700 26px/1.2 var(--home-font, 'Gaegu'), 'Nanum Myeongjo', cursive; color: color-mix(in srgb, var(--gi, #5a4a40) 90%, #2b2420); overflow-wrap: anywhere; word-break: keep-all; transform: rotate(-3deg); }
 .pol-cap { display: flex; align-items: baseline; gap: 8px; padding: 11px 2px 0; }
 .pol-title { flex: 1; min-width: 0; font: 700 22px/1.2 var(--home-font, 'Gaegu'), 'Nanum Myeongjo', cursive; color: #4a3d36; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pol-sub { flex: 1; font: 400 16px var(--home-font, 'Gaegu'), cursive; color: #8a7a6e; }
@@ -1722,6 +1722,8 @@ body.th-airmail .fullboard .bh-tools [data-b="close"], body.th-airmail .planner 
 @media (max-width: 600px) {
     .wgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
     .pol-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 12px; padding: 10px 2px 6px; }
+    .pol-grid .pol-big { font-size: 20px; padding-bottom: 2px; }
+    .pol-grid .pol-ph { padding: 7px 8px; gap: 3px; }
     .wgrid .wcard { min-height: 128px; gap: 5px; }
     .wgrid .wcard:not(.pol) { padding: 10px 11px; }
     .wgrid .wc-top { flex-wrap: wrap; gap: 4px; }
@@ -6628,7 +6630,6 @@ const THEME_KEYS = ['--bg', '--panel', '--panel2', '--line', '--text', '--muted'
 // 원고 종이(--paper)는 새싹과 같은 미색으로 통일, 돌담만 옅은 회색
 const THEMES = {
     light: [
-        { id: 'cozy', name: '코지', v: ['#f8f3ec', '#fffdf9', '#fbf7f1', '#eadfd2', '#3b322c', '#9a8b7e', '#a9695f', '#efe2db', '#fffdf8'] },   // 말린 장미 꽃잎: 채도를 낮춘 먼지 장미색
         { id: 'basic', name: '새싹', v: ['#f6f7f4', '#ffffff', '#fbfbf9', '#e4e6e0', '#23261f', '#8a8f84', '#6aa12f', '#eef6e4', '#fffefa'] },
         { id: 'polaroid', name: '폴라로이드', v: ['#f1ece3', '#fffdf9', '#faf6ee', '#e6dccb', '#3a322a', '#8f8472', '#8a6d4b', '#f1e6d3', '#fffefa'] },   // 사진틀 + 마스킹테이프
         { id: 'label', name: '견출지', v: ['#f8f5ec', '#fffdf7', '#faf7ee', '#e8dfc6', '#3a3320', '#8a8064', '#a58a52', '#f2ebd6', '#fffefa'] },   // 파스텔 스티커 + 점선
@@ -6640,6 +6641,7 @@ const THEMES = {
 };
 const darkNow = () => false; // 어두운 테마는 쓰지 않음
 function applyPalette() {
+    if (pref.lightPal === 'cozy') { pref.lightPal = 'basic'; savePref(); } // 코지 테마는 없어짐
     const s = document.documentElement.style;
     const dark = darkNow();
     const pal = dark ? THEMES.dark.find(t => t.id === pref.darkPal) : THEMES.light.find(t => t.id === pref.lightPal);

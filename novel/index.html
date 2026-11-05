@@ -4435,35 +4435,39 @@ function wbSnap() {
     return m;
 }
 function wbSame(a, b) { const ka = Object.keys(a), kb = Object.keys(b); return ka.length === kb.length && ka.every(k => a[k] === b[k]); }
-// 되돌리기 기록 저장: 걸음마다 '바뀐 메모만' 남김. 다시 열 때 보드가 그대로면(다른 기기에서 고치지 않았으면) 이어서 되돌리기
-const WB_HIST_MAX = 40, WB_HIST_BYTES = 600000;
-function wbHash(m) { let h = 0; const str = Object.keys(m).sort().map(k => k + m[k]).join('|'); for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0; return h + ':' + str.length; }
-function wbHistKey(w) { return 'wb-undo:' + w; }
+// 되돌리기 기록은 작품 데이터로 저장('wbhist_작품id' 아이템) → 클라우드로 기기끼리 같이 씀
+//  - 걸음마다 '바뀐 메모만' 남겨 작게 (작품마다 최근 40걸음, 크기 넘으면 오래된 것부터 버림)
+//  - 어느 기기에서 한 일이든 같은 기록에 쌓이고, 되돌리기는 보드에서 마지막으로 한 일을 되돌림
+const WB_HIST_MAX = 40, WB_HIST_BYTES = 400000;
+const wbHistId = w => 'wbhist_' + w;
 function wbHistSave() {
     clearTimeout(wbHistSave._t);
+    const w = wbHist.work;
     wbHistSave._t = setTimeout(() => {
-        if (!wbHist.work) return;
-        try {
-            let chain = [...wbHist.undo, wbSnap()];
-            const pack = () => { const d = []; for (let i = 0; i < chain.length - 1; i++) { const a = chain[i], b = chain[i + 1], x = {}; new Set([...Object.keys(a), ...Object.keys(b)]).forEach(id => { if (a[id] !== b[id]) x[id] = a[id] ?? null; }); d.push(x); } return JSON.stringify({ v: 1, hash: wbHash(chain[chain.length - 1]), d }); };
-            let txt = pack();
-            while (txt.length > WB_HIST_BYTES && chain.length > 2) { chain = chain.slice(1); txt = pack(); }
-            if (chain.length < 2) localStorage.removeItem(wbHistKey(wbHist.work)); else localStorage.setItem(wbHistKey(wbHist.work), txt);
-        } catch (_) {}
-    }, 500);
+        if (!w || w !== curWorkId()) return;
+        let chain = [...wbHist.undo, wbSnap()];
+        const pack = () => { const d = []; for (let k = 0; k < chain.length - 1; k++) { const a = chain[k], b = chain[k + 1], x = {}; new Set([...Object.keys(a), ...Object.keys(b)]).forEach(id => { if (a[id] !== b[id]) x[id] = a[id] ?? null; }); d.push(x); } return JSON.stringify(d); };
+        let txt = pack();
+        while (txt.length > WB_HIST_BYTES && chain.length > 2) { chain = chain.slice(1); txt = pack(); }
+        const it = items[wbHistId(w)] || { id: wbHistId(w), kind: 'wbhist', workId: w, title: '', body: '' };
+        if (it.d === txt) return;
+        it.d = txt; it.deleted = false; touch(it);
+        wbHist.loaded = it.rev;
+    }, 400);
 }
 function wbHistLoad() {
-    const w = curWorkId(); wbHist.work = w; wbHist.undo = []; wbHist.redo = [];
+    const w = curWorkId(); wbHist.work = w; wbHist.undo = []; wbHist.redo = []; wbHist.stale = false;
+    try { localStorage.removeItem('wb-undo:' + w); } catch (_) {} // 예전(기기 저장) 기록은 치움
+    const it = items[wbHistId(w)]; if (!it || it.deleted || !it.d) return;
+    wbHist.loaded = it.rev;
     try {
-        const o = JSON.parse(localStorage.getItem(wbHistKey(w)) || 'null'); if (!o || o.v !== 1) return;
-        let cur = wbSnap(); if (wbHash(cur) !== o.hash) { localStorage.removeItem(wbHistKey(w)); return; } // 그 사이 보드가 바뀌었으면 옛 기록은 버림
-        const list = [];
-        for (let i = o.d.length - 1; i >= 0; i--) { const prev = { ...cur }; Object.entries(o.d[i]).forEach(([id, v]) => { if (v == null) delete prev[id]; else prev[id] = v; }); list.unshift(prev); cur = prev; }
+        const d = JSON.parse(it.d); let cur = wbSnap(); const list = [];
+        for (let k = d.length - 1; k >= 0; k--) { const prev = { ...cur }; Object.entries(d[k]).forEach(([id, v]) => { if (v == null) delete prev[id]; else prev[id] = v; }); list.unshift(prev); cur = prev; }
         wbHist.undo = list;
     } catch (_) {}
 }
 function wbPush() {
-    if (wbHist.work !== curWorkId()) wbHistLoad();
+    if (wbHist.work !== curWorkId() || wbHist.stale) wbHistLoad();
     const s = wbSnap(), last = wbHist.undo[wbHist.undo.length - 1];
     if (last && wbSame(last, s)) return;
     wbHist.undo.push(s); if (wbHist.undo.length > WB_HIST_MAX) wbHist.undo.shift();
@@ -4480,7 +4484,7 @@ function wbRestore(s) {
     });
 }
 function wbUndo(redo) {
-    if (wbHist.work !== curWorkId()) wbHistLoad();
+    if (wbHist.work !== curWorkId() || wbHist.stale) wbHistLoad();
     const from = redo ? wbHist.redo : wbHist.undo, to = redo ? wbHist.undo : wbHist.redo;
     let s = from.pop();
     const cur = wbSnap();
@@ -5288,6 +5292,7 @@ function wbBind(view, mode) {
     view.addEventListener('pointerup', end);
     view.addEventListener('pointercancel', end);
     view.addEventListener('focusin', e => { if (e.target.matches('.pi textarea')) { wbPush(); wbSelect(mode, e.target.dataset.id); } });
+    view.addEventListener('focusout', e => { if (e.target.matches('.pi textarea, .wfr-title')) wbHistSave(); });
     view.addEventListener('input', e => { if (e.target.matches('.pi textarea')) { if (wbLay(mode) === 'topic') wbTopicLayout(wbWorld(mode)); wbDrawLines(mode); wbPlaceBar(mode); } });
     view.addEventListener('click', e => {
         const z = e.target.closest('[data-z]')?.dataset.z; if (!z) return;
@@ -6329,14 +6334,11 @@ function noticeConflict(main, copy, mineCopied) {
 // 원고 충돌 규칙 (어느 쪽 글도 잃지 않게)
 //  - 지금 이 창에서 쓰는 중이면: 이쪽 글은 그대로, 상대 글은 사본으로
 //  - 쓰는 중이 아니면: 더 나중에 고친 쪽이 본문, 진 쪽이 자기 글을 사본으로 남김
-// 다른 기기 · 다른 창에서 화이트보드가 바뀌어 들어오면 이 기기의 되돌리기 기록을 비움 (되돌리다 남이 고친 걸 덮어쓰지 않게)
+// 다른 기기 · 다른 창에서 화이트보드나 되돌리기 기록이 바뀌어 들어오면: 같이 쓰는 기록을 다시 읽음 (다시 하기는 비움)
 function wbRemoteGuard(r) {
-    if (!r || (r.kind !== 'note' && r.kind !== 'wbframe') || r.by === tabId) return;
-    if (typeof wbHist === 'undefined' || r.workId !== wbHist.work) { try { localStorage.removeItem('wb-undo:' + r.workId); } catch (_) {} return; }
-    if (!wbHist.undo.length && !wbHist.redo.length) return;
-    wbHist.undo = []; wbHist.redo = [];
-    try { localStorage.removeItem('wb-undo:' + r.workId); } catch (_) {}
-    clearTimeout(wbRemoteGuard._t); wbRemoteGuard._t = setTimeout(() => toast('다른 기기에서 화이트보드가 바뀌어서, 이 기기의 되돌리기 기록은 비웠어요.'), 300);
+    if (!r || r.by === tabId || typeof wbHist === 'undefined' || r.workId !== wbHist.work) return;
+    if (r.kind === 'wbhist') { wbHistLoad(); return; }
+    if (r.kind === 'note' || r.kind === 'wbframe') { wbHist.stale = true; wbHist.redo = []; }
 }
 function receiveItem(r) { const ok = receiveItemRaw(r); if (ok) wbRemoteGuard(r); return ok; }
 function receiveItemRaw(r) {

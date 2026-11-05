@@ -4135,12 +4135,11 @@ function wbEdge(b, tx, ty) {
 }
 const WB_LINE_COLORS = ['#5e6b63', '#23261f', '#2f8a6a', '#3a6fb5', '#8a5a9e', '#d0455b', '#e07b39', '#d98a00'];
 const WB_LINE_STYLES = [['solid', '기본 선'], ['dash', '점선'], ['dot', '동글 점선'], ['bold', '굵은 선']];
-const WB_LINE_ARROWS = [['none', '화살표 없음'], ['end', '한쪽 화살표'], ['both', '양쪽 화살표']];
 function wbLineStyle(l) {
     const c = /^#[0-9a-f]{6}$/i.test(l.c || '') ? l.c : WB_LINE_COLORS[0], st = l.st || 'solid';
     const w = st === 'bold' ? 3.4 : 1.6;
     const dash = st === 'dash' ? '9 6' : st === 'dot' ? '0.1 6' : '';
-    return { c, w, css: `stroke:${c};stroke-width:${w}px;${dash ? `stroke-dasharray:${dash};` : ''}${st === 'dot' ? 'stroke-linecap:round;stroke-width:' + (w + 1.4) + 'px;' : ''}`, ar: l.ar || 'none' };
+    return { c, w, css: `stroke:${c};stroke-width:${w}px;${dash ? `stroke-dasharray:${dash};` : ''}${st === 'dot' ? 'stroke-linecap:round;stroke-width:' + (w + 1.4) + 'px;' : ''}`, ar: 'none' };
 }
 // 선 모양 미리 보기 (작은 그림)
 function wbLineIcon(st, ar, c = '#3d4a42') {
@@ -4182,7 +4181,7 @@ function wbHead(mode) {
     const chips = `<div class="chips wb-chips"><button class="chip ${wbFilter === '*' ? 'on' : ''}" data-f="*">전체 ${all.length}</button>${tags.map(t => `<button class="chip ${wbFilter === t ? 'on' : ''}" data-f="${esc(t)}" style="--tc:${wbTagColor(t)}">${wbTopic(t) ? '' : '<i class="dot"></i>'}${wbTagHtml(t, true)} ${cnt(t)}</button>`).join('')}${none && tags.length ? `<button class="chip ${wbFilter === '' ? 'on' : ''}" data-f="">주제 없음 ${none}</button>` : ''}</div>`;
     const tools = `<button class="mini" data-b="add" title="새 포스트잇">＋메모</button><button class="mini" data-b="add-img" title="사진 포스트잇">＋사진</button>
         <button class="mini" data-b="undo" title="되돌리기 (Ctrl+Z)"><i class="ic ic-undo-2"></i></button><button class="mini" data-b="redo" title="다시 하기 (Ctrl+Shift+Z)"><i class="ic ic-redo-2"></i></button>
-        <button class="mini" data-b="list" title="주제별 목록에서 찾기"><i class="ic ic-layout-list"></i> 목록</button><button class="mini" data-b="style" title="보드 꾸미기 (글꼴 · 글자 크기 · 배경)"><i class="ic ic-palette"></i> 꾸미기</button><button class="mini" data-b="more" title="더 보기">⋯</button>`;
+        <button class="mini" data-b="style" title="보드 꾸미기 (글꼴 · 글자 크기 · 배경)"><i class="ic ic-palette"></i> 꾸미기</button><button class="mini" data-b="more" title="더 보기">⋯</button>`;
     const L = wbLay();
     const lay = `<span class="wb-lay" title="보기 방식"><button class="${L === 'free' ? 'on' : ''}" data-lay="free" title="내가 놓은 자리 그대로">원래대로</button><button class="${L === 'topic' ? 'on' : ''}" data-lay="topic" title="주제마다 한 줄로 모아 보기 (끌어서 다른 줄에 놓으면 주제가 바뀌어요)">주제별</button></span>`;
     if (mode === 'full') return `<div class="fb-left"><b class="wb-title"><i class="ic ic-layout-dashboard"></i> 화이트보드</b>${lay}${chips}</div><span class="bh-tools">${tools}<button class="mini" data-b="close" title="닫기 (Esc)">✕</button></span>`;
@@ -4402,35 +4401,26 @@ function wbLinkPop(mode, key, cx, cy) {
         <div class="wb-tagnew"><input placeholder="선 위 글자 (예: 짝사랑, 원수)" maxlength="24" value="${esc(l.t || '')}"><button class="btn primary" data-l="save">적기</button></div>
         <div class="grp">색</div><div class="wb-lcolors">${WB_LINE_COLORS.map(c => `<button class="${c === L.c ? 'on' : ''}" data-lc="${c}" style="background:${c}" title="선 색"></button>`).join('')}</div>
         <div class="grp">선 모양</div><div class="wb-lopts">${WB_LINE_STYLES.map(([k, nm]) => `<button class="${st === k ? 'on' : ''}" data-ls="${k}">${wbLineIcon(k, 'none')}<span>${nm}</span></button>`).join('')}</div>
-        <div class="grp">화살표</div><div class="wb-lopts">${WB_LINE_ARROWS.map(([k, nm]) => `<button class="${L.ar === k ? 'on' : ''}" data-la="${k}">${wbLineIcon(st === 'bold' ? 'bold' : 'solid', k)}<span>${nm}</span></button>`).join('')}</div>
-        <div class="wb-lrow">${L.ar === 'end' ? '<button data-l="flip">⇄ 화살표 방향 바꾸기</button>' : ''}<button data-l="del" class="danger">선 지우기</button></div></div>`;
+        <div class="wb-lrow"><button data-l="del" class="danger">선 지우기</button></div></div>`;
     };
     const pop = showPop(null, body(), { left: cx - 140, right: cx + 140, top: cy, bottom: cy + 6 });
     const redraw = () => { ['col', 'full'].forEach(m => wbDrawLines(m)); const t = $('input', pop).value; pop.innerHTML = body(); $('input', pop).value = t; };
-    const setL = fn => { wbPush(); fn(l); touch(n); pref.wbLineLast = { c: l.c, st: l.st, ar: l.ar }; savePref(); redraw(); };
+    const setL = fn => { wbPush(); fn(l); touch(n); pref.wbLineLast = { c: l.c, st: l.st }; savePref(); redraw(); };
     const save = () => { closePop(); wbPush(); l.t = $('input', pop).value.trim(); touch(n); renderNotes(); };
     pop.addEventListener('click', e => {
-        const b = e.target.closest('[data-lc], [data-ls], [data-la], [data-l]'); if (!b) return;
+        const b = e.target.closest('[data-lc], [data-ls], [data-l]'); if (!b) return;
         if (b.dataset.lc) { setL(x => { x.c = b.dataset.lc; }); return; }
         if (b.dataset.ls) { setL(x => { x.st = b.dataset.ls; }); return; }
-        if (b.dataset.la) { setL(x => { x.ar = b.dataset.la; }); return; }
         const a = b.dataset.l;
         if (a === 'save') save();
         if (a === 'del') { closePop(); wbPush(); n.links = n.links.filter(x => x.to !== to); touch(n); wbSel.link = null; renderNotes(); }
-        if (a === 'flip') {
-            const m = get(to); if (!m) return;
-            closePop(); wbPush();
-            n.links = n.links.filter(x => x.to !== to); touch(n);
-            m.links = [...(m.links || []).filter(x => x.to !== n.id), { ...l, to: n.id }]; touch(m);
-            wbSel.link = m.id + '|' + n.id; renderNotes();
-        }
     });
     pop.addEventListener('keydown', e => { if (e.target.matches('input') && e.key === 'Enter' && !e.isComposing) { e.preventDefault(); save(); } });
 }
 function wbLink(a, b) {
     if (!a || !b || a.id === b.id) return false;
     if ((a.links || []).some(l => l.to === b.id) || (b.links || []).some(l => l.to === a.id)) return false;
-    a.links = [...(a.links || []), { to: b.id, t: '', ...(pref.wbLineLast || {}) }]; touch(a);
+    a.links = [...(a.links || []), { to: b.id, t: '', c: pref.wbLineLast?.c, st: pref.wbLineLast?.st }]; touch(a);
     return true;
 }
 
@@ -4477,7 +4467,6 @@ function wbHeadClick(e, mode) {
     if (b === 'add') addNote(mode);
     if (b === 'add-img') { $('#file-img').dataset.forBoard = mode; $('#file-img').click(); }
     if (b === 'undo' || b === 'redo') wbUndo(b === 'redo');
-    if (b === 'list') wbListPop(bt, mode);
     if (b === 'style') wbStylePop(bt);
     if (b === 'more') {
         const pop = showPop(bt, `<button data-x="fit">모든 메모가 보이게 맞추기</button>`);
@@ -4517,13 +4506,6 @@ function wbApplyStyle() {
         WB_BGS.forEach(([k]) => v.classList.toggle('bg-' + k, S.bg === k));
         v.classList.toggle('no-tape', !S.tape); v.classList.toggle('no-tilt', !S.tilt);
     });
-}
-function wbListPop(anchor, mode) {
-    const all = notesOfWork(); if (!all.length) { toast('아직 메모가 없어요.'); return; }
-    const tags = wbTags(), groups = [...tags.map(t => [t, all.filter(n => (n.tag || '').trim() === t)]), ['', all.filter(n => !(n.tag || '').trim())]].filter(([, l]) => l.length);
-    const pop = showPop(anchor, `<div class="pin-list wb-list">${groups.map(([t, list]) => `<div class="grp" style="--tc:${t ? wbTagColor(t) : 'var(--muted)'}">${t && wbTopic(t) ? '' : '<i class="dot"></i>'}${t ? wbTagHtml(t) : '주제 없음'} <small>${list.length}</small></div>`
-        + list.map(n => `<button data-go="${n.id}"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${esc(n.color)};margin-right:6px;vertical-align:-1px"></span>${esc((n.body || (n.img ? '[사진]' : '빈 메모')).split('\n')[0].slice(0, 40))}</button>`).join('')).join('')}</div>`);
-    pop.addEventListener('click', e => { const id = e.target.closest('[data-go]')?.dataset.go; if (!id) return; closePop(); wbFocusNote(mode, id); });
 }
 function wbArrange(mode) {
     const world = wbWorld(mode), all = notesOfWork(); if (!all.length) return;

@@ -4441,20 +4441,27 @@ function wbSame(a, b) { const ka = Object.keys(a), kb = Object.keys(b); return k
 //  - 어느 기기에서 한 일이든 같은 기록에 쌓이고, 되돌리기는 보드에서 마지막으로 한 일을 되돌림
 const WB_HIST_MAX = 30, WB_HIST_BYTES = 100000, WB_HIST_WAIT = 2000;
 const wbHistId = w => 'wbhist_' + w;
+// 기록 = 한 줄로 늘어선 보드 상태들: [지난 상태들 …, 지금, … 다시 하기로 갈 상태들]
+//  저장할 때는 이웃한 두 상태 사이에 '바뀐 메모만' 남김 (지금보다 앞쪽은 앞 상태 값, 뒤쪽은 뒤 상태 값)
 function wbHistSave() {
     clearTimeout(wbHistSave._t);
-    const w = wbHist.work, undo = wbHist.undo; // 그새 다른 작품으로 옮겨도 이 작품 기록으로 저장
+    const w = wbHist.work, undo = wbHist.undo, redo = wbHist.redo; // 그새 다른 작품으로 옮겨도 이 작품 기록으로 저장
     const run = () => {
         wbHistSave._t = null; wbHistSave._run = null;
         if (!w) return;
-        let chain = [...undo, wbSnap(w)];
-        const pack = () => { const d = []; for (let k = 0; k < chain.length - 1; k++) { const a = chain[k], b = chain[k + 1], x = {}; new Set([...Object.keys(a), ...Object.keys(b)]).forEach(id => { if (a[id] !== b[id]) x[id] = a[id] ?? null; }); d.push(x); } return JSON.stringify(d); };
+        let past = [...undo], future = [...redo].reverse(); // future[0] = 다시 하기 바로 다음
+        const now = wbSnap(w);
+        const diff = (a, b, keep) => { const x = {}; new Set([...Object.keys(a), ...Object.keys(b)]).forEach(id => { if (a[id] !== b[id]) x[id] = keep[id] ?? null; }); return x; };
+        const pack = () => {
+            const chain = [...past, now, ...future], p = past.length, d = [];
+            for (let k = 0; k < chain.length - 1; k++) d.push(diff(chain[k], chain[k + 1], k < p ? chain[k] : chain[k + 1]));
+            return JSON.stringify({ v: 2, p, d });
+        };
         let txt = pack();
-        while (txt.length > WB_HIST_BYTES && chain.length > 2) { chain = chain.slice(1); txt = pack(); }
+        while (txt.length > WB_HIST_BYTES && (past.length || future.length)) { if (future.length > past.length) future.pop(); else past.shift(); txt = pack(); }
         const it = items[wbHistId(w)] || { id: wbHistId(w), kind: 'wbhist', workId: w, title: '', body: '' };
         if (it.d === txt) return;
         it.d = txt; it.deleted = false; touch(it);
-        wbHist.loaded = it.rev;
     };
     if (WB_HIST_NOW) run(); else { wbHistSave._t = setTimeout(run, WB_HIST_WAIT); wbHistSave._run = run; }
 }
@@ -4469,9 +4476,13 @@ function wbHistLoad() {
     const it = items[wbHistId(w)]; if (!it || it.deleted || !it.d) return;
     wbHist.loaded = it.rev;
     try {
-        const d = JSON.parse(it.d); let cur = wbSnap(); const list = [];
-        for (let k = d.length - 1; k >= 0; k--) { const prev = { ...cur }; Object.entries(d[k]).forEach(([id, v]) => { if (v == null) delete prev[id]; else prev[id] = v; }); list.unshift(prev); cur = prev; }
-        wbHist.undo = list;
+        let o = JSON.parse(it.d); if (Array.isArray(o)) o = { v: 2, p: o.length, d: o }; // 앞 판(되돌리기만 있던 기록)
+        const now = wbSnap(), step = (st, x) => { const n = { ...st }; Object.entries(x).forEach(([id, v]) => { if (v == null) delete n[id]; else n[id] = v; }); return n; };
+        const undo = []; let cur = now;
+        for (let k = o.p - 1; k >= 0; k--) { cur = step(cur, o.d[k]); undo.unshift(cur); }
+        const fut = []; cur = now;
+        for (let k = o.p; k < o.d.length; k++) { cur = step(cur, o.d[k]); fut.push(cur); }
+        wbHist.undo = undo; wbHist.redo = fut.reverse();
     } catch (_) {}
 }
 function wbPush() {
@@ -6342,11 +6353,11 @@ function noticeConflict(main, copy, mineCopied) {
 // 원고 충돌 규칙 (어느 쪽 글도 잃지 않게)
 //  - 지금 이 창에서 쓰는 중이면: 이쪽 글은 그대로, 상대 글은 사본으로
 //  - 쓰는 중이 아니면: 더 나중에 고친 쪽이 본문, 진 쪽이 자기 글을 사본으로 남김
-// 다른 기기 · 다른 창에서 화이트보드나 되돌리기 기록이 바뀌어 들어오면: 같이 쓰는 기록을 다시 읽음 (다시 하기는 비움)
+// 다른 기기 · 다른 창에서 화이트보드나 기록이 바뀌어 들어오면: 같이 쓰는 기록(되돌리기 · 다시 하기)을 다시 읽음
 function wbRemoteGuard(r) {
     if (!r || r.by === tabId || typeof wbHist === 'undefined' || r.workId !== wbHist.work) return;
     if (r.kind === 'wbhist') { wbHistLoad(); return; }
-    if (r.kind === 'note' || r.kind === 'wbframe') { wbHist.stale = true; wbHist.redo = []; }
+    if (r.kind === 'note' || r.kind === 'wbframe') wbHist.stale = true; // 곧 따라오는 기록을 받아 다시 읽음
 }
 function receiveItem(r) { const ok = receiveItemRaw(r); if (ok) wbRemoteGuard(r); return ok; }
 function receiveItemRaw(r) {

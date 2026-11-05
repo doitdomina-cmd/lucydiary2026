@@ -764,6 +764,22 @@ body.th-spiral .wb-cg button + button::before { border-left: 1.6px solid var(--s
 .fullboard .wb-chips .chip[data-f="*"]::after { content: ''; position: absolute; right: -6px; top: 22%; bottom: 22%; border-left: 1px solid color-mix(in srgb, var(--text) 18%, transparent); pointer-events: none; }
 body:is(.th-label, .th-polaroid) .fullboard .wb-chips .chip[data-f="*"]::after { border-left: 1.5px dashed var(--lb-dash); }
 body.th-spiral .fullboard .wb-chips .chip[data-f="*"]::after { border-left: 2px solid var(--sp-ink); top: 15%; bottom: 15%; }
+.wb-frame { position: absolute; z-index: 0; border-radius: 18px; background: color-mix(in srgb, var(--fc) 48%, transparent); border: 1.6px dashed color-mix(in srgb, var(--fc) 70%, #6b5a4a); }
+.wb-frame.dragging { box-shadow: 0 12px 30px rgba(0,0,0,.12); }
+.wfr-head { display: flex; align-items: center; gap: 4px; height: 40px; padding: 0 8px 0 10px; cursor: grab; touch-action: none; border-radius: 16px 16px 0 0; }
+.wfr-grip { color: rgba(0,0,0,.3); font-size: 14px; }
+.wfr-title { flex: 1; min-width: 40px; border: 0; outline: 0; background: transparent; font: 700 16px 'Pretendard', sans-serif; color: #3b3a33; padding: 4px 4px; border-radius: 6px; }
+.wfr-title:focus { background: rgba(255,255,255,.7); }
+.wfr-title::placeholder { color: rgba(60,50,40,.4); }
+.wfr-head button { width: 26px; height: 26px; border-radius: 7px; color: rgba(0,0,0,.45); display: inline-flex; align-items: center; justify-content: center; opacity: 0; transition: opacity .12s; font-size: 12px; }
+.wb-frame:hover .wfr-head button, .wfr-title:focus ~ button { opacity: 1; }
+@media (hover: none) { .wfr-head button { opacity: .8; } }
+.wfr-head button:hover { background: rgba(255,255,255,.75); color: #000; }
+.wfr-dot { width: 13px; height: 13px; border-radius: 50%; background: var(--fc); box-shadow: 0 0 0 1.5px rgba(0,0,0,.25); }
+.wfr-resize { position: absolute; right: 0; bottom: 0; width: 22px; height: 22px; cursor: nwse-resize; touch-action: none; border-radius: 0 0 16px 0; background: linear-gradient(135deg, transparent 55%, rgba(0,0,0,.18) 55%); }
+body.th-spiral .wb-frame { border: 2.5px solid var(--sp-ink); box-shadow: 4px 5px 0 rgba(31,45,39,.25); }
+body.th-spiral .wfr-title { font-family: 'Single Day', 'Gaegu', cursive; font-weight: 400; font-size: 20px; }
+body:is(.th-label, .th-polaroid) .wfr-title { font-family: var(--home-font, 'Gaegu'), cursive; font-size: 19px; }
 .wb-col { position: absolute; border-radius: 18px; background: color-mix(in srgb, var(--tc) 6%, transparent); border: 1.5px dashed color-mix(in srgb, var(--tc) 30%, transparent); pointer-events: none; z-index: 0; }
 .wb-col.dim { opacity: .3; filter: grayscale(1); }
 .wb-colhead { display: flex; align-items: center; gap: 6px; padding: 12px 14px 0; font-weight: 700; font-size: 15px; color: var(--tc); font-family: 'Pretendard', sans-serif; }
@@ -4391,8 +4407,9 @@ function wbFit(mode, quiet) {
     const view = wbView(mode), world = wbWorld(mode); if (!view || !view.clientWidth) return;
     const list = notesOfWork().filter(wbMatch);
     const def = mode === 'col' ? 0.8 : 1;
-    if (!list.length && !(wbLay(mode) === 'topic' && world && $('.wb-col', world))) { wbSetCam(mode, { x: 24, y: 24, z: def }); if (!quiet) wbApplyCam(mode); return; }
+    if (!list.length && !(world && $('.wb-col, .wb-frame', world))) { wbSetCam(mode, { x: 24, y: 24, z: def }); if (!quiet) wbApplyCam(mode); return; }
     const bs = list.map(n => wbBox(n, world));
+    if (world) $$('.wb-frame', world).forEach(c => bs.push({ x: c.offsetLeft, y: c.offsetTop, w: c.offsetWidth, h: c.offsetHeight }));
     if (wbLay(mode) === 'topic' && world) $$('.wb-col', world).forEach(c => bs.push({ x: c.offsetLeft, y: c.offsetTop, w: c.offsetWidth, h: c.offsetHeight })); // 주제별: 줄 이름까지 보이게
     const x0 = Math.min(...bs.map(b => b.x)), y0 = Math.min(...bs.map(b => b.y));
     const x1 = Math.max(...bs.map(b => b.x + b.w)), y1 = Math.max(...bs.map(b => b.y + b.h));
@@ -4414,7 +4431,7 @@ function wbFocusNote(mode, id) {
 /* 되돌리기 (보드 전체를 한 판씩 기억) */
 const wbHist = { undo: [], redo: [], work: null };
 function wbSnap() {
-    const m = {}; Object.values(items).forEach(i => { if (i.kind === 'note' && i.workId === curWorkId()) m[i.id] = JSON.stringify({ ...i, rev: 0, base: 0, by: 0 }); });
+    const m = {}; Object.values(items).forEach(i => { if ((i.kind === 'note' || i.kind === 'wbframe') && i.workId === curWorkId()) m[i.id] = JSON.stringify({ ...i, rev: 0, base: 0, by: 0 }); });
     return m;
 }
 function wbSame(a, b) { const ka = Object.keys(a), kb = Object.keys(b); return ka.length === kb.length && ka.every(k => a[k] === b[k]); }
@@ -4516,8 +4533,8 @@ function wbHead(mode) {
     const cnt = t => all.filter(n => (n.tag || '').trim() === t).length;
     const chips = `<div class="chips wb-chips"><button class="chip ${wbFilter === '*' ? 'on' : ''}" data-f="*">전체 ${all.length}</button>${tags.map(t => `<button class="chip ${wbFilter === t ? 'on' : ''}" data-f="${esc(t)}" style="--tc:${wbTagColor(t)}">${wbTopic(t) ? '' : '<i class="dot"></i>'}${wbTagHtml(t, true)} ${cnt(t)}</button>`).join('')}${none && tags.length ? `<button class="chip ${wbFilter === '' ? 'on' : ''}" data-f="">주제 없음 ${none}</button>` : ''}</div>`;
     const tools = `<button class="mini" data-b="undo" title="되돌리기 (Ctrl+Z)"><i class="ic ic-undo-2"></i></button><button class="mini" data-b="redo" title="다시 하기 (Ctrl+Shift+Z)"><i class="ic ic-redo-2"></i></button>
-        <button class="mini" data-b="add" title="새 포스트잇">＋메모</button><button class="mini" data-b="add-char" title="시놉 보드의 내 캐릭터로 명함 붙이기"><i class="ic ic-user"></i> 캐릭터</button><button class="mini" data-b="add-img" title="사진 포스트잇">＋사진</button>
-        <button class="mini" data-b="style" title="보드 꾸미기 (글꼴 · 글자 크기 · 배경)"><i class="ic ic-palette"></i> 꾸미기</button><button class="mini" data-b="fit" title="모든 메모가 한 화면에 보이게 맞추기"><i class="ic ic-target"></i> 전체 보기</button>`;
+        <button class="mini" data-b="add" title="새 포스트잇">＋메모</button><button class="mini" data-b="add-char" title="시놉 보드의 내 캐릭터로 명함 붙이기"><i class="ic ic-user"></i> 캐릭터</button><button class="mini" data-b="add-img" title="사진 포스트잇">＋사진</button><button class="mini" data-b="add-frame" title="메모를 모아 둘 묶음 상자 만들기"><i class="ic ic-square"></i> 묶음</button>
+        <button class="mini" data-b="style" title="보드 꾸미기 (글꼴 · 글자 크기 · 배경)"><i class="ic ic-palette"></i> 꾸미기</button><button class="mini" data-b="fit" title="모든 메모가 한 화면에 보이게 맞추기"><i class="ic ic-target"></i> 전체 보기</button><button class="mini" data-b="png" title="화이트보드를 사진(PNG)으로 저장"><i class="ic ic-file-down"></i> 사진 저장</button>`;
     const L = wbLay(mode);
     const lay = `<span class="wb-lay" title="보기 방식"><button class="${L === 'free' ? 'on' : ''}" data-lay="free" title="내가 놓은 자리 그대로">원래대로</button><button class="${L === 'topic' ? 'on' : ''}" data-lay="topic" title="주제마다 한 줄로 모아 보기 (끌어서 다른 줄에 놓으면 주제가 바뀌어요)">주제별</button></span>`;
     if (mode === 'full') return `<div class="fb-left"><b class="wb-title"><i class="ic ic-layout-dashboard"></i> 화이트보드</b>${lay}${chips}</div><span class="bh-tools">${tools}<button class="mini" data-b="close" title="닫기 (Esc)">✕</button></span>`;
@@ -4534,7 +4551,8 @@ function drawBoard(mode) {
     wbApplyStyle();
     const list = notesOfWork();
     if (wbSel[mode] && !get(wbSel[mode])) wbSel[mode] = null;
-    world.innerHTML = '<svg class="wb-lines"></svg>' + list.map(n => piHtml(n, mode)).join('');
+    const frames = mode === 'full' && wbLay(mode) === 'free' ? framesOfWork() : [];
+    world.innerHTML = frames.map(frameHtml).join('') + '<svg class="wb-lines"></svg>' + list.map(n => piHtml(n, mode)).join('');
     $$('textarea', world).forEach(autoGrow);
     view._wbShown = !!view.clientWidth;
     fillImages(world);
@@ -4549,10 +4567,166 @@ function drawBoard(mode) {
         view.appendChild(ui);
     }
     const empty = $('.wb-empty', ui);
-    empty.classList.toggle('hidden', !!list.length);
+    empty.classList.toggle('hidden', !!list.length || !!frames.length);
     empty.innerHTML = '빈 곳을 <b>두 번 누르면</b> 포스트잇이 생겨요.<br>포스트잇 오른쪽 동그라미를 끌어 다른 메모에 놓으면 선으로 이어져요.<br>포스트잇마다 <b>캐릭터 · 배경 · ☆ 회심 장면</b> 주제를 달아 모아 볼 수 있어요.';
     wbDrawLines(mode);
     wbApplyCam(mode);
+}
+/* 묶음 상자 (넓게 보기에서만): 'wbframe' 아이템 { title, gx, gy, w, h, color }
+   - 머리를 끌면 상자와 안에 든 포스트잇이 같이 움직임 · 오른쪽 아래를 끌면 크기 조절 */
+const WB_FRAME_COLORS = ['#f6d6d9', '#d6ecdf', '#d8e4f6', '#fbe9bd', '#e5daf3', '#e7e3db'];
+const framesOfWork = () => ofWork('wbframe');
+function frameHtml(f) {
+    return `<div class="wb-frame" data-frame="${f.id}" style="left:${f.gx}px;top:${f.gy}px;width:${f.w}px;height:${f.h}px;--fc:${esc(f.color || WB_FRAME_COLORS[0])}">
+        <div class="wfr-head" title="끌어서 상자째 옮기기 (안의 메모도 같이)"><span class="wfr-grip">⠿</span><input class="wfr-title" data-id="${f.id}" data-field="title" value="${esc(f.title || '')}" placeholder="묶음 이름" maxlength="40">
+            <button data-fr="color" title="상자 색 바꾸기"><i class="wfr-dot"></i></button><button data-fr="del" title="상자 지우기 (안의 메모는 그대로)">✕</button></div>
+        <div class="wfr-resize" title="끌어서 크기 조절"></div></div>`;
+}
+function addFrame(mode) {
+    const view = wbView(mode); if (!view) return;
+    const c = wbCam(mode) || { x: 0, y: 0, z: 1 };
+    const w = 520, h = 340;
+    const at = { x: (view.clientWidth / 2 - c.x) / c.z - w / 2, y: (view.clientHeight / 2 - c.y) / c.z - h / 2 };
+    wbPush();
+    const f = create('wbframe', { workId: curWorkId(), title: '', gx: Math.round(at.x), gy: Math.round(at.y), w, h, color: WB_FRAME_COLORS[framesOfWork().length % WB_FRAME_COLORS.length] });
+    renderNotes();
+    $(`.fullboard [data-frame="${f.id}"] .wfr-title`)?.focus({ preventScroll: true });
+    toast('묶음 상자를 만들었어요. 머리를 끌면 안의 메모까지 같이 옮겨져요.');
+}
+function frameClick(e) {
+    const b = e.target.closest('[data-fr]'); if (!b) return;
+    const f = get(b.closest('[data-frame]')?.dataset.frame); if (!f) return;
+    if (b.dataset.fr === 'color') { wbPush(); f.color = WB_FRAME_COLORS[(WB_FRAME_COLORS.indexOf(f.color) + 1) % WB_FRAME_COLORS.length]; touch(f); b.closest('.wb-frame').style.setProperty('--fc', f.color); }
+    if (b.dataset.fr === 'del') {
+        wbPush(); f.deleted = true; touch(f); renderNotes();
+        toast('묶음 상자를 지웠어요. 안의 메모는 그대로예요.', '되돌리기', () => { f.deleted = false; touch(f); renderNotes(); });
+    }
+}
+
+/* 화이트보드를 사진(PNG)으로 저장: 보드 위 모든 메모 · 선 · 묶음 상자를 그대로 그림 */
+function wbRR(g, x, y, w, h, r) { r = Math.min(r, w / 2, h / 2); g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+function wbWrap(g, text, maxW) {
+    const out = [];
+    String(text || '').split('\n').forEach(par => {
+        let line = '';
+        const words = par.split(/(\s+)/);
+        words.forEach(wd => {
+            if (g.measureText(line + wd).width <= maxW || !line.trim()) {
+                if (g.measureText(line + wd).width <= maxW) { line += wd; return; }
+            }
+            if (line.trim() && g.measureText(line + wd).width > maxW) { out.push(line.trimEnd()); line = wd.trimStart(); }
+            while (g.measureText(line).width > maxW && line.length > 1) { // 아주 긴 낱말은 글자 단위로
+                let k = line.length; while (k > 1 && g.measureText(line.slice(0, k)).width > maxW) k--;
+                out.push(line.slice(0, k)); line = line.slice(k);
+            }
+        });
+        out.push(line);
+    });
+    return out;
+}
+// 테이프 무늬 (화면과 같은 줄무늬 4가지 + 반투명 2가지)
+function wbTapeFill(g, k) {
+    const st = [['rgba(236,128,138,.82)', 'rgba(255,252,250,.82)'], ['rgba(96,186,148,.8)', 'rgba(250,255,252,.82)'], ['rgba(98,156,226,.8)', 'rgba(250,252,255,.82)'], ['rgba(238,192,72,.85)', 'rgba(255,253,245,.85)']][k];
+    if (!st) return k === 4 ? 'rgba(160,218,196,.72)' : 'rgba(247,196,206,.75)';
+    const c = document.createElement('canvas'); c.width = c.height = 12; const t = c.getContext('2d');
+    t.fillStyle = st[1]; t.fillRect(0, 0, 12, 12); t.strokeStyle = st[0]; t.lineWidth = 4.3;
+    [-12, 0, 12].forEach(o => { t.beginPath(); t.moveTo(o, 0); t.lineTo(o + 12, 12); t.stroke(); });
+    return g.createPattern(c, 'repeat');
+}
+function wbFont(el) { const cs = getComputedStyle(el); return `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`; }
+function wbColor(g, v, fb) { g.fillStyle = fb; try { g.fillStyle = v; } catch (_) {} return g.fillStyle; }
+async function wbExportPng(mode) {
+    const world = wbWorld(mode), view = wbView(mode); if (!world || !view) return;
+    const pis = $$('.pi', world), frs = $$('.wb-frame', world);
+    if (!pis.length && !frs.length) { toast('사진으로 저장할 메모가 없어요.'); return; }
+    toast('사진으로 만드는 중이에요…');
+    try { await document.fonts.ready; } catch (_) {}
+    const box = el => ({ x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight });
+    const all = [...pis, ...frs].map(box);
+    const pad = 48, x0 = Math.min(...all.map(b => b.x)) - pad, y0 = Math.min(...all.map(b => b.y)) - pad;
+    const x1 = Math.max(...all.map(b => b.x + b.w)) + pad, y1 = Math.max(...all.map(b => b.y + b.h)) + pad;
+    const W = x1 - x0, H = y1 - y0, S = Math.max(1, Math.min(2, Math.sqrt(16e6 / (W * H)))); // 너무 큰 보드는 크기를 줄여서
+    const cv = document.createElement('canvas'); cv.width = Math.round(W * S); cv.height = Math.round(H * S);
+    const g = cv.getContext('2d'); g.scale(S, S); g.translate(-x0, -y0);
+    // 사진 미리 불러오기
+    const imgs = {};
+    await Promise.all($$('img[data-img]', world).map(im => new Promise(res => { const it = items[im.dataset.img]; if (!it || !it.data) return res(); const I = new Image(); I.onload = () => { imgs[im.dataset.img] = I; res(); }; I.onerror = res; I.src = it.data; })));
+    // 바탕 (보드와 같은 색 + 점)
+    const bgc = getComputedStyle(view).backgroundColor;
+    wbColor(g, bgc && bgc !== 'rgba(0, 0, 0, 0)' ? bgc : '#fdfdfb', '#fdfdfb'); g.fillRect(x0, y0, W, H);
+    g.fillStyle = 'rgba(60,70,60,.16)';
+    for (let x = Math.ceil(x0 / 22) * 22; x < x1; x += 22) for (let y = Math.ceil(y0 / 22) * 22; y < y1; y += 22) { g.beginPath(); g.arc(x, y, 1.1, 0, 7); g.fill(); }
+    // 묶음 상자
+    frs.forEach(el => {
+        const f = get(el.dataset.frame), b = box(el); if (!f) return;
+        g.save(); g.globalAlpha = .5; wbColor(g, f.color, '#eee'); wbRR(g, b.x, b.y, b.w, b.h, 18); g.fill(); g.restore();
+        g.save(); g.setLineDash([7, 6]); g.lineWidth = 1.6; g.strokeStyle = 'rgba(60,50,40,.35)'; wbRR(g, b.x, b.y, b.w, b.h, 18); g.stroke(); g.restore();
+        const t = $('.wfr-title', el); g.font = wbFont(t); g.fillStyle = '#3b3a33'; g.textBaseline = 'middle';
+        g.fillText(t.value || f.title || '', b.x + t.offsetLeft + t.parentElement.offsetLeft, b.y + t.parentElement.offsetTop + t.parentElement.offsetHeight / 2);
+    });
+    // 선
+    const bx = {}; pis.forEach(el => { bx[el.dataset.note] = box(el); });
+    notesOfWork().forEach(n => (n.links || []).forEach(l => {
+        const a = bx[n.id], b = bx[l.to]; if (!a || !b || !get(l.to)) return;
+        const p = wbEdge(a, b.x + b.w / 2, b.y + b.h / 2), q = wbEdge(b, a.x + a.w / 2, a.y + a.h / 2), L = wbLineStyle(l), st = l.st || 'solid';
+        g.save(); g.strokeStyle = L.c; g.lineWidth = st === 'dot' ? L.w + 1.4 : L.w; g.lineCap = 'round';
+        g.setLineDash(st === 'dash' ? [9, 6] : st === 'dot' ? [0.1, 6] : []);
+        g.beginPath(); g.moveTo(p.x, p.y); g.lineTo(q.x, q.y); g.stroke(); g.setLineDash([]);
+        g.fillStyle = L.c; [p, q].forEach(o => { g.beginPath(); g.arc(o.x, o.y, L.w < 1 ? 2.4 : 3.5, 0, 7); g.fill(); });
+        if (l.t) {
+            g.font = "400 12px 'Pretendard', sans-serif"; const tw = g.measureText(l.t).width, mx = (p.x + q.x) / 2, my = (p.y + q.y) / 2;
+            g.fillStyle = '#fff'; g.strokeStyle = '#c9d0ca'; g.lineWidth = 1; wbRR(g, mx - tw / 2 - 6, my - 10, tw + 12, 20, 9); g.fill(); g.stroke();
+            g.fillStyle = '#3d4a42'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(l.t, mx, my + .5);
+        }
+        g.restore();
+    }));
+    // 포스트잇 (겹친 순서대로)
+    const S2 = wbStyle(), radius = { paper: 4, round: 18, fold: 3, lined: 4 }[S2.shape] ?? 4;
+    pis.map(el => [el, get(el.dataset.note)]).filter(([, n]) => n).sort((a, b) => (a[1].z || 1) - (b[1].z || 1)).forEach(([el, n]) => {
+        const b = box(el);
+        g.save();
+        if (S2.tilt) { const cx = b.x + b.w / 2, cy = b.y + b.h / 2; g.translate(cx, cy); g.rotate(wbTilt(n.id) * Math.PI / 180); g.translate(-cx, -cy); }
+        g.save(); g.shadowColor = 'rgba(40,40,30,.18)'; g.shadowBlur = 14; g.shadowOffsetY = 5;
+        wbColor(g, n.color || WB_COLORS[0], '#fff1a8'); wbRR(g, b.x, b.y, b.w, b.h, radius); g.fill(); g.restore();
+        if (S2.shape === 'lined') { g.strokeStyle = 'rgba(70,100,150,.2)'; g.lineWidth = 1; const lh = (S2.size || 13) * 1.6; for (let y = b.y + 30 + lh; y < b.y + b.h - 6; y += lh) { g.beginPath(); g.moveTo(b.x, y); g.lineTo(b.x + b.w, y); g.stroke(); } }
+        if (S2.tape) { g.save(); const tp = wbTape(n.id); g.translate(b.x + b.w * tp.x / 100, b.y); g.rotate(tp.r * Math.PI / 180); g.fillStyle = wbTapeFill(g, tp.k); g.fillRect(-31, -9, 62, 20); g.restore(); }
+        const rel = (e2) => { let x = 0, y = 0, c = e2; while (c && c !== el) { x += c.offsetLeft; y += c.offsetTop; c = c.offsetParent; } return { x: b.x + x, y: b.y + y, w: e2.offsetWidth, h: e2.offsetHeight }; };
+        // 주제 칩
+        const tag = $('.pi-tag:not(.none)', el);
+        if (tag) {
+            const r = rel(tag), cs = getComputedStyle(tag);
+            wbColor(g, cs.backgroundColor, 'rgba(255,255,255,.7)'); wbRR(g, r.x, r.y, r.w, r.h, r.h / 2); g.fill();
+            g.font = wbFont(tag); wbColor(g, cs.color, '#2f8a6a'); g.textBaseline = 'middle'; g.textAlign = 'center';
+            g.fillText(tag.textContent.trim(), r.x + r.w / 2, r.y + r.h / 2 + .5); g.textAlign = 'left';
+        }
+        if (n.tag === '☆') { g.fillStyle = '#ffb400'; g.beginPath(); g.arc(b.x + b.w - 5, b.y + 3, 13, 0, 7); g.fill(); g.fillStyle = '#fff'; g.font = "700 15px 'Pretendard', sans-serif"; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('★', b.x + b.w - 5, b.y + 4); g.textAlign = 'left'; }
+        // 캐릭터 명함
+        const card = $('.pi-card', el);
+        if (card) {
+            const ph = $('.pc-photo', card), r = rel(ph), I = n.chImg && imgs[n.chImg];
+            g.save(); g.beginPath(); g.arc(r.x + r.w / 2, r.y + r.h / 2, r.w / 2, 0, 7); g.closePath();
+            g.fillStyle = '#ddeee6'; g.fill(); g.clip();
+            if (I) { const k = Math.max(r.w / I.width, r.h / I.height), iw = I.width * k, ih = I.height * k, oy = ((n.ch?.y ?? 50) / 100) * (ih - r.h); g.drawImage(I, r.x + (r.w - iw) / 2, r.y - oy, iw, ih); }
+            g.restore();
+            ['small', 'b', 'em'].forEach(t => { const e2 = $('.pc-info ' + t, card); if (!e2 || !e2.textContent) return; const r2 = rel(e2), cs = getComputedStyle(e2); g.font = wbFont(e2); wbColor(g, cs.color, '#23261f'); g.textBaseline = 'middle'; g.fillText(e2.textContent, r2.x, r2.y + r2.h / 2, r2.w + 4); });
+        }
+        // 사진
+        $$(':scope > img[data-img]', el).forEach(im => { const I = imgs[im.dataset.img], r = rel(im); if (I && r.w) g.drawImage(I, r.x, r.y, r.w, r.h); });
+        // 글
+        const ta = $('textarea', el);
+        if (ta && ta.value) {
+            const r = rel(ta), cs = getComputedStyle(ta), pl = parseFloat(cs.paddingLeft), pr = parseFloat(cs.paddingRight), pt = parseFloat(cs.paddingTop);
+            const lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.6, maxW = r.w - pl - pr;
+            g.font = wbFont(ta); wbColor(g, cs.color, '#2b2a26'); g.textBaseline = 'middle';
+            const al = cs.textAlign; g.textAlign = al === 'center' ? 'center' : al === 'right' || al === 'end' ? 'right' : 'left';
+            const tx = al === 'center' ? r.x + pl + maxW / 2 : g.textAlign === 'right' ? r.x + pl + maxW : r.x + pl;
+            wbWrap(g, ta.value, maxW).forEach((line, i) => g.fillText(line, tx, r.y + pt + lh * i + lh / 2));
+            g.textAlign = 'left';
+        }
+        g.restore();
+    });
+    const name = (get(curWorkId())?.title || '작품') + '_화이트보드.png';
+    cv.toBlob(bl => { if (!bl) { toast('사진을 만들지 못했어요. 보드가 너무 크면 메모를 조금 모아 주세요.'); return; } download(name, bl, 'image/png'); }, 'image/png');
 }
 // 주제별 보기: 주제마다 세로 한 줄 (캐릭터 · 배경 · 회심 · 다른 주제 · 주제 없음)
 function wbTopicLayout(world) {
@@ -4850,6 +5024,8 @@ function wbHeadClick(e, mode) {
     if (b === 'add') addNote(mode);
     if (b === 'add-img') { $('#file-img').dataset.forBoard = mode; $('#file-img').click(); }
     if (b === 'add-char') wbCharPop(bt, mode);
+    if (b === 'add-frame') { if (wbLay(mode) === 'topic') { wbSetLay('free'); renderNotes(); } addFrame(mode); }
+    if (b === 'png') wbExportPng(mode);
     if (b === 'undo' || b === 'redo') wbUndo(b === 'redo');
     if (b === 'style') wbStylePop(bt);
     if (b === 'fit') wbFit(mode);
@@ -4909,7 +5085,7 @@ function wbBind(view, mode) {
     const ptrs = new Map();
     let op = null, lastTap = null;
     const local = e => { const r = view.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
-    view.addEventListener('click', e => { if (e.target.closest('.wb-float')) wbFloatClick(e, mode); });
+    view.addEventListener('click', e => { if (e.target.closest('.wb-float')) wbFloatClick(e, mode); if (e.target.closest('[data-fr]')) frameClick(e); });
     view.addEventListener('wheel', e => {
         if (e.target.closest('.pi textarea:focus') && !e.ctrlKey) return;
         e.preventDefault();
@@ -4932,6 +5108,20 @@ function wbBind(view, mode) {
         const el = e.target.closest('.pi'), ln = e.target.closest('.wb-ln');
         closePop();
         if (ln) { e.preventDefault(); op = { kind: 'link-tap', key: ln.dataset.link, p }; return; }
+        const ae = document.activeElement;
+        if (ae && ae.matches && ae.matches('.wfr-title') && !e.target.closest('.wfr-title')) ae.blur();
+        const fr = !el && e.target.closest('.wb-frame');
+        if (fr && (e.target.closest('.wfr-head') || e.target.closest('.wfr-resize'))) {
+            if (e.target.closest('input, button')) { op = null; return; } // 이름 쓰기 · 단추는 그대로
+            e.preventDefault();
+            const f = get(fr.dataset.frame); if (!f) return;
+            const fb = { x: fr.offsetLeft, y: fr.offsetTop, w: fr.offsetWidth, h: fr.offsetHeight };
+            const kind = e.target.closest('.wfr-resize') ? 'fresize' : 'fmove';
+            const mem = kind === 'fmove' ? $$('.pi', view).filter(pe => { const cx = pe.offsetLeft + pe.offsetWidth / 2, cy = pe.offsetTop + pe.offsetHeight / 2; return cx > fb.x && cx < fb.x + fb.w && cy > fb.y && cy < fb.y + fb.h; }).map(pe => ({ el: pe, x0: pe.offsetLeft, y0: pe.offsetTop })) : [];
+            op = { kind, fr, f, p, moved: false, x0: fb.x, y0: fb.y, w0: fb.w, h0: fb.h, z: c.z, mem };
+            try { view.setPointerCapture(e.pointerId); } catch (_) {}
+            return;
+        }
         if (!el) {
             if (wbSel[mode] || wbSel.link) { document.activeElement?.closest?.('.pi') && document.activeElement.blur(); }
             e.preventDefault();
@@ -4965,9 +5155,17 @@ function wbBind(view, mode) {
         if (!op.moved) {
             op.moved = true;
             if (op.kind === 'move' || op.kind === 'resize') { wbPush(); op.el.classList.add('dragging'); op.el.style.zIndex = 9999; }
+            if (op.kind === 'fmove' || op.kind === 'fresize') { wbPush(); op.fr.classList.add('dragging'); }
             if (op.kind !== 'pan') { wbBusy = true; wbPlaceFloat(mode); }
         }
         if (op.kind === 'pan') { wbSetCam(mode, { x: op.c0.x + dx, y: op.c0.y + dy, z: op.c0.z }); wbApplyCam(mode); }
+        if (op.kind === 'fmove') {
+            const ddx = Math.round(dx / op.z), ddy = Math.round(dy / op.z);
+            op.fr.style.left = (op.x0 + ddx) + 'px'; op.fr.style.top = (op.y0 + ddy) + 'px';
+            op.mem.forEach(m => { m.el.style.left = (m.x0 + ddx) + 'px'; m.el.style.top = (m.y0 + ddy) + 'px'; });
+            wbDrawLines(mode);
+        }
+        if (op.kind === 'fresize') { op.fr.style.width = Math.max(180, Math.round(op.w0 + dx / op.z)) + 'px'; op.fr.style.height = Math.max(120, Math.round(op.h0 + dy / op.z)) + 'px'; }
         if (op.kind === 'move') { op.el.style.left = Math.round(op.x0 + dx / op.z) + 'px'; op.el.style.top = Math.round(op.y0 + dy / op.z) + 'px'; wbDrawLines(mode); }
         if (op.kind === 'resize') {
             op.el.style.width = Math.max(110, Math.round(op.w0 + dx / op.z)) + 'px';
@@ -5004,6 +5202,17 @@ function wbBind(view, mode) {
             }
             lastTap = { t: now, x: p.x, y: p.y };
             if (wbSel[mode] || wbSel.link) { wbSel.link = null; wbSelect(mode, null); wbDrawLines(mode); }
+            return;
+        }
+        if (o.kind === 'fmove' || o.kind === 'fresize') {
+            o.fr.classList.remove('dragging');
+            if (!o.moved) return;
+            const f = o.f;
+            if (o.kind === 'fmove') { f.gx = o.fr.offsetLeft; f.gy = o.fr.offsetTop; o.mem.forEach(m => { const n2 = get(m.el.dataset.note); if (n2) { n2.gx = m.el.offsetLeft; n2.gy = m.el.offsetTop; touch(n2); } }); }
+            else { f.w = o.fr.offsetWidth; f.h = o.fr.offsetHeight; }
+            touch(f);
+            if (o.mem && o.mem.length) renderBoard();
+            wbDrawLines(mode); wbPlaceBar(mode);
             return;
         }
         const n = o.n;

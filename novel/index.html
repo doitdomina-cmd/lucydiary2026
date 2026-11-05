@@ -659,8 +659,8 @@ body.tw-ov .manuscript[contenteditable="true"] { caret-color: transparent; }
 .pi.star { border-color: rgba(255,180,0,.55); }
 .pi.sel { border-color: #2f7d6d; box-shadow: 0 0 0 2px rgba(47,125,109,.25), 0 10px 22px -6px rgba(40,50,40,.3); }
 .pi.link-target { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(106,161,47,.35); }
-.pi.dim { filter: grayscale(1) brightness(1.04); opacity: .4; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
-.pi.dim .pi-tape { opacity: .5; }
+.pi.dim { filter: grayscale(1) contrast(.55) brightness(1.12); opacity: .32; box-shadow: none; }
+.pi.dim .pi-tape, .pi.dim .pi-star { opacity: .4; }
 .wb-chips .chip.on[style*="--tc"] { background: color-mix(in srgb, var(--tc) 14%, var(--panel)); border-color: var(--tc); color: var(--tc); font-weight: 700; }
 .pi.flash { animation: wbflash 1.2s; }
 @keyframes wbflash { 0%, 60% { box-shadow: 0 0 0 6px rgba(47,125,109,.45); } }
@@ -714,6 +714,17 @@ body.tw-ov .manuscript[contenteditable="true"] { caret-color: transparent; }
 .wf-topics button b .ic { background-color: #fff; width: 16px !important; height: 16px !important; }
 .wf-topics button:hover { background: color-mix(in srgb, var(--tc) 11%, var(--panel)); }
 .wf-topics button.on { border-color: var(--tc); background: color-mix(in srgb, var(--tc) 16%, var(--panel)); }
+.wb-lay { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 2px; background: var(--panel); flex: none; margin-left: 6px; }
+.wb-lay button { font-size: 11.5px; padding: 3px 10px; border-radius: 999px; color: var(--muted); white-space: nowrap; }
+.wb-lay button.on { background: #2f7d6d; color: #fff; font-weight: 700; }
+.wb-col { position: absolute; border-radius: 18px; background: color-mix(in srgb, var(--tc) 6%, transparent); border: 1.5px dashed color-mix(in srgb, var(--tc) 30%, transparent); pointer-events: none; z-index: 0; }
+.wb-col.dim { opacity: .3; filter: grayscale(1); }
+.wb-colhead { display: flex; align-items: center; gap: 6px; padding: 12px 14px 0; font-weight: 700; font-size: 15px; color: var(--tc); font-family: 'Pretendard', sans-serif; }
+.wb-colhead b { width: 26px; height: 26px; border-radius: 50%; background: var(--tc); display: flex; align-items: center; justify-content: center; }
+.wb-colhead b .ic { background-color: #fff; width: 15px; height: 15px; }
+.wb-colhead small { font-weight: 400; color: var(--muted); font-size: 12px; }
+.wb-colempty { margin: 40px 14px 0; text-align: center; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.lay-topic .pi { transform: none; }
 @media (max-width: 760px) {
     .wb-float { padding: 2px 4px 4px; border-radius: 12px; }
     .wf-fmt { padding: 1px 0 3px; margin-bottom: 4px; }
@@ -3994,7 +4005,9 @@ function wbMigrate() {
 }
 
 /* 화면 위치·배율 (기기마다) */
-function wbCamKey(mode) { return curWorkId() + ':' + mode; }
+function wbLay() { return (pref.wbLay || {})[curWorkId()] === 'topic' ? 'topic' : 'free'; }
+function wbSetLay(v) { pref.wbLay = { ...(pref.wbLay || {}), [curWorkId()]: v }; savePref(); }
+function wbCamKey(mode) { return curWorkId() + ':' + mode + (wbLay() === 'topic' ? ':topic' : ''); }
 function wbCam(mode) { pref.wbCam ??= {}; return pref.wbCam[wbCamKey(mode)] || null; }
 function wbSetCam(mode, c) {
     pref.wbCam ??= {}; pref.wbCam[wbCamKey(mode)] = { x: Math.round(c.x), y: Math.round(c.y), z: Math.round(c.z * 1000) / 1000 };
@@ -4034,8 +4047,9 @@ function wbFit(mode, quiet) {
     const view = wbView(mode), world = wbWorld(mode); if (!view || !view.clientWidth) return;
     const list = notesOfWork().filter(wbMatch);
     const def = mode === 'col' ? 0.8 : 1;
-    if (!list.length) { wbSetCam(mode, { x: 24, y: 24, z: def }); if (!quiet) wbApplyCam(mode); return; }
+    if (!list.length && !(wbLay() === 'topic' && world && $('.wb-col', world))) { wbSetCam(mode, { x: 24, y: 24, z: def }); if (!quiet) wbApplyCam(mode); return; }
     const bs = list.map(n => wbBox(n, world));
+    if (wbLay() === 'topic' && world) $$('.wb-col', world).forEach(c => bs.push({ x: c.offsetLeft, y: c.offsetTop, w: c.offsetWidth, h: c.offsetHeight })); // 주제별: 줄 이름까지 보이게
     const x0 = Math.min(...bs.map(b => b.x)), y0 = Math.min(...bs.map(b => b.y));
     const x1 = Math.max(...bs.map(b => b.x + b.w)), y1 = Math.max(...bs.map(b => b.y + b.h));
     const pad = 30, vw = view.clientWidth, vh = view.clientHeight;
@@ -4139,8 +4153,10 @@ function wbHead(mode) {
     const tools = `<button class="mini" data-b="add" title="새 포스트잇">＋메모</button><button class="mini" data-b="add-img" title="사진 포스트잇">＋사진</button>
         <button class="mini" data-b="undo" title="되돌리기 (Ctrl+Z)"><i class="ic ic-undo-2"></i></button><button class="mini" data-b="redo" title="다시 하기 (Ctrl+Shift+Z)"><i class="ic ic-redo-2"></i></button>
         <button class="mini" data-b="list" title="주제별 목록에서 찾기"><i class="ic ic-layout-list"></i> 목록</button><button class="mini" data-b="style" title="보드 꾸미기 (글꼴 · 글자 크기 · 배경)"><i class="ic ic-palette"></i> 꾸미기</button><button class="mini" data-b="more" title="더 보기">⋯</button>`;
-    if (mode === 'full') return `<div class="fb-left"><b class="wb-title"><i class="ic ic-layout-dashboard"></i> 화이트보드</b>${chips}</div><span class="bh-tools">${tools}<button class="mini" data-b="close" title="닫기 (Esc)">✕</button></span>`;
-    return `<div class="bh-row"><b class="wb-title"><i class="ic ic-layout-dashboard"></i> 화이트보드</b><span style="flex:1"></span><button class="mini" data-b="full" title="넓게 보기"><i class="ic ic-maximize-2"></i> 넓게</button></div>${chips}<span class="bh-tools">${tools}</span>`;
+    const L = wbLay();
+    const lay = `<span class="wb-lay" title="보기 방식"><button class="${L === 'free' ? 'on' : ''}" data-lay="free" title="내가 놓은 자리 그대로">원래대로</button><button class="${L === 'topic' ? 'on' : ''}" data-lay="topic" title="주제마다 한 줄로 모아 보기 (끌어서 다른 줄에 놓으면 주제가 바뀌어요)">주제별</button></span>`;
+    if (mode === 'full') return `<div class="fb-left"><b class="wb-title"><i class="ic ic-layout-dashboard"></i> 화이트보드</b>${lay}${chips}</div><span class="bh-tools">${tools}<button class="mini" data-b="close" title="닫기 (Esc)">✕</button></span>`;
+    return `<div class="bh-row"><b class="wb-title"><i class="ic ic-layout-dashboard"></i> 화이트보드</b>${lay}<span style="flex:1"></span><button class="mini" data-b="full" title="넓게 보기"><i class="ic ic-maximize-2"></i> 넓게</button></div>${chips}<span class="bh-tools">${tools}</span>`;
 }
 function drawBoard(mode) {
     const view = wbView(mode), world = wbWorld(mode); if (!view || !world) return;
@@ -4154,7 +4170,9 @@ function drawBoard(mode) {
     $$('textarea', world).forEach(autoGrow);
     view._wbShown = !!view.clientWidth;
     fillImages(world);
-    $$('img', world).forEach(img => { if (!img.complete) img.addEventListener('load', () => wbDrawLines(mode), { once: true }); });
+    view.classList.toggle('lay-topic', wbLay() === 'topic');
+    if (wbLay() === 'topic') wbTopicLayout(world);
+    $$('img', world).forEach(img => { if (!img.complete) img.addEventListener('load', () => { if (wbLay() === 'topic') wbTopicLayout(world); wbDrawLines(mode); }, { once: true }); });
     let ui = $('.wb-ui', view);
     if (!ui) {
         ui = document.createElement('div'); ui.className = 'wb-ui';
@@ -4167,6 +4185,32 @@ function drawBoard(mode) {
     empty.innerHTML = '빈 곳을 <b>두 번 누르면</b> 포스트잇이 생겨요.<br>포스트잇 오른쪽 동그라미를 끌어 다른 메모에 놓으면 선으로 이어져요.<br>포스트잇마다 <b>캐릭터 · 배경 · ☆ 회심 장면</b> 주제를 달아 모아 볼 수 있어요.';
     wbDrawLines(mode);
     wbApplyCam(mode);
+}
+// 주제별 보기: 주제마다 세로 한 줄 (캐릭터 · 배경 · 회심 · 다른 주제 · 주제 없음)
+function wbTopicLayout(world) {
+    $$('.wb-col', world).forEach(x => x.remove());
+    const all = notesOfWork(), els = {};
+    $$('.pi', world).forEach(el => { els[el.dataset.note] = el; });
+    const others = wbTags().filter(t => !wbTopic(t));
+    const keys = [...WB_TOPICS.map(x => x.t), ...others, ''];
+    const groups = keys.map(k => [k, all.filter(n => (n.tag || '').trim() === k)]).filter(([k, l]) => l.length || wbTopic(k));
+    let x = 0, html = '';
+    const cols = [];
+    groups.forEach(([k, list]) => {
+        list.sort((a, b) => ((a.gy || 0) - (b.gy || 0)) || ((a.gx || 0) - (b.gx || 0)));
+        const w = Math.max(WB_W, ...list.map(n => els[n.id]?.offsetWidth || 0));
+        let y = 64;
+        list.forEach(n => { const el = els[n.id]; if (!el) return; el.style.left = x + 'px'; el.style.top = y + 'px'; y += el.offsetHeight + 24; });
+        const tp = wbTopic(k), c = k ? wbTagColor(k) : '#8a8f84';
+        const dim = wbFilter !== '*' && wbFilter !== k ? ' dim' : '';
+        html += `<div class="wb-col${dim}" data-col="${esc(k)}" style="left:${x - 16}px;top:-14px;width:${w + 32}px;height:${Math.max(y, 260) + 6}px;--tc:${c}">
+            <div class="wb-colhead">${tp ? `<b><i class="ic ic-${tp.icon}"></i></b>${esc(tp.name)}` : `<i class="dot"></i>${esc(k || '주제 없음')}`}<small>${list.length}</small></div>
+            ${list.length ? '' : '<div class="wb-colempty">포스트잇을 여기로 끌어 오면<br>이 주제가 붙어요</div>'}</div>`;
+        cols.push({ k, x0: x - 35, x1: x + w + 35 });
+        x += w + 70;
+    });
+    world.insertAdjacentHTML('afterbegin', html);
+    world._cols = cols;
 }
 function renderBoard() {
     $('#col-notes').classList.remove('no-board');
@@ -4374,6 +4418,8 @@ async function addImageNote(file, mode, at, noteId) {
 /* 머리 줄 단추 */
 function wbHeadClick(e, mode) {
     if (e.target.closest('.wb-bar')) { wbBarClick(e, mode); return; }
+    const ly = e.target.closest('[data-lay]');
+    if (ly) { if (ly.dataset.lay !== wbLay()) { wbSetLay(ly.dataset.lay); renderNotes(); } return; }
     const chip = e.target.closest('[data-f]');
     if (chip) { wbFilter = chip.dataset.f; renderNotes(); return; }
     const bt = e.target.closest('[data-b]'), b = bt?.dataset.b; if (!b) return;
@@ -4385,7 +4431,7 @@ function wbHeadClick(e, mode) {
     if (b === 'list') wbListPop(bt, mode);
     if (b === 'style') wbStylePop(bt);
     if (b === 'more') {
-        const pop = showPop(bt, `<button data-x="fit">모든 메모가 보이게 맞추기</button><button data-x="arrange">주제별로 모아 놓기</button>`);
+        const pop = showPop(bt, `<button data-x="fit">모든 메모가 보이게 맞추기</button>`);
         pop.addEventListener('click', ev => {
             const x = ev.target.closest('[data-x]')?.dataset.x; if (!x) return;
             closePop();
@@ -4543,7 +4589,8 @@ function wbBind(view, mode) {
             if (lastTap && now - lastTap.t < 380 && Math.hypot(p.x - lastTap.x, p.y - lastTap.y) < 30) {
                 lastTap = null;
                 const q = wbToBoard(mode, e.clientX, e.clientY);
-                addNote(mode, { at: { x: q.x - WB_W / 2, y: q.y - 20 } });
+                const col = wbLay() === 'topic' && (wbWorld(mode)._cols || []).find(c => q.x >= c.x0 && q.x < c.x1);
+                addNote(mode, { at: { x: q.x - WB_W / 2, y: q.y - 20 }, ...(col ? { tag: col.k } : {}) });
                 return;
             }
             lastTap = { t: now, x: p.x, y: p.y };
@@ -4576,16 +4623,22 @@ function wbBind(view, mode) {
         }
         o.el.classList.remove('dragging');
         n.z = maxZ() + 1; o.el.style.zIndex = n.z;
+        if (o.kind === 'move' && wbLay() === 'topic') {
+            const cx = o.el.offsetLeft + o.el.offsetWidth / 2, col = (wbWorld(mode)._cols || []).find(c => cx >= c.x0 && cx < c.x1);
+            if (col && col.k !== (n.tag || '').trim()) { n.tag = col.k; touch(n); toast(col.k ? `주제를 '${wbTagLabel(col.k)}'(으)로 바꿨어요.` : '주제를 뗐어요.'); }
+            renderNotes(); return;
+        }
         if (o.kind === 'move') { n.gx = o.el.offsetLeft; n.gy = o.el.offsetTop; }
         else { n.w = o.el.offsetWidth; n.h = parseFloat(o.el.style.minHeight) || null; }
         touch(n);
+        if (wbLay() === 'topic') { renderNotes(); return; }
         if (mode === 'full') renderBoard(); else renderFullBoard();
         wbDrawLines(mode); wbPlaceBar(mode);
     };
     view.addEventListener('pointerup', end);
     view.addEventListener('pointercancel', end);
     view.addEventListener('focusin', e => { if (e.target.matches('.pi textarea')) { wbPush(); wbSelect(mode, e.target.dataset.id); } });
-    view.addEventListener('input', e => { if (e.target.matches('.pi textarea')) { wbDrawLines(mode); wbPlaceBar(mode); } });
+    view.addEventListener('input', e => { if (e.target.matches('.pi textarea')) { if (wbLay() === 'topic') wbTopicLayout(wbWorld(mode)); wbDrawLines(mode); wbPlaceBar(mode); } });
     view.addEventListener('click', e => {
         const z = e.target.closest('[data-z]')?.dataset.z; if (!z) return;
         const c = wbCam(mode) || { z: 1 };

@@ -4435,12 +4435,40 @@ function wbSnap() {
     return m;
 }
 function wbSame(a, b) { const ka = Object.keys(a), kb = Object.keys(b); return ka.length === kb.length && ka.every(k => a[k] === b[k]); }
+// 되돌리기 기록 저장: 걸음마다 '바뀐 메모만' 남김. 다시 열 때 보드가 그대로면(다른 기기에서 고치지 않았으면) 이어서 되돌리기
+const WB_HIST_MAX = 40, WB_HIST_BYTES = 600000;
+function wbHash(m) { let h = 0; const str = Object.keys(m).sort().map(k => k + m[k]).join('|'); for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0; return h + ':' + str.length; }
+function wbHistKey(w) { return 'wb-undo:' + w; }
+function wbHistSave() {
+    clearTimeout(wbHistSave._t);
+    wbHistSave._t = setTimeout(() => {
+        if (!wbHist.work) return;
+        try {
+            let chain = [...wbHist.undo, wbSnap()];
+            const pack = () => { const d = []; for (let i = 0; i < chain.length - 1; i++) { const a = chain[i], b = chain[i + 1], x = {}; new Set([...Object.keys(a), ...Object.keys(b)]).forEach(id => { if (a[id] !== b[id]) x[id] = a[id] ?? null; }); d.push(x); } return JSON.stringify({ v: 1, hash: wbHash(chain[chain.length - 1]), d }); };
+            let txt = pack();
+            while (txt.length > WB_HIST_BYTES && chain.length > 2) { chain = chain.slice(1); txt = pack(); }
+            if (chain.length < 2) localStorage.removeItem(wbHistKey(wbHist.work)); else localStorage.setItem(wbHistKey(wbHist.work), txt);
+        } catch (_) {}
+    }, 500);
+}
+function wbHistLoad() {
+    const w = curWorkId(); wbHist.work = w; wbHist.undo = []; wbHist.redo = [];
+    try {
+        const o = JSON.parse(localStorage.getItem(wbHistKey(w)) || 'null'); if (!o || o.v !== 1) return;
+        let cur = wbSnap(); if (wbHash(cur) !== o.hash) { localStorage.removeItem(wbHistKey(w)); return; } // 그 사이 보드가 바뀌었으면 옛 기록은 버림
+        const list = [];
+        for (let i = o.d.length - 1; i >= 0; i--) { const prev = { ...cur }; Object.entries(o.d[i]).forEach(([id, v]) => { if (v == null) delete prev[id]; else prev[id] = v; }); list.unshift(prev); cur = prev; }
+        wbHist.undo = list;
+    } catch (_) {}
+}
 function wbPush() {
-    if (wbHist.work !== curWorkId()) { wbHist.work = curWorkId(); wbHist.undo = []; wbHist.redo = []; }
+    if (wbHist.work !== curWorkId()) wbHistLoad();
     const s = wbSnap(), last = wbHist.undo[wbHist.undo.length - 1];
     if (last && wbSame(last, s)) return;
-    wbHist.undo.push(s); if (wbHist.undo.length > 60) wbHist.undo.shift();
+    wbHist.undo.push(s); if (wbHist.undo.length > WB_HIST_MAX) wbHist.undo.shift();
     wbHist.redo = [];
+    wbHistSave();
 }
 function wbRestore(s) {
     const cur = wbSnap();
@@ -4452,7 +4480,7 @@ function wbRestore(s) {
     });
 }
 function wbUndo(redo) {
-    if (wbHist.work !== curWorkId()) return;
+    if (wbHist.work !== curWorkId()) wbHistLoad();
     const from = redo ? wbHist.redo : wbHist.undo, to = redo ? wbHist.undo : wbHist.redo;
     let s = from.pop();
     const cur = wbSnap();
@@ -4461,6 +4489,7 @@ function wbUndo(redo) {
     to.push(cur);
     document.activeElement?.blur?.();
     wbRestore(s); renderNotes();
+    wbHistSave();
 }
 
 /* 그리기 */
@@ -4978,18 +5007,21 @@ function wbCharPop(anchor, mode) {
         <span class="pc-info"><small>${esc(c.role)}</small><b>${esc(c.name || '이름 없음')}</b><em>${esc([wbAgeText(c.age), c.job].filter(Boolean).join(' · '))}</em></span></button>`).join('')}</div>`);
     pop.addEventListener('click', e => { const t = e.target.closest('[data-ch]')?.dataset.ch; if (!t) return; closePop(); wbAddChar(mode, t); });
 }
+function wbSrcKey(src) { let h = 0; for (let i = 0; i < src.length; i += Math.max(1, Math.floor(src.length / 4000))) h = (h * 31 + src.charCodeAt(i)) | 0; return 'p' + h + ':' + src.length; }
 function wbPhotoItem(src) {
-    // 시놉 보드 사진을 작게 줄여 이 작품 사진으로 한 번 저장
+    // 시놉 보드 사진을 작게 줄여 이 작품 사진으로 한 번만 저장 (같은 사진이면 저장해 둔 것을 다시 씀)
     return new Promise(resolve => {
         if (!src) { resolve(null); return; }
+        const key = wbSrcKey(src), had = ofWork('image').find(i => i.srcKey === key && i.data);
+        if (had) { resolve(had.id); return; }
         const img = new Image();
         img.onload = () => {
             try {
                 const k = Math.min(1, 320 / Math.max(img.width, img.height)), cv = document.createElement('canvas');
                 cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
                 const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height); g.drawImage(img, 0, 0, cv.width, cv.height);
-                resolve(create('image', { workId: curWorkId(), data: cv.toDataURL('image/jpeg', 0.86) }).id);
-            } catch (_) { resolve(create('image', { workId: curWorkId(), data: src }).id); }
+                resolve(create('image', { workId: curWorkId(), data: cv.toDataURL('image/jpeg', 0.86), srcKey: key }).id);
+            } catch (_) { resolve(create('image', { workId: curWorkId(), data: src, srcKey: key }).id); }
         };
         img.onerror = () => resolve(null);
         img.src = src;

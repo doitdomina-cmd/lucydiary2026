@@ -11100,6 +11100,20 @@ html body.theme-candy.theme-cozy .cozy-pubhero .eyebrow { margin-top: 16px !impo
         }
         // 메모 HTML 안의 <img> 를 저장용/화면용으로 바꾼다
         function assetMemoHtml(html, forSave) {
+            // 예전 메모 형식(블록 JSON 배열 — 메모 창을 열면 HTML 로 바뀜): 사진 블록의 content 만 바꾼다
+            if (typeof html === 'string' && html.charAt(0) === '[' && html.indexOf('"image"') >= 0) {
+                try {
+                    const blocks = JSON.parse(html);
+                    if (Array.isArray(blocks)) {
+                        blocks.forEach(b => {
+                            if (!b || b.type !== 'image' || typeof b.content !== 'string') return;
+                            const ref = assetRefForSave(b.content);
+                            b.content = forSave ? ref : (assetDir ? assetDisplayUrl(ref) : ref);
+                        });
+                        return JSON.stringify(blocks);
+                    }
+                } catch (e) {}
+            }
             if (typeof html !== 'string' || html.indexOf('<img') < 0) return html;
             return html.replace(/<img\b[^>]*>/gi, tag => {
                 const da = /\sdata-asset="([^"]+)"/i.exec(tag);
@@ -11177,6 +11191,9 @@ html body.theme-candy.theme-cozy .cozy-pubhero .eyebrow { margin-top: 16px !impo
                 if (!w) return w;
                 const c = Object.assign({}, w);
                 if (c.coverImage) c.coverImage = assetToDataUrl(assetDisplayUrl(c.coverImage));
+                if (typeof c.memo === 'string' && c.memo.charAt(0) === '[' && c.memo.indexOf('"image"') >= 0) {
+                    try { const bl = JSON.parse(c.memo); if (Array.isArray(bl)) { bl.forEach(b => { if (b && b.type === 'image' && typeof b.content === 'string') b.content = assetToDataUrl(assetDisplayUrl(b.content)); }); c.memo = JSON.stringify(bl); } } catch (e) {}
+                }
                 if (typeof c.memo === 'string' && c.memo.indexOf('data-asset=') >= 0) c.memo = c.memo.replace(/<img\b[^>]*>/gi, tag => {
                     const da = /\sdata-asset="([^"]+)"/i.exec(tag); if (!da || !assetDir) return tag;
                     return tag.replace(/\ssrc="[^"]*"/i, ' src="' + assetToDataUrl(_assetDirUrl + da[1]) + '"');
@@ -13392,7 +13409,8 @@ html body.theme-candy.theme-cozy .cozy-pubhero .eyebrow { margin-top: 16px !impo
                 parsed.forEach(b => {
                     if (b.type === 'image') {
                         const w = b.width ? ` style="width:${b.width};max-width:100%"` : ' style="max-width:100%"';
-                        html += `<img src="${b.content}"${w} draggable="true"><br>`;
+                        const an = assetNameFromUrl(b.content);   // 사진이 보관함 파일이면 이름을 같이 달아 둔다(웹은 받아서 채움)
+                        html += an ? `<img src="${assetDir ? b.content : ASSET_BLANK}" data-asset="${an}"${w} draggable="true"><br>` : `<img src="${b.content}"${w} draggable="true"><br>`;
                     } else if (b.type === 'divider') {
                         html += '<hr style="border:none;border-top:2px solid #e2e8f0;margin:8px 0">';
                     } else {

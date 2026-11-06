@@ -11040,6 +11040,152 @@ html body.theme-candy.theme-cozy .cozy-pubhero .eyebrow { margin-top: 16px !impo
             });
         }
 
+        // ═══ 사진·파일은 데이터 밖으로 (2026-11-06) ═══
+        // · 데이터 파일·클라우드에는 'asset:<해시>.<확장자>' 표시만 남긴다 (예전엔 표지·메모 사진이 base64로 들어가 26MB였음).
+        // · 실제 파일은 PC 의 ~/RoyaltyAssets/ 에 두고, main.js 가 Cloud Storage(users/{uid}/royalty-assets/)와 구글드라이브에 올린다.
+        // · 화면(메모리)에서는 PC=file:// 주소, 웹=Storage 에서 받은 blob: 주소를 쓴다. 저장할 때 다시 'asset:' 으로 바꾼다.
+        // · 메모 속 사진은 <img data-asset="이름"> 으로 이름을 같이 들고 다닌다.
+        const ASSET_PREFIX = 'asset:';
+        const ASSET_NAME_RX = /^[0-9a-f]{16}\.(?:jpg|png|gif|webp|pdf|bin)$/;
+        const ASSET_EXT = { 'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'image/webp': 'webp', 'application/pdf': 'pdf' };
+        const ASSET_BLANK = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+        let assetDir = null, _assetDirUrl = '', _assetMissing = new Set();
+        if (isNodeEnvironment) {
+            try {
+                assetDir = path.join(os.homedir(), 'RoyaltyAssets');
+                _assetDirUrl = require('url').pathToFileURL(assetDir).href + '/';
+            } catch (e) { assetDir = null; }
+        }
+        function assetNameFromUrl(s) {
+            if (typeof s !== 'string') return null;
+            let n = null;
+            if (s.startsWith(ASSET_PREFIX)) n = s.slice(ASSET_PREFIX.length);
+            else if (_assetDirUrl && s.startsWith(_assetDirUrl)) n = s.slice(_assetDirUrl.length).split(/[?#]/)[0];
+            return n && ASSET_NAME_RX.test(n) ? n : null;
+        }
+        // base64(data:) → ~/RoyaltyAssets/ 파일. 실패하면 null (그럼 원래 data: 를 그대로 둔다 — 잃어버리지 않게)
+        function assetStoreDataUrl(dataUrl) {
+            if (!assetDir || typeof dataUrl !== 'string') return null;
+            const m = /^data:([\w.+-]+\/[\w.+-]+);base64,/.exec(dataUrl);
+            if (!m) return null;
+            try {
+                const buf = Buffer.from(dataUrl.slice(m[0].length), 'base64');
+                if (!buf.length) return null;
+                const name = require('crypto').createHash('sha1').update(buf).digest('hex').slice(0, 16) + '.' + (ASSET_EXT[m[1].toLowerCase()] || 'bin');
+                const p = path.join(assetDir, name);
+                if (!fs.existsSync(assetDir)) fs.mkdirSync(assetDir, { recursive: true });
+                if (!fs.existsSync(p) || fs.statSync(p).size !== buf.length) {
+                    fs.writeFileSync(p + '.tmp', buf);
+                    fs.renameSync(p + '.tmp', p);
+                }
+                if (fs.statSync(p).size !== buf.length) return null;
+                return name;
+            } catch (e) { console.error('[Asset] 파일로 빼기 실패', e); return null; }
+        }
+        // 저장용: 화면 주소/base64 → 'asset:이름'
+        function assetRefForSave(v) {
+            if (typeof v !== 'string' || !v) return v;
+            const n = assetNameFromUrl(v);
+            if (n) return ASSET_PREFIX + n;
+            if (v.startsWith('data:')) { const s = assetStoreDataUrl(v); if (s) return ASSET_PREFIX + s; }
+            return v;
+        }
+        // 화면용: 'asset:이름' → PC 는 file:// 주소 (파일이 없으면 main 에 내려받기를 부탁)
+        function assetDisplayUrl(v) {
+            const n = (typeof v === 'string' && v.startsWith(ASSET_PREFIX)) ? assetNameFromUrl(v) : null;
+            if (!n) return v;
+            if (!assetDir) return v;
+            try { if (!fs.existsSync(path.join(assetDir, n))) _assetMissing.add(n); } catch (e) {}
+            return _assetDirUrl + n;
+        }
+        // 메모 HTML 안의 <img> 를 저장용/화면용으로 바꾼다
+        function assetMemoHtml(html, forSave) {
+            if (typeof html !== 'string' || html.indexOf('<img') < 0) return html;
+            return html.replace(/<img\b[^>]*>/gi, tag => {
+                const da = /\sdata-asset="([^"]+)"/i.exec(tag);
+                const sm = /\ssrc="([^"]*)"/i.exec(tag);
+                let name = da && ASSET_NAME_RX.test(da[1]) ? da[1] : null;
+                if (!name && sm) {
+                    name = assetNameFromUrl(sm[1]);
+                    if (!name && forSave && sm[1].startsWith('data:')) name = assetStoreDataUrl(sm[1]);
+                }
+                if (!name) return tag;
+                const src = forSave ? ASSET_PREFIX + name : (assetDir ? assetDisplayUrl(ASSET_PREFIX + name) : ASSET_BLANK);
+                let t = tag.replace(/\sdata-asset="[^"]*"/i, '').replace(/\ssrc="[^"]*"/i, '');
+                return t.replace(/^<img\b/i, `<img src="${src}" data-asset="${name}"`);
+            });
+        }
+        function assetWorkForSave(w) {
+            if (!w || typeof w !== 'object') return w;
+            const c = Object.assign({}, w);
+            if (c.coverImage) c.coverImage = assetRefForSave(c.coverImage);
+            if (c.memo) c.memo = assetMemoHtml(c.memo, true);
+            if (c.contractFile && typeof c.contractFile === 'object' && c.contractFile.data) c.contractFile = Object.assign({}, c.contractFile, { data: assetRefForSave(c.contractFile.data) });
+            return c;
+        }
+        // 저장 직전(PC): base64 를 파일로 빼고, 메모리도 file:// 주소로 바꿔서 가볍게 한다. 저장할 객체 배열을 돌려준다
+        function assetPrepareWorksForSave() {
+            if (!Array.isArray(masterWorks)) return masterWorks;
+            const out = masterWorks.map(assetWorkForSave);
+            if (assetDir) masterWorks.forEach((w, i) => {
+                const s = out[i]; if (!w || !s) return;
+                if (typeof w.coverImage === 'string' && w.coverImage.startsWith('data:') && String(s.coverImage).startsWith(ASSET_PREFIX)) w.coverImage = assetDisplayUrl(s.coverImage);
+                if (typeof w.memo === 'string' && w.memo.indexOf('base64,') >= 0 && s.memo !== w.memo) {
+                    w.memo = assetMemoHtml(s.memo, false);   // 열려 있는 메모 창은 건드리지 않는다(커서 유지) — 닫을 때 다시 저장되며 같은 파일을 쓴다
+                }
+                if (w.contractFile && s.contractFile && w.contractFile.data !== s.contractFile.data && String(s.contractFile.data).startsWith(ASSET_PREFIX)) w.contractFile = s.contractFile;
+            });
+            return out;
+        }
+        // 불러온 직후: 'asset:' → 화면 주소
+        function assetHydrateWorks(list) {
+            if (!Array.isArray(list)) return;
+            list.forEach(w => {
+                if (!w) return;
+                if (typeof w.coverImage === 'string' && w.coverImage.startsWith(ASSET_PREFIX)) w.coverImage = assetDir ? assetDisplayUrl(w.coverImage) : null;   // 웹은 표지를 royalty-covers 에서 따로 받는다
+                if (w.memo) w.memo = assetMemoHtml(w.memo, false);
+            });
+            assetFetchMissing();
+        }
+        // PC 에 없는 파일(다른 PC 에서 넣은 사진 등)은 main 이 Storage 에서 내려받고, 다 받으면 화면을 다시 그린다
+        let _assetFetching = false;
+        async function assetFetchMissing() {
+            if (!ipcRenderer || !_assetMissing.size || _assetFetching) return;
+            _assetFetching = true;
+            const names = [..._assetMissing]; _assetMissing.clear();
+            let got = 0;
+            try {
+                for (const n of names) { try { if (await ipcRenderer.invoke('asset-fetch', n)) got++; } catch (e) {} }
+            } finally { _assetFetching = false; }
+            if (got) { try { updateUI(); } catch (e) {} try { renderVisualLibrary(); } catch (e) {} }
+        }
+        // 화면 주소(file://)인 표지를 그림판(canvas)에 쓸 수 있게 data: 로 읽어 온다 (자르기용)
+        function assetToDataUrl(v) {
+            const n = assetNameFromUrl(v);
+            if (!n || !assetDir) return v;
+            try {
+                const ext = n.split('.').pop();
+                const mime = Object.keys(ASSET_EXT).find(k => ASSET_EXT[k] === ext) || 'application/octet-stream';
+                return 'data:' + mime + ';base64,' + fs.readFileSync(path.join(assetDir, n)).toString('base64');
+            } catch (e) { return v; }
+        }
+
+        // 백업 내보내기(JSON 다운로드)는 다른 곳에서도 그대로 열리게 사진을 다시 base64 로 넣는다
+        function assetWorksForExport() {
+            if (!Array.isArray(masterWorks)) return masterWorks;
+            return masterWorks.map(w => {
+                if (!w) return w;
+                const c = Object.assign({}, w);
+                if (c.coverImage) c.coverImage = assetToDataUrl(assetDisplayUrl(c.coverImage));
+                if (typeof c.memo === 'string' && c.memo.indexOf('data-asset=') >= 0) c.memo = c.memo.replace(/<img\b[^>]*>/gi, tag => {
+                    const da = /\sdata-asset="([^"]+)"/i.exec(tag); if (!da || !assetDir) return tag;
+                    return tag.replace(/\ssrc="[^"]*"/i, ' src="' + assetToDataUrl(_assetDirUrl + da[1]) + '"');
+                });
+                if (c.contractFile && typeof c.contractFile === 'object' && typeof c.contractFile.data === 'string' && c.contractFile.data.startsWith(ASSET_PREFIX)) c.contractFile = Object.assign({}, c.contractFile, { data: assetToDataUrl(assetDisplayUrl(c.contractFile.data)) });
+                return c;
+            });
+        }
+
         let saveTimeout = null;
         let _savePendingSilent = null;
         function save(silent = false) { 
@@ -11053,8 +11199,13 @@ html body.theme-candy.theme-cozy .cozy-pubhero .eyebrow { margin-top: 16px !impo
             {
                 try {
                     try { localStorage.setItem('lastModified_v6', new Date().toISOString()); } catch(e) {}
+                    // 표지·메모 사진이 아직 base64 로 들어 있으면(첫 이전) 이전 전 데이터 파일을 한 번 통째로 복사해 둔다
+                    if (isNodeEnvironment && assetDir && (masterWorks || []).some(w => w && ((typeof w.coverImage === 'string' && w.coverImage.startsWith('data:')) || (typeof w.memo === 'string' && w.memo.indexOf('base64,') >= 0) || (w.contractFile && typeof w.contractFile.data === 'string' && w.contractFile.data.startsWith('data:'))))) {
+                        try { const bk = path.join(os.homedir(), 'RoyaltyData_v6.BEFORE_assets.json'); if (!fs.existsSync(bk) && fs.existsSync(dataFilePath)) fs.copyFileSync(dataFilePath, bk); } catch (e) {}
+                    }
+                    const _worksForSave = assetPrepareWorksForSave();
                     const dataToSave = { settingsPresets, uiTheme: { theme: activeTheme, customColor: localStorage.getItem('custom_color_v6') || '', bgMain: document.documentElement.style.getPropertyValue('--bg-main').trim() || localStorage.getItem('bg_main_v6') || '', appFont: localStorage.getItem('app_font_v1') || '', menuFont: localStorage.getItem('menu_font_v1') || '', appFs: localStorage.getItem('app_fs_v1') || '', menuFs: localStorage.getItem('menu_fs_v1') || '' },
-                        masterWorks, monthlyData, years, publisherData, analysisData, 
+                        masterWorks: _worksForSave, monthlyData, years, publisherData, analysisData, 
                         publisherSortOrder, publisherCardSortOrder, publisherViewMode, genreList, genreBadgeOpacity, tableFontSettings, crosshairSettings,
                         writeSchedules, writeSpans, timelineScenarios, writeVolumes, writeMergedVolumeWorks, taskSchedules, contacts, penNames, widgetSettingsData, ddayCardDesigns, ddayCardFonts, modalDesign, calCardDesigns, calCardFonts, calCardSizes, writeCardSettings, taskCardSettings, taskColors: TASK_COLORS, taskCategoryList, writeColors: WRITE_COLORS, writeCategoryList,
                         writerWorks, writerDailyData, writerGlobalDailyGoal, writeCounterBase, writeCounterResetDate, submissions, webtoonSubs, webtoonSubOrder, incomeGoals, taxSettings, taxGoalMemos, charGoals, writerLastWorkKey, taxGoalItems, contactSortMode, webtoonManage, webtoonCardSettings, penNameColorOverrides, webtoonViewFilter, webtoonSortMode, workManage, workManageCardSettings, workManageViewFilter, workManageSortMode, refSchedWorks, refSchedHidden
@@ -11108,6 +11259,7 @@ html body.theme-candy.theme-cozy .cozy-pubhero .eyebrow { margin-top: 16px !impo
         function hydrateFromParsed(parsed) {
             if (!parsed) return;
             masterWorks = parsed.masterWorks || [];
+            try { assetHydrateWorks(masterWorks); } catch (e) { console.error('[Asset] 불러오기 변환 실패', e); }
             monthlyData = parsed.monthlyData || {};
             years = parsed.years || [2024, 2025, 2026];
             publisherData = parsed.publisherData || {};
@@ -11207,6 +11359,8 @@ html body.theme-candy.theme-cozy .cozy-pubhero .eyebrow { margin-top: 16px !impo
 
             if (fileData) {
                 hydrateFromParsed(JSON.parse(fileData));
+                // 사진이 아직 base64 로 들어 있는 예전 파일이면 켜자마자 한 번 저장해서 파일로 빼 둔다
+                if (assetDir && fileData.indexOf(';base64,') >= 0) setTimeout(() => save(true), 3000);
             }
         } catch(e) { console.error("데이터 로딩 중 에러 발생:", e); }
 
@@ -11929,7 +12083,7 @@ html body.theme-candy.theme-cozy .cozy-pubhero .eyebrow { margin-top: 16px !impo
 
         function downloadBackup() { 
             const data = { settingsPresets, 
-                masterWorks, monthlyData, years, publisherData, analysisData, publisherSortOrder, publisherCardSortOrder, publisherViewMode, genreList, theme: localStorage.getItem('theme_v6'), customColor: localStorage.getItem('custom_color_v6'), genreBadgeOpacity, bgMain: localStorage.getItem('bg_main_v6'), tableFontSettings, crosshairSettings, 
+                masterWorks: assetWorksForExport(), monthlyData, years, publisherData, analysisData, publisherSortOrder, publisherCardSortOrder, publisherViewMode, genreList, theme: localStorage.getItem('theme_v6'), customColor: localStorage.getItem('custom_color_v6'), genreBadgeOpacity, bgMain: localStorage.getItem('bg_main_v6'), tableFontSettings, crosshairSettings, 
                 writeSchedules, writeSpans, timelineScenarios, writeVolumes, writeMergedVolumeWorks, taskSchedules, writeCardSettings, taskCardSettings, taskColors: TASK_COLORS, taskCategoryList, writeColors: WRITE_COLORS, writeCategoryList,
                 contacts, penNames, widgetSettingsData, ddayCardDesigns, ddayCardFonts, modalDesign, calCardDesigns, calCardFonts, calCardSizes, submissions, webtoonSubs, webtoonSubOrder, contactSortMode, webtoonViewFilter, webtoonSortMode,
                 // [FIX] 글자수 관리 탭 데이터가 백업에서 빠져있던 문제 수정 — 아래 항목들이 누락되어 있었음
@@ -12649,7 +12803,7 @@ html body.theme-candy.theme-cozy .cozy-pubhero .eyebrow { margin-top: 16px !impo
             const work = masterWorks.find(w => w.id === workId);
             if (!work || !work.coverImage) return;
             uploadingWorkId = workId;
-            openCoverCropModal(work.coverImage);
+            openCoverCropModal(assetToDataUrl(work.coverImage));
         }
 
         // ══ 표지 자르기(크롭) ══════════════════════════════
@@ -13260,6 +13414,7 @@ html body.theme-candy.theme-cozy .cozy-pubhero .eyebrow { margin-top: 16px !impo
             beInitPalettes();
             if (typeof _meRefreshImgDraggable === 'function') _meRefreshImgDraggable();
             if (typeof _meOverlayUpdate === 'function') _meOverlayUpdate();
+            if (!assetDir) { try { assetWebFill(editor); } catch (e) {} }
         }
 
 
@@ -19558,6 +19713,29 @@ html body.theme-candy.theme-cozy .cozy-pubhero .eyebrow { margin-top: 16px !impo
                 if (!blob) { blob = await remoteStorageGet(id + '.jpg', false); coverIdbPut(key, blob); }
                 return (remoteCovers.urls[key] = URL.createObjectURL(blob));
             } catch (e) { return null; }
+        }
+        // 웹: 메모 속 사진(<img data-asset>)을 Storage(users/{uid}/royalty-assets/)에서 받아 채운다. 받은 건 IndexedDB 에 보관
+        const _assetWebUrls = {};
+        async function assetWebFill(root) {
+            if (!root || !remoteCoversUsable()) return;
+            const imgs = [...root.querySelectorAll('img[data-asset]')].filter(im => !String(im.src).startsWith('blob:'));
+            for (const im of imgs) {
+                const name = im.getAttribute('data-asset');
+                if (!ASSET_NAME_RX.test(name)) continue;
+                try {
+                    if (!_assetWebUrls[name]) {
+                        let blob = await coverIdbGet('a:' + name);
+                        if (!blob) {
+                            const user = firebase.auth().currentUser, token = await user.getIdToken();
+                            const res = await fetch('https://firebasestorage.googleapis.com/v0/b/' + REMOTE_COVER_BUCKET + '/o/' + encodeURIComponent('users/' + user.uid + '/royalty-assets/' + name) + '?alt=media', { headers: { Authorization: 'Firebase ' + token } });
+                            if (!res.ok) continue;
+                            blob = await res.blob(); coverIdbPut('a:' + name, blob);
+                        }
+                        _assetWebUrls[name] = URL.createObjectURL(blob);
+                    }
+                    im.src = _assetWebUrls[name];
+                } catch (e) {}
+            }
         }
         // 목록이 준비되면 보고 있는 화면(대시보드 폴라로이드, 작품 등록의 표지 목록)을 다시 그린다
         function refreshRemoteCoverViews() {
@@ -27641,7 +27819,8 @@ html body.theme-candy.theme-cozy .cozy-pubhero .eyebrow { margin-top: 16px !impo
                         const c = Object.assign({}, w);
                         delete c.coverImage;
                         delete c.contractFile;  // 계약서
-                        delete c.memo;          // 메모 (이미지 포함 가능)
+                        // 메모: 사진이 Storage 로 빠진 뒤(asset:)엔 가벼우니 같이 올린다 — 폰에서도 메모가 보이게. base64 가 남아 있으면 예전처럼 뺀다
+                        if (typeof c.memo === 'string' && c.memo) { c.memo = assetMemoHtml(c.memo, true); if (c.memo.indexOf('base64,') >= 0) delete c.memo; } else delete c.memo;
                         return c;
                     });
                 }

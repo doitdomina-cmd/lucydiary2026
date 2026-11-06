@@ -17058,6 +17058,12 @@ html body.theme-candy.theme-cozy .cozy-pubhero .eyebrow { margin-top: 16px !impo
                 <label class="text-xs font-bold text-slate-400 ml-1 mb-1 block">${label}</label>
                 <input type="text" value="${val || ''}" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100" onchange="pubCardFieldChanged('${field}', this.value)">
             </div>`;
+            // 입금일이 주말·공휴일이면 언제 들어오는지 (구글 캘린더 '출판사 입금일' 자동 넣기에 씀)
+            const payShiftField = `<div class="mt-3"><label class="text-xs font-bold text-slate-400 ml-1 mb-1 block">입금일이 주말·공휴일이면</label>
+                <select class="bg-slate-50 border border-slate-200 text-sm rounded-lg p-1.5 w-full cursor-pointer" onchange="pubCardFieldChanged('payShift', this.value)">
+                    <option value="prev" ${info.payShift !== 'next' ? 'selected' : ''}>그 전 영업일에 입금</option>
+                    <option value="next" ${info.payShift === 'next' ? 'selected' : ''}>그 다음 영업일에 입금</option>
+                </select></div>`;
             if (currentPubCardTab === 'publishers') {
                 body.innerHTML = `<div class="grid grid-cols-2 gap-3">
                     ${textField('현로 레이블', 'labelHyun', info.labelHyun)}
@@ -17069,6 +17075,7 @@ html body.theme-candy.theme-cozy .cozy-pubhero .eyebrow { margin-top: 16px !impo
                     <div><label class="text-xs font-bold text-slate-400 ml-1 mb-1 block">정산 사이트</label><div class="flex items-center gap-1">${mkPubSelect(pub, 'site', ['실시간','자체','웹하드','이메일','이카운트'].map(v => ({ value: v, label: v })), true)}<button onclick="openPublisherSite('${pub}')" class="shrink-0 transition-opacity hover:opacity-100" style="color:var(--primary); opacity:0.55;" title="정산 사이트 열기"><i class="fa-solid fa-heart text-xs"></i></button></div></div>
                     <div><label class="text-xs font-bold text-slate-400 ml-1 mb-1 block">업데이트</label>${mkPubSelect(pub, 'updateDay', [...Array.from({length: 30}, (_, i) => i + 1), '말일'].map(d => ({ value: d, label: `${d}${typeof d==='number'?'일':''}` })), true, true)}</div>
                 </div>
+                ${payShiftField}
                 <div class="mt-3">
                     <label class="text-xs font-bold text-slate-400 ml-1 mb-1 block">비고</label>
                     <input type="text" value="${info.memo || ''}" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100" onchange="pubCardFieldChanged('memo', this.value)">
@@ -17101,6 +17108,7 @@ html body.theme-candy.theme-cozy .cozy-pubhero .eyebrow { margin-top: 16px !impo
                     ${textField('정산일', 'paymentDay', info.paymentDay)}
                     ${textField('정산 기준', 'standard', info.standard)}
                 </div>
+                ${payShiftField}
                 <button onclick="openOverseasModal('${pub}')" class="mt-3 w-full px-4 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 flex items-center justify-center gap-2 transition-all"><i class="fa-solid fa-globe"></i> 해외 정산 메모</button>
                 <div class="mt-3">
                     <label class="text-xs font-bold text-slate-400 ml-1 mb-1 block">기타</label>

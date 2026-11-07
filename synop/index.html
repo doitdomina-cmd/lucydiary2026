@@ -1046,7 +1046,7 @@ body[data-theme="follow"] .theme-canvas ::placeholder { color: var(--pf-muted, #
                     <ol style="margin:8px 0 0 16px; list-style:decimal; line-height:1.7;">
                         <li>네이버 메일 → 환경설정 → <b>POP3/IMAP 설정</b> → "IMAP/SMTP 설정"을 <b>사용함</b>으로 저장</li>
                         <li>2단계 인증을 쓰고 있다면 네이버 계정 → 보안설정 → 2단계 인증 → <b>애플리케이션 비밀번호</b>를 만들어서 위 칸에 넣기 (안 쓰고 있으면 평소 비밀번호)</li>
-                        <li>비밀번호는 이 PC에서만 풀 수 있게 암호화되어 저장돼요</li>
+                        <li>비밀번호는 암호화되어 저장돼요 (PC 앱은 이 PC에만, 웹은 내 계정의 비공개 문서에)</li>
                     </ol>
                 </details>
                 <div id="mail-status" class="text-xs" style="min-height:16px;"></div>
@@ -1390,8 +1390,8 @@ try {
 // (웹뷰 안에서는 구글이 보안상 팝업 로그인을 차단하기 때문)
 let isNativeAppEnvironment = !!(typeof window !== 'undefined' && window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
 let isAutoAuthEnvironment = isNodeEnvironment || isNativeAppEnvironment;
-// 이메일로 기록 보내기는 PC 앱(Electron)에서만 보인다 (웹에서는 버튼이 계속 숨겨져 있다)
-if (isNodeEnvironment) { const mb = document.getElementById('mail-open-btn'); if (mb) mb.style.display = 'block'; }
+// 이메일로 기록 보내기: PC는 앱 안에서, 웹은 Firebase 함수로 보낸다 (웹에서는 버튼이 계속 숨겨져 있다)
+{ const mb = document.getElementById('mail-open-btn'); if (mb) mb.style.display = 'block'; }  // PC·웹 모두 보임
 
 // --- GitHub 동기화 (여러 PC간 데이터 이어쓰기용) ---
 let ghConfigPath = '';
@@ -4419,7 +4419,23 @@ window.manualFirebasePush = async function () {
         };
 
         // ── 이메일로 기록 보내기 (PC 앱 전용, 네이버 SMTP는 main.js에서 처리) ──
-        function mailIpc() { return require('electron').ipcRenderer; }
+        // PC 앱은 main.js(IPC)로, 웹/노트북은 Firebase 함수(synopMail)로 보낸다 (함수는 내 구글 로그인 토큰을 확인)
+        const SYNOP_MAIL_URL = 'https://asia-northeast3-writer-routine.cloudfunctions.net/synopMail';
+        async function mailCall(channel, payload) {
+            if (isNodeEnvironment) return require('electron').ipcRenderer.invoke(channel, payload);
+            const u = (typeof fbAuthObj !== 'undefined' && fbAuthObj) ? fbAuthObj.currentUser : null;
+            if (!u || u.isAnonymous) throw new Error('먼저 구글 로그인을 해 주세요.');
+            const token = await u.getIdToken();
+            let body;
+            if (channel === 'mail-get-settings') body = { action: 'get' };
+            else if (channel === 'mail-save-settings') body = { action: 'save', naverId: payload.naverId, pass: payload.password, to: payload.to };
+            else body = { action: 'send', subject: payload.subject, text: payload.text, attachments: payload.attachments };
+            const resp = await fetch(SYNOP_MAIL_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify(body) });
+            let j = null; try { j = await resp.json(); } catch (e) {}
+            if (!j) throw new Error('메일 서버 응답이 없어요 (' + resp.status + ')');
+            if (channel === 'mail-get-settings') { if (!j.ok) throw new Error(j.error || '불러오기 실패'); return j.settings; }
+            return j;
+        }
 
         function buildEvidenceText(boards) {
             const out = [];
@@ -4492,7 +4508,7 @@ window.manualFirebasePush = async function () {
             modal.style.display = 'flex';
             document.getElementById('mail-status').textContent = '';
             try {
-                const s = await mailIpc().invoke('mail-get-settings');
+                const s = await mailCall('mail-get-settings');
                 document.getElementById('mail-naver-id').value = s.naverId || '';
                 document.getElementById('mail-to').value = s.to || '';
                 document.getElementById('mail-naver-pass').value = '';
@@ -4507,7 +4523,7 @@ window.manualFirebasePush = async function () {
         }
 
         window.saveMailSettings = async () => {
-            const r = await mailIpc().invoke('mail-save-settings', {
+            const r = await mailCall('mail-save-settings', {
                 naverId: document.getElementById('mail-naver-id').value,
                 password: document.getElementById('mail-naver-pass').value,
                 to: document.getElementById('mail-to').value
@@ -4515,7 +4531,7 @@ window.manualFirebasePush = async function () {
             if (r && r.ok) {
                 setMailStatus('설정을 저장했어요.', '#16a34a');
                 document.getElementById('mail-naver-pass').value = '';
-                const s = await mailIpc().invoke('mail-get-settings');
+                const s = await mailCall('mail-get-settings');
                 document.getElementById('mail-pass-saved').style.display = s.hasPassword ? 'inline' : 'none';
                 return true;
             }
@@ -4537,7 +4553,7 @@ window.manualFirebasePush = async function () {
                 // 사진(base64)은 용량이 너무 커서 첨부 JSON에서는 뺀다
                 const json = JSON.stringify(boards, (k, v) => (k === 'photo' && typeof v === 'string' && v.startsWith('data:')) ? '[사진 생략]' : v, 2);
                 const text = buildEvidenceText(boards);
-                const r = await mailIpc().invoke('mail-send', {
+                const r = await mailCall('mail-send', {
                     subject: `[시놉시스 기록] ${boards.length === 1 ? (boards[0].title || '제목 없음') : `전체 ${boards.length}개 작품`} (${stamp})`,
                     text: text.length > 20000 ? text.slice(0, 20000) + '\n…(이하 첨부 파일 참고)' : text,
                     attachments: [

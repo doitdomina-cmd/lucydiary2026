@@ -144,6 +144,23 @@ lucide.createIcons({icons});\``);if(typeof c>"u")throw new Error("`createIcons()
         }
         .block-item:hover { border-color: #cbd5e1; }
         .block-item .rich-editor { min-height: 1.4em; }
+        /* 블록의 작성일/수정일 — 평소엔 안 보이다가 마우스를 올리면 오른쪽 아래에 작게 나타난다 */
+        .block-stamp {
+            position: absolute; right: 22px; bottom: 0; z-index: 5;
+            font-size: 9px; line-height: 1.5; color: #a3aab8; white-space: nowrap;
+            background: rgba(255,255,255,0.92); padding: 0 4px; border-radius: 4px;
+            opacity: 0; transition: opacity 0.15s; cursor: pointer;
+        }
+        .block-item:hover .block-stamp { opacity: 1; }
+        .char-history-btn {
+            position: absolute; top: 6px; right: 10px; z-index: 5;
+            font-size: 10px; font-weight: 700; color: #a3aab8; background: #f8fafc;
+            border: 1px solid #eef0f4; border-radius: 9999px; padding: 2px 9px; cursor: pointer;
+            opacity: 0; transition: opacity 0.15s;
+        }
+        #char-profile-box:hover .char-history-btn { opacity: 1; }
+        .char-history-btn:hover { color: #3b82f6; border-color: #bfdbfe; }
+        .block-stamp:hover { color: #3b82f6; }
         .block-item.block-dragging { opacity: 0.35; }
         .block-item.active-block { box-shadow: 0 0 0 2px #3b82f6; }
         .block-item.block-drag-over-top { border-top-color: #3b82f6; box-shadow: inset 0 2px 0 0 #3b82f6; }
@@ -995,6 +1012,50 @@ body[data-theme="follow"] .theme-canvas ::placeholder { color: var(--pf-muted, #
                 <button onclick="window.resetData()" class="text-gray-400 hover:text-red-500 transition-colors">초기화</button>
             </div>
             <input type="file" id="import-file" accept=".json" class="hidden" onchange="window.importData(event)">
+            <button id="mail-open-btn" onclick="window.openMailModal()" class="w-full text-[10px] text-gray-500 hover:text-blue-600 transition-colors" style="display:none; margin-top:4px; padding:5px 0; border:1px dashed #d5dae3; border-radius:8px;" title="작성일·수정 이력이 담긴 기록을 내 네이버 메일로 보내요">✉ 이메일로 기록 보내기</button>
+        </div>
+    </div>
+
+    <!-- 이메일로 기록 보내기 모달 (PC 앱 전용) -->
+    <div id="mail-modal" style="display:none; position:fixed; inset:0; z-index:200; background:rgba(15,23,42,0.45); align-items:center; justify-content:center;">
+        <div style="width:480px; max-width:92vw; max-height:90vh; overflow-y:auto; background:#fff; border-radius:20px; box-shadow:0 20px 60px rgba(0,0,0,0.25); padding:26px;">
+            <h3 class="text-base font-bold text-gray-800" style="margin-bottom:4px;">이메일로 기록 보내기</h3>
+            <p class="text-xs text-gray-400" style="margin-bottom:16px;">작성일·수정 이력이 담긴 파일이 내 네이버 메일로 가요. 메일에 찍힌 발송 시각이 제3자 기록이 돼요.</p>
+            <div style="display:flex; flex-direction:column; gap:12px;">
+                <div>
+                    <label class="text-xs font-bold text-gray-500" style="display:block; margin-bottom:5px;">네이버 아이디 <span style="font-weight:400; color:#94a3b8;">(@naver.com 앞부분)</span></label>
+                    <input id="mail-naver-id" type="text" class="w-full text-sm outline-none border border-gray-200 rounded-lg" style="padding:8px 12px;" autocomplete="off">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-gray-500" style="display:block; margin-bottom:5px;">앱 비밀번호 <span id="mail-pass-saved" style="font-weight:400; color:#16a34a; display:none;">· 저장되어 있어요 (바꿀 때만 입력)</span></label>
+                    <input id="mail-naver-pass" type="password" class="w-full text-sm outline-none border border-gray-200 rounded-lg" style="padding:8px 12px;" autocomplete="new-password">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-gray-500" style="display:block; margin-bottom:5px;">받는 주소 <span style="font-weight:400; color:#94a3b8;">(비우면 내 네이버로)</span></label>
+                    <input id="mail-to" type="text" class="w-full text-sm outline-none border border-gray-200 rounded-lg" style="padding:8px 12px;" autocomplete="off">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-gray-500" style="display:block; margin-bottom:5px;">보낼 범위</label>
+                    <select id="mail-scope" class="w-full text-sm outline-none border border-gray-200 rounded-lg bg-white" style="padding:8px 12px;">
+                        <option value="current">지금 보고 있는 작품만</option>
+                        <option value="all">모든 작품 전체</option>
+                    </select>
+                </div>
+                <details class="text-xs text-gray-500" style="background:#f8fafc; border-radius:10px; padding:10px 12px;">
+                    <summary style="cursor:pointer; font-weight:700;">처음 한 번만: 네이버에서 준비할 것</summary>
+                    <ol style="margin:8px 0 0 16px; list-style:decimal; line-height:1.7;">
+                        <li>네이버 메일 → 환경설정 → <b>POP3/IMAP 설정</b> → "IMAP/SMTP 설정"을 <b>사용함</b>으로 저장</li>
+                        <li>2단계 인증을 쓰고 있다면 네이버 계정 → 보안설정 → 2단계 인증 → <b>애플리케이션 비밀번호</b>를 만들어서 위 칸에 넣기 (안 쓰고 있으면 평소 비밀번호)</li>
+                        <li>비밀번호는 이 PC에서만 풀 수 있게 암호화되어 저장돼요</li>
+                    </ol>
+                </details>
+                <div id="mail-status" class="text-xs" style="min-height:16px;"></div>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+                <button onclick="window.closeMailModal()" class="text-sm text-gray-500 hover:text-gray-700" style="padding:9px 16px; border-radius:10px; background:#f1f5f9;">닫기</button>
+                <button onclick="window.saveMailSettings()" class="text-sm text-gray-700" style="padding:9px 16px; border-radius:10px; background:#e2e8f0;">설정 저장</button>
+                <button id="mail-send-btn" onclick="window.sendEvidenceMail()" class="text-sm text-white font-bold" style="padding:9px 18px; border-radius:10px; background:#2563eb;">보내기</button>
+            </div>
         </div>
     </div>
 
@@ -1087,7 +1148,8 @@ body[data-theme="follow"] .theme-canvas ::placeholder { color: var(--pf-muted, #
                             </label>
                         </div>
                         <div class="flex flex-col flex-1 min-w-0">
-                            <div id="char-profile-box" class="bg-white border border-gray-100 rounded-2xl" style="padding:4px 20px; box-shadow:0 2px 10px rgba(15,23,42,0.05); border-top:3px solid #c4b5fd; min-height:420px; box-sizing:border-box;">
+                            <div id="char-profile-box" class="bg-white border border-gray-100 rounded-2xl" style="position:relative; padding:4px 20px; box-shadow:0 2px 10px rgba(15,23,42,0.05); border-top:3px solid #c4b5fd; min-height:420px; box-sizing:border-box;">
+                                <button type="button" onclick="window.showStampHistory('char')" class="char-history-btn" title="이 캐릭터 프로필의 작성·수정 기록 보기">기록</button>
                                 <div class="flex items-start gap-3" id="char-name-age-row" style="padding:10px 4px; border-bottom:1px solid #f1f3f5;">
                                     <label class="text-sm font-bold text-gray-700 shrink-0" style="padding-left:4px; padding-top:4px;">이름 :</label>
                                     <textarea rows="1" id="char-name-input" oninput="window.updateCharField('name', this.value); window.autoGrowTextarea(this);" spellcheck="false"
@@ -1328,6 +1390,8 @@ try {
 // (웹뷰 안에서는 구글이 보안상 팝업 로그인을 차단하기 때문)
 let isNativeAppEnvironment = !!(typeof window !== 'undefined' && window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
 let isAutoAuthEnvironment = isNodeEnvironment || isNativeAppEnvironment;
+// 이메일로 기록 보내기는 PC 앱(Electron)에서만 보인다 (웹에서는 버튼이 계속 숨겨져 있다)
+if (isNodeEnvironment) { const mb = document.getElementById('mail-open-btn'); if (mb) mb.style.display = 'block'; }
 
 // --- GitHub 동기화 (여러 PC간 데이터 이어쓰기용) ---
 let ghConfigPath = '';
@@ -3458,7 +3522,10 @@ window.manualFirebasePush = async function () {
             if (!board || !window.activeCharTab) return;
             if (!board.charProfiles) board.charProfiles = {};
             if (!board.charProfiles[window.activeCharTab]) board.charProfiles[window.activeCharTab] = {};
-            board.charProfiles[window.activeCharTab][key] = value;
+            const holder = board.charProfiles[window.activeCharTab];
+            stampField(holder, key, holder[key], value);
+            holder[key] = value;
+            refreshActiveFieldTitle(holder, key);
             window.triggerSave();
         };
 
@@ -3708,6 +3775,11 @@ window.manualFirebasePush = async function () {
             if (jobInput) { jobInput.value = profile.job || ''; window.autoGrowTextarea(jobInput); }
 
             renderCharProfileFields();
+            // 각 칸에 마우스를 올리면 작성일/수정일이 말풍선으로 보이게
+            document.querySelectorAll('#page-character textarea[oninput*="updateCharField"]').forEach(t => {
+                const m = /updateCharField\('([^']+)'/.exec(t.getAttribute('oninput') || '');
+                if (m) t.title = stampTitle(profile, m[1]);
+            });
             if (window.lucide) window.lucide.createIcons();
         }
 
@@ -3716,7 +3788,7 @@ window.manualFirebasePush = async function () {
             return `
                 <div class="flex items-center gap-2">
                     <label class="text-xs font-bold text-gray-400 shrink-0" style="width:44px;">${label}</label>
-                    <input type="text" value="${escapeHtml(sc[key] || '')}" oninput="window.updateSubCharField('${sc.id}','${key}',this.value)" spellcheck="false"
+                    <input type="text" value="${escapeHtml(sc[key] || '')}"${stampTitleAttr(sc, key)} oninput="window.updateSubCharField('${sc.id}','${key}',this.value)" spellcheck="false"
                            class="flex-1 min-w-0 text-sm text-gray-700 bg-transparent outline-none border-b border-gray-100 py-1">
                 </div>`;
         }
@@ -3724,7 +3796,7 @@ window.manualFirebasePush = async function () {
         function subCharNoteRow(sc) {
             return `
                 <div class="subchar-note-row" style="margin-left:148px;">
-                    <textarea rows="1" oninput="window.updateSubCharField('${sc.id}','note',this.value); window.autoGrowTextarea(this);" spellcheck="false"
+                    <textarea rows="1"${stampTitleAttr(sc, 'note')} oninput="window.updateSubCharField('${sc.id}','note',this.value); window.autoGrowTextarea(this);" spellcheck="false"
                               class="w-full text-sm text-gray-700 bg-transparent outline-none border-b border-gray-100 py-1 resize-none"
                               style="overflow:hidden; min-height:0; height:26px;">${escapeHtml(sc.note || '')}</textarea>
                 </div>`;
@@ -3742,6 +3814,7 @@ window.manualFirebasePush = async function () {
                      ondragleave="this.classList.remove('subchar-drag-over')"
                      ondrop="this.classList.remove('subchar-drag-over'); window.handleSubCharCardDrop(event,'${sc.id}')">
                     <div class="absolute flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" style="top:10px; right:44px; z-index:5;">
+                        <button onclick="window.showStampHistory('sub','${sc.id}'); event.stopPropagation();" class="text-gray-300 hover:text-blue-500" title="작성·수정 기록 보기"><i data-lucide="history" class="w-4 h-4"></i></button>
                         ${markerBtn('star', 'text-yellow-500')}
                         ${markerBtn('alert-circle', 'text-red-500')}
                     </div>
@@ -3880,7 +3953,14 @@ window.manualFirebasePush = async function () {
             const board = window.getCurrentBoard();
             if (!board || !Array.isArray(board.subChars)) return;
             const sc = board.subChars.find(s => s.id === id);
-            if (sc) { sc[key] = value; window.triggerSave(); }
+            if (sc) {
+                if (typeof value === 'string' && STAMP_FIELD_LABELS[key]) {
+                    stampField(sc, key, sc[key], value);
+                    refreshActiveFieldTitle(sc, key);
+                }
+                sc[key] = value;
+                window.triggerSave();
+            }
         };
 
         window.uploadSubCharPhoto = async (event, id) => {
@@ -4005,13 +4085,14 @@ window.manualFirebasePush = async function () {
                 <div class="hover-card group rounded-2xl flex items-start gap-2" data-note-entry-id="${entry.id}" style="padding:18px 20px; box-shadow:0 3px 14px rgba(15,23,42,0.07); background-color:${bgHex};">
                     <div class="flex-1 min-w-0 flex flex-col gap-1.5">
                         ${markers.length ? `<div class="flex gap-1">${markers.map(m => `<i data-lucide="${m}" class="w-3.5 h-3.5 ${markerColors[m] || 'text-gray-400'}"></i>`).join('')}</div>` : ''}
-                        <div id="editor-note-${entry.id}" contenteditable="true" spellcheck="false"
+                        <div id="editor-note-${entry.id}" contenteditable="true" spellcheck="false"${stampTitleAttr(entry, 'text')}
                              oninput="window.updateNoteEntry('${entry.id}', this.innerHTML); window.toggleEmptyEditor(this);"
                              onfocus="window.activeBlockEditorId='editor-note-${entry.id}'; window.activeNoteEntryId='${entry.id}';"
                              class="rich-editor outline-none text-gray-700 text-sm ${isEmpty ? 'empty-editor' : ''}"
                              style="min-height:46px; padding:2px 4px; line-height:1.9;" data-placeholder="${escapeHtml(memoTabPlaceholders[window.activeNoteTab] || '내용을 입력하세요.')}">${entry.text || ''}</div>
                     </div>
                     <div class="flex items-center gap-1 shrink-0">
+                        <button onclick="window.showStampHistory('memo','${entry.id}')" class="card-remove-btn text-gray-300 hover:text-blue-500" title="작성·수정 기록 보기"><i data-lucide="history" class="w-4 h-4"></i></button>
                         ${markerBtn('star', 'text-yellow-500')}
                         ${markerBtn('heart', 'text-red-500')}
                         <button onclick="window.deleteNoteEntry('${entry.id}')" class="card-remove-btn text-gray-300 hover:text-red-500" title="삭제">
@@ -4066,7 +4147,12 @@ window.manualFirebasePush = async function () {
             const arr = board.memoEntries[window.activeNoteTab];
             if (!arr) return;
             const e = arr.find(x => x.id === id);
-            if (e) { e.text = value; window.triggerSave(); }
+            if (e) {
+                stampField(e, 'text', e.text, value);
+                e.text = value;
+                refreshActiveFieldTitle(e, 'text');
+                window.triggerSave();
+            }
         };
 
         window.toggleNoteMarker = (id, marker) => {
@@ -4163,11 +4249,307 @@ window.manualFirebasePush = async function () {
         };
 
         // --- 시놉시스 블록 (카드 안의 여러 텍스트 블록) ---
+        // 작성일/수정일 기록 (나중에 "내가 먼저 썼다"를 보여줄 자료용).
+        // 수정 이력은 화면엔 안 띄우고 데이터로만 쌓는다. 30분 이내의 연속 수정은 한 묶음으로 합치고,
+        // 최대 30개까지만 보관한다 (첫 기록은 항상 남기고, 넘치면 그다음으로 오래된 것부터 정리).
+        const BLOCK_HISTORY_GAP_MS = 30 * 60 * 1000;
+        const BLOCK_HISTORY_MAX = 30;
+
+        function fmtStamp(iso) {
+            const d = new Date(iso);
+            if (isNaN(d)) return '';
+            const p = (n) => String(n).padStart(2, '0');
+            return `${d.getFullYear()}.${p(d.getMonth() + 1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+        }
+
+        function blockStampHtml(cardId, block) {
+            if (!block || !block.createdAt) return '';
+            const created = `${block.legacy ? '기록 시작 ' : '작성 '}${fmtStamp(block.createdAt)}`;
+            const edited = (block.updatedAt && block.updatedAt !== block.createdAt) ? ` · 수정 ${fmtStamp(block.updatedAt)}` : '';
+            return `<span class="block-stamp" onclick="window.showBlockHistory('${cardId}', '${block.id}'); event.stopPropagation();" title="클릭하면 수정 이력을 볼 수 있어요">${created}${edited}</span>`;
+        }
+
+        function stampBlockEdit(block, prevHtml, newHtml) {
+            const nowIso = new Date().toISOString();
+            if (!block.createdAt) {
+                // 이 기능이 생기기 전부터 있던 블록: 원래 작성일은 알 수 없으니 '기록 시작'으로 표시
+                block.createdAt = nowIso;
+                block.legacy = true;
+            }
+            block.updatedAt = nowIso;
+            if (!Array.isArray(block.history)) block.history = [];
+            if (block.history.length === 0 && prevHtml && prevHtml.trim()) {
+                block.history.push({ t: block.createdAt, u: block.createdAt, html: prevHtml, legacy: true });
+            }
+            const last = block.history[block.history.length - 1];
+            if (last && !last.legacy && (Date.now() - new Date(last.t).getTime()) < BLOCK_HISTORY_GAP_MS) {
+                last.u = nowIso; last.html = newHtml;
+            } else {
+                block.history.push({ t: nowIso, u: nowIso, html: newHtml });
+                if (block.history.length > BLOCK_HISTORY_MAX) block.history.splice(1, 1);
+            }
+        }
+
         window.updateBlockContent = (cardId, blockId, htmlContent) => {
             const result = findCardAndRow(cardId);
             if (!result) return;
             const block = (result.card.blocks || []).find(b => b.id === blockId);
-            if (block) { block.html = htmlContent; window.triggerSave(); }
+            if (block) {
+                stampBlockEdit(block, block.html, htmlContent);
+                block.html = htmlContent;
+                // 지금 보고 있는 블록의 표시도 바로 갱신 (입력 중인 글자 커서는 건드리지 않음)
+                const blockEl = document.querySelector(`.block-item[data-block-id="${blockId}"]`);
+                if (blockEl) {
+                    const old = blockEl.querySelector('.block-stamp');
+                    if (old) old.remove();
+                    blockEl.insertAdjacentHTML('beforeend', blockStampHtml(cardId, block));
+                }
+                window.triggerSave();
+            }
+        };
+
+        window.showBlockHistory = (cardId, blockId) => {
+            const result = findCardAndRow(cardId);
+            const block = result && (result.card.blocks || []).find(b => b.id === blockId);
+            if (!block) return;
+            const toText = (html) => { const d = document.createElement('div'); d.innerHTML = html || ''; return d.innerText || d.textContent || ''; };
+            const items = (block.history || []).slice().reverse().map(h => `
+                <div style="border-top:1px solid #eef0f4; padding:10px 0;">
+                    <div style="font-size:11px; color:#7c8899; font-weight:700; margin-bottom:4px;">${fmtStamp(h.t)}${h.u && h.u !== h.t ? ` ~ ${fmtStamp(h.u)}` : ''}${h.legacy ? ' (기록 시작 시점의 내용)' : ''}</div>
+                    <div style="font-size:13px; color:#334155; white-space:pre-wrap; line-height:1.6;">${escapeHtml(toText(h.html)) || '(빈 내용)'}</div>
+                </div>`).join('');
+            const wrap = document.createElement('div');
+            wrap.style.cssText = 'position:fixed; inset:0; z-index:300; background:rgba(15,23,42,0.45); display:flex; align-items:center; justify-content:center; padding:24px;';
+            wrap.onclick = (e) => { if (e.target === wrap) wrap.remove(); };
+            wrap.innerHTML = `
+                <div style="background:#fff; border-radius:16px; width:560px; max-width:100%; max-height:80vh; display:flex; flex-direction:column; box-shadow:0 20px 50px rgba(0,0,0,.25);">
+                    <div style="padding:18px 22px 10px; display:flex; align-items:center; justify-content:space-between;">
+                        <div>
+                            <div style="font-size:15px; font-weight:800; color:#1e293b;">수정 이력</div>
+                            <div style="font-size:11px; color:#94a3b8; margin-top:2px;">${block.legacy ? '기록 시작' : '작성'} ${fmtStamp(block.createdAt)}${block.updatedAt && block.updatedAt !== block.createdAt ? ` · 마지막 수정 ${fmtStamp(block.updatedAt)}` : ''}</div>
+                        </div>
+                        <button style="font-size:22px; color:#94a3b8; background:none; border:none; cursor:pointer;" onclick="this.closest('div[style*=fixed]').remove()">×</button>
+                    </div>
+                    <div style="padding:0 22px 18px; overflow-y:auto;">${items || '<div style="padding:14px 0; font-size:13px; color:#94a3b8;">아직 기록된 수정 이력이 없어요.</div>'}</div>
+                </div>`;
+            document.body.appendChild(wrap);
+        };
+
+        // ── 캐릭터/조연/메모 칸의 작성일·수정일 (칸 위에 마우스를 올리면 말풍선으로 보이고, 이력은 '기록' 버튼으로 모아서 봄)
+        const STAMP_FIELD_LABELS = {
+            name: '이름', age: '나이', keyword: '키워드', job: '직업',
+            mbti: 'MBTI / 성격', scent: '향수 / 고유 체향', hobby: '취미 / 무의식적 습관', style: '선호 색상 / 스타일',
+            speech: '말버릇 / 대사 톤', appearance: '상세 외양 및 체격',
+            dailyRoutine: '하루 일과', fetish: '성적 취향 및 성감대', trigger: '발작 버튼', trauma: '결핍 / 트라우마',
+            relationship: '관계 역학', charm: '상업적 매력', currentWant: '현재 가장 원하는 것',
+            fearOfLoss: '절대 잃고 싶지 않은 것 / 두려움', hiddenFromPartner: '상대에게 숨기는 것', arcChange: '초반 → 결말 변화',
+            personality: '성격', role: '직책', relation: '관계', note: '메모', text: '메모'
+        };
+
+        function stampField(holder, key, prev, next) {
+            if (!holder) return;
+            if (!holder._stamps) holder._stamps = {};
+            const nowIso = new Date().toISOString();
+            let s = holder._stamps[key];
+            if (!s) {
+                s = holder._stamps[key] = { createdAt: nowIso, updatedAt: nowIso, history: [] };
+                if (prev && String(prev).trim()) {
+                    // 이 기능이 생기기 전부터 쓰여 있던 내용: 원래 작성일은 알 수 없으니 '기록 시작'으로 표시
+                    s.legacy = true;
+                    s.history.push({ t: nowIso, u: nowIso, text: prev, legacy: true });
+                }
+            }
+            s.updatedAt = nowIso;
+            const last = s.history[s.history.length - 1];
+            if (last && !last.legacy && (Date.now() - new Date(last.t).getTime()) < BLOCK_HISTORY_GAP_MS) {
+                last.u = nowIso; last.text = next;
+            } else {
+                s.history.push({ t: nowIso, u: nowIso, text: next });
+                if (s.history.length > BLOCK_HISTORY_MAX) s.history.splice(1, 1);
+            }
+        }
+
+        function stampTitle(holder, key) {
+            const s = holder && holder._stamps && holder._stamps[key];
+            if (!s) return '';
+            return `${s.legacy ? '기록 시작' : '작성'} ${fmtStamp(s.createdAt)}${s.updatedAt !== s.createdAt ? ` · 수정 ${fmtStamp(s.updatedAt)}` : ''}`;
+        }
+        function stampTitleAttr(holder, key) {
+            const t = stampTitle(holder, key);
+            return t ? ` title="${t}"` : '';
+        }
+        // 지금 입력 중인 칸의 말풍선을 바로 갱신
+        function refreshActiveFieldTitle(holder, key) {
+            const el = document.activeElement;
+            if (el && (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT' || el.isContentEditable)) el.title = stampTitle(holder, key);
+        }
+
+        window.showStampHistory = (kind, id) => {
+            const board = window.getCurrentBoard();
+            if (!board) return;
+            let holder = null, heading = '';
+            if (kind === 'char') { holder = board.charProfiles && board.charProfiles[window.activeCharTab]; heading = '캐릭터 프로필'; }
+            else if (kind === 'sub') { holder = (board.subChars || []).find(s => s.id === id); heading = '조연 카드'; }
+            else if (kind === 'memo') { holder = ((board.memoEntries || {})[window.activeNoteTab] || []).find(e => e.id === id); heading = '메모'; }
+            const stamps = (holder && holder._stamps) || {};
+            const toText = (html) => { const d = document.createElement('div'); d.innerHTML = html || ''; return d.innerText || d.textContent || ''; };
+            const keys = Object.keys(stamps).filter(k => stamps[k].history && stamps[k].history.length);
+            const body = keys.map(k => {
+                const s = stamps[k];
+                const items = s.history.slice().reverse().map(h => `
+                    <div style="padding:8px 0 8px 12px; border-left:2px solid #e5e9f0; margin:6px 0;">
+                        <div style="font-size:11px; color:#7c8899; font-weight:700; margin-bottom:3px;">${fmtStamp(h.t)}${h.u && h.u !== h.t ? ` ~ ${fmtStamp(h.u)}` : ''}${h.legacy ? ' (기록 시작 시점의 내용)' : ''}</div>
+                        <div style="font-size:13px; color:#334155; white-space:pre-wrap; line-height:1.6;">${escapeHtml(toText(h.text)) || '(빈 내용)'}</div>
+                    </div>`).join('');
+                return `<div style="border-top:1px solid #eef0f4; padding:12px 0;">
+                    <div style="font-size:13px; font-weight:800; color:#1e293b;">${STAMP_FIELD_LABELS[k] || k} <span style="font-size:11px; font-weight:600; color:#94a3b8;">· ${stampTitle(holder, k)}</span></div>${items}</div>`;
+            }).join('');
+            const wrap = document.createElement('div');
+            wrap.style.cssText = 'position:fixed; inset:0; z-index:300; background:rgba(15,23,42,0.45); display:flex; align-items:center; justify-content:center; padding:24px;';
+            wrap.onclick = (e) => { if (e.target === wrap) wrap.remove(); };
+            wrap.innerHTML = `
+                <div style="background:#fff; border-radius:16px; width:600px; max-width:100%; max-height:80vh; display:flex; flex-direction:column; box-shadow:0 20px 50px rgba(0,0,0,.25);">
+                    <div style="padding:18px 22px 10px; display:flex; align-items:center; justify-content:space-between;">
+                        <div style="font-size:15px; font-weight:800; color:#1e293b;">${heading} 작성·수정 기록</div>
+                        <button style="font-size:22px; color:#94a3b8; background:none; border:none; cursor:pointer;" onclick="this.closest('div[style*=fixed]').remove()">×</button>
+                    </div>
+                    <div style="padding:0 22px 18px; overflow-y:auto;">${body || '<div style="padding:14px 0; font-size:13px; color:#94a3b8;">아직 기록된 내용이 없어요. 이 칸을 수정하면 그때부터 기록돼요.</div>'}</div>
+                </div>`;
+            document.body.appendChild(wrap);
+        };
+
+        // ── 이메일로 기록 보내기 (PC 앱 전용, 네이버 SMTP는 main.js에서 처리) ──
+        function mailIpc() { return require('electron').ipcRenderer; }
+
+        function buildEvidenceText(boards) {
+            const out = [];
+            const plain = (html) => { const d = document.createElement('div'); d.innerHTML = html || ''; return (d.innerText || d.textContent || '').trim(); };
+            const stampLine = (obj, key) => { const t = stampTitle(obj, key); return t ? `   [${t}]` : ''; };
+            out.push('작성·수정 기록 (에피소드 기획 보드)');
+            out.push(`내보낸 시각: ${fmtStamp(new Date().toISOString())}`);
+            out.push('※ 작성/수정 시각은 작성한 PC의 시계 기준입니다. 이 메일의 발송 시각이 별도의 기록이 됩니다.');
+            out.push('※ "기록 시작"은 이 기록 기능이 생기기 전부터 있던 내용이라 원래 작성일은 알 수 없고, 기록을 시작한 시점을 뜻합니다.');
+            out.push('');
+            boards.forEach(board => {
+                const tabs = board.memoTabs || DEFAULT_MEMO_TABS;
+                const tabLabel = (id) => charTabLabel(board, id, (tabs.find(t => t.id === id) || {}).label || id);
+                out.push('='.repeat(60));
+                out.push(`작품: ${board.title || '(제목 없음)'}${board.genre ? ` [${board.genre}]` : ''}`);
+                out.push('='.repeat(60));
+                out.push('');
+                out.push('■ 플롯');
+                (board.data || []).forEach(row => (row.cards || []).forEach(card => {
+                    out.push(`◆ ${card.title || '(제목 없음)'}${card.location ? ` — ${card.location}` : ''}`);
+                    (card.blocks || []).forEach(b => {
+                        const txt = plain(b.html);
+                        if (!txt && !b.createdAt) return;
+                        const stamp = b.createdAt ? `   [${b.legacy ? '기록 시작' : '작성'} ${fmtStamp(b.createdAt)}${b.updatedAt && b.updatedAt !== b.createdAt ? ` · 수정 ${fmtStamp(b.updatedAt)}` : ''}]` : '';
+                        out.push(`  - ${txt.replace(/\n/g, '\n    ') || '(빈 블록)'}${stamp}`);
+                        (b.history || []).forEach(h => out.push(`      · 이력 ${fmtStamp(h.t)}${h.u && h.u !== h.t ? ` ~ ${fmtStamp(h.u)}` : ''}${h.legacy ? ' (기록 시작 시점의 내용)' : ''}: ${plain(h.html).replace(/\n/g, ' ')}`));
+                    });
+                }));
+                out.push('');
+                out.push('■ 캐릭터');
+                Object.keys(board.charProfiles || {}).forEach(tabId => {
+                    const p = board.charProfiles[tabId] || {};
+                    const keys = Object.keys(p).filter(k => k !== '_stamps' && typeof p[k] === 'string' && p[k].trim());
+                    if (!keys.length) return;
+                    out.push(`◆ ${tabLabel(tabId)}`);
+                    keys.forEach(k => {
+                        out.push(`  - ${STAMP_FIELD_LABELS[k] || k}: ${p[k].replace(/\n/g, ' / ')}${stampLine(p, k)}`);
+                        const s = p._stamps && p._stamps[k];
+                        if (s) (s.history || []).forEach(h => out.push(`      · 이력 ${fmtStamp(h.t)}${h.u && h.u !== h.t ? ` ~ ${fmtStamp(h.u)}` : ''}${h.legacy ? ' (기록 시작 시점의 내용)' : ''}: ${String(h.text || '').replace(/\n/g, ' ')}`));
+                    });
+                });
+                (board.subChars || []).forEach(sc => {
+                    out.push(`◆ 조연: ${sc.name || '(이름 없음)'}`);
+                    ['name', 'age', 'relation', 'role', 'personality', 'note'].forEach(k => {
+                        if (typeof sc[k] !== 'string' || !sc[k].trim()) return;
+                        out.push(`  - ${STAMP_FIELD_LABELS[k] || k}: ${sc[k].replace(/\n/g, ' / ')}${stampLine(sc, k)}`);
+                        const s = sc._stamps && sc._stamps[k];
+                        if (s) (s.history || []).forEach(h => out.push(`      · 이력 ${fmtStamp(h.t)}${h.u && h.u !== h.t ? ` ~ ${fmtStamp(h.u)}` : ''}${h.legacy ? ' (기록 시작 시점의 내용)' : ''}: ${String(h.text || '').replace(/\n/g, ' ')}`));
+                    });
+                });
+                out.push('');
+                out.push('■ 메모');
+                Object.keys(board.memoEntries || {}).forEach(tabId => {
+                    const entries = (board.memoEntries[tabId] || []).filter(e => plain(e.text));
+                    if (!entries.length) return;
+                    out.push(`◆ ${tabLabel(tabId)}`);
+                    entries.forEach(e => {
+                        out.push(`  - ${plain(e.text).replace(/\n/g, '\n    ')}${stampLine(e, 'text')}`);
+                        const s = e._stamps && e._stamps.text;
+                        if (s) (s.history || []).forEach(h => out.push(`      · 이력 ${fmtStamp(h.t)}${h.u && h.u !== h.t ? ` ~ ${fmtStamp(h.u)}` : ''}${h.legacy ? ' (기록 시작 시점의 내용)' : ''}: ${plain(h.text).replace(/\n/g, ' ')}`));
+                    });
+                });
+                out.push('');
+            });
+            return out.join('\n');
+        }
+
+        window.openMailModal = async () => {
+            const modal = document.getElementById('mail-modal');
+            modal.style.display = 'flex';
+            document.getElementById('mail-status').textContent = '';
+            try {
+                const s = await mailIpc().invoke('mail-get-settings');
+                document.getElementById('mail-naver-id').value = s.naverId || '';
+                document.getElementById('mail-to').value = s.to || '';
+                document.getElementById('mail-naver-pass').value = '';
+                document.getElementById('mail-pass-saved').style.display = s.hasPassword ? 'inline' : 'none';
+            } catch (e) { document.getElementById('mail-status').textContent = '설정을 불러오지 못했어요: ' + e.message; }
+        };
+        window.closeMailModal = () => { document.getElementById('mail-modal').style.display = 'none'; };
+
+        function setMailStatus(msg, color) {
+            const el = document.getElementById('mail-status');
+            el.textContent = msg; el.style.color = color || '#64748b';
+        }
+
+        window.saveMailSettings = async () => {
+            const r = await mailIpc().invoke('mail-save-settings', {
+                naverId: document.getElementById('mail-naver-id').value,
+                password: document.getElementById('mail-naver-pass').value,
+                to: document.getElementById('mail-to').value
+            });
+            if (r && r.ok) {
+                setMailStatus('설정을 저장했어요.', '#16a34a');
+                document.getElementById('mail-naver-pass').value = '';
+                const s = await mailIpc().invoke('mail-get-settings');
+                document.getElementById('mail-pass-saved').style.display = s.hasPassword ? 'inline' : 'none';
+                return true;
+            }
+            setMailStatus((r && r.error) || '저장에 실패했어요.', '#dc2626');
+            return false;
+        };
+
+        window.sendEvidenceMail = async () => {
+            const btn = document.getElementById('mail-send-btn');
+            btn.disabled = true;
+            try {
+                if (!(await window.saveMailSettings())) return;
+                const scope = document.getElementById('mail-scope').value;
+                const boards = scope === 'all' ? window.workspaces : [window.getCurrentBoard()].filter(Boolean);
+                if (!boards.length) { setMailStatus('보낼 작품이 없어요.', '#dc2626'); return; }
+                setMailStatus('보내는 중이에요…', '#64748b');
+                const stamp = fmtStamp(new Date().toISOString());
+                const fileTag = new Date().toISOString().slice(0, 10);
+                // 사진(base64)은 용량이 너무 커서 첨부 JSON에서는 뺀다
+                const json = JSON.stringify(boards, (k, v) => (k === 'photo' && typeof v === 'string' && v.startsWith('data:')) ? '[사진 생략]' : v, 2);
+                const text = buildEvidenceText(boards);
+                const r = await mailIpc().invoke('mail-send', {
+                    subject: `[시놉시스 기록] ${boards.length === 1 ? (boards[0].title || '제목 없음') : `전체 ${boards.length}개 작품`} (${stamp})`,
+                    text: text.length > 20000 ? text.slice(0, 20000) + '\n…(이하 첨부 파일 참고)' : text,
+                    attachments: [
+                        { filename: `시놉시스_기록_${fileTag}.txt`, content: text, contentType: 'text/plain; charset=utf-8' },
+                        { filename: `시놉시스_원본데이터_${fileTag}.json`, content: json, contentType: 'application/json; charset=utf-8' }
+                    ]
+                });
+                if (r && r.ok) setMailStatus(`${r.to} 로 보냈어요.`, '#16a34a');
+                else setMailStatus('보내지 못했어요: ' + ((r && r.error) || '알 수 없는 오류'), '#dc2626');
+            } catch (e) {
+                setMailStatus('보내지 못했어요: ' + e.message, '#dc2626');
+            } finally { btn.disabled = false; }
         };
 
         window.addBlock = (cardId) => {
@@ -4176,7 +4558,8 @@ window.manualFirebasePush = async function () {
             if (!result) return;
             if (!Array.isArray(result.card.blocks)) result.card.blocks = [];
             const newBlockId = generateId();
-            result.card.blocks.push({ id: newBlockId, html: '', markers: [], color: '' });
+            const createdNow = new Date().toISOString();
+            result.card.blocks.push({ id: newBlockId, html: '', markers: [], color: '', createdAt: createdNow, updatedAt: createdNow, history: [] });
             renderAll();
             window.triggerSave();
             setTimeout(() => {
@@ -4373,7 +4756,8 @@ window.manualFirebasePush = async function () {
             if(row) {
                 const newId = generateId();
                 const firstBlockId = generateId();
-                row.cards.push({ id: newId, title: '', location: '', estWords: '', blocks: [{ id: firstBlockId, html: '' }], color: 'bg-white', markers: [], checklist: [], episode: '', foreshadows: [] });
+                const createdNow = new Date().toISOString();
+                row.cards.push({ id: newId, title: '', location: '', estWords: '', blocks: [{ id: firstBlockId, html: '', createdAt: createdNow, updatedAt: createdNow, history: [] }], color: 'bg-white', markers: [], checklist: [], episode: '', foreshadows: [] });
                 renderAll();
                 window.triggerSave();
                 setTimeout(() => {
@@ -4665,6 +5049,7 @@ window.manualFirebasePush = async function () {
                                                 class="block-del shrink-0 mt-1 text-gray-300 opacity-0 group-hover/block:opacity-100 hover:text-red-500" title="블록 삭제">
                                             <i data-lucide="x" class="w-3 h-3"></i>
                                         </button>
+                                        ${blockStampHtml(card.id, block)}
                                     </div>`;
                                     }).join('')}
                                 </div>

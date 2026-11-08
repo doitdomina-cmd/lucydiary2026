@@ -17960,6 +17960,36 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         let currentWebtoonSubWorkId = null;
         let currentWebtoonSubEntryId = null;
         let currentWebtoonTabWorkId = null;
+        // ── 메일 관리: 필명 탭마다 인사말·맺음말 (중간 내용은 작품 화면의 「메일 내용」) ──
+        let webtoonMailMode = false, webtoonMailPen = '';
+        function smMailPens() { return [...new Set([...(penNames || []), ...masterWorks.filter(w => !w.deleted).map(w => smPenOf(w.id))].filter(Boolean))]; }
+        function openWebtoonMailMgmt() { webtoonMailMode = true; renderWebtoonSubsList(); }
+        function selectMailPen(i) { webtoonMailPen = smMailPens()[i] || ''; renderWebtoonSubsList(); }
+        function smMmSave() {
+            if (!webtoonMailPen) return;
+            const m = (webtoonSubs['__mail__'] = webtoonSubs['__mail__'] || {}); m.__tpl__ = m.__tpl__ || {};
+            m.__tpl__['pen:' + webtoonMailPen] = { intro: document.getElementById('mm-intro').value, outro: document.getElementById('mm-outro').value };
+            save(); try { showMailCopyToast('저장했어요.'); } catch (e) {}
+        }
+        function smMmReset(k) { document.getElementById('mm-' + k).value = SM_TPL_DEF[k]; smMmSave(); }
+        function smMailMgmtHtml() {
+            const pens = smMailPens(), esc = t => String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            if (!pens.includes(webtoonMailPen)) webtoonMailPen = pens[0] || '';
+            if (!pens.length) return '<div class="text-center py-16 text-slate-400 text-sm">등록된 필명이 없어요.<br>작품 관리에서 필명을 먼저 지정해 주세요.</div>';
+            const tabs = pens.map((pn, i) => { const on = pn === webtoonMailPen; return `<button onclick="selectMailPen(${i})" class="px-3 py-1.5 rounded-full text-xs font-bold transition-all" style="background:${on ? '#f59e0b' : '#fff'}; color:${on ? '#fff' : '#78716c'}; border:1px solid ${on ? '#f59e0b' : '#e7e5e4'};">${esc(pn)}</button>`; }).join('');
+            const cnt = masterWorks.filter(w => !w.deleted && smPenOf(w.id) === webtoonMailPen).length;
+            return `<div class="border border-slate-200 rounded-xl p-4" style="background:white">
+                <div class="flex items-center gap-2 mb-1"><i class="fa-solid fa-envelope" style="color:#f59e0b"></i><span class="font-bold text-slate-700">메일 관리</span></div>
+                <div class="text-[11px] text-slate-400 mb-3">인사말·맺음말은 <b>필명마다</b> 따로, 중간 내용은 <b>작품마다</b>(왼쪽에서 작품 선택 → 「메일 내용」)에서 고쳐요. 자동으로 바뀌는 말: <b>{출판사}</b> <b>{장르}</b> <b>{필명}</b> <b>{제목}</b></div>
+                <div class="flex flex-wrap gap-1.5 mb-4">${tabs}</div>
+                <div class="text-xs text-slate-500 mb-1"><b class="text-slate-700">${esc(webtoonMailPen)}</b> · 이 필명의 작품 ${cnt}개에 적용</div>
+                <div class="flex items-center justify-between mt-3 mb-1"><label class="text-xs font-bold text-slate-500">인사말 (메일 맨 앞)</label><button onclick="smMmReset('intro')" class="text-[11px] text-slate-400 hover:text-slate-600">처음 문구로</button></div>
+                <textarea id="mm-intro" rows="6" spellcheck="false" onchange="smMmSave()" class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none" style="line-height:1.7;">${esc(smTpl('intro', webtoonMailPen))}</textarea>
+                <div class="flex items-center justify-between mt-3 mb-1"><label class="text-xs font-bold text-slate-500">맺음말 (메일 맨 끝)</label><button onclick="smMmReset('outro')" class="text-[11px] text-slate-400 hover:text-slate-600">처음 문구로</button></div>
+                <textarea id="mm-outro" rows="5" spellcheck="false" onchange="smMmSave()" class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none" style="line-height:1.7;">${esc(smTpl('outro', webtoonMailPen))}</textarea>
+                <div class="flex items-center justify-between mt-3"><span class="text-[11px] text-slate-400">칸 밖을 누르면 자동 저장돼요</span><button onclick="smMmSave()" class="px-4 py-2 rounded-xl text-white text-xs font-bold" style="background:#f59e0b"><i class="fa-solid fa-floppy-disk"></i> 저장</button></div>
+            </div>`;
+        }
 
         function renderWebtoonSubsList() {
             const container = document.getElementById('publisher-status-list');
@@ -18097,9 +18127,11 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 rightContent = `<div class="text-center py-16 text-slate-400 text-sm">왼쪽에서 작품을 선택하거나<br>작품 추가 버튼으로 시작하세요.</div>`;
             }
 
+            if (webtoonMailMode) rightContent = smMailMgmtHtml();
             container.innerHTML = `<div class="flex gap-4 h-full" style="min-height:400px">
                 <!-- 왼쪽 작품 탭 -->
                 <div class="w-52 shrink-0 flex flex-col">
+                    <button onclick="openWebtoonMailMgmt()" class="w-full mb-2 px-3 rounded-lg flex items-center gap-1.5 justify-center hover:-translate-y-0.5 transition-all" style="background:${webtoonMailMode ? '#f59e0b' : '#fff'}; color:${webtoonMailMode ? '#fff' : '#b45309'}; border:1px solid #f59e0b; padding-top:0.44rem; padding-bottom:0.44rem; font-size:0.8rem; font-weight:600;"><i class="fa-solid fa-envelope"></i> 메일 관리</button>
                     <button onclick="openWebtoonSubWorkPicker()" class="w-full mb-3 px-3 rounded-lg text-white flex items-center gap-1.5 justify-center hover:-translate-y-0.5 transition-all" style="background:var(--primary); padding-top:0.44rem; padding-bottom:0.44rem; font-size:0.8rem; font-weight:500;"><i class="fa-solid fa-plus"></i> 작품 추가</button>
                     <div class="wsub-left border border-slate-200 rounded-xl overflow-hidden" style="background:white">
                         ${tabListHtml || '<p class="text-xs text-slate-400 text-center py-4">추가된 작품 없음</p>'}
@@ -18138,6 +18170,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         }
 
         function selectWebtoonTab(workId) {
+            webtoonMailMode = false;
             currentWebtoonTabWorkId = workId;
             renderWebtoonSubsList();
         }
@@ -18206,7 +18239,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             document.getElementById('wsub-picker-overlay')?.remove();
             if (!webtoonSubs[workId]) webtoonSubs[workId] = [];
             if (!webtoonSubOrder.includes(workId)) webtoonSubOrder.push(workId);
-            currentWebtoonTabWorkId = workId;
+            currentWebtoonTabWorkId = workId; webtoonMailMode = false;
             save(); renderWebtoonSubsList();
         }
 

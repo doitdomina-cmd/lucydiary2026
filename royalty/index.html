@@ -2109,6 +2109,15 @@ body.theme-spiral .grid.grid-cols-7:has(+ :is(#publish-cal-body, :is(#task-calen
         body[class] .wsub-left .wsub-tab-item.wsub-tab-item { transform: none !important; align-items: center; }
         body[class] .wsub-left .wsub-tab-item.wsub-tab-item > button:first-of-type { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; word-break: keep-all; line-height: 1.35 !important; font-size: .95rem !important; padding-top: 9px !important; padding-bottom: 9px !important; }
         @media (min-width: 768px) { body[class] .wsub-leftcol { width: 16.5rem !important; } }
+        /* 폰: 목록은 위에 폭 가득, 접으면 표가 화면 전체 폭. 접기 줄은 폰에서만 */
+        .wsub-listtoggle { display: none; }
+        @media (max-width: 767px) {
+            html body .wsub-layout { flex-direction: column; gap: 10px; }
+            html body .wsub-listtoggle { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 10px 14px; border-radius: 12px; border: 1.5px dashed rgba(120,100,60,.45); background: #fffbea; color: #5b4a2a; font-weight: 700; font-size: .9rem; text-align: left; }
+            html body .wsub-listtoggle > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            html body .wsub-layout .wsub-leftcol { width: 100% !important; }
+            html body .wsub-layout.wsub-collapsed .wsub-leftcol { display: none; }
+        }
         body.theme-cozy .wsub-tab-item > span:first-child { color: #C7B99D !important; font-family: var(--cozy-en); font-style: italic; font-weight: 400 !important; font-size: .95rem !important; }
         body.theme-cozy .wsub-table-wrap { border-radius: 24px !important; border: 1px solid #EFE8DA !important; background: #FFFEFC !important; box-shadow: 0 6px 22px rgba(139,115,80,.07); }
         body.theme-cozy .wsub-table-wrap thead tr { background: #FAF6EE !important; color: #A39A8C !important; border-bottom: 1px solid #EFE8DA !important; }
@@ -3760,13 +3769,13 @@ body.menu-font-on #settings-panel-modal .settings-tabbtn, body.menu-font-on #the
             #genre-tabs-container { gap: 4px !important; }
             #tab-records .genre-tab-btn { padding: 4px 9px !important; font-size: 0.68rem !important; }
 
-            /* 작품 관리 / 웹툰 관리 탭 — 상단 보기 필터 줄, 정렬 버튼 줄을 줄바꿈 없이 한 줄로,
-               다 안 들어가면 가로 스크롤로 보이게 축소 */
+            /* 작품 관리 / 웹툰 관리 탭 — 상단 보기 필터 줄, 정렬 버튼 줄: 가로 스크롤 없이,
+               다 안 들어가면 다음 줄로 줄바꿈 */
             #workmanage-view-tabs, #webtoon-view-tabs,
             #workmanage-sort-row, #webtoon-sort-row {
-                flex-wrap: nowrap !important;
-                overflow-x: auto !important;
-                -webkit-overflow-scrolling: touch;
+                flex-wrap: wrap !important;
+                overflow-x: visible !important;
+                row-gap: 6px;
             }
             #workmanage-view-tabs button, #webtoon-view-tabs button,
             #workmanage-sort-row button, #webtoon-sort-row button {
@@ -18215,7 +18224,10 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             }
 
             if (webtoonMailMode) rightContent = smMailMgmtHtml();
-            container.innerHTML = `<div class="flex gap-4 h-full" style="min-height:400px">
+            const curW = masterWorks.find(x => x.id === currentWebtoonTabWorkId);
+            container.innerHTML = `<div class="wsub-layout flex gap-4 h-full${wsubListOpen ? '' : ' wsub-collapsed'}" style="min-height:400px">
+                <!-- 폰: 작품 목록 접고 펴기 -->
+                <button type="button" class="wsub-listtoggle" onclick="toggleWsubList()"><span><i class="fa-solid fa-list"></i> 작품 목록${curW ? ' · ' + (curW.title || '').replace(/</g, '&lt;') : ''}</span><i class="fa-solid fa-chevron-${wsubListOpen ? 'up' : 'down'}"></i></button>
                 <!-- 왼쪽 작품 탭 -->
                 <div class="wsub-leftcol w-52 shrink-0 flex flex-col">
                     <button onclick="openWebtoonMailMgmt()" class="w-full mb-2 px-3 rounded-lg flex items-center gap-1.5 justify-center hover:-translate-y-0.5 transition-all" style="background:${webtoonMailMode ? '#f59e0b' : '#fff'}; color:${webtoonMailMode ? '#fff' : '#b45309'}; border:1px solid #f59e0b; padding-top:0.44rem; padding-bottom:0.44rem; font-size:0.8rem; font-weight:600;"><i class="fa-solid fa-envelope"></i> 메일 관리</button>
@@ -18275,9 +18287,18 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             if (m.__contract__[wid]) { if (!confirm('계약완료 표시를 해제할까요?')) return; delete m.__contract__[wid]; } else m.__contract__[wid] = true;
             save(); renderWebtoonSubsList();
         }
+        // 폰에서 왼쪽 작품 목록을 접었다 펴기 (고르면 접혀서 오른쪽 표가 바로 보임)
+        let wsubListOpen = (() => { try { return localStorage.getItem('wsubListOpen_v1') !== '0'; } catch (e) { return true; } })();
+        function wsubIsPhone() { return window.matchMedia('(max-width: 767px)').matches; }
+        function toggleWsubList() {
+            wsubListOpen = !wsubListOpen;
+            try { localStorage.setItem('wsubListOpen_v1', wsubListOpen ? '1' : '0'); } catch (e) {}
+            renderWebtoonSubsList();
+        }
         function selectWebtoonTab(workId) {
             webtoonMailMode = false;
             currentWebtoonTabWorkId = workId;
+            if (wsubIsPhone() && wsubListOpen) { wsubListOpen = false; try { localStorage.setItem('wsubListOpen_v1', '0'); } catch (e) {} }
             renderWebtoonSubsList();
         }
 

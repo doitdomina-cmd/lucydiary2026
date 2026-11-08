@@ -9160,6 +9160,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 <div>
                     <label class="text-xs font-bold text-slate-500 ml-1 mb-1 block">보낼 출판사(웹툰사) <span class="font-normal text-slate-400">한 곳씩</span></label>
                     <select id="sm-studio" onchange="smRefresh(false)" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none"></select>
+                    <label class="flex items-center gap-1.5 mt-1 ml-1 text-[11px] text-slate-400 cursor-pointer"><input type="checkbox" id="sm-studio-all" onchange="smRenderStudios(); smRefresh(false)"> 이미 보낸 곳도 보기 <span id="sm-studio-hint"></span></label>
                 </div>
             </div>
             <div class="mb-3">
@@ -18540,12 +18541,23 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             sel.innerHTML = smWorks().map(w => `<option value="${w.id}">${(w.title || '').replace(/</g, '&lt;')}</option>`).join('');
             if (workId) sel.value = workId;
             const subs = [...submissions].filter(s => s.studio).sort((a, b) => a.studio.localeCompare(b.studio, 'ko'));
-            document.getElementById('sm-studio').innerHTML = '<option value="">출판사를 선택하세요</option>' + subs.map(s => `<option value="${s.id}">${s.studio.replace(/</g, '&lt;')}${s.email ? '' : ' (메일 주소 없음)'}</option>`).join('');
+            smRenderStudios();
             document.getElementById('sm-setup').classList.toggle('hidden', !!(smBase() && smCfg().key));
             document.getElementById('send-mail-modal').classList.add('open');
             smRefresh(true);
         }
         function closeSendMailModal() { document.getElementById('send-mail-modal').classList.remove('open'); }
+        function smRenderStudios() {
+            const sel = document.getElementById('sm-studio'); if (!sel) return;
+            const wid = document.getElementById('sm-work').value, all = !!(document.getElementById('sm-studio-all') || {}).checked;
+            const sent = new Set((Array.isArray(webtoonSubs[wid]) ? webtoonSubs[wid] : []).map(e => e.studio));
+            const base = [...submissions].filter(x => x.studio), subs = base.filter(x => all || !sent.has(x.studio)).sort((a, b) => a.studio.localeCompare(b.studio, 'ko'));
+            const cur = sel.value;
+            sel.innerHTML = `<option value="">출판사를 선택하세요 (${subs.length}곳)</option>` + subs.map(x => `<option value="${x.id}">${x.studio.replace(/</g, '&lt;')}${x.email ? '' : ' (메일 주소 없음)'}</option>`).join('');
+            if (subs.some(x => x.id === cur)) sel.value = cur;
+            const hid = base.filter(x => sent.has(x.studio)).length, h = document.getElementById('sm-studio-hint');
+            if (h) h.textContent = all ? '' : (hid ? `(이미 보낸 ${hid}곳 숨김)` : '');
+        }
         function smStudio() { const id = document.getElementById('sm-studio').value; return submissions.find(s => s.id === id) || null; }
         // 발송 전 큰 미리보기: 받는 사람에게 보이는 그대로
         function smBigPreview() {
@@ -18628,7 +18640,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             return { workId, st, subject, pen, acct, genre, html: '<div style="font-family:\'Malgun Gothic\',\'맑은 고딕\',sans-serif;font-size:15px;line-height:1.8;color:#222;">' + intro + (md.body || '') + outro + '</div>', hasBody: true };
         }
         async function smRefresh(reloadPdf) {
-            if (reloadPdf) smRenderSender();
+            if (reloadPdf) { smRenderSender(); smRenderStudios(); }
             if (reloadPdf) { const gi = document.getElementById('sm-genre'); if (gi) gi.value = smGenreMap()[document.getElementById('sm-work').value] || ''; }
             const b = smBuild(), warn = [];
             document.getElementById('sm-to').textContent = b.st ? (b.st.email || '(메일 주소 없음)') : '(출판사를 선택하세요)';

@@ -18388,7 +18388,8 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         // 서버 부르기: 함수 이름이 주소 맨 앞에 붙은 방식(…/sendMail)이 아니라 함수마다 따로 주소가 있어서, 설정 주소의 'sendmail' 부분을 함수 이름으로 바꿔 부름
         function smEndpoint(fn) {
             const b = smBase(); if (!b) return '';
-            return /sendmail/i.test(b) ? b.replace(/sendmail/i, fn === 'sendMail' ? 'sendmail' : fn.toLowerCase()) : b + '/' + fn;
+            if (/\/sendmail$/i.test(b)) return b.replace(/\/sendmail$/i, '/' + fn); /* cloudfunctions.net 주소(경로 방식): 함수 이름 대소문자 그대로 */
+            return /sendmail/i.test(b) ? b.replace(/sendmail/i, fn.toLowerCase()) : b + '/' + fn;
         }
         async function smCall(fn, opt) {
             const c = smCfg(), url = smEndpoint(fn); if (!url || !c.key) throw new Error('먼저 오른쪽 위 ⚙에서 발송 서버를 설정해 주세요.');

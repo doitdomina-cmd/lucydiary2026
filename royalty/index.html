@@ -18047,6 +18047,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                     tabListHtml += `<div class="flex items-center group wsub-tab-item" draggable="true" data-id="${w.id}" ondragstart="webtoonTabDragStart(event,'${w.id}')" ondragover="webtoonTabDragOver(event)" ondrop="webtoonTabDrop(event,'${w.id}')" ondragend="webtoonTabDragEnd(event)" style="--gc:${gc}; border-top:1px solid rgba(0,0,0,0.05); ${rowBg ? 'background:'+rowBg+';' : ''}">
                         <span style="font-family:'Pretendard','Apple SD Gothic Neo',sans-serif; font-size:0.78rem; font-weight:700; color:${gc}; width:1.5rem; text-align:center; flex-shrink:0; cursor:grab;">${idx+1}</span>
                         <button onclick="selectWebtoonTab('${w.id}')" class="flex-1 text-left py-2.5 transition-all truncate" style="font-family:'Pretendard','Apple SD Gothic Neo','Noto Sans KR',sans-serif; font-size:0.88rem; padding-left:2px; padding-right:4px; ${isActive ? 'font-weight:700; color:'+gc+';' : 'color:#64748b;'}">${w.title}</button>
+                        ${wsubBadge(w.id)}
                         <button onclick="event.stopPropagation(); removeWebtoonTab('${w.id}')" class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 text-xs shrink-0 px-1 transition-all"><i class="fa-solid fa-xmark"></i></button>
                     </div>`;
                 });
@@ -18060,6 +18061,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                     tabListHtml += `<div class="flex items-center group wsub-tab-item" draggable="true" data-id="${w.id}" ondragstart="webtoonTabDragStart(event,'${w.id}')" ondragover="webtoonTabDragOver(event)" ondrop="webtoonTabDrop(event,'${w.id}')" ondragend="webtoonTabDragEnd(event)" style="--gc:#cbd5e1; border-top:1px solid rgba(0,0,0,0.05);">
                         <span style="font-family:'Pretendard',sans-serif; font-size:0.78rem; color:#94a3b8; width:1.5rem; text-align:center; flex-shrink:0;">${idx+1}</span>
                         <button onclick="selectWebtoonTab('${w.id}')" class="flex-1 text-left py-2.5 transition-all truncate" style="font-family:'Pretendard','Apple SD Gothic Neo','Noto Sans KR',sans-serif; font-size:0.88rem; padding-left:2px; ${isActive ? 'font-weight:700; color:var(--primary);' : 'color:#64748b;'}">${w.title}</button>
+                        ${wsubBadge(w.id)}
                         <button onclick="event.stopPropagation(); removeWebtoonTab('${w.id}')" class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 text-xs shrink-0 px-1 transition-all"><i class="fa-solid fa-xmark"></i></button>
                     </div>`;
                 });
@@ -18179,6 +18181,22 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             _webtoonDragSrcId = null;
         }
 
+        // 계약완료 뱃지: 이력 결과가 「계약」이면 자동, 이력에 없는 작품은 ✓ 로 직접 표시
+        function wsubContractInfo(wid) {
+            const arr = Array.isArray(webtoonSubs[wid]) ? webtoonSubs[wid] : [];
+            const auto = arr.some(e => e.result === '계약'), manual = !!((((webtoonSubs['__mail__'] || {}).__contract__) || {})[wid]);
+            return { auto, manual, on: auto || manual };
+        }
+        function wsubBadge(wid) {
+            const c = wsubContractInfo(wid);
+            if (c.on) return `<span class="shrink-0" title="${c.auto ? '이력에 「계약」 결과가 있어요' : '직접 표시했어요 (누르면 해제)'}" ${c.auto ? '' : `onclick="event.stopPropagation(); toggleManualContract('${wid}')"`} style="font-size:0.62rem; font-weight:700; padding:1px 6px; border-radius:999px; background:#d1fae5; color:#047857; margin-right:4px; white-space:nowrap; ${c.auto ? '' : 'cursor:pointer;'}">계약완료</span>`;
+            return `<button onclick="event.stopPropagation(); toggleManualContract('${wid}')" title="계약완료로 표시" class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-emerald-500 text-xs shrink-0 px-1 transition-all"><i class="fa-solid fa-check"></i></button>`;
+        }
+        function toggleManualContract(wid) {
+            const m = (webtoonSubs['__mail__'] = webtoonSubs['__mail__'] || {}); m.__contract__ = m.__contract__ || {};
+            if (m.__contract__[wid]) { if (!confirm('계약완료 표시를 해제할까요?')) return; delete m.__contract__[wid]; } else m.__contract__[wid] = true;
+            save(); renderWebtoonSubsList();
+        }
         function selectWebtoonTab(workId) {
             webtoonMailMode = false;
             currentWebtoonTabWorkId = workId;

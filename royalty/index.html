@@ -17584,6 +17584,12 @@ html body.theme-candy.theme-cozy .cozy-pubhero .eyebrow { margin-top: 16px !impo
                         <i class="fa-solid fa-arrow-up-right-from-square shrink-0"></i>
                         <span class="truncate">${s.website.replace(/^https?:\/\//, '')}</span>
                       </a>` : '';
+                const sentList = smSentTo(s.studio);
+                const sentBox = sentList.length ? `<div class="mt-2 pt-2 border-t border-slate-100" onclick="event.stopPropagation()">
+                        <button onclick="openSentMailList('${s.id}')" class="flex items-center gap-1.5 w-full text-left text-[11px] font-bold text-amber-600 hover:text-amber-700"><i class="fa-solid fa-paper-plane shrink-0"></i> 보낸 메일 ${sentList.length}통 <i class="fa-solid fa-chevron-right ml-auto text-[9px] opacity-60"></i></button>
+                        ${sentList.slice(0, 3).map(m => `<div class="flex items-center gap-1.5 mt-1 text-[11px] text-slate-500 cursor-pointer hover:text-slate-700" onclick="showSentMail('${m.workId}','${m.entryId}')"><span class="text-slate-400 shrink-0">${smFmtDate(m.at)}</span><span class="truncate">${(m.title || '').replace(/</g, '&lt;')}</span></div>`).join('')}
+                        ${sentList.length > 3 ? `<div class="mt-1 text-[10px] text-slate-400">외 ${sentList.length - 3}통</div>` : ''}
+                    </div>` : '';
                 const dragAttrs = `draggable="true" ondragstart="subDragStart(event,'${s.id}')" ondragover="subDragOver(event,this)" ondragleave="subDragLeave(this)" ondrop="subDrop(event,'${s.id}',this)" ondragend="subDragEnd(this)"`;
                 return `<div onclick="openSubmissionModal('${s.id}')" ${dragAttrs} class="ct-card bg-white rounded-xl border border-slate-200 p-4 cursor-pointer hover:shadow-md hover:border-emerald-300 transition-all relative group flex flex-col" style="height:152px; overflow:hidden;">
                     <button onclick="event.stopPropagation(); deleteSubmission('${s.id}')" class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 text-xs transition-all z-10" title="삭제"><i class="fa-solid fa-trash-can"></i></button>
@@ -17596,6 +17602,7 @@ html body.theme-candy.theme-cozy .cozy-pubhero .eyebrow { margin-top: 16px !impo
                     </div>
                     ${emailBtn}
                     ${websiteBtn}
+                    ${sentBox}
                 </div>`;
             }).join('');
 
@@ -18121,6 +18128,24 @@ html body.theme-candy.theme-cozy .cozy-pubhero .eyebrow { margin-top: 16px !impo
             try { await smCall('uploadPdf', { query: `?workId=${encodeURIComponent(workId)}&name=${encodeURIComponent(f.name)}`, headers: { 'Content-Type': 'application/pdf' }, body: f }); }
             catch (e) { alert('PDF를 올리지 못했어요.\n' + e.message); }
             smRefresh(true);
+        }
+        function smFmtDate(t) { const d = new Date(t || 0), p = n => String(n).padStart(2, '0'); return `${String(d.getFullYear()).slice(2)}.${p(d.getMonth() + 1)}.${p(d.getDate())}`; }
+        function smSentTo(studio) {
+            const out = [];
+            Object.keys(webtoonSubs).forEach(wid => {
+                if (wid === '__mail__' || !Array.isArray(webtoonSubs[wid])) return;
+                const w = masterWorks.find(x => x.id === wid);
+                webtoonSubs[wid].forEach(e => { if (e.sentMail && e.studio === studio) out.push({ workId: wid, entryId: e.id, work: w ? w.title : '(지운 작품)', at: e.sentMail.at || e.mailSentAt || 0, title: e.sentMail.subject }); });
+            });
+            return out.sort((a, b) => b.at - a.at);
+        }
+        function openSentMailList(subId) {
+            const st = submissions.find(x => x.id === subId); if (!st) return;
+            const list = smSentTo(st.studio), esc = t => String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;');
+            document.getElementById('email-preview-title').innerHTML = `<i class="fa-solid fa-paper-plane text-amber-500"></i> ${esc(st.studio)}에 보낸 메일 ${list.length}통`;
+            const bd = document.getElementById('email-preview-body'); bd.style.whiteSpace = 'normal';
+            bd.innerHTML = list.length ? `<div class="divide-y divide-slate-100">${list.map(m => `<div class="py-2.5 cursor-pointer hover:bg-slate-50 px-1 rounded" onclick="showSentMail('${m.workId}','${m.entryId}')"><div class="flex items-center gap-2 text-xs text-slate-400"><span class="font-bold text-slate-500">${smFmtDate(m.at)}</span><span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">${esc(m.work)}</span></div><div class="text-sm text-slate-700 mt-0.5">${esc(m.title)}</div></div>`).join('')}</div>` : '<div class="text-slate-400 text-sm py-6 text-center">아직 보낸 메일이 없어요.</div>';
+            document.getElementById('email-preview-modal').classList.add('open');
         }
         function showSentMail(workId, entryId) {
             const e = (webtoonSubs[workId] || []).find(x => x.id === entryId); if (!e || !e.sentMail) return;

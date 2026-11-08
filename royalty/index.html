@@ -9101,6 +9101,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 <button onclick="copyMailSubject()" class="py-3 px-4 rounded-xl font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 text-sm flex items-center gap-1.5">
                     <i class="fa-solid fa-copy text-xs"></i> 제목 복사
                 </button>
+                <button onclick="mailNormalizeText()" title="글자 크기·색·글꼴 서식을 지우고 같은 모양으로 맞춰요 (굵게·밑줄·링크는 그대로)" class="py-3 px-4 rounded-xl font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 text-sm flex items-center gap-1.5"><i class="fa-solid fa-text-height text-xs"></i> 글자 통일</button>
                 <button onclick="mailTrimIndent()" title="줄 맨 앞 공백·들여쓰기와 맨 아래 빈 줄을 지워요" class="py-3 px-4 rounded-xl font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 text-sm flex items-center gap-1.5"><i class="fa-solid fa-broom text-xs"></i> 앞공백 지우기</button>
                 <button onclick="copyMailBody()" class="py-3 px-4 rounded-xl font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 text-sm flex items-center gap-1.5">
                     <i class="fa-solid fa-copy text-xs"></i> 본문 복사
@@ -18414,6 +18415,23 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         }
 
         // 본문 정리: 줄 맨 앞 공백(nbsp·전각 포함)·들여쓰기 서식 제거, 맨 아래 빈 줄 제거 (저장은 따로 눌러야 함)
+        // 본문에 붙여 넣을 때 다른 곳의 글꼴·크기·색이 딸려 오지 않게 글자만 넣음
+        document.addEventListener('paste', function (e) {
+            const t = e.target; if (!t || !t.closest || !t.closest('#mail-body-editor')) return;
+            e.preventDefault();
+            const txt = (e.clipboardData || window.clipboardData).getData('text/plain');
+            document.execCommand('insertText', false, txt);
+        });
+        // 글자 크기·색·글꼴·줄간격 서식을 지움 (굵게·기울임·밑줄·링크는 유지)
+        function mailNormalizeText() {
+            const ed = document.getElementById('mail-body-editor'); if (!ed) return;
+            ed.querySelectorAll('*').forEach(el => {
+                ['size', 'face', 'color'].forEach(a => el.removeAttribute(a));
+                if (el.style) { ['fontSize', 'color', 'fontFamily', 'lineHeight', 'backgroundColor', 'background', 'letterSpacing'].forEach(k => { el.style[k] = ''; }); if (!el.getAttribute('style')) el.removeAttribute('style'); }
+            });
+            ed.querySelectorAll('font, span:not([style]):not([class])').forEach(el => { while (el.firstChild) el.parentNode.insertBefore(el.firstChild, el); el.remove(); });
+            try { showMailCopyToast('글자 모양을 맞췄어요. 「저장」을 눌러 주세요.'); } catch (e) {}
+        }
         function mailTrimIndent() {
             const ed = document.getElementById('mail-body-editor'); if (!ed) return;
             ed.querySelectorAll('*').forEach(el => { if (el.style) { el.style.marginLeft = ''; el.style.paddingLeft = ''; el.style.textIndent = ''; } });

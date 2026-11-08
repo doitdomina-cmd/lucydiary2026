@@ -9011,6 +9011,54 @@ html body.theme-candy.theme-cozy .cozy-pubhero .eyebrow { margin-top: 16px !impo
     </div>
 
     <!-- 필명 관리 모달 -->
+
+    <!-- 투고 메일 발송 모달 (네이버 메일로 PDF 첨부 발송 → 투고 이력 자동 기록) -->
+    <div id="send-mail-modal" class="modal-overlay">
+        <div class="modal-content w-full" style="max-width:720px; max-height:92vh; overflow-y:auto;">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-paper-plane" style="color:#f59e0b"></i> <span id="sm-title">투고하기</span></h3>
+                <div class="flex items-center gap-3">
+                    <button onclick="smOpenSettings()" title="발송 서버 설정" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-gear"></i></button>
+                    <button onclick="closeSendMailModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-times text-xl"></i></button>
+                </div>
+            </div>
+            <div id="sm-setup" class="hidden mb-4 p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-slate-600 space-y-2">
+                <div class="font-bold text-slate-700">발송 서버 설정 <span class="font-normal text-slate-400">(이 기기에 한 번만)</span></div>
+                <input id="sm-url" type="text" placeholder="발송 서버 주소 (예: https://…run.app 의 앞부분)" spellcheck="false" class="w-full p-2 bg-white rounded-lg border border-slate-200 text-xs outline-none">
+                <input id="sm-key" type="password" placeholder="비밀 열쇠" autocomplete="off" class="w-full p-2 bg-white rounded-lg border border-slate-200 text-xs outline-none">
+                <input id="sm-from" type="text" placeholder="보내는 이름 (예: 홍길동)" class="w-full p-2 bg-white rounded-lg border border-slate-200 text-xs outline-none">
+                <button onclick="smSaveSettings()" class="px-3 py-1.5 rounded-lg bg-slate-700 text-white font-bold text-xs">저장</button>
+            </div>
+            <div class="grid grid-cols-2 gap-3 mb-3">
+                <div>
+                    <label class="text-xs font-bold text-slate-500 ml-1 mb-1 block">작품</label>
+                    <select id="sm-work" onchange="smRefresh(true)" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none"></select>
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-500 ml-1 mb-1 block">보낼 출판사(웹툰사) <span class="font-normal text-slate-400">한 곳씩</span></label>
+                    <select id="sm-studio" onchange="smRefresh(false)" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none"></select>
+                </div>
+            </div>
+            <div class="mb-3 p-3 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between gap-2">
+                <div class="text-xs"><span class="font-bold text-slate-500">첨부 PDF</span> <span id="sm-pdf-state" class="text-slate-600 ml-1">확인 중…</span></div>
+                <label class="px-3 py-1.5 rounded-lg bg-white border border-slate-300 text-xs font-bold text-slate-600 cursor-pointer hover:bg-slate-100"><i class="fa-solid fa-upload"></i> <span id="sm-pdf-btn">PDF 올리기</span>
+                    <input type="file" id="sm-pdf-file" accept="application/pdf,.pdf" class="hidden" onchange="smUploadPdf(this)"></label>
+            </div>
+            <div class="text-xs font-bold text-slate-500 ml-1 mb-1">미리 보기</div>
+            <div class="rounded-xl border border-slate-200 bg-white overflow-hidden mb-3">
+                <div class="px-3 py-2 border-b border-slate-100 text-xs text-slate-500"><b class="text-slate-600">받는 사람</b> <span id="sm-to" class="ml-1"></span></div>
+                <div class="px-3 py-2 border-b border-slate-100 text-xs text-slate-500"><b class="text-slate-600">제목</b> <span id="sm-subject" class="ml-1 text-slate-700"></span></div>
+                <div class="px-3 py-2 border-b border-slate-100 text-xs text-slate-500"><b class="text-slate-600">첨부</b> <span id="sm-attach" class="ml-1"></span></div>
+                <div id="sm-body" class="p-4 text-sm text-slate-700" style="min-height:140px; max-height:260px; overflow-y:auto; line-height:1.7;"></div>
+            </div>
+            <div id="sm-warn" class="hidden mb-3 text-xs text-rose-500"></div>
+            <div class="flex gap-2">
+                <button onclick="openMailContentModal(document.getElementById('sm-work').value)" class="py-3 px-4 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 text-sm"><i class="fa-solid fa-pen text-xs"></i> 공통 내용 수정</button>
+                <button id="sm-send" onclick="smSend()" class="flex-1 py-3 rounded-xl font-bold text-white shadow-lg text-sm flex items-center justify-center gap-1.5" style="background:#f59e0b"><i class="fa-solid fa-paper-plane text-xs"></i> <span id="sm-send-label">발송</span></button>
+            </div>
+        </div>
+    </div>
+
     <div id="penname-modal" class="modal-overlay">
         <div class="modal-content h-auto max-w-md w-full">
             <div class="flex justify-between items-center mb-5">
@@ -17635,6 +17683,7 @@ html body.theme-candy.theme-cozy .cozy-pubhero .eyebrow { margin-top: 16px !impo
                         <span class="text-xs text-slate-400">${w?.genre || ''}</span>
                     </div>
                     <div class="flex items-center gap-2">
+                        <button onclick="openSendMailModal('${currentWebtoonTabWorkId}')" class="px-3 rounded-lg text-white flex items-center gap-1.5 transition-all hover:-translate-y-0.5" style="background:#f59e0b; padding-top:0.44rem; padding-bottom:0.44rem; font-size:0.8rem; font-weight:600;"><i class="fa-solid fa-paper-plane text-xs"></i> 투고하기</button>
                         <button onclick="openMailContentModal('${currentWebtoonTabWorkId}')" class="px-3 rounded-lg flex items-center gap-1.5 transition-all hover:-translate-y-0.5 border" style="padding-top:0.44rem; padding-bottom:0.44rem; font-size:0.8rem; font-weight:500; color:var(--primary); border-color:var(--primary); background:var(--primary-light);"><i class="fa-solid fa-envelope text-xs"></i> 메일 내용</button>
                         <button onclick="openWebtoonSubModal('${currentWebtoonTabWorkId}')" class="px-3 rounded-lg text-white flex items-center gap-1.5 transition-all hover:-translate-y-0.5" style="background:var(--primary); padding-top:0.44rem; padding-bottom:0.44rem; font-size:0.8rem; font-weight:500;"><i class="fa-solid fa-plus"></i> 이력 추가</button>
                     </div>
@@ -17990,6 +18039,115 @@ html body.theme-candy.theme-cozy .cozy-pubhero .eyebrow { margin-top: 16px !impo
                 sel.removeAllRanges();
                 showMailCopyToast('본문이 복사되었습니다!');
             }
+        }
+
+
+        // ════════ 투고하기: 네이버 메일 발송 (발송 서버 = 파이어베이스 함수) ════════
+        const SM_LS = 'royaltyMailServer_v1';
+        function smCfg() { try { return JSON.parse(localStorage.getItem(SM_LS) || '{}'); } catch (e) { return {}; } }
+        function smBase() { return (smCfg().url || '').trim().replace(/\/+$/, ''); }
+        function smSaveSettings() {
+            const url = document.getElementById('sm-url').value.trim(), key = document.getElementById('sm-key').value.trim(), from = document.getElementById('sm-from').value.trim();
+            if (!url || !key) { alert('서버 주소와 비밀 열쇠를 둘 다 넣어 주세요.'); return; }
+            if (!/^https:\/\//.test(url)) { alert('서버 주소는 https:// 로 시작해야 해요.'); return; }
+            localStorage.setItem(SM_LS, JSON.stringify({ url, key, from }));
+            document.getElementById('sm-setup').classList.add('hidden');
+            smRefresh(true);
+        }
+        function smOpenSettings() {
+            const c = smCfg();
+            document.getElementById('sm-url').value = c.url || ''; document.getElementById('sm-key').value = c.key || ''; document.getElementById('sm-from').value = c.from || '';
+            document.getElementById('sm-setup').classList.toggle('hidden');
+        }
+        // 서버 부르기: 함수 이름이 주소 맨 앞에 붙은 방식(…/sendMail)이 아니라 함수마다 따로 주소가 있어서, 설정 주소의 'sendmail' 부분을 함수 이름으로 바꿔 부름
+        function smEndpoint(fn) {
+            const b = smBase(); if (!b) return '';
+            return /sendmail/i.test(b) ? b.replace(/sendmail/i, fn === 'sendMail' ? 'sendmail' : fn.toLowerCase()) : b + '/' + fn;
+        }
+        async function smCall(fn, opt) {
+            const c = smCfg(), url = smEndpoint(fn); if (!url || !c.key) throw new Error('먼저 오른쪽 위 ⚙에서 발송 서버를 설정해 주세요.');
+            const r = await fetch(url + (opt.query || ''), { method: opt.method || 'POST', headers: { 'x-api-key': c.key, ...(opt.headers || {}) }, body: opt.body });
+            let j = null; try { j = await r.json(); } catch (e) {}
+            if (!r.ok || !j || j.ok === false) throw new Error((j && j.error) || ('서버가 응답하지 않아요 (' + r.status + ')'));
+            return j;
+        }
+        let smPdf = null; // { exists, name, size }
+        function smWorks() { return masterWorks.filter(w => !w.deleted); }
+        function openSendMailModal(workId) {
+            const sel = document.getElementById('sm-work');
+            sel.innerHTML = smWorks().map(w => `<option value="${w.id}">${(w.title || '').replace(/</g, '&lt;')}</option>`).join('');
+            if (workId) sel.value = workId;
+            const subs = [...submissions].filter(s => s.studio).sort((a, b) => a.studio.localeCompare(b.studio, 'ko'));
+            document.getElementById('sm-studio').innerHTML = '<option value="">출판사를 선택하세요</option>' + subs.map(s => `<option value="${s.id}">${s.studio.replace(/</g, '&lt;')}${s.email ? '' : ' (메일 주소 없음)'}</option>`).join('');
+            document.getElementById('sm-setup').classList.toggle('hidden', !!(smBase() && smCfg().key));
+            document.getElementById('send-mail-modal').classList.add('open');
+            smRefresh(true);
+        }
+        function closeSendMailModal() { document.getElementById('send-mail-modal').classList.remove('open'); }
+        function smStudio() { const id = document.getElementById('sm-studio').value; return submissions.find(s => s.id === id) || null; }
+        // 본문 = 작품 공통 내용 + 맨 앞에 「○○ 담당자님」 자동
+        function smBuild() {
+            const workId = document.getElementById('sm-work').value, st = smStudio();
+            const md = (webtoonSubs['__mail__'] || {})[workId] || {};
+            const name = st ? st.studio : '';
+            const subject = String(md.subject || '').replace(/\{\s*(출판사|웹툰사)\s*\}/g, name);
+            const greet = name ? `<div>${name.replace(/</g, '&lt;')} 담당자님,</div><br>` : '';
+            return { workId, st, subject, html: greet + (md.body || ''), hasBody: !!String(md.body || '').replace(/<[^>]*>/g, '').trim() };
+        }
+        async function smRefresh(reloadPdf) {
+            const b = smBuild(), warn = [];
+            document.getElementById('sm-to').textContent = b.st ? (b.st.email || '(메일 주소 없음)') : '(출판사를 선택하세요)';
+            document.getElementById('sm-subject').textContent = b.subject || '(제목 없음)';
+            document.getElementById('sm-body').innerHTML = b.hasBody ? b.html : '<span class="text-slate-400">이 작품의 공통 메일 내용이 비어 있어요. 아래 「공통 내용 수정」에서 적어 주세요.</span>';
+            if (b.st && !b.st.email) warn.push('이 출판사는 메일 주소가 없어요. 출판사 관리 → 투고에서 먼저 입력해 주세요.');
+            if (!b.subject) warn.push('메일 제목이 비어 있어요. 「공통 내용 수정」에서 제목을 적어 주세요.');
+            document.getElementById('sm-warn').innerHTML = warn.join('<br>'); document.getElementById('sm-warn').classList.toggle('hidden', !warn.length);
+            if (reloadPdf) {
+                smPdf = null; document.getElementById('sm-pdf-state').textContent = '확인 중…';
+                try { smPdf = await smCall('pdfInfo', { method: 'GET', query: '?workId=' + encodeURIComponent(b.workId) }); } catch (e) { smPdf = { error: e.message }; }
+            }
+            const el = document.getElementById('sm-pdf-state');
+            if (smPdf && smPdf.error) { el.textContent = smPdf.error; el.style.color = '#e11d48'; }
+            else if (smPdf && smPdf.exists) { el.textContent = `${smPdf.name} (${(smPdf.size / 1048576).toFixed(1)}MB)`; el.style.color = '#334155'; document.getElementById('sm-pdf-btn').textContent = 'PDF 바꾸기'; }
+            else { el.textContent = '올려 둔 PDF가 없어요'; el.style.color = '#e11d48'; document.getElementById('sm-pdf-btn').textContent = 'PDF 올리기'; }
+            document.getElementById('sm-attach').textContent = smPdf && smPdf.exists ? smPdf.name : '(없음)';
+        }
+        async function smUploadPdf(inp) {
+            const f = inp.files && inp.files[0]; inp.value = ''; if (!f) return;
+            if (!/\.pdf$/i.test(f.name)) { alert('PDF 파일만 올릴 수 있어요.'); return; }
+            if (f.size > 25 * 1048576) { alert('PDF가 너무 커요. 25MB 이하로 줄여 주세요.'); return; }
+            const workId = document.getElementById('sm-work').value, el = document.getElementById('sm-pdf-state');
+            el.textContent = '올리는 중…'; el.style.color = '#64748b';
+            try { await smCall('uploadPdf', { query: `?workId=${encodeURIComponent(workId)}&name=${encodeURIComponent(f.name)}`, headers: { 'Content-Type': 'application/pdf' }, body: f }); }
+            catch (e) { alert('PDF를 올리지 못했어요.\n' + e.message); }
+            smRefresh(true);
+        }
+        let smBusy = false;
+        async function smSend() {
+            if (smBusy) return;
+            const b = smBuild();
+            if (!b.st) { alert('보낼 출판사를 선택해 주세요.'); return; }
+            if (!b.st.email) { alert('이 출판사는 메일 주소가 없어요.'); return; }
+            if (!b.subject) { alert('메일 제목이 비어 있어요.'); return; }
+            if (!b.hasBody) { alert('메일 본문이 비어 있어요.'); return; }
+            if (!(smPdf && smPdf.exists)) { alert('이 작품에 올려 둔 PDF가 없어요. 먼저 PDF를 올려 주세요.'); return; }
+            const w = masterWorks.find(x => x.id === b.workId);
+            if (!confirm(`아래 내용으로 발송할까요?\n\n작품: ${w ? w.title : ''}\n받는 사람: ${b.st.studio} <${b.st.email}>\n제목: ${b.subject}\n첨부: ${smPdf.name}`)) return;
+            // 같은 출판사에 오늘 이미 보낸 기록이 있으면 한 번 더 확인
+            const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+            const dup = (webtoonSubs[b.workId] || []).some(e => e.studio === b.st.studio && e.date === today && e.mailSentAt);
+            if (dup && !confirm('오늘 이 출판사에 이미 발송한 기록이 있어요. 또 보낼까요?')) return;
+            smBusy = true; const btn = document.getElementById('sm-send'), lab = document.getElementById('sm-send-label'); btn.disabled = true; btn.style.opacity = .6; lab.textContent = '발송 중…';
+            try {
+                const r = await smCall('sendMail', { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ workId: b.workId, to: b.st.email, subject: b.subject, html: b.html, attachName: smPdf.name, fromName: smCfg().from || '' }) });
+                if (!webtoonSubs[b.workId]) webtoonSubs[b.workId] = [];
+                webtoonSubs[b.workId].push({ id: 'ws_' + Date.now(), studio: b.st.studio, date: today, acceptDate: '', expectedDate: '', replyDate: '', result: '답변대기', myReplyDeadline: '', mailSentAt: Date.now(), mailTo: b.st.email });
+                save(); try { renderWebtoonSubsList(); } catch (e) {}
+                showMailCopyToast('발송했어요! 투고 이력에 기록했어요.');
+                closeSendMailModal();
+            } catch (e) {
+                alert('발송하지 못했어요. 투고 이력에는 기록하지 않았어요.\n\n' + e.message);
+            } finally { smBusy = false; btn.disabled = false; btn.style.opacity = 1; lab.textContent = '발송'; }
         }
 
         function showMailCopyToast(msg) {

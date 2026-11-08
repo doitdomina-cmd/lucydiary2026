@@ -9121,7 +9121,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 <h3 class="text-lg font-bold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-pen" style="color:#f59e0b"></i> <span id="mt-title">인사말</span></h3>
                 <button onclick="smCloseTpl()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-times text-xl"></i></button>
             </div>
-            <div class="text-[11px] text-slate-400 mb-2">자동으로 바뀌는 말: <b>{출판사}</b> <b>{장르}</b> <b>{필명}</b> <b>{제목}</b> · 줄바꿈은 그대로 나가요 · 모든 작품에 같이 적용돼요</div>
+            <div class="text-[11px] text-slate-400 mb-2">자동으로 바뀌는 말: <b>{출판사}</b> <b>{장르}</b> <b>{필명}</b> <b>{제목}</b> · 줄바꿈은 그대로 나가요 · 이 필명의 모든 작품에 적용돼요</div>
             <textarea id="mt-text" rows="7" spellcheck="false" class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none" style="line-height:1.7;"></textarea>
             <div class="flex gap-2 mt-3">
                 <button onclick="smResetTpl()" class="py-2.5 px-4 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 text-sm">처음 문구로</button>
@@ -18501,19 +18501,25 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             intro: '안녕하세요, {출판사} 담당자님.\n{장르} 소설을 집필하고 있는 {필명} 라고 합니다.\n다름이 아니라, 최근에 출간한 신작 <{제목}> 웹툰 투고 드립니다.',
             outro: '많이 바쁘실테지만 시간 내어 검토 해주시면 감사하겠습니다. 😊\n그럼, 오늘도 즐거운 하루 보내세요.\n감사합니다.'
         };
-        function smTpl(k) { const t = ((webtoonSubs['__mail__'] || {}).__tpl__ || {})[k]; return typeof t === 'string' ? t : SM_TPL_DEF[k]; }
-        let smTplKey = '';
+        // 필명마다 따로 저장('pen:필명'). 없으면 예전 공통 문구 → 기본 문구 순서로 씀
+        function smTpl(k, pen) {
+            const T = (webtoonSubs['__mail__'] || {}).__tpl__ || {}, pt = (T['pen:' + (pen || '')] || {})[k];
+            if (typeof pt === 'string') return pt;
+            return typeof T[k] === 'string' ? T[k] : SM_TPL_DEF[k];
+        }
+        let smTplKey = '', smTplPen = '';
         function smOpenTpl(k) {
-            smTplKey = k;
-            document.getElementById('mt-title').textContent = k === 'intro' ? '인사말 (메일 맨 앞)' : '맺음말 (메일 맨 끝)';
-            document.getElementById('mt-text').value = smTpl(k);
+            smTplKey = k; smTplPen = smPenOf(document.getElementById('sm-work').value);
+            document.getElementById('mt-title').textContent = (smTplPen || '필명 없음') + ' · ' + (k === 'intro' ? '인사말 (메일 맨 앞)' : '맺음말 (메일 맨 끝)');
+            document.getElementById('mt-text').value = smTpl(k, smTplPen);
             document.getElementById('mail-tpl-modal').classList.add('open');
         }
         function smCloseTpl() { document.getElementById('mail-tpl-modal').classList.remove('open'); }
         function smResetTpl() { document.getElementById('mt-text').value = SM_TPL_DEF[smTplKey]; }
         function smSaveTpl() {
             const m = (webtoonSubs['__mail__'] = webtoonSubs['__mail__'] || {}); m.__tpl__ = m.__tpl__ || {};
-            m.__tpl__[smTplKey] = document.getElementById('mt-text').value;
+            const pk = 'pen:' + smTplPen; m.__tpl__[pk] = m.__tpl__[pk] || {};
+            m.__tpl__[pk][smTplKey] = document.getElementById('mt-text').value;
             save(); smCloseTpl(); smRefresh(false);
         }
         function smGenreMap() { const m = (webtoonSubs['__mail__'] = webtoonSubs['__mail__'] || {}); return (m['__genre__'] = m['__genre__'] || {}); }
@@ -18529,7 +18535,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             const pen = smPenOf(workId), acct = pen ? (smAcctMap()[pen] || 0) : 0;
             const subject = `${genre ? genre + ' ' : ''}[${title}] 웹툰 투고 합니다.`;
             const sub = (t, k, v) => t.split('{' + k + '}').join(v);
-            const fill = k => smTpl(k).split(/\r?\n/).map(line => '<div>' + (sub(sub(sub(sub(esc(line), '출판사', esc(name)), '장르', esc(genre)), '필명', esc(pen)), '제목', esc(title)) || '<br>') + '</div>').join('');
+            const fill = k => smTpl(k, pen).split(/\r?\n/).map(line => '<div>' + (sub(sub(sub(sub(esc(line), '출판사', esc(name)), '장르', esc(genre)), '필명', esc(pen)), '제목', esc(title)) || '<br>') + '</div>').join('');
             const intro = fill('intro') + '<br>';
             const outro = '<br>' + fill('outro');
             return { workId, st, subject, pen, acct, genre, html: '<div style="font-family:\'Malgun Gothic\',\'맑은 고딕\',sans-serif;font-size:15px;line-height:1.8;color:#222;">' + intro + (md.body || '') + outro + '</div>', hasBody: true };

@@ -9164,6 +9164,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             </div>
             <div id="sm-warn" class="hidden mb-3 text-xs text-rose-500"></div>
             <div class="flex gap-2">
+                <button onclick="smBigPreview()" class="py-3 px-4 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 text-sm"><i class="fa-solid fa-eye text-xs"></i> 미리보기</button>
                 <button onclick="openMailContentModal(document.getElementById('sm-work').value)" class="py-3 px-4 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 text-sm"><i class="fa-solid fa-pen text-xs"></i> 공통 내용 수정</button>
                 <button id="sm-send" onclick="smSend()" class="flex-1 py-3 rounded-xl font-bold text-white shadow-lg text-sm flex items-center justify-center gap-1.5" style="background:#f59e0b"><i class="fa-solid fa-paper-plane text-xs"></i> <span id="sm-send-label">발송</span></button>
             </div>
@@ -18443,6 +18444,15 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         }
         function closeSendMailModal() { document.getElementById('send-mail-modal').classList.remove('open'); }
         function smStudio() { const id = document.getElementById('sm-studio').value; return submissions.find(s => s.id === id) || null; }
+        // 발송 전 큰 미리보기: 받는 사람에게 보이는 그대로
+        function smBigPreview() {
+            const b = smBuild(), esc = t => String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;');
+            document.getElementById('email-preview-title').innerHTML = '<i class="fa-solid fa-eye text-amber-500"></i> 발송 전 미리보기';
+            const bd = document.getElementById('email-preview-body'); bd.style.whiteSpace = 'normal';
+            const to = b.st ? `${esc(b.st.studio)} &lt;${esc(b.st.email || '메일 주소 없음')}&gt;` : '(출판사를 선택하세요)';
+            bd.innerHTML = `<div class="text-xs text-slate-500 mb-3 space-y-0.5"><div><b class="text-slate-600">보내는 사람</b> ${esc(b.pen)} (계정 ${b.acct || '미지정'})</div><div><b class="text-slate-600">받는 사람</b> ${to}</div><div><b class="text-slate-600">제목</b> ${esc(b.subject)}</div><div><b class="text-slate-600">첨부</b> ${esc(smPdf && smPdf.exists ? smPdf.name : '(없음)')}</div></div><div class="border-t border-slate-100 pt-3">${b.html}</div>`;
+            document.getElementById('email-preview-modal').classList.add('open');
+        }
         function smGenreMap() { const m = (webtoonSubs['__mail__'] = webtoonSubs['__mail__'] || {}); return (m['__genre__'] = m['__genre__'] || {}); }
         function smSetGenre(v) { smGenreMap()[document.getElementById('sm-work').value] = String(v || '').trim(); save(); smRefresh(false); }
         // 메일 = 고정 인사(담당자·필명·작품 제목 자동) + 내가 적은 중간 내용 + 고정 맺음말
@@ -18457,7 +18467,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             const subject = `${genre ? genre + ' ' : ''}[${title}] 웹툰 투고 합니다.`;
             const intro = `<div>안녕하세요, ${esc(name)} 담당자님.</div><div>${esc(genre)} 소설을 집필하고 있는 ${esc(pen)} 라고 합니다.</div><div>다름이 아니라, 최근에 출간한 신작 &lt;${esc(title)}&gt; 웹툰 투고 드립니다.</div><br>`;
             const outro = '<br><div>많이 바쁘실테지만 시간 내어 검토 해주시면 감사하겠습니다. 😊</div><div>그럼, 오늘도 즐거운 하루 보내세요.</div><div>감사합니다.</div>';
-            return { workId, st, subject, pen, acct, genre, html: intro + (md.body || '') + outro, hasBody: true };
+            return { workId, st, subject, pen, acct, genre, html: '<div style="font-family:\'Malgun Gothic\',\'맑은 고딕\',sans-serif;font-size:15px;line-height:1.8;color:#222;">' + intro + (md.body || '') + outro + '</div>', hasBody: true };
         }
         async function smRefresh(reloadPdf) {
             if (reloadPdf) { const gi = document.getElementById('sm-genre'); if (gi) gi.value = smGenreMap()[document.getElementById('sm-work').value] || ''; }

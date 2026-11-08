@@ -16189,7 +16189,10 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         function parseContractText(raw) {
             const t = raw.replace(/\s+/g, ' ');
             const out = {};
-            const dateRe = /(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/g;
+            // 날짜 표기: 2025년 7월 1일 / 2025. 7. 1. / 2025-07-01 / 2025/7/1 모두 읽는다
+            const DT = '(\\d{4})\\s*[년.\\-/]\\s*(\\d{1,2})\\s*[월.\\-/]\\s*(\\d{1,2})\\s*일?';
+            const dateRe = new RegExp(DT, 'g');
+            const okDate = (y, m, d) => +y >= 2000 && +y <= 2100 && +m >= 1 && +m <= 12 && +d >= 1 && +d <= 31;
 
             // 이용허락/계약 기간: "~부터 ~까지"
             const period = t.match(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일\s*부터\s*(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일\s*까지/);
@@ -16198,9 +16201,25 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 out.periodEnd   = parseKoreanDate(period[4], period[5], period[6]);
             }
 
-            // 계약 체결일: 보통 서명란 위에 마지막으로 적힌 날짜
-            const allDates = [...t.matchAll(dateRe)].map(m => parseKoreanDate(m[1], m[2], m[3]));
-            if (allDates.length) out.contractDate = allDates[allDates.length - 1];
+            // 기간이 '2025.07.01 ~ 2030.06.30' 처럼 적힌 계약서
+            if (!period) {
+                const p2 = t.match(new RegExp(DT + '\\s*(?:부터|~|∼|－|-)\\s*' + DT));
+                if (p2 && okDate(p2[1], p2[2], p2[3]) && okDate(p2[4], p2[5], p2[6])) {
+                    out.periodStart = parseKoreanDate(p2[1], p2[2], p2[3]);
+                    out.periodEnd = parseKoreanDate(p2[4], p2[5], p2[6]);
+                }
+            }
+
+            // 계약 체결일: ① '계약일/체결일' 이라고 적힌 곳 ② 서명란 쪽(마지막)에 적힌 날짜(기간·인도일 제외) ③ 기간 시작일
+            const labeled = t.match(new RegExp('(?:계약\\s*체결\\s*일|계약\\s*일\\s*자|계약\\s*일|체결\\s*일|작성\\s*일)\\s*[:：]?\\s*' + DT));
+            const dv = t.match(new RegExp(DT + '\\s*까지[^.]{0,40}?인도'));
+            const skip = new Set([out.periodStart, out.periodEnd, dv && okDate(dv[1], dv[2], dv[3]) ? parseKoreanDate(dv[1], dv[2], dv[3]) : null].filter(Boolean));
+            const allDates = [...t.matchAll(dateRe)].filter(m => okDate(m[1], m[2], m[3])).map(m => parseKoreanDate(m[1], m[2], m[3]));
+            const rest = allDates.filter(d => !skip.has(d));
+            if (labeled && okDate(labeled[1], labeled[2], labeled[3])) out.contractDate = parseKoreanDate(labeled[1], labeled[2], labeled[3]);
+            else if (rest.length) out.contractDate = rest[rest.length - 1];
+            else if (out.periodStart) out.contractDate = out.periodStart;
+            else if (allDates.length) out.contractDate = allDates[allDates.length - 1];
 
             // 자료 인도일: "~까지 ... 인도"
             const deliver = t.match(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일\s*까지[^.]{0,40}?인도/);

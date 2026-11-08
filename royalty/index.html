@@ -16246,6 +16246,30 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             const company = t.match(/((?:주식회사|㈜)\s*[^\s(,]{1,20})/);
             if (company) out.company = company[1].replace(/\s+/g, ' ').trim();
 
+            // 완고(원고) 입고일: '~까지 원고 인도/납품/입고' 또는 '원고 인도일: ~'
+            if (!out.deliveryDate) {
+                const dl = t.match(new RegExp(DT + '\\s*까지[^.]{0,50}?(?:원고|완성\\s*원고|완고|납품|입고|제공|전달)'))
+                        || t.match(new RegExp('(?:원고\\s*(?:인도|납품|입고|제출)\\s*(?:일|기한)?|완고\\s*(?:입고)?\\s*일?|납품\\s*(?:일|기한)|인도\\s*(?:일|기한))\\s*[:：]?\\s*' + DT));
+                if (dl && okDate(dl[1], dl[2], dl[3])) out.deliveryDate = parseKoreanDate(dl[1], dl[2], dl[3]);
+            }
+
+            // 분량: '5만자 이상' / '100,000자 이상' (공백 제외/포함 표기 포함)
+            {
+                const mc = t.match(/(?:공백\s*(제외|미포함|포함)[^0-9]{0,12})?(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?\s*만)\s*자\s*(?:\(?[^)]{0,12}\)?)?\s*(?:이상|내외|정도)/);
+                if (mc) {
+                    let n = mc[2].replace(/\s/g, '');
+                    n = n.endsWith('만') ? Math.round(parseFloat(n) * 10000) : parseInt(n.replace(/,/g, ''));
+                    if (n >= 1000) out.minChars = n;
+                }
+            }
+
+            // 2차 저작권(2차적저작물 작성·매체변환·영상화 등) 관련 조항 문장
+            {
+                const sentences = t.split(/(?<=[.。])\s+|\s(?=제\s*\d+\s*조)/);
+                const hit = sentences.filter(x => /2\s*차\s*적?\s*저작|2차\s*저작|매체\s*변환|영상화|웹툰화|드라마화|애니메이션화/.test(x)).map(x => x.trim()).filter(x => x.length >= 8);
+                if (hit.length) out.secondary = hit.slice(0, 3).map(x => x.length > 220 ? x.slice(0, 220) + '…' : x);
+            }
+
             // 독점 여부
             if (/독점적으로\s*이용|독점적\s*이용권/.test(t)) out.exclusive = true;
 
@@ -16265,14 +16289,20 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             if (info.kind) L.push(`· 계약 종류: ${info.kind}${info.exclusive ? ' (독점)' : ''}`);
             if (info.workTitle) L.push(`· 대상 저작물: ${info.workTitle}`);
             if (info.company) L.push(`· 계약 상대: ${info.company}`);
-            if (info.contractDate) L.push(`· 계약 체결일: ${info.contractDate}`);
+            L.push(`· 계약일: ${info.contractDate || '찾지 못함 (직접 확인)'}`);
+            L.push(`· 완고 입고일: ${info.deliveryDate || '찾지 못함 (직접 확인)'}`);
+            L.push(`· 분량: ${info.minChars ? `${(info.minChars / 10000).toLocaleString(undefined, { maximumFractionDigits: 1 })}만자 이상 (${info.minChars.toLocaleString()}자)` : '찾지 못함 (직접 확인)'}`);
             if (info.periodStart && info.periodEnd) {
                 const d1 = new Date(info.periodStart), d2 = new Date(info.periodEnd);
                 const years = ((d2 - d1) / (1000*60*60*24*365.25)).toFixed(1).replace(/\.0$/, '');
                 L.push(`· 계약 기간: ${info.periodStart} ~ ${info.periodEnd} (약 ${years}년)`);
             }
             if (info.rate) L.push(`· 수익 배분: 순매출의 ${info.rate}% (작가)`);
-            if (info.mgText) L.push(`· 선급금: ${info.mgText}`);
+            if (info.mgText) L.push(`· 선인세(선급금): ${info.mgText}`);
+            if (info.secondary && info.secondary.length) {
+                L.push('· 2차 저작권 관련:');
+                info.secondary.forEach(x => L.push(`   - ${x}`));
+            } else L.push('· 2차 저작권 관련: 관련 조항을 찾지 못함 (직접 확인)');
             if (fileName) L.push(`· 원본 파일: ${fileName}`);
             return L.join('\n');
         }

@@ -9165,6 +9165,14 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 <label class="text-xs font-bold text-slate-500 ml-1 mb-1 block">장르 <span class="font-normal text-slate-400">제목·인사말에 들어가요 (작품마다 한 번만 적으면 기억해요)</span></label>
                 <input id="sm-genre" type="text" placeholder="예: 현대 로맨스" spellcheck="false" oninput="smRefresh(false)" onchange="smSetGenre(this.value)" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none">
             </div>
+            <div class="mb-3">
+                <label class="text-xs font-bold text-slate-500 ml-1 mb-1 block">보내는 이름 <span class="font-normal text-slate-400">메일에 보이는 이름 · 새 이름을 더 추가할 수 있어요</span></label>
+                <div class="flex gap-2">
+                    <select id="sm-sender" onchange="smSetSender(this.value)" class="flex-1 min-w-0 p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none"></select>
+                    <input id="sm-sender-new" type="text" placeholder="예: 타락감자(오렌지말머리)" spellcheck="false" class="flex-1 min-w-0 p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none">
+                    <button onclick="smAddSender()" class="px-3 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 text-xs shrink-0">+ 추가</button>
+                </div>
+            </div>
             <div class="mb-3 p-3 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between gap-2">
                 <div class="text-xs"><span class="font-bold text-slate-500">첨부 PDF</span> <span id="sm-pdf-state" class="text-slate-600 ml-1">확인 중…</span></div>
                 <label class="px-3 py-1.5 rounded-lg bg-white border border-slate-300 text-xs font-bold text-slate-600 cursor-pointer hover:bg-slate-100"><i class="fa-solid fa-upload"></i> <span id="sm-pdf-btn">PDF 올리기</span>
@@ -17962,7 +17970,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         let currentWebtoonTabWorkId = null;
         // ── 메일 관리: 필명 탭마다 인사말·맺음말 (중간 내용은 작품 화면의 「메일 내용」) ──
         let webtoonMailMode = false, webtoonMailPen = '';
-        function smMailPens() { return [...new Set([...(penNames || []), ...masterWorks.filter(w => !w.deleted).map(w => smPenOf(w.id))].filter(Boolean))]; }
+        function smMailPens() { return [...new Set([...(penNames || []), ...masterWorks.filter(w => !w.deleted).map(w => smPenOf(w.id)), ...smSenderList()].filter(Boolean))]; }
         function openWebtoonMailMgmt() { webtoonMailMode = true; renderWebtoonSubsList(); }
         function selectMailPen(i) { webtoonMailPen = smMailPens()[i] || ''; renderWebtoonSubsList(); }
         function smMmSave() {
@@ -17982,7 +17990,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 <div class="flex items-center gap-2 mb-1"><i class="fa-solid fa-envelope" style="color:#f59e0b"></i><span class="font-bold text-slate-700">메일 관리</span></div>
                 <div class="text-[11px] text-slate-400 mb-3">인사말·맺음말은 <b>필명마다</b> 따로, 중간 내용은 <b>작품마다</b>(왼쪽에서 작품 선택 → 「메일 내용」)에서 고쳐요. 자동으로 바뀌는 말: <b>{출판사}</b> <b>{장르}</b> <b>{필명}</b> <b>{제목}</b></div>
                 <div class="flex flex-wrap gap-1.5 mb-4">${tabs}</div>
-                <div class="text-xs text-slate-500 mb-1"><b class="text-slate-700">${esc(webtoonMailPen)}</b> · 이 필명의 작품 ${cnt}개에 적용</div>
+                <div class="text-xs text-slate-500 mb-1"><b class="text-slate-700">${esc(webtoonMailPen)}</b> ${smSenderList().includes(webtoonMailPen) ? ' · 추가한 보내는 이름 <button onclick="smDelSender()" class="ml-1 text-[11px] text-rose-400 hover:text-rose-600 underline">삭제</button>' : ' · 이 필명의 작품 ' + cnt + '개에 적용'}</div>
                 <div class="flex items-center justify-between mt-3 mb-1"><label class="text-xs font-bold text-slate-500">인사말 (메일 맨 앞)</label><button onclick="smMmReset('intro')" class="text-[11px] text-slate-400 hover:text-slate-600">처음 문구로</button></div>
                 <textarea id="mm-intro" rows="6" spellcheck="false" onchange="smMmSave()" class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none" style="line-height:1.7;">${esc(smTpl('intro', webtoonMailPen))}</textarea>
                 <div class="flex items-center justify-between mt-3 mb-1"><label class="text-xs font-bold text-slate-500">맺음말 (메일 맨 끝)</label><button onclick="smMmReset('outro')" class="text-[11px] text-slate-400 hover:text-slate-600">처음 문구로</button></div>
@@ -18503,7 +18511,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         function smAcctMap() { const m = (webtoonSubs['__mail__'] = webtoonSubs['__mail__'] || {}); return (m['__acct__'] = m['__acct__'] || {}); }
         function smPenOf(workId) { return String(((webtoonManage || {})[workId] || {}).penName || ((workManage || {})[workId] || {}).penName || '').trim(); }
         function smRenderAcct() {
-            const pens = [...new Set([...(penNames || []), ...smWorks().map(w => smPenOf(w.id))].filter(Boolean))], map = smAcctMap();
+            const pens = [...new Set([...(penNames || []), ...smWorks().map(w => smPenOf(w.id)), ...smSenderList()].filter(Boolean))], map = smAcctMap();
             document.getElementById('sm-acct-list').innerHTML = pens.length ? pens.map(p => `<div class="flex items-center gap-2"><span class="flex-1 truncate">${p.replace(/</g, '&lt;')}</span><select onchange="smSetAcct(this.dataset.p, this.value)" data-p="${p.replace(/"/g, '&quot;')}" class="p-1.5 bg-white rounded-lg border border-slate-200 text-xs"><option value="">미지정</option>${[1, 2, 3].map(n => `<option value="${n}" ${String(map[p]) === String(n) ? 'selected' : ''}>계정 ${n}</option>`).join('')}</select></div>`).join('') : '<div class="text-slate-400">저장된 필명이 없어요. 컨택/작품 관리에서 필명을 먼저 저장해 주세요.</div>';
         }
         function smSetAcct(pen, v) { const m = smAcctMap(); if (v) m[pen] = Number(v); else delete m[pen]; save(); smRefresh(false); }
@@ -18542,7 +18550,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         }
         let smTplKey = '', smTplPen = '';
         function smOpenTpl(k) {
-            smTplKey = k; smTplPen = smPenOf(document.getElementById('sm-work').value);
+            smTplKey = k; smTplPen = (document.getElementById('sm-sender') || {}).value || smPenOf(document.getElementById('sm-work').value);
             document.getElementById('mt-title').textContent = (smTplPen || '필명 없음') + ' · ' + (k === 'intro' ? '인사말 (메일 맨 앞)' : '맺음말 (메일 맨 끝)');
             document.getElementById('mt-text').value = smTpl(k, smTplPen);
             document.getElementById('mail-tpl-modal').classList.add('open');
@@ -18555,6 +18563,34 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             m.__tpl__[pk][smTplKey] = document.getElementById('mt-text').value;
             save(); smCloseTpl(); smRefresh(false);
         }
+        // 보내는 이름: 작품의 필명(기본) 말고 따로 추가한 이름(예: 타락감자(오렌지말머리))도 고를 수 있음
+        function smSenderList() { const m = webtoonSubs['__mail__'] || {}; return Array.isArray(m.__senders__) ? m.__senders__ : []; }
+        function smRenderSender() {
+            const el = document.getElementById('sm-sender'); if (!el) return;
+            const esc = t => String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+            const wid = document.getElementById('sm-work').value, pen = smPenOf(wid), m = webtoonSubs['__mail__'] || {}, cur = (m.__sender__ || {})[wid] || '';
+            el.innerHTML = `<option value="">${esc(pen || '(필명 없음)')} · 작품 필명</option>` + smSenderList().map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+            el.value = smSenderList().includes(cur) ? cur : '';
+        }
+        function smSetSender(v) {
+            const m = (webtoonSubs['__mail__'] = webtoonSubs['__mail__'] || {}); m.__sender__ = m.__sender__ || {};
+            const wid = document.getElementById('sm-work').value;
+            if (v) m.__sender__[wid] = v; else delete m.__sender__[wid];
+            save(); smRefresh(false);
+        }
+        function smAddSender() {
+            const inp = document.getElementById('sm-sender-new'), n = inp.value.trim(); if (!n) return;
+            const m = (webtoonSubs['__mail__'] = webtoonSubs['__mail__'] || {}); m.__senders__ = smSenderList().slice();
+            if (!m.__senders__.includes(n)) m.__senders__.push(n);
+            inp.value = ''; save(); smRenderSender(); document.getElementById('sm-sender').value = n; smSetSender(n);
+        }
+        function smDelSender() {
+            const n = webtoonMailPen; if (!smSenderList().includes(n)) return;
+            if (!confirm('보내는 이름 「' + n + '」을 지울까요? (그 이름으로 정해 둔 작품은 작품 필명으로 돌아가요)')) return;
+            const m = webtoonSubs['__mail__']; m.__senders__ = m.__senders__.filter(x => x !== n);
+            Object.keys(m.__sender__ || {}).forEach(k => { if (m.__sender__[k] === n) delete m.__sender__[k]; });
+            webtoonMailPen = ''; save(); renderWebtoonSubsList();
+        }
         function smGenreMap() { const m = (webtoonSubs['__mail__'] = webtoonSubs['__mail__'] || {}); return (m['__genre__'] = m['__genre__'] || {}); }
         function smSetGenre(v) { smGenreMap()[document.getElementById('sm-work').value] = String(v || '').trim(); save(); smRefresh(false); }
         // 메일 = 고정 인사(담당자·필명·작품 제목 자동) + 내가 적은 중간 내용 + 고정 맺음말
@@ -18565,7 +18601,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             const w = masterWorks.find(x => x.id === workId), title = w ? (w.title || '') : '';
             const name = st ? st.studio : '';
             const gEl = document.getElementById('sm-genre'), genre = (gEl ? gEl.value : '').trim();
-            const pen = smPenOf(workId), acct = pen ? (smAcctMap()[pen] || 0) : 0;
+            const pen = (document.getElementById('sm-sender') || {}).value || smPenOf(workId), acct = pen ? (smAcctMap()[pen] || 0) : 0;
             const subject = `${genre ? genre + ' ' : ''}[${title}] 웹툰 투고 합니다.`;
             const sub = (t, k, v) => t.split('{' + k + '}').join(v);
             const fill = k => smTpl(k, pen).split(/\r?\n/).map(line => '<div>' + (sub(sub(sub(sub(esc(line), '출판사', esc(name)), '장르', esc(genre)), '필명', esc(pen)), '제목', esc(title)) || '<br>') + '</div>').join('');
@@ -18574,6 +18610,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             return { workId, st, subject, pen, acct, genre, html: '<div style="font-family:\'Malgun Gothic\',\'맑은 고딕\',sans-serif;font-size:15px;line-height:1.8;color:#222;">' + intro + (md.body || '') + outro + '</div>', hasBody: true };
         }
         async function smRefresh(reloadPdf) {
+            if (reloadPdf) smRenderSender();
             if (reloadPdf) { const gi = document.getElementById('sm-genre'); if (gi) gi.value = smGenreMap()[document.getElementById('sm-work').value] || ''; }
             const b = smBuild(), warn = [];
             document.getElementById('sm-to').textContent = b.st ? (b.st.email || '(메일 주소 없음)') : '(출판사를 선택하세요)';

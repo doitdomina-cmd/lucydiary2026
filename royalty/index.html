@@ -18185,16 +18185,19 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             _webtoonDragSrcId = null;
         }
 
-        // 계약완료 뱃지: 이력 결과가 「계약」이면 자동, 이력에 없는 작품은 ✓ 로 직접 표시
+        // 작품 옆 뱃지: 이력 결과 「통과」→ 민트 「통과」, 「계약」(또는 직접 표시)→ 분홍 「계약완료」. 이력에 없는 작품은 ✓ 로 계약완료를 직접 표시
         function wsubContractInfo(wid) {
             const arr = Array.isArray(webtoonSubs[wid]) ? webtoonSubs[wid] : [];
-            const auto = arr.some(e => e.result === '계약'), manual = !!((((webtoonSubs['__mail__'] || {}).__contract__) || {})[wid]);
-            return { auto, manual, on: auto || manual };
+            const auto = arr.some(e => e.result === '계약'), pass = arr.some(e => e.result === '통과'), manual = !!((((webtoonSubs['__mail__'] || {}).__contract__) || {})[wid]);
+            return { auto, pass, manual, on: auto || manual };
         }
         function wsubBadge(wid) {
-            const c = wsubContractInfo(wid);
-            if (c.on) return `<span class="shrink-0" title="${c.auto ? '이력에 「계약」 결과가 있어요' : '직접 표시했어요 (누르면 해제)'}" ${c.auto ? '' : `onclick="event.stopPropagation(); toggleManualContract('${wid}')"`} style="font-size:0.62rem; font-weight:700; padding:1px 6px; border-radius:999px; background:#d1fae5; color:#047857; margin-right:4px; white-space:nowrap; ${c.auto ? '' : 'cursor:pointer;'}">계약완료</span>`;
-            return `<button onclick="event.stopPropagation(); toggleManualContract('${wid}')" title="계약완료로 표시" class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-emerald-500 text-xs shrink-0 px-1 transition-all"><i class="fa-solid fa-check"></i></button>`;
+            const c = wsubContractInfo(wid), base = 'font-size:0.62rem; font-weight:700; padding:1px 6px; border-radius:999px; margin-right:4px; white-space:nowrap;';
+            let h = '';
+            if (c.pass) h += `<span class="shrink-0" title="이력에 「통과」 결과가 있어요" style="${base} background:#ccf5e6; color:#0f766e;">통과</span>`;
+            if (c.on) h += `<span class="shrink-0" title="${c.auto ? '이력에 「계약」 결과가 있어요' : '직접 표시했어요 (누르면 해제)'}" ${c.auto ? '' : `onclick="event.stopPropagation(); toggleManualContract('${wid}')"`} style="${base} background:#fce7f3; color:#be185d; ${c.auto ? '' : 'cursor:pointer;'}">계약완료</span>`;
+            else h += `<button onclick="event.stopPropagation(); toggleManualContract('${wid}')" title="계약완료로 표시" class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-pink-500 text-xs shrink-0 px-1 transition-all"><i class="fa-solid fa-check"></i></button>`;
+            return h;
         }
         function toggleManualContract(wid) {
             const m = (webtoonSubs['__mail__'] = webtoonSubs['__mail__'] || {}); m.__contract__ = m.__contract__ || {};

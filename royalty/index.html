@@ -9101,6 +9101,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 <button onclick="copyMailSubject()" class="py-3 px-4 rounded-xl font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 text-sm flex items-center gap-1.5">
                     <i class="fa-solid fa-copy text-xs"></i> 제목 복사
                 </button>
+                <button onclick="mailTrimIndent()" title="줄 맨 앞 공백·들여쓰기와 맨 아래 빈 줄을 지워요" class="py-3 px-4 rounded-xl font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 text-sm flex items-center gap-1.5"><i class="fa-solid fa-broom text-xs"></i> 앞공백 지우기</button>
                 <button onclick="copyMailBody()" class="py-3 px-4 rounded-xl font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 text-sm flex items-center gap-1.5">
                     <i class="fa-solid fa-copy text-xs"></i> 본문 복사
                 </button>
@@ -18352,6 +18353,30 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             });
         }
 
+        // 본문 정리: 줄 맨 앞 공백(nbsp·전각 포함)·들여쓰기 서식 제거, 맨 아래 빈 줄 제거 (저장은 따로 눌러야 함)
+        function mailTrimIndent() {
+            const ed = document.getElementById('mail-body-editor'); if (!ed) return;
+            ed.querySelectorAll('*').forEach(el => { if (el.style) { el.style.marginLeft = ''; el.style.paddingLeft = ''; el.style.textIndent = ''; } });
+            ed.querySelectorAll('blockquote').forEach(bq => { const d = document.createElement('div'); d.innerHTML = bq.innerHTML; bq.replaceWith(d); });
+            const BLK = /^(BR|DIV|P|UL|OL|LI|H[1-6])$/;
+            const atStart = n => {
+                let cur = n;
+                while (cur && cur !== ed) {
+                    const pv = cur.previousSibling;
+                    if (pv) return pv.nodeType === 1 && BLK.test(pv.nodeName);
+                    const par = cur.parentNode;
+                    if (par === ed || /^(DIV|P|LI|H[1-6])$/.test(par.nodeName)) return true;
+                    cur = par;
+                }
+                return true;
+            };
+            const w = document.createTreeWalker(ed, NodeFilter.SHOW_TEXT), nodes = [];
+            while (w.nextNode()) nodes.push(w.currentNode);
+            nodes.forEach(n => { if (atStart(n)) n.nodeValue = n.nodeValue.replace(/^[\s\u00a0\u3000]+/, ''); });
+            const emptyEnd = el => el && ((el.nodeName === 'BR') || (el.nodeType === 3 && !el.nodeValue.trim()) || (el.nodeName === 'DIV' && !el.textContent.trim() && !el.querySelector('img,a')));
+            while (emptyEnd(ed.lastChild)) ed.removeChild(ed.lastChild);
+            try { showMailCopyToast('앞 공백을 지웠어요. 「저장」을 눌러 주세요.'); } catch (e) {}
+        }
         function copyMailBody() {
             const editor = document.getElementById('mail-body-editor');
             if (!editor.innerText.trim()) { alert('본문이 비어 있습니다.'); return; }

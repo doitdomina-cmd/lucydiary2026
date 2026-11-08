@@ -51,8 +51,9 @@ exports.sendMail = onRequest(OPTS, async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'POST만 돼요.' });
   if (!okKey(req)) return res.status(401).json({ ok: false, error: '열쇠가 맞지 않아요.' });
   const { workId, to, subject, html, attachName, accountNo } = req.body || {};
-  const acc = account(accountNo);
-  if (!acc) return res.status(400).json({ ok: false, error: `계정 ${accountNo || '?'}번이 서버에 설정돼 있지 않아요.` });
+  const au = (req.body || {}).auth; // 앱 설정창에서 보낸 로그인 정보가 있으면 그걸 쓰고, 없으면 서버 비밀 저장소의 계정 사용
+  const acc = (au && au.user && au.pass) ? { user: String(au.user).trim().replace(/@naver\.com$/i, ''), pass: String(au.pass) } : account(accountNo);
+  if (!acc) return res.status(400).json({ ok: false, error: `계정 ${accountNo || "?"}번의 로그인 정보가 없어요. 투고하기 ⚙에서 이 계정의 아이디·비밀번호를 넣어 주세요.` });
   if (!validMail(to)) return res.status(400).json({ ok: false, error: '받는 사람 메일 주소가 올바르지 않아요.' });
   if (!subject || !String(subject).trim()) return res.status(400).json({ ok: false, error: '메일 제목이 비어 있어요.' });
   if (!html || !String(html).replace(/<[^>]*>/g, '').trim()) return res.status(400).json({ ok: false, error: '메일 본문이 비어 있어요.' });

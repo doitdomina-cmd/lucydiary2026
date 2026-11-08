@@ -9145,6 +9145,10 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                     <select id="sm-studio" onchange="smRefresh(false)" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none"></select>
                 </div>
             </div>
+            <div class="mb-3">
+                <label class="text-xs font-bold text-slate-500 ml-1 mb-1 block">장르 <span class="font-normal text-slate-400">제목·인사말에 들어가요 (작품마다 한 번만 적으면 기억해요)</span></label>
+                <input id="sm-genre" type="text" placeholder="예: 현대 로맨스" spellcheck="false" oninput="smRefresh(false)" onchange="smSetGenre(this.value)" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none">
+            </div>
             <div class="mb-3 p-3 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between gap-2">
                 <div class="text-xs"><span class="font-bold text-slate-500">첨부 PDF</span> <span id="sm-pdf-state" class="text-slate-600 ml-1">확인 중…</span></div>
                 <label class="px-3 py-1.5 rounded-lg bg-white border border-slate-300 text-xs font-bold text-slate-600 cursor-pointer hover:bg-slate-100"><i class="fa-solid fa-upload"></i> <span id="sm-pdf-btn">PDF 올리기</span>
@@ -18439,17 +18443,24 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         }
         function closeSendMailModal() { document.getElementById('send-mail-modal').classList.remove('open'); }
         function smStudio() { const id = document.getElementById('sm-studio').value; return submissions.find(s => s.id === id) || null; }
-        // 본문 = 작품 공통 내용 + 맨 앞에 「○○ 담당자님」 자동
+        function smGenreMap() { const m = (webtoonSubs['__mail__'] = webtoonSubs['__mail__'] || {}); return (m['__genre__'] = m['__genre__'] || {}); }
+        function smSetGenre(v) { smGenreMap()[document.getElementById('sm-work').value] = String(v || '').trim(); save(); smRefresh(false); }
+        // 메일 = 고정 인사(담당자·필명·작품 제목 자동) + 내가 적은 중간 내용 + 고정 맺음말
         function smBuild() {
             const workId = document.getElementById('sm-work').value, st = smStudio();
             const md = (webtoonSubs['__mail__'] || {})[workId] || {};
+            const esc = t => String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const w = masterWorks.find(x => x.id === workId), title = w ? (w.title || '') : '';
             const name = st ? st.studio : '';
-            const subject = String(md.subject || '').replace(/\{\s*(출판사|웹툰사)\s*\}/g, name);
-            const greet = name ? `<div>${name.replace(/</g, '&lt;')} 담당자님,</div><br>` : '';
+            const gEl = document.getElementById('sm-genre'), genre = (gEl ? gEl.value : '').trim();
             const pen = smPenOf(workId), acct = pen ? (smAcctMap()[pen] || 0) : 0;
-            return { workId, st, subject, pen, acct, html: greet + (md.body || ''), hasBody: !!String(md.body || '').replace(/<[^>]*>/g, '').trim() };
+            const subject = `${genre ? genre + ' ' : ''}[${title}] 웹툰 투고 합니다.`;
+            const intro = `<div>안녕하세요, ${esc(name)} 담당자님.</div><div>${esc(genre)} 소설을 집필하고 있는 ${esc(pen)} 라고 합니다.</div><div>다름이 아니라, 최근에 출간한 신작 &lt;${esc(title)}&gt; 웹툰 투고 드립니다.</div><br>`;
+            const outro = '<br><div>많이 바쁘실테지만 시간 내어 검토 해주시면 감사하겠습니다. 😊</div><div>그럼, 오늘도 즐거운 하루 보내세요.</div><div>감사합니다.</div>';
+            return { workId, st, subject, pen, acct, genre, html: intro + (md.body || '') + outro, hasBody: true };
         }
         async function smRefresh(reloadPdf) {
+            if (reloadPdf) { const gi = document.getElementById('sm-genre'); if (gi) gi.value = smGenreMap()[document.getElementById('sm-work').value] || ''; }
             const b = smBuild(), warn = [];
             document.getElementById('sm-to').textContent = b.st ? (b.st.email || '(메일 주소 없음)') : '(출판사를 선택하세요)';
             document.getElementById('sm-subject').textContent = b.subject || '(제목 없음)';
@@ -18458,7 +18469,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             if (!b.pen) warn.push('이 작품에 필명이 없어요. 작품 관리에서 필명을 지정해 주세요.');
             else if (!b.acct) warn.push(`필명 「${b.pen}」에 연결된 네이버 계정이 없어요. 오른쪽 위 ⚙에서 계정을 골라 주세요.`);
             if (b.st && !b.st.email) warn.push('이 출판사는 메일 주소가 없어요. 출판사 관리 → 투고에서 먼저 입력해 주세요.');
-            if (!b.subject) warn.push('메일 제목이 비어 있어요. 「공통 내용 수정」에서 제목을 적어 주세요.');
+            if (!b.genre) warn.push('장르를 적어 주세요. (제목과 인사말에 들어가요)');
             document.getElementById('sm-warn').innerHTML = warn.join('<br>'); document.getElementById('sm-warn').classList.toggle('hidden', !warn.length);
             if (reloadPdf) {
                 smPdf = null; document.getElementById('sm-pdf-state').textContent = '확인 중…';
@@ -18515,7 +18526,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             if (!b.pen) { alert('이 작품에 필명이 없어요. 작품 관리에서 필명을 지정해 주세요.'); return; }
             if (!b.acct) { alert(`필명 「${b.pen}」에 연결된 네이버 계정이 없어요. ⚙에서 계정을 골라 주세요.`); return; }
             if (!b.st.email) { alert('이 출판사는 메일 주소가 없어요.'); return; }
-            if (!b.subject) { alert('메일 제목이 비어 있어요.'); return; }
+            if (!b.genre) { alert('장르를 적어 주세요. (예: 현대 로맨스)'); return; }
             if (!b.hasBody) { alert('메일 본문이 비어 있어요.'); return; }
             if (!(smPdf && smPdf.exists)) { alert('이 작품에 올려 둔 PDF가 없어요. 먼저 PDF를 올려 주세요.'); return; }
             const w = masterWorks.find(x => x.id === b.workId);

@@ -17727,7 +17727,7 @@ html body.theme-candy.theme-cozy .cozy-pubhero .eyebrow { margin-top: 16px !impo
                         </td>`;
                         rightContent += `<tr class="border-b border-slate-50 hover:bg-slate-50 transition-colors cursor-pointer" onclick="openWebtoonSubModal('${currentWebtoonTabWorkId}', '${e.id}')">
                             <td class="px-3 py-2.5 text-center text-slate-400 text-[13px] font-bold">${ei+1}</td>
-                            <td class="px-3 py-2.5 font-medium text-slate-700 text-[13px]">${e.studio || '-'}</td>
+                            <td class="px-3 py-2.5 font-medium text-slate-700 text-[13px]">${e.studio || '-'}${e.sentMail ? ` <button onclick="event.stopPropagation(); showSentMail('${currentWebtoonTabWorkId}','${e.id}')" title="보낸 메일 보기" class="ml-1 text-amber-500 hover:text-amber-600 text-xs"><i class="fa-solid fa-envelope"></i></button>` : ''}</td>
                             ${mkDate('date', e.date, false)}
                             ${mkDate('acceptDate', e.acceptDate, false)}
                             ${mkDate('expectedDate', e.expectedDate, true)}
@@ -18122,6 +18122,15 @@ html body.theme-candy.theme-cozy .cozy-pubhero .eyebrow { margin-top: 16px !impo
             catch (e) { alert('PDF를 올리지 못했어요.\n' + e.message); }
             smRefresh(true);
         }
+        function showSentMail(workId, entryId) {
+            const e = (webtoonSubs[workId] || []).find(x => x.id === entryId); if (!e || !e.sentMail) return;
+            const m = e.sentMail, esc = t => String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;');
+            const d = new Date(m.at || Date.now()), p2 = n => String(n).padStart(2, '0');
+            document.getElementById('email-preview-title').innerHTML = '<i class="fa-solid fa-envelope text-amber-500"></i> 보낸 메일';
+            const bd = document.getElementById('email-preview-body'); bd.style.whiteSpace = 'normal';
+            bd.innerHTML = `<div class="text-xs text-slate-500 mb-3 space-y-0.5"><div><b class="text-slate-600">보낸 시각</b> ${d.getFullYear()}.${p2(d.getMonth() + 1)}.${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())}</div><div><b class="text-slate-600">받는 사람</b> ${esc(e.studio)} &lt;${esc(m.to)}&gt;</div><div><b class="text-slate-600">제목</b> ${esc(m.subject)}</div><div><b class="text-slate-600">첨부</b> ${esc(m.attach)}</div></div><div class="border-t border-slate-100 pt-3" style="line-height:1.7">${m.html || ''}</div>`;
+            document.getElementById('email-preview-modal').classList.add('open');
+        }
         let smBusy = false;
         async function smSend() {
             if (smBusy) return;
@@ -18141,7 +18150,7 @@ html body.theme-candy.theme-cozy .cozy-pubhero .eyebrow { margin-top: 16px !impo
             try {
                 const r = await smCall('sendMail', { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ workId: b.workId, to: b.st.email, subject: b.subject, html: b.html, attachName: smPdf.name, fromName: smCfg().from || '' }) });
                 if (!webtoonSubs[b.workId]) webtoonSubs[b.workId] = [];
-                webtoonSubs[b.workId].push({ id: 'ws_' + Date.now(), studio: b.st.studio, date: today, acceptDate: '', expectedDate: '', replyDate: '', result: '답변대기', myReplyDeadline: '', mailSentAt: Date.now(), mailTo: b.st.email });
+                webtoonSubs[b.workId].push({ id: 'ws_' + Date.now(), studio: b.st.studio, date: today, acceptDate: '', expectedDate: '', replyDate: '', result: '답변대기', myReplyDeadline: '', mailSentAt: Date.now(), mailTo: b.st.email, sentMail: { to: b.st.email, subject: b.subject, html: b.html, attach: smPdf.name, at: Date.now() } });
                 save(); try { renderWebtoonSubsList(); } catch (e) {}
                 showMailCopyToast('발송했어요! 투고 이력에 기록했어요.');
                 closeSendMailModal();

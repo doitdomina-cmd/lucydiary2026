@@ -3165,7 +3165,7 @@ body.menu-font-on #settings-panel-modal .settings-tabbtn, body.menu-font-on #the
         #dash-memo-board .dmb-note:hover, #dash-memo-board .dmb-note:focus-within { transform: rotate(0deg) translateY(-2px); }
         #dash-memo-board .dmb-note.dragging { transform: rotate(0deg) scale(1.03); box-shadow: 0 14px 26px rgba(60,45,25,.28); transition: none; }
         #dash-memo-board .dmb-note::before { content: ''; position: absolute; top: -10px; left: 50%; width: 64px; height: 20px; margin-left: -32px; background: rgba(255,255,255,.62); box-shadow: 0 1px 2px rgba(60,45,25,.18); transform: rotate(-3deg); }
-        #dash-memo-board .dmb-grip { position: absolute; top: -10px; left: 0; right: 0; height: 36px; cursor: grab; touch-action: none; z-index: 2; }
+        #dash-memo-board .dmb-grip { position: absolute; top: -10px; left: 0; right: 0; height: 30px; cursor: grab; touch-action: none; z-index: 2; }
         #dash-memo-board .dmb-note.dragging .dmb-grip { cursor: grabbing; }
         html body #dash-memo-board .dmb-note .dmb-text { display: block; width: 100%; min-height: 120px; flex: 1; border: 0 !important; outline: none !important; background: transparent !important; box-shadow: none !important; padding: 0 !important; margin: 0; font: inherit; font-size: 15px; line-height: 1.6; color: #4a3f33 !important; white-space: pre-wrap; overflow-wrap: anywhere; cursor: text; }
         html body #dash-memo-board .dmb-note .dmb-text::first-line { font-weight: 800; color: #2B2118; }
@@ -3202,6 +3202,8 @@ body.menu-font-on #settings-panel-modal .settings-tabbtn, body.menu-font-on #the
         body.theme-label #dash-memo-board .dmb-note[data-tape="5"]::before { background: rgba(255,255,255,.92); border: 1px solid rgba(150,130,100,.3); transform: rotate(2deg); }
         /* 견출지: 최근 런칭한 작품 보드는 버터색 (메모 보드는 아이보리 그대로) */
         body.theme-label #dash-recent-launches .cozy-launch-wrap { background: #FFF4CC !important; }
+        /* 폴라로이드: 메모 보드 배경은 코르크 말고 아이보리 (최근 런칭 보드는 그대로) */
+        html body.theme-cozy.theme-polaroid #tab-dashboard #dash-memo-board .cozy-launch-wrap.cozy-launch-wrap, html body.theme-polaroid #dash-memo-board .cozy-launch-wrap { background: #FFFCF4 !important; }
         /* 폴라로이드: 인화지 틀 + 사진 자리에 글 */
         body.theme-polaroid #dash-memo-board .dmb-note { background: #FFFEFA; border: 0; border-radius: 3px; padding: 14px 14px 40px; min-height: 240px; box-shadow: 0 8px 18px rgba(60,45,25,.22), 0 1px 3px rgba(60,45,25,.18); }
         body.theme-polaroid #dash-memo-board .dmb-note::after { display: none; }
@@ -20659,15 +20661,20 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         function dmbGripDown(e, id) {
             if (e.button !== undefined && e.button !== 0) return;
             const m = dashMemos.find(x => x.id === id); if (!m) return;
-            const n = e.currentTarget.closest('.dmb-note'), nr = n.getBoundingClientRect();
+            const n = e.currentTarget.closest('.dmb-note'), canvas = n.parentElement, cr = canvas.getBoundingClientRect();
             e.preventDefault();
-            m.z = 1 + Math.max(0, ...dashMemos.map(x => x.z || 0)); n.style.zIndex = m.z;
-            _dmbDrag = { m, n, canvas: n.parentElement, offX: e.clientX - nr.left, offY: e.clientY - nr.top, W: n.offsetWidth };
-            n.classList.add('dragging');
+            // 잡은 자리와 메모 왼쪽 위 모서리의 간격 (기울기·들뜸 효과와 상관없는 실제 위치 기준)
+            _dmbDrag = { m, n, canvas, moved: false, sx: e.clientX, sy: e.clientY, offX: e.clientX - (cr.left + n.offsetLeft), offY: e.clientY - (cr.top + n.offsetTop), W: n.offsetWidth };
             try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {}
         }
         function dmbGripMove(e) {
             const d = _dmbDrag; if (!d) return;
+            if (!d.moved) {
+                if (Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 4) return;   // 살짝 눌렀다 뗀 건 끌기가 아님
+                d.moved = true;
+                d.m.z = 1 + Math.max(0, ...dashMemos.map(x => x.z || 0)); d.n.style.zIndex = d.m.z;
+                d.n.classList.add('dragging');
+            }
             const cr = d.canvas.getBoundingClientRect(), maxL = cr.width - d.W;
             const l = Math.max(0, Math.min(maxL, e.clientX - cr.left - d.offX));
             const t = Math.max(0, e.clientY - cr.top - d.offY);
@@ -20676,8 +20683,9 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             dmbResize();
         }
         function dmbGripUp() {
-            if (!_dmbDrag) return;
-            _dmbDrag.n.classList.remove('dragging'); _dmbDrag = null; dmbSave();
+            const d = _dmbDrag; if (!d) return;
+            _dmbDrag = null; d.n.classList.remove('dragging');
+            if (d.moved) dmbSave();
         }
         let _dmbRO = null, _dmbW = 0;
         function dmbWatch() {

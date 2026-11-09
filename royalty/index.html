@@ -20820,10 +20820,37 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             if (!container) return;
             container.innerHTML = Object.keys(TASK_COLORS).map(cat => `
                 <div class="flex items-center justify-between p-2 bg-slate-50 rounded-xl border border-slate-200">
-                    <span class="text-sm text-slate-600 font-medium">${cat}</span>
-                    <input type="color" value="${TASK_COLORS[cat]}" class="w-8 h-8 rounded-lg border border-slate-200 cursor-pointer p-0.5" oninput="updateTaskCategoryColor('${cat}', this.value)">
+                    <input type="text" value="${String(cat).replace(/&/g, '&amp;').replace(/"/g, '&quot;')}" data-old="${String(cat).replace(/&/g, '&amp;').replace(/"/g, '&quot;')}" title="이름을 고치면 기존 일정의 분류명도 같이 바뀌어요" class="task-cat-name-input flex-1 min-w-0 mr-2 text-sm text-slate-600 font-medium bg-transparent border border-transparent hover:border-slate-200 focus:border-indigo-300 focus:bg-white rounded-lg px-1.5 py-1 outline-none" onchange="renameTaskCategoryInline(this)" onkeydown="if(event.key==='Enter'){this.blur();}">
+                    <input type="color" value="${TASK_COLORS[cat]}" class="w-8 h-8 rounded-lg border border-slate-200 cursor-pointer p-0.5 shrink-0" oninput="updateTaskCategoryColor(this.closest('div').querySelector('.task-cat-name-input').dataset.old, this.value)">
                 </div>
             `).join('');
+        }
+        // 분류 이름 고치기: 분류 목록·색상·이미 넣어 둔 일정의 분류명을 모두 같이 바꾼다
+        function renameTaskCategoryInline(inp) {
+            const oldName = inp.dataset.old;
+            const newName = (inp.value || '').trim();
+            if (!newName || newName === oldName) { inp.value = oldName; return; }
+            if (PROTECTED_TASK_CATEGORIES.includes(oldName)) {
+                alert(`"${oldName}"은(는) 웹툰 관리 탭과 이름으로 자동 연동되는 분류라 이름을 바꿀 수 없어요.`);
+                inp.value = oldName; return;
+            }
+            if (Object.prototype.hasOwnProperty.call(TASK_COLORS, newName) || taskCategoryList.some(c => (c || '').trim() === newName)) {
+                alert('이미 있는 분류명이에요.');
+                inp.value = oldName; return;
+            }
+            const idx = taskCategoryList.indexOf(oldName);
+            if (idx >= 0) taskCategoryList[idx] = newName;
+            // 색상표 순서를 유지한 채 키만 바꿈
+            const entries = Object.entries(TASK_COLORS).map(([k, v]) => [k === oldName ? newName : k, v]);
+            Object.keys(TASK_COLORS).forEach(k => delete TASK_COLORS[k]);
+            entries.forEach(([k, v]) => { TASK_COLORS[k] = v; });
+            Object.keys(taskSchedules).forEach(dateStr => {
+                (taskSchedules[dateStr] || []).forEach(t => { if (t.category === oldName) t.category = newName; });
+            });
+            save();
+            renderTaskCategoryColorList();
+            try { if (typeof renderTaskCategoryManagerList === 'function') renderTaskCategoryManagerList(); } catch (e) {}
+            renderTaskCalendar();
         }
         function updateTaskCategoryColor(cat, value) {
             TASK_COLORS[cat] = value;

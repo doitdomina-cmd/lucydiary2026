@@ -3155,6 +3155,28 @@ body.menu-font-on #settings-panel-modal .settings-tabbtn, body.menu-font-on #the
         body.theme-cozy #genre-sheets-container h4 > span { font-family: var(--sans, inherit); font-size: .8rem; }
 
         /* 대시보드 '최근 런칭' 폴라로이드 — 코지 테마에서만 보인다 */
+        /* ── 대시보드 메모 보드 (포스트잇) ── */
+        #dash-memo-board .dmb-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+        #dash-memo-board .dmb-title { font-size: 14px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+        #dash-memo-board .dmb-count { font-size: 11px; font-weight: 800; color: #fff; background: var(--primary); border-radius: 999px; padding: 1px 8px; }
+        #dash-memo-board .dmb-btns { display: flex; gap: 6px; }
+        #dash-memo-board .dmb-btn { font-size: 12px; font-weight: 800; padding: 6px 12px; border-radius: 999px; border: 1.5px solid rgba(120,100,60,.35); background: rgba(255,255,255,.7); color: #5b4a2a; cursor: pointer; }
+        #dash-memo-board .dmb-btn:hover { background: #FFF6CF; }
+        #dash-memo-board .dmb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 18px 16px; margin-top: 16px; padding: 4px 4px 6px; }
+        #dash-memo-board .dmb-note { position: relative; background: var(--c, #FFF1A8); border-radius: 3px; padding: 18px 12px 8px; box-shadow: 0 6px 12px rgba(60,45,25,.16), 0 1px 2px rgba(60,45,25,.2); transform: rotate(var(--rot, 0deg)); transition: transform .15s; display: flex; flex-direction: column; min-width: 0; }
+        #dash-memo-board .dmb-note:hover, #dash-memo-board .dmb-note:focus-within { transform: rotate(0deg) translateY(-2px); z-index: 2; }
+        #dash-memo-board .dmb-note::before { content: ''; position: absolute; top: -9px; left: 50%; width: 56px; height: 18px; margin-left: -28px; background: rgba(255,255,255,.62); box-shadow: 0 1px 2px rgba(60,45,25,.18); transform: rotate(-3deg); }
+        html body #dash-memo-board .dmb-note textarea { width: 100%; min-height: 96px; resize: none; overflow: hidden; border: 0 !important; outline: none !important; background: transparent !important; box-shadow: none !important; padding: 0 !important; margin: 0; font: inherit; font-size: 14px; line-height: 1.55; color: #4a3f33 !important; }
+        html body #dash-memo-board .dmb-note textarea::placeholder { color: rgba(74,63,51,.4); }
+        #dash-memo-board .dmb-foot { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 8px; padding-top: 6px; border-top: 1px dashed rgba(74,63,51,.25); }
+        #dash-memo-board .dmb-dots { display: flex; gap: 4px; }
+        #dash-memo-board .dmb-dot { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid rgba(74,63,51,.35); cursor: pointer; padding: 0; }
+        #dash-memo-board .dmb-dot.on { border-color: #4a3f33; box-shadow: 0 0 0 1.5px #fff inset; }
+        #dash-memo-board .dmb-date { font-size: 10px; color: rgba(74,63,51,.55); white-space: nowrap; }
+        #dash-memo-board .dmb-del { border: 0; background: transparent; color: rgba(74,63,51,.5); cursor: pointer; font-size: 12px; padding: 2px 4px; }
+        #dash-memo-board .dmb-del:hover { color: #c0392b; }
+        #dash-memo-board .dmb-empty { text-align: center; padding: 22px 8px 12px; font-size: 13px; opacity: .7; }
+        @media (max-width: 767px) { #dash-memo-board .dmb-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; } #dash-memo-board .dmb-note { padding: 16px 9px 6px; } html body #dash-memo-board .dmb-note textarea { font-size: 13px; min-height: 84px; } }
         #dash-recent-launches { display: none; }
         body.theme-cozy #dash-recent-launches { display: block; }
         .cozy-launch-wrap {
@@ -7420,6 +7442,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                         </div>
                     </div>
 
+                    <div id="dash-memo-board"></div>
                     <div id="dash-recent-launches"></div>
 
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -11034,6 +11057,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         let publisherCardSortOrder = []; // [NEW] 카드 보기 전용 순서 (줄 보기 순서와 별도 저장)
         let taxViewYear = new Date().getFullYear();
         let settingsPresets = [null, null, null, null, null];   // 설정 프리셋 5칸 ({name, savedAt, data})
+        let dashMemos = [];   // 대시보드 메모 보드: [{id, text, color, ts}]
         let calCardSizes = { pub: 12 };   // 출간 일정 카드 글자 크기(px)
         let calCardFonts = { pub: 'auto', task: 'auto', write: 'auto', tl: 'auto', works: 'auto' };   // 달력/목록 카드 글씨체(화면마다): auto | sans | serif | hand | pen | ink | single | dodum
         let calCardDesigns = { pub: 'cozy', task: 'cozy', write: 'cozy', tl: 'cozy', works: 'cozy' };   // 달력 칸 안 카드 디자인(화면마다): cozy(기본) | label | polaroid | postcard | fountain
@@ -11463,7 +11487,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                     const dataToSave = { settingsPresets, uiTheme: { theme: activeTheme, customColor: localStorage.getItem('custom_color_v6') || '', bgMain: document.documentElement.style.getPropertyValue('--bg-main').trim() || localStorage.getItem('bg_main_v6') || '', appFont: localStorage.getItem('app_font_v1') || '', menuFont: localStorage.getItem('menu_font_v1') || '', appFs: localStorage.getItem('app_fs_v1') || '', menuFs: localStorage.getItem('menu_fs_v1') || '' },
                         masterWorks: _worksForSave, monthlyData, years, publisherData, analysisData, 
                         publisherSortOrder, publisherCardSortOrder, publisherViewMode, genreList, genreBadgeOpacity, tableFontSettings, crosshairSettings,
-                        writeSchedules, writeSpans, timelineScenarios, writeVolumes, writeMergedVolumeWorks, taskSchedules, contacts, penNames, widgetSettingsData, ddayCardDesigns, ddayCardFonts, modalDesign, calCardDesigns, calCardFonts, calCardSizes, writeCardSettings, taskCardSettings, taskColors: TASK_COLORS, taskCategoryList, writeColors: WRITE_COLORS, writeCategoryList,
+                        writeSchedules, writeSpans, timelineScenarios, writeVolumes, writeMergedVolumeWorks, taskSchedules, contacts, penNames, widgetSettingsData, dashMemos, ddayCardDesigns, ddayCardFonts, modalDesign, calCardDesigns, calCardFonts, calCardSizes, writeCardSettings, taskCardSettings, taskColors: TASK_COLORS, taskCategoryList, writeColors: WRITE_COLORS, writeCategoryList,
                         writerWorks, writerDailyData, writerGlobalDailyGoal, writeCounterBase, writeCounterResetDate, submissions, webtoonSubs, webtoonSubOrder, incomeGoals, taxSettings, taxGoalMemos, charGoals, writerLastWorkKey, taxGoalItems, contactSortMode, webtoonManage, webtoonCardSettings, penNameColorOverrides, webtoonViewFilter, webtoonSortMode, workManage, workManageCardSettings, workManageViewFilter, workManageSortMode, refSchedWorks, refSchedHidden
                     };
                     const jsonStr = JSON.stringify(dataToSave);
@@ -11579,6 +11603,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             if (parsed.calCardDesigns) Object.assign(calCardDesigns, parsed.calCardDesigns);
             if (parsed.calCardFonts) Object.assign(calCardFonts, parsed.calCardFonts);
             if (parsed.calCardSizes) Object.assign(calCardSizes, parsed.calCardSizes);
+            dashMemos = Array.isArray(parsed.dashMemos) ? parsed.dashMemos : [];
             if (parsed.modalDesign) modalDesign = parsed.modalDesign;
             if (parsed.ddayCardFonts) Object.assign(ddayCardFonts, parsed.ddayCardFonts);
             if (parsed.ddayCardDesigns) Object.assign(ddayCardDesigns, parsed.ddayCardDesigns);
@@ -12354,7 +12379,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             const data = { settingsPresets, 
                 masterWorks: assetWorksForExport(), monthlyData, years, publisherData, analysisData, publisherSortOrder, publisherCardSortOrder, publisherViewMode, genreList, theme: localStorage.getItem('theme_v6'), customColor: localStorage.getItem('custom_color_v6'), genreBadgeOpacity, bgMain: localStorage.getItem('bg_main_v6'), tableFontSettings, crosshairSettings, 
                 writeSchedules, writeSpans, timelineScenarios, writeVolumes, writeMergedVolumeWorks, taskSchedules, writeCardSettings, taskCardSettings, taskColors: TASK_COLORS, taskCategoryList, writeColors: WRITE_COLORS, writeCategoryList,
-                contacts, penNames, widgetSettingsData, ddayCardDesigns, ddayCardFonts, modalDesign, calCardDesigns, calCardFonts, calCardSizes, submissions, webtoonSubs, webtoonSubOrder, contactSortMode, webtoonViewFilter, webtoonSortMode,
+                contacts, penNames, widgetSettingsData, dashMemos, ddayCardDesigns, ddayCardFonts, modalDesign, calCardDesigns, calCardFonts, calCardSizes, submissions, webtoonSubs, webtoonSubOrder, contactSortMode, webtoonViewFilter, webtoonSortMode,
                 // [FIX] 글자수 관리 탭 데이터가 백업에서 빠져있던 문제 수정 — 아래 항목들이 누락되어 있었음
                 writerWorks, writerDailyData, writerGlobalDailyGoal, writeCounterBase, writeCounterResetDate, writerLastWorkKey,
                 incomeGoals, taxSettings, taxGoalMemos, taxGoalItems, charGoals, webtoonManage, webtoonCardSettings, penNameColorOverrides, workManage, workManageCardSettings, workManageViewFilter, workManageSortMode, refSchedWorks, refSchedHidden
@@ -20531,8 +20556,74 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             if (box.dataset.sig !== html) { box.dataset.sig = html; box.innerHTML = html; }
         }
 
+        // ═══ 대시보드 메모 보드 (포스트잇) ═══
+        const DMB_COLORS = ['#FFF1A8', '#FFD6DE', '#CDEBD9', '#CFE3F7', '#E3D6F5'];
+        let _dmbTimer = null, _dmbSig = '';
+        function dmbOpen() { try { return localStorage.getItem('dmbOpen_v1') !== '0'; } catch (e) { return true; } }
+        function dmbToggle() { try { localStorage.setItem('dmbOpen_v1', dmbOpen() ? '0' : '1'); } catch (e) {} _dmbSig = ''; renderDashMemoBoard(true); }
+        // 칸 높이를 글 길이에 맞춤 (화면에 보이지 않을 땐 계산이 틀리므로 건너뜀)
+        function dmbFit(one) {
+            const list = one ? [one] : document.querySelectorAll('#dash-memo-board .dmb-note textarea');
+            list.forEach(t => { if (!t.offsetParent) return; t.style.height = 'auto'; t.style.height = Math.max(96, t.scrollHeight) + 'px'; });
+        }
+        let _dmbRO = null, _dmbW = 0;
+        function dmbWatch() {
+            if (_dmbRO || typeof ResizeObserver === 'undefined') return;
+            const box = document.getElementById('dash-memo-board'); if (!box) return;
+            _dmbRO = new ResizeObserver(() => { const w = box.getBoundingClientRect().width; if (Math.abs(w - _dmbW) > 1) { _dmbW = w; dmbFit(); } });
+            _dmbRO.observe(box);
+        }
+        function dmbSave() { clearTimeout(_dmbTimer); _dmbTimer = setTimeout(() => { save(true); }, 600); }
+        function dmbFmt(ts) { const d = new Date(ts || Date.now()); return (d.getMonth() + 1) + '/' + d.getDate(); }
+        function dmbAdd() {
+            dashMemos.unshift({ id: 'm' + Date.now() + Math.floor(Math.random() * 1000), text: '', color: DMB_COLORS[dashMemos.length % DMB_COLORS.length], ts: Date.now() });
+            try { localStorage.setItem('dmbOpen_v1', '1'); } catch (e) {}
+            save(true); _dmbSig = ''; renderDashMemoBoard(true);
+            const t = document.querySelector('#dash-memo-board .dmb-note textarea'); if (t) t.focus();
+        }
+        function dmbInput(id, el) {
+            const m = dashMemos.find(x => x.id === id); if (!m) return;
+            m.text = el.value; m.ts = Date.now();
+            dmbFit(el);
+            const dt = el.closest('.dmb-note').querySelector('.dmb-date'); if (dt) dt.textContent = dmbFmt(m.ts);
+            dmbSave();
+        }
+        function dmbColor(id, c) { const m = dashMemos.find(x => x.id === id); if (!m) return; m.color = c; save(true); _dmbSig = ''; renderDashMemoBoard(true); }
+        function dmbDel(id) {
+            const m = dashMemos.find(x => x.id === id); if (!m) return;
+            if ((m.text || '').trim() && !confirm('이 메모를 지울까요?')) return;
+            dashMemos = dashMemos.filter(x => x.id !== id);
+            save(true); _dmbSig = ''; renderDashMemoBoard(true);
+        }
+        function renderDashMemoBoard(force) {
+            const box = document.getElementById('dash-memo-board'); if (!box) return;
+            if (!force && box.contains(document.activeElement) && document.activeElement.tagName === 'TEXTAREA') return;   // 쓰는 중엔 다시 그리지 않음
+            const open = dmbOpen();
+            const sig = JSON.stringify(dashMemos) + '|' + open;
+            if (!force && sig === _dmbSig && box.firstChild) return;
+            _dmbSig = sig;
+            const rots = [-1.6, 1.2, -0.8, 1.8, -1.3, 0.9];
+            const notes = dashMemos.map((m, i) => `<div class="dmb-note" style="--c:${m.color || DMB_COLORS[0]};--rot:${rots[i % rots.length]}deg">
+                <textarea placeholder="메모를 적어요" oninput="dmbInput('${m.id}', this)">${escapeHtml(m.text || '')}</textarea>
+                <div class="dmb-foot">
+                    <div class="dmb-dots">${DMB_COLORS.map(c => `<button type="button" class="dmb-dot${(m.color || DMB_COLORS[0]) === c ? ' on' : ''}" style="background:${c}" onclick="dmbColor('${m.id}','${c}')" title="색 바꾸기"></button>`).join('')}</div>
+                    <span class="dmb-date">${dmbFmt(m.ts)}</span>
+                    <button type="button" class="dmb-del" onclick="dmbDel('${m.id}')" title="메모 지우기"><i class="fa-solid fa-trash-can"></i></button>
+                </div>
+            </div>`).join('');
+            box.innerHTML = `<div class="glass-card dmb-card">
+                <div class="dmb-head">
+                    <h4 data-eyebrow="memo board" class="dmb-title text-sm font-bold text-slate-500"><i class="fa-solid fa-thumbtack"></i> 메모 보드 <span class="dmb-count">${dashMemos.length}</span></h4>
+                    <div class="dmb-btns"><button type="button" class="dmb-btn" onclick="dmbAdd()"><i class="fa-solid fa-plus"></i> 메모 추가</button><button type="button" class="dmb-btn" onclick="dmbToggle()">${open ? '접기' : '펼치기'}</button></div>
+                </div>
+                ${open ? (dashMemos.length ? `<div class="dmb-grid">${notes}</div>` : '<div class="dmb-empty">출판사와 의논 중인 일, 잊으면 안 되는 일을 붙여 두세요 📌</div>') : ''}
+            </div>`;
+            dmbFit(); dmbWatch();
+        }
+
         function updateDashboardStats() {
             renderCozyRecentLaunches();
+            try { renderDashMemoBoard(); } catch (e) { console.error(e); }
             let totalProfit = 0, totalSales = 0, yearProfit = 0, yearSales = 0, thisMonthProfit = 0, thisMonthSales = 0;
             let prevYearProfit = 0, prevMonthProfit = 0, prevMonth2Profit = 0;
             const genreStats = {}, workStats = {}, workStatsByYear = {}, monthlyStats = Array(12).fill(0).map(() => ({})); const yearTotals = {}; years.forEach(y => yearTotals[y] = {}); const now = new Date(); 

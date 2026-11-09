@@ -20642,17 +20642,13 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             const has = m => typeof m.fx === 'number' && typeof m.y === 'number';
             const rects = [];
             dashMemos.forEach((m, i) => { if (has(m)) rects.push({ l: m.fx * (cw - W), t: m.y, w: W, h: notes[i] ? notes[i].offsetHeight : H }); });
-            let changed = false;
+            let changed = false, placed = rects.length;
             dashMemos.forEach(m => {
                 if (has(m)) return;
-                for (let k = 0; k < 400; k++) {
-                    const col = k % cols, row = Math.floor(k / cols);
-                    const l = cols > 1 ? col * (cw - W) / (cols - 1) : 0, t = 24 + row * (H + gapY);
-                    if (!rects.some(r => l < r.l + r.w - 10 && l + W > r.l + 10 && t < r.t + r.h - 10 && t + H > r.t + 10)) {
-                        m.fx = cols > 1 ? col / (cols - 1) : 0; m.y = t; rects.push({ l, t, w: W, h: H }); break;
-                    }
-                }
-                changed = true;
+                // 겹쳐도 괜찮으니 맨 위 줄에 옆으로 차례로 놓는다 (알아서 아래로 내려보내지 않음)
+                const col = placed % cols, wrap = Math.floor(placed / cols) % 4;
+                m.fx = cols > 1 ? col / (cols - 1) : 0; m.y = 24 + wrap * 16;
+                placed++; changed = true;
             });
             notes.forEach((n, i) => { const m = dashMemos[i]; if (!m) return; n.style.setProperty('--fx', m.fx); n.style.setProperty('--y', m.y + 'px'); });
             dmbResize();

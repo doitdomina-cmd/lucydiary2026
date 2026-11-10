@@ -13907,6 +13907,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         function meInsertImgSrc(src, width) {
             const editor = document.getElementById('memo-editor'); if (!editor) return;
             editor.focus();
+            if (_meSavedRange && editor.contains(_meSavedRange.startContainer)) meRestoreSelection();
             const img = document.createElement('img');
             img.src = src;
             if (width) img.style.width = width;
@@ -14049,6 +14050,11 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             editor.addEventListener('keyup', () => {
                 const sel = window.getSelection();
                 if (sel && sel.rangeCount) _meSavedRange = sel.getRangeAt(0).cloneRange();
+            });
+            // 폰: 터치로 커서를 옮기면 mouseup 이 안 와서 위치가 저장되지 않음 → 선택이 바뀔 때마다 저장
+            document.addEventListener('selectionchange', () => {
+                const sel = window.getSelection();
+                if (sel && sel.rangeCount && editor.contains(sel.anchorNode)) _meSavedRange = sel.getRangeAt(0).cloneRange();
             });
         });
 

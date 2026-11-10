@@ -385,6 +385,9 @@ body.pane-resizing.gut-row, body.pane-resizing.gut-row * { cursor: row-resize !i
 .fb-top { display: flex; align-items: flex-end; gap: 10px; margin-bottom: 12px; }
 .fb-path { font-size: 11px; color: var(--muted); }
 .fb-top h2 { margin: 2px 0 0; font-size: 18px; display: flex; align-items: center; gap: 6px; }
+.fb-name { flex: 1; min-width: 0; font: inherit; color: inherit; background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 1px 6px; margin-left: -6px; outline: 0; }
+.fb-name:hover { border-color: var(--line, #e6dcc8); }
+.fb-name:focus { border-color: var(--accent); background: rgba(255,255,255,.7); }
 .fb-top h2 small { font-size: 12px; color: var(--muted); font-weight: 400; }
 .fb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
 .fb-card { background: var(--paper); border: 1px solid var(--line); border-top: 3px solid var(--cc, var(--line)); border-radius: 6px; display: flex; flex-direction: column; min-height: 210px; box-shadow: var(--shadow); }
@@ -10143,7 +10146,7 @@ function folderBoardHtml(f) {
             <div class="fb-list">${children(c.id).slice(0, 8).map(x => `<div>${esc(x.title || '제목 없음')}</div>`).join('') || '<div class="fb-empty">비어 있어요</div>'}</div></div>`
         : `<div class="fb-card" data-fb-card="${c.id}" style="${c.cardColor ? `--cc:${esc(c.cardColor)}` : ''}"><div class="fb-head" draggable="true" title="끌어서 순서 바꾸기"><button class="fb-title" data-fb-open="${c.id}" title="이 회차 열기">${c.locked ? '<i class="ic ic-lock"></i> ' : ''}${esc(c.title || '제목 없음')}</button><span class="fb-meta" title="공백 포함(공포) 글자 수">공포 ${fmt(docCount(c).all)}자</span></div>
             <textarea data-id="${c.id}" data-field="summary" placeholder="이 회차 트릿을 적어 두세요">${esc(c.summary || '')}</textarea></div>`;
-    return `<div class="fb-top"><div><div class="fb-path">${esc(path)}</div><h2><i class="ic ic-folder"></i> ${esc(f.title || '폴더')} <small>${kids.length}개</small></h2></div><span style="flex:1"></span>
+    return `<div class="fb-top"><div><div class="fb-path">${esc(path)}</div><h2><i class="ic ic-folder"></i> <input class="fb-name" data-fb-name="${f.id}" value="${esc(f.title || '')}" placeholder="폴더 이름" title="눌러서 바로 이름 바꾸기" spellcheck="false"> <small>${kids.length}개</small></h2></div><span style="flex:1"></span>
             <button class="btn" data-fb-new="${f.id}"><i class="ic ic-file-plus"></i> 새 문서</button></div>
         <div class="fb-grid">${kids.map(card).join('')}<button class="fb-card fb-add" data-fb-new="${f.id}"><i class="ic ic-plus"></i> 새 문서 · 여러 개 한 번에</button></div>`;
 }
@@ -10178,6 +10181,17 @@ $('#editor-grid').addEventListener('drop', e => {
     fbDrag = null; fbClear();
 });
 $('#editor-grid').addEventListener('dragend', () => { fbDrag = null; fbClear(); });
+// 폴더 화면 맨 위 이름: 눌러서 바로 고치기 (Enter · 칸 밖을 누르면 저장, Esc는 취소)
+$('#editor-grid').addEventListener('keydown', e => {
+    const i = e.target.closest && e.target.closest('.fb-name'); if (!i) return;
+    if (e.key === 'Enter') { e.preventDefault(); i.blur(); }
+    if (e.key === 'Escape') { i.value = get(i.dataset.fbName)?.title || ''; i.blur(); }
+});
+$('#editor-grid').addEventListener('focusout', e => {
+    const i = e.target.closest && e.target.closest('.fb-name'); if (!i) return;
+    const f = get(i.dataset.fbName), t = i.value.trim(); if (!f || !t || t === f.title) { if (f) i.value = f.title; return; }
+    f.title = t; touch(f); renderAll();
+});
 $('#editor-grid').addEventListener('click', e => {
     const o = e.target.closest('[data-fb-open]'); if (o) { treeSel = o.dataset.fbOpen; openDoc(o.dataset.fbOpen); return; }
     const n = e.target.closest('[data-fb-new]'); if (n) { treeSel = n.dataset.fbNew; newDoc(n.dataset.fbNew); }

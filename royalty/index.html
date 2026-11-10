@@ -3458,6 +3458,12 @@ body.menu-font-on #settings-panel-modal .settings-tabbtn, body.menu-font-on #the
         @media (max-width: 767px) { html body #dash-memo-board .dmb-canvas { align-items: start; } html body #dash-memo-board .dmb-note { padding-bottom: 32px; } html body #dash-memo-board .dmb-note .dmb-date { left: 10px; } }
         /* dgb-align2: 왼쪽 수익 목표 윗선을 오른쪽 메모장 윗선과 맞춤 (PC) */
         @media (min-width: 768px) { html body #dash-goal-board .dgb-goals > div:nth-child(1) { margin-top: 18px; } }
+        /* dgb-year: 목표 윗부분 연도 이동 (고양이 옆) */
+        #dash-goal-board .dgb-yearnav { margin-left: auto; margin-right: 290px; display: inline-flex; align-items: center; gap: 4px; padding: 3px 6px; background: #fff; border: 1.5px solid #F6C9D6; border-radius: 99px; box-shadow: 0 2px 6px rgba(60,45,25,.1); position: relative; z-index: 3; }
+        #dash-goal-board .dgb-yearnav b { font-family: 'Fredoka', 'Jua', system-ui, sans-serif; font-size: 1.05rem; font-weight: 700; color: #c2607f; letter-spacing: .04em; min-width: 3.2em; text-align: center; }
+        #dash-goal-board .dgb-yearnav button { width: 22px; height: 22px; border: 0; border-radius: 50%; background: #FFE9EF; color: #c2607f; font-size: 15px; font-weight: 800; line-height: 20px; cursor: pointer; padding: 0; transition: transform .12s; }
+        #dash-goal-board .dgb-yearnav button:hover { transform: scale(1.15); background: #FFD6E2; }
+        @media (max-width: 767px) { #dash-goal-board .dgb-yearnav { margin-right: 0; } }
         /* dgb-dots: 보드 바탕에 연한 버터색 큰 동그라미(도트) */
         html body #dash-goal-board .cozy-launch-wrap.cozy-launch-wrap { position: relative; background: linear-gradient(180deg, #FFFCF0 0%, #FFF6DA 100%) !important; }
         #dash-goal-board .dgb-tape { position: absolute; width: 96px; height: 28px; z-index: 1; pointer-events: none; opacity: .92; background-color: #fff; background-image: repeating-linear-gradient(0deg, rgba(255,140,165,.5) 0 7px, transparent 7px 14px), repeating-linear-gradient(90deg, rgba(255,140,165,.5) 0 7px, transparent 7px 14px); box-shadow: 0 2px 4px rgba(60,45,25,.12); }
@@ -21063,6 +21069,9 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><g fill="#F8B9CB" stroke="#d77b97" stroke-width="1.1"><circle cx="12" cy="6" r="4"/><circle cx="18" cy="11" r="4"/><circle cx="16" cy="18" r="4"/><circle cx="8" cy="18" r="4"/><circle cx="6" cy="11" r="4"/></g><circle cx="12" cy="12" r="3" fill="#FBE3A8" stroke="#c9a227" stroke-width="1"/></svg>`
         ];
         const DGB_PAL = ['#F4B6CB', '#9FCBF0', '#F2BE96', '#A9DDBE', '#CBB8EE', '#F0DC82'];
+        let _dgbYear = 0;
+        function dgbYr() { return _dgbYear || new Date().getFullYear(); }
+        function dgbYearMove(d) { _dgbYear = Math.max(2000, dgbYr() + d); _dgbEdit = ''; renderDashGoalBoard(true); }
         function dgbSave() { clearTimeout(_dgbTimer); _dgbTimer = setTimeout(() => save(true), 600); }
         function dgbRead(el) { return ((t0, br) => (br ? t0.replace(/\n$/, '') : t0))(el.innerText, el.lastChild && el.lastChild.nodeName === 'BR').replace(/ /g, ' '); }
         function dgbGroups() {
@@ -21079,15 +21088,15 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         function dgbTab(t) { _dgbTab = t; _dgbAddGroup = false; try { localStorage.setItem('dgbTab_v1', t); } catch (e) {} renderDashGoalBoard(true); }
         function dgbEditGoal(k) { _dgbEdit = k; renderDashGoalBoard(true); const i = document.getElementById('dgb-gin'); if (i) { i.focus(); i.select(); } }
         function dgbSetGoal(k, v) {
-            const yr = new Date().getFullYear(), g = Number(String(v).replace(/[^0-9]/g, '')) || 0;
+            const yr = dgbYr(), g = Number(String(v).replace(/[^0-9]/g, '')) || 0;
             if (k === 'inc') incomeGoals[yr] = g; else charGoals[yr] = g;
             _dgbEdit = ''; save(true); renderDashGoalBoard(true);
         }
-        function dgbToggleItem(id) { const it = getYearGoalItems(new Date().getFullYear()).find(x => x.id === id); if (!it) return; it.done = !it.done; save(true); renderDashGoalBoard(true); }
-        function dgbDelItem(id) { const yr = new Date().getFullYear(); taxGoalItems[yr] = getYearGoalItems(yr).filter(x => x.id !== id); save(true); renderDashGoalBoard(true); }
+        function dgbToggleItem(id) { const it = getYearGoalItems(dgbYr()).find(x => x.id === id); if (!it) return; it.done = !it.done; save(true); renderDashGoalBoard(true); }
+        function dgbDelItem(id) { const yr = dgbYr(); taxGoalItems[yr] = getYearGoalItems(yr).filter(x => x.id !== id); save(true); renderDashGoalBoard(true); }
         function dgbAddItem(inp) {
             const t = inp.value.trim(); if (!t) return;
-            getYearGoalItems(new Date().getFullYear()).push({ id: genTaxGoalItemId(), text: t, done: false });
+            getYearGoalItems(dgbYr()).push({ id: genTaxGoalItemId(), text: t, done: false });
             save(true); renderDashGoalBoard(true);
             const n = document.getElementById('dgb-newitem'); if (n) n.focus();
         }
@@ -21169,7 +21178,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             const box = document.getElementById('dash-goal-board'); if (!box) return;
             const ae = document.activeElement;
             if (!force && ae && box.contains(ae) && (ae.isContentEditable || ae.tagName === 'INPUT')) return;   // 쓰는 중엔 다시 그리지 않음
-            const yr = new Date().getFullYear();
+            const yr = dgbYr();
             const net = getYearNet(yr), goal = incomeGoals[yr] || 0, chars = getYearCharTotal(yr), cg = charGoals[yr] || 0;
             const items = getYearGoalItems(yr);
             const sig = JSON.stringify([_dgbTab, _dgbEdit, _dgbAddGroup, net, goal, chars, cg, items, workIdeas, penNames, penNameColorOverrides, yr]);
@@ -21206,7 +21215,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             const newCol = `<div class="dgb-newcol">${_dgbAddGroup ? `<input id="dgb-newgroup" class="dgb-gin" placeholder="그룹 이름 (Enter)" onkeydown="if(event.key==='Enter'){this.onblur=null;dgbNewGroup(this,true)}else if(event.key==='Escape'){this.onblur=null;dgbNewGroup(this,false)}" onblur="dgbNewGroup(this,false)">` : `<button type="button" class="dgb-newbtn" onclick="_dgbAddGroup=true;renderDashGoalBoard(true);document.getElementById('dgb-newgroup').focus()">+ 신규 그룹</button>`}</div>`;
             const ideaHtml = `<div class="dgb-cols">${cols}${newCol}</div>`;
             box.innerHTML = `<div class="cozy-launch-wrap dgb-card-wrap"><img class="dgb-leaf l" src="deco/heart-flower.png" alt=""><img class="dgb-art" src="deco/header-art.png" alt="">
-                <div class="cozy-launch-head" style="align-items:center; margin-bottom:0"><div class="dgb-hl"><span class="ko">GOALS</span></div></div>
+                <div class="cozy-launch-head" style="align-items:center; margin-bottom:0"><div class="dgb-hl"><span class="ko">GOALS</span><span class="dgb-yearnav"><button type="button" onclick="dgbYearMove(-1)" title="이전 해">‹</button><b>${yr}</b><button type="button" onclick="dgbYearMove(1)" title="다음 해">›</button></span></div></div>
                 <div class="dgb-body">${goalHtml}<div class="dgb-sub"><span class="dgb-bico">${DGB_ART.book}</span><b>작품 구상</b></div>${ideaHtml}</div>
             </div>`;
         }

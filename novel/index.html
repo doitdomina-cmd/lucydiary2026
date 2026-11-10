@@ -3637,13 +3637,26 @@ function goalRing(it) {
     const p = Math.min(100, Math.round(docCount(it).all / it.goal * 100));
     return `<span class="goal-ring ${p >= 100 ? 'done' : ''}" style="--p:${p}" title="목표 ${fmt(it.goal)}자 중 ${p}%"></span>`;
 }
+// 이 문서부터 뒤의 문서를 순서대로 'N화'로 다시 매김 (중간에 끼워 넣었을 때). 제목의 'N화' 숫자만 바꾸고 뒤의 말은 그대로
+async function renumberFrom(it) {
+    const re = /^(\s*)(\d+)(\s*화)/;
+    const docs = flatDocs().filter(d => !isRefDoc(d) && !inTrash(d));
+    const k = docs.findIndex(d => d.id === it.id), m0 = re.exec(it.title || '');
+    if (k < 0 || !m0) { toast('이 문서 제목이 \'6화\'처럼 시작해야 거기서부터 다시 매길 수 있어요.'); return; }
+    let n = +m0[2]; const todo = [];
+    docs.slice(k).forEach(d => { const m = re.exec(d.title || ''); if (!m) return; const t = d.title.replace(re, (_, a, _n, c) => a + n + c); if (t !== d.title) todo.push([d, t]); n++; });
+    if (!todo.length) { toast('이미 순서대로예요.'); return; }
+    if (!await confirmBox(`'${it.title}'부터 뒤 ${todo.length}개 문서의 화수를 순서대로 바꿀까요? 예) ${todo[0][0].title} → ${todo[0][1]}`, '바꾸기')) return;
+    todo.forEach(([d, t]) => { d.title = t; touch(d); });
+    renderAll(); toast(`${todo.length}개 문서 이름을 바꿨어요.`);
+}
 function rowMenu(anchor, it, at) {
     const W = WL();
     let html = '';
     if (it.kind === 'episode') {
         html = `<button data-m="open">열기</button><button data-m="split">옆 분할에 열기</button><button data-m="ref">참고창으로 열기 (본문 아래)</button><hr>
             <button data-m="rename">이름 바꾸기</button><button data-m="icon">아이콘 달기</button><button data-m="goal">목표 글자 수</button>
-            <button data-m="history"><i class="ic ic-history"></i> 버전 기록</button><button data-m="lock">${it.locked ? '<i class="ic ic-lock-open"></i> 잠금 해제' : '<i class="ic ic-lock"></i> 잠금 (편집 막기)'}</button><button data-m="dup">복제</button><hr>
+            <button data-m="renum"><i class="ic ic-replace"></i> 여기부터 화수 다시 매기기</button><button data-m="history"><i class="ic ic-history"></i> 버전 기록</button><button data-m="lock">${it.locked ? '<i class="ic ic-lock-open"></i> 잠금 해제' : '<i class="ic ic-lock"></i> 잠금 (편집 막기)'}</button><button data-m="dup">복제</button><hr>
             <button data-m="trash" class="danger">휴지통으로</button>`;
     } else if (it.kind === 'folder') {
         html = `<button data-m="new-doc">이 폴더에 새 문서</button><button data-m="new-folder">이 폴더에 새 폴더</button><hr>
@@ -3661,6 +3674,7 @@ function rowMenu(anchor, it, at) {
         if (m === 'ref') openDoc(it.id, 'ref');
         if (m === 'open-synop') openSynop(it.id);
         if (m === 'rename') { const t = await ask('이름 바꾸기', it.title); if (t != null) { it.title = t.trim() || '제목 없음'; touch(it); renderAll(); } }
+        if (m === 'renum') renumberFrom(it);
         if (m === 'goal') { const t = await ask('목표 글자 수 (공백 포함, 공포)', it.goal || 5000, 'number'); if (t != null) { it.goal = Math.max(0, parseInt(t, 10) || 0); touch(it); renderAll(); } }
         if (m === 'history') openHistory(it.id);
         if (m === 'icon') pickIcon(anchor, it, at);

@@ -20925,6 +20925,28 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             c[f] = dgbRead(el); if (!c[f]) el.innerHTML = '';
             dgbSave();
         }
+        // 작품 구상 카드의 글자수: 숫자만 적으면(만자 단위) 자동으로 '만자'가 붙고, 칸 위쪽에 합계가 나옴
+        function dgbMan(c) {
+            if (typeof c.man === 'number') return c.man;
+            const m = String(c.when || '').match(/^\s*(\d+(?:\.\d+)?)\s*(?:만\s*자?)?\s*$/);   // 예전에 '13만자'처럼 적어 둔 것도 읽음
+            return m ? parseFloat(m[1]) : 0;
+        }
+        function dgbManFmt(n) { return String(Math.round(n * 100) / 100); }
+        function dgbCwText(c) { const n = dgbMan(c); return n ? dgbManFmt(n) + '만자' : (c.when && typeof c.man !== 'number' ? c.when : ''); }
+        function dgbSumText(cards) { const t = cards.reduce((a, c) => a + dgbMan(c), 0); return cards.length + (t > 0 ? ' · ' + dgbManFmt(t) + '만자' : ''); }
+        function dgbCwFocus(id, el) { const c = workIdeas.cards.find(x => x.id === id); if (!c) return; const n = dgbMan(c); if (n) el.textContent = dgbManFmt(n); }
+        function dgbCwInput(id, el) {
+            const c = workIdeas.cards.find(x => x.id === id); if (!c) return;
+            const v = parseFloat((el.innerText || '').replace(/[^0-9.]/g, ''));
+            c.man = isNaN(v) ? 0 : v; c.when = '';
+            const gi = dgbGroups().indexOf(c.pen), col = document.querySelectorAll('#dash-goal-board .dgb-col')[gi];
+            const cnt = col && col.querySelector('.dgb-cnt'); if (cnt) cnt.textContent = dgbSumText(workIdeas.cards.filter(x => x.pen === c.pen));
+            dgbSave();
+        }
+        function dgbCwBlur(id, el) {
+            const c = workIdeas.cards.find(x => x.id === id); if (!c) return;
+            el.textContent = c.man ? dgbManFmt(c.man) + '만자' : '';
+        }
         function dgbCardDel(id) {
             const c = workIdeas.cards.find(x => x.id === id); if (!c) return;
             if ((c.title || c.when || '').trim() && !confirm('이 작품 구상을 지울까요?')) return;
@@ -20992,11 +21014,11 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 const pc = getPenColor(g) || DGB_PAL[gi % DGB_PAL.length];
                 const cards = workIdeas.cards.filter(c => c.pen === g);
                 return `<div class="dgb-col" style="--pc:${pc}" ondragover="dgbDragOver(event,this)" ondragleave="dgbDragLeave(this)" ondrop="dgbDrop(event,${gi},this)">
-                    <div class="dgb-chead"><span class="dgb-chip">${escapeHtml(g)}</span><span class="dgb-cnt">${cards.length}</span>${(penNames || []).includes(g) ? '' : `<button type="button" class="dgb-colx" onclick="dgbGroupDel(${gi})" title="이 칸 지우기">✕</button>`}</div>
+                    <div class="dgb-chead"><span class="dgb-chip">${escapeHtml(g)}</span><span class="dgb-cnt">${dgbSumText(cards)}</span>${(penNames || []).includes(g) ? '' : `<button type="button" class="dgb-colx" onclick="dgbGroupDel(${gi})" title="이 칸 지우기">✕</button>`}</div>
                     ${cards.map(c => `<div class="dgb-card" data-id="${c.id}">
                         <div class="dgb-grip" draggable="true" title="끌어서 옮기기" ondragstart="dgbDragStart(event,'${c.id}')"></div>
                         <div class="dgb-ct" contenteditable="${DMB_CE}" spellcheck="false" data-ph="작품 제목" oninput="dgbCardInput('${c.id}','title',this)" onpaste="dmbPaste(event)">${escapeHtml(c.title || '')}</div>
-                        <div class="dgb-cw" contenteditable="${DMB_CE}" spellcheck="false" data-ph="희망 시기·메모" oninput="dgbCardInput('${c.id}','when',this)" onpaste="dmbPaste(event)">${escapeHtml(c.when || '')}</div>
+                        <div class="dgb-cw" contenteditable="${DMB_CE}" spellcheck="false" data-ph="글자수 (만자)" oninput="dgbCwInput('${c.id}',this)" onfocus="dgbCwFocus('${c.id}',this)" onblur="dgbCwBlur('${c.id}',this)" onpaste="dmbPaste(event)">${escapeHtml(dgbCwText(c))}</div>
                         <div class="dgb-ctools"><button type="button" onclick="dgbCardMove('${c.id}',-1)" title="앞 칸으로">‹</button><button type="button" onclick="dgbCardMove('${c.id}',1)" title="다음 칸으로">›</button><button type="button" onclick="dgbCardDel('${c.id}')" title="지우기">✕</button></div>
                     </div>`).join('')}
                     <button type="button" class="dgb-addc" onclick="dgbAddCard(${gi})" title="새 작품 추가">+</button>

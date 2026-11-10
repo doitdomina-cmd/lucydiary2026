@@ -165,6 +165,8 @@ body.cozy .row { border-radius: 10px; padding: 5px 6px; }
 body.cozy .row.open { background: color-mix(in srgb, var(--accent-soft) 85%, var(--panel)); }
 .row .caret { width: 14px; flex: none; text-align: center; color: var(--muted); font-size: 10px; }
 .row .ico { flex: none; font-size: 12px; width: 16px; text-align: center; }
+.row .fgoal { flex: none; font-size: 11px; color: var(--muted, #9a8f7a); margin-left: 4px; white-space: nowrap; }
+.row .fgoal.done { color: var(--accent); font-weight: 600; }
 .row .r-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row .r-meta { font-size: 10px; color: var(--muted); white-space: nowrap; }
 .row .r-more { opacity: 0; font-size: 13px; color: var(--muted); padding: 0 4px; border-radius: 4px; line-height: 1; }
@@ -2645,7 +2647,7 @@ function renderTree() {
                 const col = !!W.collapsed[it.id];
  rows.push(`<div class="row folder ${it.ref ? 'ref-folder' : ''} ${open.has(it.id) ? 'open' : ''} ${treeSel === it.id ? 'sel' : ''}" draggable="true" data-id="${it.id}" style="padding-left:${pad}px">
                     <span class="caret" data-a="fold">${col ? '▸' : '▾'}</span><span class="ico">${it.icon ? `<span class="emo">${esc(it.icon)}</span>` : it.ref ? '<i class="ic ic-library"></i>' : '<i class="ic ic-folder"></i>'}</span>
-                    <span class="r-title">${esc(it.title || '폴더')}</span>
+                    <span class="r-title">${esc(it.title || '폴더')}</span>${folderGoalTag(it)}
                     <button class="r-more" data-a="more" title="메뉴">⋯</button></div>`);
                 if (!col) walk(it.id, depth + 1);
             } else {
@@ -3632,6 +3634,18 @@ function pickIcon(anchor, it, at) {
     pop.addEventListener('click', e => { const b = e.target.closest('[data-ic]'); if (!b) return; it.icon = b.dataset.ic; touch(it); closePop(); renderAll(); });
 }
 // 회차 목표 글자 수(공백 포함, 공포)를 바인더에 작은 동그라미로
+// 폴더 안 문서들의 목표 글자 수 합 · 실제로 쓴 글자 수 합 → '12,000/2만' 처럼 폴더 이름 옆에 보여 줌
+function folderGoal(id) {
+    let goal = 0, all = 0;
+    children(id).forEach(c => { if (c.kind === 'folder') { if (c.ref) return; const r = folderGoal(c.id); goal += r.goal; all += r.all; } else if (!isRefDoc(c) && c.goal) { goal += c.goal; all += docCount(c).all; } });
+    return { goal, all };
+}
+const fmtMan = n => n >= 10000 ? (n % 10000 ? (n / 10000).toFixed(1).replace(/\.0$/, '') : n / 10000) + '만' : fmt(n);
+function folderGoalTag(it) {
+    if (it.ref) return '';
+    const g = folderGoal(it.id); if (!g.goal) return '';
+    return `<span class="fgoal${g.all >= g.goal ? ' done' : ''}" title="쓴 글자 ${fmt(g.all)}자 / 목표 ${fmt(g.goal)}자">${fmt(g.all)}/${fmtMan(g.goal)}</span>`;
+}
 function goalRing(it) {
     if (!it.goal) return '';
     const p = Math.min(100, Math.round(docCount(it).all / it.goal * 100));

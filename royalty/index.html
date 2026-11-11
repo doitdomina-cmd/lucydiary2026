@@ -2766,6 +2766,7 @@ body.theme-cozy #month-detail-modal #month-detail-total { font-family: var(--coz
 body.theme-cozy #month-detail-modal button.text-slate-400 { width: 34px; height: 34px; border-radius: 999px; background: #F4EEE2; display: flex; align-items: center; justify-content: center; }
         @media (max-width: 640px) { body.theme-cozy #month-detail-modal h3 { font-size: 1.05rem; } body.theme-cozy #month-detail-modal .modal-content { padding: 24px 20px; } }
 
+        #memo-editor img { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; } /* 폰: 사진을 꾹 눌러 끌어 옮길 때 저장 메뉴가 안 뜨게 */
         /* 스케줄·집필 달력 칸 카드: 복사·삭제 버튼(마우스 올릴 때만 보임)이 글자 자리를 차지하지 않게 글자 위로 띄움 */
         #task-calendar-body .cal-selectable > .flex.items-start > .task-heart-btn { position: absolute; left: 2px; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 0; padding: 0; border: 0; background: transparent; cursor: pointer; z-index: 3; }
         #task-calendar-body .cal-selectable > .flex.items-start > .task-heart-btn:hover { background: rgba(255,255,255,.35); border-radius: 999px; }
@@ -13957,6 +13958,49 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 files.forEach(f => meResizeImage(f, src => meInsertImgSrc(src, null)));
                 meAutoSave();
             });
+
+            // 폰·태블릿: 사진을 꾹 눌렀다가(0.4초) 끌어서 원하는 글 사이로 옮김 (터치에서는 위의 드래그가 안 되므로)
+            (function () {
+                let t = null, img = null, ghost = null, sx = 0, sy = 0, on = false;
+                const cancel = () => { clearTimeout(t); t = null; if (ghost) ghost.remove(); ghost = null; if (img) img.style.opacity = ''; img = null; on = false; const dc = getDropCaret(); if (dc) dc.style.display = 'none'; };
+                document.addEventListener('touchstart', e => {
+                    const editor = document.getElementById('memo-editor');
+                    const im = e.target.tagName === 'IMG' && editor && editor.contains(e.target) ? e.target : null;
+                    if (!im || e.touches.length !== 1) { cancel(); return; }
+                    sx = e.touches[0].clientX; sy = e.touches[0].clientY; img = im;
+                    t = setTimeout(() => {
+                        on = true; sel(im); if (typeof updateResizeUI === 'function') updateResizeUI();
+                        im.style.opacity = '0.3';
+                        ghost = im.cloneNode(); ghost.removeAttribute('id'); ghost.style.cssText = 'position:fixed;z-index:99999;pointer-events:none;opacity:.8;width:80px;height:auto;max-width:80px;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.3);left:' + (sx - 40) + 'px;top:' + (sy - 40) + 'px';
+                        document.body.appendChild(ghost);
+                        if (navigator.vibrate) try { navigator.vibrate(15); } catch (_) {}
+                    }, 400);
+                }, { passive: true });
+                document.addEventListener('touchmove', e => {
+                    if (!img) return;
+                    const x = e.touches[0].clientX, y = e.touches[0].clientY;
+                    if (!on) { if (Math.abs(x - sx) > 8 || Math.abs(y - sy) > 8) cancel(); return; } // 그냥 스크롤이면 취소
+                    e.preventDefault();
+                    ghost.style.left = (x - 40) + 'px'; ghost.style.top = (y - 40) + 'px';
+                    const ed = document.getElementById('memo-editor');
+                    if (ed) { const r = ed.getBoundingClientRect(); if (y < r.top + 50) ed.scrollTop -= 12; else if (y > r.bottom - 50) ed.scrollTop += 12; }
+                }, { passive: false });
+                document.addEventListener('touchend', e => {
+                    if (!img) return;
+                    if (!on) { cancel(); return; }
+                    const editor = document.getElementById('memo-editor'), tc = e.changedTouches[0];
+                    const range = editor && getCaretRange(tc.clientX, tc.clientY);
+                    const moving = img;
+                    if (range && editor.contains(range.startContainer) && !moving.contains(range.startContainer)) {
+                        moving.remove(); range.insertNode(moving);
+                        const nr = document.createRange(); nr.setStartAfter(moving); nr.collapse(true);
+                        const s2 = window.getSelection(); s2.removeAllRanges(); s2.addRange(nr);
+                        meAutoSave();
+                    }
+                    cancel(); sel(moving); if (typeof updateResizeUI === 'function') updateResizeUI();
+                });
+                document.addEventListener('touchcancel', cancel);
+            })();
         })();
 
         // ── 이미지 삽입 ──

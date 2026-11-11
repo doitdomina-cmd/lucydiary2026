@@ -29327,7 +29327,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                     const payload = cloudPayload(dataToSave);
                     let _bytes = payload.length; try { _bytes = new Blob([payload]).size; } catch (e) {}
                     if (_bytes > 1040000) { console.error('클라우드 저장 보류: 데이터가 1MB를 초과 (' + _bytes + ')'); cloudWarn('데이터가 너무 커서(' + Math.round(_bytes/1024) + 'KB) 클라우드에 저장하지 못했어요. 개발자에게 알려 주세요.'); return; }
-                    const _ts = Date.now(); _cloudPushing++;
+                    const _cb = (snap && snap.exists && snap.data() && Number(snap.data()._savedAt)) || 0; const _ts = Math.max(Date.now(), _cb + 1); _cloudPushing++;   // 기기 시계가 달라도 PC(main.js)가 '더 새 것'으로 인식하도록 클라우드의 현재 시각보다 항상 크게
                     const mainSave = window.__cloudDocRef.set({ payload: payload, _savedAt: _ts }).then(() => { _cloudSeenAt = _ts; _cloudPushing--; markCloudActive(); }).catch(e => { _cloudPushing--; console.error('클라우드 저장 실패', e); cloudWarn('클라우드 저장 실패: ' + (e && (e.code || e.message) || '')); });
                     // webtoonSubs 별도 doc에 저장
                     let subsSave = Promise.resolve();

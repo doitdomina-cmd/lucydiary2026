@@ -3493,6 +3493,10 @@ body.menu-font-on #settings-panel-modal .settings-tabbtn, body.menu-font-on #the
         html body #dash-goal-board .dgb-grip::before { content: none !important; }
         html body #dash-goal-board .dgb-grip { left: 0; top: 0; bottom: 0; height: auto; width: 12px; line-height: 1; }
         html body #dash-goal-board .dgb-card { padding-left: 12px; }
+        /* wsub-result-colors: 투고 결과 색 — 답변대기 회색 / 거절 하늘색 / 통과 분홍 (모든 테마) */
+        html body .wsub-table-wrap .wsub-inline-result.wsub-r-wait, html body .wsub-inline-result.wsub-r-wait { background: #E7E7EA !important; color: #5b5f69 !important; }
+        html body .wsub-table-wrap .wsub-inline-result.wsub-r-no, html body .wsub-inline-result.wsub-r-no { background: #D6EBFA !important; color: #3d6f98 !important; }
+        html body .wsub-table-wrap .wsub-inline-result.wsub-r-pass, html body .wsub-inline-result.wsub-r-pass { background: #FFDCE7 !important; color: #b04a70 !important; }
         /* dgb-dots: 보드 바탕에 연한 버터색 큰 동그라미(도트) */
         html body #dash-goal-board .cozy-launch-wrap.cozy-launch-wrap { position: relative; background: linear-gradient(180deg, #FFFCF0 0%, #FFF6DA 100%) !important; }
         #dash-goal-board .dgb-tape { position: absolute; width: 96px; height: 28px; z-index: 1; pointer-events: none; opacity: .92; background-color: #fff; background-image: repeating-linear-gradient(0deg, rgba(255,140,165,.5) 0 7px, transparent 7px 14px), repeating-linear-gradient(90deg, rgba(255,140,165,.5) 0 7px, transparent 7px 14px); box-shadow: 0 2px 4px rgba(60,45,25,.12); }
@@ -11835,7 +11839,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         function save(silent = false) { 
             if (saveTimeout) clearTimeout(saveTimeout);
             _savePendingSilent = silent;
-            saveTimeout = setTimeout(() => runSave(silent), 600);
+            saveTimeout = setTimeout(() => runSave(silent), 300);
         }
         function runSave(silent = false) {
             saveTimeout = null; _savePendingSilent = null;
@@ -18499,7 +18503,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             // webtoonSubOrder 기반 정렬 (새 항목은 끝에 추가)
             webtoonSubOrder = [...webtoonSubOrder.filter(id => workIds.includes(id)), ...workIds.filter(id => !webtoonSubOrder.includes(id))];
             const tabWorks = webtoonSubOrder.map(id => masterWorks.find(w => w.id === id)).filter(Boolean);
-            const resultColors = { '대기중': 'bg-slate-100 text-slate-500', '답변대기': 'bg-amber-100 text-amber-700', '거절': 'bg-rose-50 text-rose-400', '통과': 'bg-emerald-100 text-emerald-600', '계약': 'bg-blue-100 text-blue-700' };
+            const resultColors = { '대기중': 'bg-slate-100 text-slate-500', '답변대기': 'wsub-r-wait', '거절': 'wsub-r-no', '통과': 'wsub-r-pass', '계약': 'bg-blue-100 text-blue-700' };
 
             // 현재 선택된 탭 유지
             if (!currentWebtoonTabWorkId && tabWorks.length > 0) currentWebtoonTabWorkId = tabWorks[0].id;
@@ -19323,7 +19327,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             save();
         }
 
-        const _wsub_resultColors = { '대기중': 'bg-slate-100 text-slate-500', '답변대기': 'bg-slate-200 text-slate-600', '거절': 'bg-rose-50 text-rose-400', '통과': 'bg-emerald-100 text-emerald-600', '계약': 'bg-blue-100 text-blue-700' };
+        const _wsub_resultColors = { '대기중': 'bg-slate-100 text-slate-500', '답변대기': 'wsub-r-wait', '거절': 'wsub-r-no', '통과': 'wsub-r-pass', '계약': 'bg-blue-100 text-blue-700' };
         function inlineUpdateWebtoonResult(workId, entryId, selectEl) {
             if (!webtoonSubs[workId]) return;
             const idx = webtoonSubs[workId].findIndex(e => e.id === entryId);
@@ -21013,7 +21017,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             const t = (e.clipboardData || window.clipboardData).getData('text/plain');
             document.execCommand('insertText', false, t);
         }
-        function dmbSave() { clearTimeout(_dmbTimer); _dmbTimer = setTimeout(() => { save(true); }, 600); }
+        function dmbSave() { save(true); }   // save() 가 이미 짧게 모아서 저장 — 이중 대기 없이 바로 넘김(탭을 숨겨도 flush 됨)
         function dmbFmt(ts) { const d = new Date(ts || Date.now()); return (d.getMonth() + 1) + '/' + d.getDate(); }
         function dmbAdd() {
             dashMemos.unshift({ id: 'm' + Date.now() + Math.floor(Math.random() * 1000), text: '', color: DMB_COLORS[dashMemos.length % DMB_COLORS.length], ts: Date.now() });
@@ -21100,7 +21104,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         let _dgbYear = 0;
         function dgbYr() { return _dgbYear || new Date().getFullYear(); }
         function dgbYearMove(d) { _dgbYear = Math.max(2000, dgbYr() + d); _dgbEdit = ''; renderDashGoalBoard(true); }
-        function dgbSave() { clearTimeout(_dgbTimer); _dgbTimer = setTimeout(() => save(true), 600); }
+        function dgbSave() { save(true); }
         function dgbRead(el) { return ((t0, br) => (br ? t0.replace(/\n$/, '') : t0))(el.innerText, el.lastChild && el.lastChild.nodeName === 'BR').replace(/ /g, ' '); }
         function dgbGroups() {
             const out = [];
@@ -29201,7 +29205,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             // 이미 브라우저에 로그인돼 있는 구글 계정이 있으면 구글이 계정 선택 창 없이
             // 그 계정으로 조용히 로그인시켜버릴 수 있어서, 항상 계정 선택 화면이 뜨도록 강제한다
             provider.setCustomParameters({ prompt: 'select_account' });
-            let cloudReady = false, cloudTimer = null;
+            let cloudReady = false, cloudTimer = null, _cloudSeenAt = 0, _cloudPushing = 0, _cloudPullAt = 0;
 
             // [FIX] 오래 방치된 세션이 옛날 데이터를 들고 있다가 실수로 저장/업로드하는 걸 막기 위한 자동 로그아웃.
             // 마지막 활동 이후 IDLE_LOGOUT_MS(기본 6시간)가 지났으면, 다시 열었을 때 자동으로 로그아웃시켜서
@@ -29323,7 +29327,8 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                     const payload = cloudPayload(dataToSave);
                     let _bytes = payload.length; try { _bytes = new Blob([payload]).size; } catch (e) {}
                     if (_bytes > 1040000) { console.error('클라우드 저장 보류: 데이터가 1MB를 초과 (' + _bytes + ')'); cloudWarn('데이터가 너무 커서(' + Math.round(_bytes/1024) + 'KB) 클라우드에 저장하지 못했어요. 개발자에게 알려 주세요.'); return; }
-                    const mainSave = window.__cloudDocRef.set({ payload: payload, _savedAt: Date.now() }).then(markCloudActive).catch(e => { console.error('클라우드 저장 실패', e); cloudWarn('클라우드 저장 실패: ' + (e && (e.code || e.message) || '')); });
+                    const _ts = Date.now(); _cloudPushing++;
+                    const mainSave = window.__cloudDocRef.set({ payload: payload, _savedAt: _ts }).then(() => { _cloudSeenAt = _ts; _cloudPushing--; markCloudActive(); }).catch(e => { _cloudPushing--; console.error('클라우드 저장 실패', e); cloudWarn('클라우드 저장 실패: ' + (e && (e.code || e.message) || '')); });
                     // webtoonSubs 별도 doc에 저장
                     let subsSave = Promise.resolve();
                     if (window.__cloudSubsRef) {
@@ -29342,8 +29347,32 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 if (!cloudReady || !window.__cloudDocRef) return;
                 if (cloudTimer) clearTimeout(cloudTimer);
                 window.__cloudPending = dataToSave;
-                cloudTimer = setTimeout(() => { cloudTimer = null; const d = window.__cloudPending; window.__cloudPending = null; cloudSaveNow(d); }, 400);
+                cloudTimer = setTimeout(() => { cloudTimer = null; const d = window.__cloudPending; window.__cloudPending = null; cloudSaveNow(d); }, 150);
             };
+            // 웹(폰): 다른 기기(PC 등)에서 올린 최신 데이터를, 이 페이지로 돌아올 때(화면 켜기·탭 전환) 자동으로 받아온다.
+            // 내 변경이 저장 대기 중이거나 입력 중이면 건드리지 않는다. PC 앱은 표지·파일 때문에 제외.
+            function cloudPullIfNewer(){
+                try {
+                    if (typeof isNodeEnvironment !== 'undefined' && isNodeEnvironment) return;
+                    if (!cloudReady || !window.__cloudDocRef) return;
+                    if (Date.now() - _cloudPullAt < 4000) return; _cloudPullAt = Date.now();
+                    if (saveTimeout || cloudTimer || _cloudPushing) return;
+                    const ae = document.activeElement; if (ae && (ae.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName))) return;
+                    Promise.all([window.__cloudDocRef.get(), window.__cloudSubsRef ? window.__cloudSubsRef.get() : Promise.resolve(null)]).then(([snap, subsSnap]) => {
+                        const d = snap && snap.exists ? snap.data() : null; if (!d || !d.payload) return;
+                        if ((d._savedAt || 0) === _cloudSeenAt) return;
+                        if (saveTimeout || cloudTimer || _cloudPushing) return;   // 그 사이 내가 고쳤으면 내 것을 우선
+                        const parsed = JSON.parse(d.payload);
+                        if (subsSnap && subsSnap.exists && subsSnap.data() && subsSnap.data().payload) { const sp = JSON.parse(subsSnap.data().payload); parsed.webtoonSubs = sp.webtoonSubs || {}; parsed.webtoonSubOrder = sp.webtoonSubOrder || []; }
+                        _cloudSeenAt = d._savedAt || 0;
+                        applyAndRender(parsed);
+                        try { initRemoteCovers(); } catch (e) {}
+                        try { _dgbSig = ''; _dmbSig = ''; renderDashGoalBoard(true); renderDashMemoBoard(true); } catch (e) {}
+                    }).catch(e => console.error('[Cloud] 최신 데이터 받기 실패', e));
+                } catch (e) {}
+            }
+            document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') cloudPullIfNewer(); });
+            window.addEventListener('focus', cloudPullIfNewer);
             window.cloudFlush = function(){
                 if (!cloudTimer) return;
                 clearTimeout(cloudTimer); cloudTimer = null;
@@ -29387,6 +29416,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                     console.log('[Cloud] subsSnap exists:', subsSnap.exists);
                     if (mainSnap.exists && mainSnap.data() && mainSnap.data().payload) {
                         const mainParsed = JSON.parse(mainSnap.data().payload);
+                        _cloudSeenAt = mainSnap.data()._savedAt || 0;
                         console.log('[Cloud] mainParsed webtoonSubs keys:', Object.keys(mainParsed.webtoonSubs || {}));
                         // webtoonSubs를 별도 doc에서 복원 (있으면)
                         if (subsSnap.exists && subsSnap.data() && subsSnap.data().payload) {

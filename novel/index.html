@@ -1423,6 +1423,10 @@ nav.mtabs button .ic { width: 20px; height: 20px; }
 .gdot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 .wgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
 .wcard { background: var(--panel); border: 1px solid var(--line); border-top: 4px solid var(--gc); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; cursor: pointer; transition: transform .12s, box-shadow .12s; min-height: 150px; }
+.wcard.drag-src { opacity: .35; }
+.wcard.drop-before { box-shadow: -5px 0 0 var(--accent), 0 8px 20px rgba(0,0,0,.08) !important; }
+.wcard.drop-after { box-shadow: 5px 0 0 var(--accent), 0 8px 20px rgba(0,0,0,.08) !important; }
+.wcard { -webkit-touch-callout: none; }
 .wcard:hover, .wcard:focus-visible { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,.08); outline: none; }
 .wc-top { display: flex; align-items: center; gap: 6px; }
 .wc-genre { font-size: 11px; font-weight: 700; color: var(--gi, var(--muted)); background: color-mix(in srgb, var(--gc) 35%, #fff); padding: 1px 7px; border-radius: 999px; }
@@ -10241,7 +10245,8 @@ function openHome() {
     if (!h) {
         h = document.createElement('div'); h.className = 'home';
         document.body.appendChild(h);
-        h.addEventListener('click', homeClick);
+        h.addEventListener('click', e => { if (Date.now() < homeDragQuiet) { e.preventDefault(); return; } homeClick(e); });
+        homeDragInit(h);
     }
     renderHome(); renderCloudBadge();
     try { ensureSynopFrame(); } catch (e) {}
@@ -10317,7 +10322,8 @@ function renderHome() {
     const h = $('.home'); if (!h) return;
     const mode = pref.homeGroup || 'genre';
     const list = works().map(w => ({ w, g: workGenre(w.id), s: workStats(w.id), plan: get('plan_' + w.id) }))
-        .sort((a, b) => b.s.last - a.s.last);
+        .sort((a, b) => { const oa = a.w.homeOrder, ob = b.w.homeOrder; // 끌어서 정한 순서가 있으면 그 순서, 아직 정하지 않은 작품(새 작품)은 맨 앞
+            if (oa != null && ob != null) return oa - ob; if (oa != null) return 1; if (ob != null) return -1; return b.s.last - a.s.last; });
     const groups = mode === 'status'
         ? [['미완고', list.filter(x => !x.w.done)], ['완고', list.filter(x => x.w.done)]]
         : [...WORK_GENRES.map(g => [g, list.filter(x => x.g === g)]), ['장르 미정', list.filter(x => !x.g)]];
@@ -10328,7 +10334,7 @@ function renderHome() {
     const polaroid = (x, i) => {
         const cover = x.w.cover || '', ld = leadNames(x.w.id);
         const metaTxt = (ld.m || ld.f) ? `<span class="pol-lead">${esc(ld.m || '?')}<i>♡</i>${esc(ld.f || '?')}</span>` : `원고 ${x.s.docs}편 · ${fmt(x.s.chars)}자`;
-        return `<div class="wcard pol" data-work="${x.w.id}" tabindex="0" style="${genreVars(x.g)};--rot:${[-2.2, 1.6, -0.9, 2.1, -1.5][i % 5]}deg">
+        return `<div class="wcard pol" data-work="${x.w.id}" draggable="true" tabindex="0" style="${genreVars(x.g)};--rot:${[-2.2, 1.6, -0.9, 2.1, -1.5][i % 5]}deg">
         <i class="pol-tape"></i>
         <div class="pol-ph${cover ? ' has-cover' : ''}">${cover ? `<img src="${cover}" alt="">` : ''}
             <div class="wc-top"><span class="wc-genre">${esc(x.g || '장르 미정')}</span><span class="wc-status ${x.w.done ? 'done' : ''}">${x.w.done ? '완고' : '미완고'}</span>
@@ -10338,7 +10344,7 @@ function renderHome() {
             ? `<div class="pol-cap"><b class="pol-title">${esc(x.w.title || '제목 없음')}</b><span class="pol-when">${when(x.s.last)}</span></div><div class="pol-sub">${metaTxt}</div>`
             : `<div class="pol-cap"><span class="pol-sub">${metaTxt}</span><span class="pol-when">${when(x.s.last)}</span></div>`}</div>`;
     };
-    const card = (x, i) => polCards ? polaroid(x, i) : `<div class="wcard" data-work="${x.w.id}" tabindex="0" style="${genreVars(x.g)}">
+    const card = (x, i) => polCards ? polaroid(x, i) : `<div class="wcard" data-work="${x.w.id}" draggable="true" tabindex="0" style="${genreVars(x.g)}">
         <div class="wc-top"><span class="wc-genre">${esc(x.g || '장르 미정')}</span><span class="wc-status ${x.w.done ? 'done' : ''}">${x.w.done ? '완고' : '미완고'}</span>
             <button class="mini wc-more" data-wm="${x.w.id}" title="작품 메뉴">⋯</button></div>
         <div class="wc-title">${esc(x.w.title || '제목 없음')}</div>
@@ -10354,6 +10360,46 @@ function renderHome() {
                 <h2>${mode === 'genre' ? `<span class="gdot" style="background:${GENRE_COLOR[name] || 'var(--muted)'};box-shadow:0 0 0 1px ${GENRE_INK[name] || 'transparent'}"></span>` : name === '완고' ? '<i class="ic ic-circle-check"></i>' : '<i class="ic ic-pen-line"></i>'} ${esc(name)} <small>${l.length}</small></h2>
                 <div class="wgrid${polCards ? ' pol-grid' : ''}">${(l.map(card).join('') + (polCards && mode === 'genre' && name === groups.filter(([, gl]) => gl.length).slice(-1)[0]?.[0] ? newPol : '')) || '<div class="modal-note">아직 없어요</div>'}</div></section>`).join('')}
         </main>`;
+}
+// 홈 작품 카드 끌어서 순서 바꾸기 (마우스: 그냥 끌기 / 폰: 꾹 눌렀다가 끌기). 같은 묶음(장르·완고) 안에서만, 순서는 작품에 저장(homeOrder)
+let homeDragQuiet = 0, homeDragId = null;
+function homeMove(id, targetId, after) {
+    const card = el => el && el.closest ? el.closest('.wcard[data-work]') : null;
+    const src = $('.home .wcard[data-work="' + id + '"]'), tgt = $('.home .wcard[data-work="' + targetId + '"]');
+    if (!src || !tgt || src === tgt || src.parentElement !== tgt.parentElement) return;
+    const ids = [...src.parentElement.querySelectorAll('.wcard[data-work]')].map(c => c.dataset.work).filter(x => x !== id);
+    let k = ids.indexOf(targetId); if (after) k++;
+    ids.splice(k, 0, id);
+    ids.forEach((wid, i) => { const w = get(wid); if (w && w.homeOrder !== (i + 1) * 10 + (0)) { w.homeOrder = (i + 1) * 10; touch(w); } });
+    renderHome();
+}
+function homeDragInit(h) {
+    const overOf = (x, y) => { const el = document.elementFromPoint(x, y); return el && el.closest ? el.closest('.wcard[data-work]') : null; };
+    const clear = () => h.querySelectorAll('.wcard.drop-before, .wcard.drop-after, .wcard.drag-src').forEach(c => c.classList.remove('drop-before', 'drop-after', 'drag-src'));
+    const mark = (c, x) => { h.querySelectorAll('.wcard.drop-before, .wcard.drop-after').forEach(o => o.classList.remove('drop-before', 'drop-after')); if (!c || c.dataset.work === homeDragId) return null; const r = c.getBoundingClientRect(), after = x > r.left + r.width / 2; c.classList.add(after ? 'drop-after' : 'drop-before'); return after; };
+    // 마우스
+    h.addEventListener('dragstart', e => { const c = e.target.closest && e.target.closest('.wcard[data-work]'); if (!c) return; homeDragId = c.dataset.work; e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', homeDragId); } catch (_) {} setTimeout(() => c.classList.add('drag-src'), 0); });
+    h.addEventListener('dragover', e => { if (!homeDragId) return; const c = e.target.closest && e.target.closest('.wcard[data-work]'); if (c) { e.preventDefault(); mark(c, e.clientX); } });
+    h.addEventListener('drop', e => { if (!homeDragId) return; const c = e.target.closest && e.target.closest('.wcard[data-work]'); e.preventDefault(); if (c) homeMove(homeDragId, c.dataset.work, mark(c, e.clientX)); homeDragId = null; clear(); homeDragQuiet = Date.now() + 300; });
+    h.addEventListener('dragend', () => { homeDragId = null; clear(); homeDragQuiet = Date.now() + 300; });
+    // 폰 · 태블릿: 카드를 0.45초 꾹 눌러 끌기
+    let t = null, id = null, on = false, sx = 0, sy = 0, ghost = null;
+    const stop = () => { clearTimeout(t); t = null; if (ghost) ghost.remove(); ghost = null; if (on) homeDragQuiet = Date.now() + 400; on = false; id = null; homeDragId = null; clear(); };
+    h.addEventListener('touchstart', e => {
+        const c = e.target.closest && e.target.closest('.wcard[data-work]');
+        if (!c || e.touches.length !== 1 || e.target.closest('.wc-more')) { stop(); return; }
+        id = c.dataset.work; sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+        t = setTimeout(() => { on = true; homeDragId = id; c.classList.add('drag-src'); ghost = c.cloneNode(true); ghost.classList.add('drag-ghost'); const r = c.getBoundingClientRect(); ghost.style.cssText = `position:fixed;z-index:99999;pointer-events:none;width:${r.width}px;left:${r.left}px;top:${r.top}px;opacity:.85;transform:scale(.92);box-shadow:0 10px 26px rgba(0,0,0,.28)`; document.body.appendChild(ghost); if (navigator.vibrate) try { navigator.vibrate(15); } catch (_) {} }, 450);
+    }, { passive: true });
+    h.addEventListener('touchmove', e => {
+        if (!id) return; const x = e.touches[0].clientX, y = e.touches[0].clientY;
+        if (!on) { if (Math.abs(x - sx) > 8 || Math.abs(y - sy) > 8) stop(); return; }
+        e.preventDefault(); ghost.style.left = (x - ghost.offsetWidth / 2) + 'px'; ghost.style.top = (y - 30) + 'px';
+        mark(overOf(x, y), x);
+        const body = h.querySelector('.home-body') || h; if (y < 80) body.scrollTop -= 14; else if (y > innerHeight - 80) body.scrollTop += 14;
+    }, { passive: false });
+    h.addEventListener('touchend', e => { if (!id) return; if (on) { const tc = e.changedTouches[0], c = overOf(tc.clientX, tc.clientY); if (c) homeMove(id, c.dataset.work, mark(c, tc.clientX)); } stop(); });
+    h.addEventListener('touchcancel', stop);
 }
 async function homeClick(e) {
     const t = e.target.closest('[data-hg], [data-h], [data-wm], .wcard, .hh-go'); if (!t) return;

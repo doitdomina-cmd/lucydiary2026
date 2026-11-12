@@ -3510,6 +3510,17 @@ body.menu-font-on #settings-panel-modal .settings-tabbtn, body.menu-font-on #the
         html body .wsub-table-wrap .wsub-inline-result.wsub-r-contract, html body .wsub-inline-result.wsub-r-contract { background: #E4D9FA !important; color: #6a4aa8 !important; }
         /* cnt-badge-big: 웹툰·작품 관리 제목 옆 숫자칸 크게 */
         html body :is(#webtoon-total-count, #workmanage-total-count) { font-size: 16px !important; padding: 3px 14px !important; line-height: 1.3 !important; }
+        /* dgb-hide: 작품 구상 필명 선택 */
+        #dash-goal-board .dgb-flbtn { border: 0; background: transparent; padding: 2px; cursor: pointer; line-height: 0; border-radius: 50%; transition: transform .2s; }
+        #dash-goal-board .dgb-flbtn svg { width: 30px; height: 30px; }
+        #dash-goal-board .dgb-flbtn:hover, #dash-goal-board .dgb-flbtn.on { transform: rotate(40deg) scale(1.1); }
+        #dash-goal-board .dgb-setp { background: rgba(255,255,255,.85); border: 1.5px dashed rgba(138,101,8,.45); border-radius: 12px; padding: 10px 14px 12px; margin: 0 0 12px; }
+        #dash-goal-board .dgb-setp-h { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 14px; color: #5a4a30; }
+        #dash-goal-board .dgb-setp-h button { border: 0; background: transparent; cursor: pointer; color: #a8957a; font-size: 14px; }
+        #dash-goal-board .dgb-setp-l { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-bottom: 8px; }
+        #dash-goal-board .dgb-setp-l label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 14px; font-weight: 700; color: #3a3226; }
+        #dash-goal-board .dgb-setp-l input { width: 16px; height: 16px; accent-color: #d98a98; cursor: pointer; }
+        #dash-goal-board .dgb-setp-add { width: 100%; max-width: 260px; font-size: 13px; }
         /* dgb-dots: 보드 바탕에 연한 버터색 큰 동그라미(도트) */
         html body #dash-goal-board .cozy-launch-wrap.cozy-launch-wrap { position: relative; background: linear-gradient(180deg, #FFFCF0 0%, #FFF6DA 100%) !important; }
         #dash-goal-board .dgb-tape { position: absolute; width: 96px; height: 28px; z-index: 1; pointer-events: none; opacity: .92; background-color: #fff; background-image: repeating-linear-gradient(0deg, rgba(255,140,165,.5) 0 7px, transparent 7px 14px), repeating-linear-gradient(90deg, rgba(255,140,165,.5) 0 7px, transparent 7px 14px); box-shadow: 0 2px 4px rgba(60,45,25,.12); }
@@ -11438,7 +11449,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         let publisherCardSortOrder = []; // [NEW] 카드 보기 전용 순서 (줄 보기 순서와 별도 저장)
         let taxViewYear = new Date().getFullYear();
         let settingsPresets = [null, null, null, null, null];   // 설정 프리셋 5칸 ({name, savedAt, data})
-        let workIdeas = { cards: [], groups: [] };   // 대시보드 목표 보드 '작품 구상': cards [{id, pen, title, when}], groups = 필명 말고 직접 만든 칸
+        let workIdeas = { cards: [], groups: [], order: [], hidden: [] };   // 대시보드 목표 보드 '작품 구상': cards [{id, pen, title, when}], groups = 필명 말고 직접 만든 칸
         let dashMemos = [];   // 대시보드 메모 보드: [{id, text, color, ts}]
         let calCardSizes = { pub: 12 };   // 출간 일정 카드 글자 크기(px)
         let calCardFonts = { pub: 'auto', task: 'auto', write: 'auto', tl: 'auto', works: 'auto' };   // 달력/목록 카드 글씨체(화면마다): auto | sans | serif | hand | pen | ink | single | dodum
@@ -11985,7 +11996,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             if (parsed.calCardFonts) Object.assign(calCardFonts, parsed.calCardFonts);
             if (parsed.calCardSizes) Object.assign(calCardSizes, parsed.calCardSizes);
             dashMemos = Array.isArray(parsed.dashMemos) ? parsed.dashMemos : [];
-            workIdeas = (parsed.workIdeas && Array.isArray(parsed.workIdeas.cards)) ? { cards: parsed.workIdeas.cards, groups: Array.isArray(parsed.workIdeas.groups) ? parsed.workIdeas.groups : [], order: Array.isArray(parsed.workIdeas.order) ? parsed.workIdeas.order : [] } : { cards: [], groups: [], order: [] };
+            workIdeas = (parsed.workIdeas && Array.isArray(parsed.workIdeas.cards)) ? { cards: parsed.workIdeas.cards, groups: Array.isArray(parsed.workIdeas.groups) ? parsed.workIdeas.groups : [], order: Array.isArray(parsed.workIdeas.order) ? parsed.workIdeas.order : [], hidden: Array.isArray(parsed.workIdeas.hidden) ? parsed.workIdeas.hidden : [] } : { cards: [], groups: [], order: [], hidden: [] };
             if (parsed.modalDesign) modalDesign = parsed.modalDesign;
             if (parsed.ddayCardFonts) Object.assign(ddayCardFonts, parsed.ddayCardFonts);
             if (parsed.ddayCardDesigns) Object.assign(ddayCardDesigns, parsed.ddayCardDesigns);
@@ -21102,7 +21113,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         }
 
         // ── 대시보드 목표 보드: [목표] 올해 수익·글자수 진행바 + 목표 메모 / [작품 구상] 필명별 칸반 ──
-        let _dgbSig = '', _dgbTab = (() => { try { return localStorage.getItem('dgbTab_v1') === 'idea' ? 'idea' : 'goal'; } catch (e) { return 'goal'; } })(), _dgbAddGroup = false, _dgbEdit = '', _dgbDragId = null, _dgbTimer = null;
+        let _dgbSig = '', _dgbTab = (() => { try { return localStorage.getItem('dgbTab_v1') === 'idea' ? 'idea' : 'goal'; } catch (e) { return 'goal'; } })(), _dgbAddGroup = false, _dgbEdit = '', _dgbDragId = null, _dgbTimer = null, _dgbSet = false;
         // 손으로 그린 SVG 그림들 (고양이·머그컵·잎사귀·아이콘)
         const DGB_ART = {
             cat: `<svg viewBox="0 0 160 76" xmlns="http://www.w3.org/2000/svg"><g stroke="#6b4a3a" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><rect x="10" y="54" width="130" height="15" rx="4" fill="#A9CBD3" fill-opacity="0"/><rect x="10" y="54" width="130" height="15" rx="4" fill="#A9CC93"/><path d="M18 62h112" stroke="#7fa56d" stroke-width="1.2"/><rect x="20" y="40" width="112" height="14" rx="4" fill="#F5B3BE"/><path d="M28 47h96" stroke="#d98a98" stroke-width="1.2"/><path d="M112 33c16 3 22-9 14-17" fill="none" stroke="#E8A56F" stroke-width="3"/><ellipse cx="82" cy="31" rx="36" ry="13" fill="#FFF9F2"/><ellipse cx="98" cy="25" rx="14" ry="7" fill="#F2B880" stroke="none"/><circle cx="46" cy="30" r="14" fill="#FFF9F2"/><path d="M34 22l-2-12 11 6z" fill="#FFF9F2"/><path d="M58 22l3-12-12 7z" fill="#F2B880"/><path d="M40 30q3 3 6 0M50 30q3 3 6 0" fill="none"/><path d="M46 35q2 1.5 4 0" fill="none" stroke-width="1.2"/></g><ellipse cx="37" cy="35" rx="3" ry="2" fill="#F9A8B8"/><ellipse cx="59" cy="35" rx="3" ry="2" fill="#F9A8B8"/><circle cx="16" cy="14" r="11" fill="#fff" stroke="#F3A0B3" stroke-width="1.6"/><path d="M16 20c-6-4-7-8-4-10 2-1 4 0 4 2 0-2 2-3 4-2 3 2 2 6-4 10z" fill="#F4768F"/><circle cx="29" cy="28" r="2" fill="#fff" stroke="#F3A0B3"/><path d="M150 6l2 6 6 2-6 2-2 6-2-6-6-2 6-2z" fill="#F6C85F"/></svg>`,
@@ -21139,6 +21150,17 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         function dgbColMove(gi, d) {
             const g = dgbGroups(), j = gi + d; if (j < 0 || j >= g.length) return;
             [g[gi], g[j]] = [g[j], g[gi]]; workIdeas.order = g; save(true); renderDashGoalBoard(true);
+        }
+        function dgbToggleSet() { _dgbSet = !_dgbSet; renderDashGoalBoard(true); }
+        function dgbToggleHide(i) {
+            const n = dgbGroups()[i]; if (!n) return; const h = workIdeas.hidden || (workIdeas.hidden = []);
+            const k = h.indexOf(n); if (k >= 0) h.splice(k, 1); else h.push(n);
+            save(true); renderDashGoalBoard(true);
+        }
+        function dgbPanelAdd(inp) {
+            const name = (inp.value || '').trim(); if (!name) return;
+            if (!dgbGroups().includes(name)) { workIdeas.groups.push(name); save(true); }
+            renderDashGoalBoard(true);
         }
         function dgbTab(t) { _dgbTab = t; _dgbAddGroup = false; try { localStorage.setItem('dgbTab_v1', t); } catch (e) {} renderDashGoalBoard(true); }
         function dgbEditGoal(k) { _dgbEdit = k; renderDashGoalBoard(true); const i = document.getElementById('dgb-gin'); if (i) { i.focus(); i.select(); } }
@@ -21236,7 +21258,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             const yr = dgbYr();
             const net = getYearNet(yr), goal = incomeGoals[yr] || 0, chars = getYearCharTotal(yr), cg = charGoals[yr] || 0;
             const items = getYearGoalItems(yr);
-            const sig = JSON.stringify([_dgbTab, _dgbEdit, _dgbAddGroup, net, goal, chars, cg, items, workIdeas, penNames, penNameColorOverrides, yr]);
+            const sig = JSON.stringify([_dgbTab, _dgbEdit, _dgbAddGroup, net, goal, chars, cg, items, workIdeas, penNames, penNameColorOverrides, yr, _dgbSet]);
             if (!force && sig === _dgbSig && box.firstChild) return;
             _dgbSig = sig;
             const pct = (v, g) => g > 0 ? Math.min(Math.round(v / g * 100), 999) : 0;
@@ -21253,7 +21275,9 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                     </div><input id="dgb-newitem" class="dgb-add" placeholder="적고 Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();dgbAddItem(this)}">
                 </div></div>`;
             const groups = dgbGroups();
+            const _hid = workIdeas.hidden || [];
             const cols = groups.map((g, gi) => {
+                if (_hid.includes(g)) return '';
                 const pc = getPenColor(g) || DGB_PAL[gi % DGB_PAL.length];
                 const cards = workIdeas.cards.filter(c => c.pen === g);
                 return `<div class="dgb-col" style="--pc:${pc}" ondragover="dgbDragOver(event,this)" ondragleave="dgbDragLeave(this)" ondrop="dgbDrop(event,${gi},this)">
@@ -21268,10 +21292,11 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 </div>`;
             }).join('');
             const newCol = `<div class="dgb-newcol">${_dgbAddGroup ? `<input id="dgb-newgroup" class="dgb-gin" placeholder="그룹 이름 (Enter)" onkeydown="if(event.key==='Enter'){this.onblur=null;dgbNewGroup(this,true)}else if(event.key==='Escape'){this.onblur=null;dgbNewGroup(this,false)}" onblur="dgbNewGroup(this,false)">` : `<button type="button" class="dgb-newbtn" onclick="_dgbAddGroup=true;renderDashGoalBoard(true);document.getElementById('dgb-newgroup').focus()">+ 신규 그룹</button>`}</div>`;
-            const ideaHtml = `<div class="dgb-cols">${cols}${newCol}</div>`;
+            const setPanel = _dgbSet ? `<div class="dgb-setp"><div class="dgb-setp-h"><b>보일 필명 선택</b><button type="button" onclick="dgbToggleSet()" title="닫기">✕</button></div><div class="dgb-setp-l">${groups.map((g, gi) => `<label><input type="checkbox" ${_hid.includes(g) ? '' : 'checked'} onchange="dgbToggleHide(${gi})"><span>${escapeHtml(g)}</span></label>`).join('')}</div><input class="dgb-gin dgb-setp-add" placeholder="새 그룹 이름 (Enter)" onkeydown="if(event.key==='Enter'){event.preventDefault();dgbPanelAdd(this)}"></div>` : '';
+            const ideaHtml = `${setPanel}<div class="dgb-cols">${cols}</div>`;
             box.innerHTML = `<div class="cozy-launch-wrap dgb-card-wrap"><img class="dgb-leaf l" src="deco/heart-flower.png" alt=""><img class="dgb-art" src="deco/header-art.png" alt="">
                 <div class="cozy-launch-head" style="align-items:center; margin-bottom:0"><div class="dgb-hl"><span class="ko">GOALS</span><span class="dgb-yearnav"><button type="button" onclick="dgbYearMove(-1)" title="이전 해">‹</button><b>${yr}</b><button type="button" onclick="dgbYearMove(1)" title="다음 해">›</button></span></div></div>
-                <div class="dgb-body">${goalHtml}<div class="dgb-sub"><span class="dgb-bico">${DGB_ART.book}</span><b>작품 구상</b></div>${ideaHtml}</div>
+                <div class="dgb-body">${goalHtml}<div class="dgb-sub"><span class="dgb-bico">${DGB_ART.book}</span><b>작품 구상</b><button type="button" class="dgb-flbtn${_dgbSet ? ' on' : ''}" onclick="dgbToggleSet()" title="보일 필명 고르기">${DGB_ICONS[6]}</button></div>${ideaHtml}</div>
             </div>`;
         }
 

@@ -12126,6 +12126,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
 
         // '메모' 분류는 체크리스트 카드용으로 항상 존재해야 한다 (이름 변경/삭제는 막아둠)
         const WRITE_MEMO_CATEGORY = '메모';
+        const WRITE_NOWORK_KEY = '__nowork__';   // 작품을 고르지 않고 만든 '메모' 카드의 workId
         if (!writeCategoryList.includes(WRITE_MEMO_CATEGORY)) {
             writeCategoryList.push(WRITE_MEMO_CATEGORY);
             if (WRITE_COLORS[WRITE_MEMO_CATEGORY] === undefined) WRITE_COLORS[WRITE_MEMO_CATEGORY] = '#FDE9A9';
@@ -21858,6 +21859,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         function isScheduleWorkValid(workId) {
             if (!workId) return false;
             if (workId === WRITER_BULK_UNASSIGNED_KEY) return true; // 작품 미지정 일괄 입력 글자수는 항상 유효
+            if (workId === WRITE_NOWORK_KEY) return true;           // 작품 없이 만든 메모 카드
             const r = resolveWorkItem(workId);
             if (!r.work) return false;                       // 본편(또는 외전의 부모 작품)이 삭제됨
             if (String(workId).includes('::') && !r.extra) return false; // 외전 자체가 삭제됨
@@ -22064,12 +22066,13 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
 
             const html = generateCalendarHTML(writeCalDate, writeSchedules, (s) => {
                 const resolved = resolveWorkItem(s.workId);
-                const work = resolved.work;
+                const _noWork = s.workId === WRITE_NOWORK_KEY;
+                const work = resolved.work || (_noWork ? { genre: '', title: '' } : null);
                 if(!work) return '';
-                if(writeGenreFilter !== '전체' && work.genre !== writeGenreFilter) return '';
+                if(writeGenreFilter !== '전체' && (_noWork || work.genre !== writeGenreFilter)) return '';
 
-                const color = getGenreColor(work.genre);
-                const titleForDisplay = resolved.displayTitle;
+                const color = _noWork ? '#cbd5e1' : getGenreColor(work.genre);
+                const titleForDisplay = _noWork ? (((s.checklist || []).find(it => it.text) || {}).text || '') : resolved.displayTitle;
                 let content = '';
                 
                 if (s.category) {
@@ -23778,7 +23781,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
 
         function saveWriteSchedule() {
             const dateStr = currentEditWriteDate;
-            const workId = document.getElementById('write-work-select').value;
+            let workId = document.getElementById('write-work-select').value;
             const category = document.getElementById('write-category-select').value;
             const goal = category ? 0 : (parseInt(document.getElementById('write-goal-input').value) || 0);
             const isMemoCard = category === WRITE_MEMO_CATEGORY;
@@ -23789,6 +23792,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 : document.getElementById('write-is-completed').checked;
             const volumeId = document.getElementById('write-volume-select').value;
 
+            if (!workId && isMemoCard) workId = WRITE_NOWORK_KEY;   // 메모는 작품 선택 없이도 저장
             if(!workId) { alert("작품을 선택해주세요."); return; }
 
             if(!writeSchedules[dateStr]) writeSchedules[dateStr] = [];

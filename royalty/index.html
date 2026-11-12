@@ -16120,7 +16120,37 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 </div>`;
             });
             requestAnimationFrame(fitWorksPanelsHeight);
+            requestAnimationFrame(fitWorkListCards);
         }
+        // 작품 등록 목록 카드: 장르 칸은 한 줄로, 제목은 '...' 없이 글자를 줄여서 다 보이게 (아이패드처럼 칸이 좁을 때)
+        function fitWorkListCards() {
+            const c = document.getElementById('master-works-by-genre-container'); if (!c || !c.clientWidth) return;
+            const P = (el, k, v) => el.style.setProperty(k, v, 'important');
+            Array.from(c.children).forEach(card => {
+                const row = card.querySelector(':scope > .flex.items-start.justify-between');
+                const g = row && row.firstElementChild, r = row && row.lastElementChild, h = card.querySelector(':scope > h4');
+                if (g && row) {
+                    P(g, 'white-space', 'nowrap'); P(g, 'flex-shrink', '0'); g.style.removeProperty('font-size');
+                    const base = parseFloat(getComputedStyle(g).fontSize) || 10;
+                    const avail = row.clientWidth - ((r && r !== g) ? r.getBoundingClientRect().width + 8 : 0);
+                    for (let fs = base; g.getBoundingClientRect().width > avail && fs > 6; fs -= 0.5) P(g, 'font-size', fs + 'px');
+                }
+                if (h) {
+                    P(h, 'white-space', 'nowrap'); P(h, 'display', 'block'); P(h, 'text-overflow', 'clip'); P(h, 'overflow', 'hidden'); h.style.removeProperty('font-size');
+                    const base = parseFloat(getComputedStyle(h).fontSize) || 14; let fs = base;
+                    for (; h.scrollWidth > h.clientWidth + 0.5 && fs > 7; fs -= 0.5) P(h, 'font-size', fs + 'px');
+                    if (h.scrollWidth > h.clientWidth + 0.5) P(h, 'text-overflow', 'ellipsis');
+                }
+            });
+        }
+        (function () {
+            let raf = 0; const run = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(fitWorkListCards); };
+            window.addEventListener('resize', run); window.addEventListener('load', run);
+            if (document.fonts && document.fonts.ready) document.fonts.ready.then(run);
+            if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', run);
+            /* fitobs */ const obs = () => { const c = document.getElementById('master-works-by-genre-container'); if (c) new MutationObserver(run).observe(c, { childList: true }); document.addEventListener('transitionend', e => { if (e.target && e.target.closest && e.target.closest('#master-works-by-genre-container')) run(); }, true); };
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', obs); else obs();
+        })();
         // 작품 등록 탭: 왼쪽 폼 카드 / 오른쪽 목록 카드의 높이를 실제 남은 뷰포트 공간에 맞춰
         // 정확히 계산해서 페이지 전체 스크롤이 생기지 않도록 한다.
         function fitWorksPanelsHeight() {

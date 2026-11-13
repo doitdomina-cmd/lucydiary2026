@@ -17060,11 +17060,18 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         // MG 입금 자동 찾기: 월별 정산에 직접 적은 금액이 'MG × 비율(없으면 100%) × 0.967(3.3% 뗌)' 과 같은 달을 찾는다.
         // 날짜는 모르니 월(YYYY-MM)까지만 넣는다.
         function findMgPaidMonth(w) {
-            const mg = Number(w.advanceAmount) || 0;
+            const mg = (Number(w.advanceAmount) || 0) * 10000; // MG 칸은 만원 단위
             if (!mg) return '';
             const wr = Number(w.webtoonRate) || 0;
             const base = mg * (wr > 0 ? wr / 100 : 1);
             const want = [Math.round(base * 0.967), Math.floor(base * 0.967), Math.round(base - Math.floor(base * 0.033))];
+            // 1순위: '선인세 입금 내역'에 적힌 입금 (날짜까지 있으면 날짜 그대로)
+            const advs = getWorkAdvances(w).filter(a => a && a.date && Number(a.amount) > 0)
+                .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+            const hit = advs.find(a => want.some(x => Math.abs(x - Number(a.amount)) <= 2));
+            if (hit) return String(hit.date);
+            const advSum = advs.reduce((s, a) => s + Number(a.amount), 0);
+            if (advs.length && advSum >= want[1] - 2) return String(advs[advs.length - 1].date);
             const months = Object.keys(monthlyData || {}).filter(m => /^\d{4}-\d{2}$/.test(m)).sort();
             for (const m of months) {
                 const v = Number((monthlyData[m] || {})[w.id]) || 0;

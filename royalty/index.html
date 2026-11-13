@@ -9050,6 +9050,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                             </span>
                         </label>
                         <input type="date" id="wtm-mg-paid-date" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100">
+                        <input type="month" id="wtm-mg-paid-month" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100 hidden" onchange="if(!this.value) setWtmMgPaidInputs('')">
                     </div>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -16655,6 +16656,8 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             // 계약 파기한 작품은 '계약 파기' 보기에서만 보인다 (전체 보기·필명 별로 보기 등에서는 빠짐)
             const brokenWorks = masterWorks.filter(w => w.genre && w.genre.includes('웹툰') && w.contractBroken);
             const allWebtoonWorks = masterWorks.filter(w => w.genre && w.genre.includes('웹툰') && !w.contractBroken);
+            // 월별 정산에 MG를 직접 적어 둔 작품은 입금완료로 자동 체크
+            if (allWebtoonWorks.map(autoMarkMgPaid).some(Boolean)) save();
             const totalBadge = document.getElementById('webtoon-total-count');
             if (totalBadge) totalBadge.textContent = allWebtoonWorks.length;
             const brokenBtn = document.getElementById('wtvf-broken');
@@ -17054,10 +17057,52 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             }
         }
 
+        // MG 입금 자동 찾기: 월별 정산에 직접 적은 금액이 'MG × 비율(없으면 100%) × 0.967(3.3% 뗌)' 과 같은 달을 찾는다.
+        // 날짜는 모르니 월(YYYY-MM)까지만 넣는다.
+        function findMgPaidMonth(w) {
+            const mg = Number(w.advanceAmount) || 0;
+            if (!mg) return '';
+            const wr = Number(w.webtoonRate) || 0;
+            const base = mg * (wr > 0 ? wr / 100 : 1);
+            const want = [Math.round(base * 0.967), Math.floor(base * 0.967), Math.round(base - Math.floor(base * 0.033))];
+            const months = Object.keys(monthlyData || {}).filter(m => /^\d{4}-\d{2}$/.test(m)).sort();
+            for (const m of months) {
+                const v = Number((monthlyData[m] || {})[w.id]) || 0;
+                if (v > 0 && want.some(x => Math.abs(x - v) <= 2)) return m;
+            }
+            return '';
+        }
+        function autoMarkMgPaid(w) {
+            if (!w) return false;
+            const info = webtoonManage[w.id] || {};
+            if (info.mgPaidDone) return false;
+            const m = findMgPaidMonth(w);
+            if (!m) return false;
+            if (!webtoonManage[w.id]) webtoonManage[w.id] = {};
+            webtoonManage[w.id].mgPaidDone = true;
+            if (!webtoonManage[w.id].mgPaidDate) webtoonManage[w.id].mgPaidDate = m;
+            return true;
+        }
+        // 입금일이 월(YYYY-MM)뿐이면 월 입력칸, 아니면 날짜 입력칸을 보여준다
+        function setWtmMgPaidInputs(val) {
+            const d = document.getElementById('wtm-mg-paid-date');
+            const mo = document.getElementById('wtm-mg-paid-month');
+            const isMonth = /^\d{4}-\d{2}$/.test(val || '');
+            d.value = isMonth ? '' : (val || '');
+            mo.value = isMonth ? val : '';
+            d.classList.toggle('hidden', isMonth);
+            mo.classList.toggle('hidden', !isMonth);
+        }
+        function getWtmMgPaidValue() {
+            const mo = document.getElementById('wtm-mg-paid-month');
+            if (!mo.classList.contains('hidden')) return mo.value;
+            return document.getElementById('wtm-mg-paid-date').value;
+        }
         function openWebtoonManageModal(workId) {
             const w = masterWorks.find(x => x.id === workId);
             if (!w) return;
             currentWebtoonManageWorkId = workId;
+            if (autoMarkMgPaid(w)) save();
             const info = webtoonManage[workId] || {};
             document.getElementById('wtm-modal-title').innerText = w.title;
             populatePenNameSelect();
@@ -17075,7 +17120,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             document.getElementById('wtm-charguide-date').value = getWebtoonCharGuideDate(workId) || '';
             document.getElementById('wtm-cashsheet-date').value = info.cashsheetDate || '';
             document.getElementById('wtm-ep1conti-date').value = info.ep1ContiDate || '';
-            document.getElementById('wtm-mg-paid-date').value = info.mgPaidDate || '';
+            setWtmMgPaidInputs(info.mgPaidDate || '');
             document.getElementById('wtm-charguide-done').checked = !!info.charGuideDone;
             document.getElementById('wtm-cashsheet-done').checked = !!info.cashsheetDone;
             document.getElementById('wtm-ep1conti-done').checked = !!info.ep1ContiDone;
@@ -17134,7 +17179,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             webtoonManage[workId].penName = document.getElementById('wtm-pen-name').value;
             webtoonManage[workId].cashsheetDate = document.getElementById('wtm-cashsheet-date').value;
             webtoonManage[workId].ep1ContiDate = document.getElementById('wtm-ep1conti-date').value;
-            webtoonManage[workId].mgPaidDate = document.getElementById('wtm-mg-paid-date').value;
+            webtoonManage[workId].mgPaidDate = getWtmMgPaidValue();
             webtoonManage[workId].charGuideDone = document.getElementById('wtm-charguide-done').checked;
             webtoonManage[workId].cashsheetDone = document.getElementById('wtm-cashsheet-done').checked;
             webtoonManage[workId].ep1ContiDone = document.getElementById('wtm-ep1conti-done').checked;

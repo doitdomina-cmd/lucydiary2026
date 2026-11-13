@@ -11950,6 +11950,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         function hydrateFromParsed(parsed) {
             if (!parsed) return;
             masterWorks = parsed.masterWorks || [];
+            try { fixWebtoonRates(); } catch(e) {}   // 웹툰 내 비율 7 → 70% (다른 기기에서 불러온 자료도)
             try { assetHydrateWorks(masterWorks); } catch (e) { console.error('[Asset] 불러오기 변환 실패', e); }
             monthlyData = parsed.monthlyData || {};
             years = parsed.years || [2024, 2025, 2026];
@@ -12098,6 +12099,29 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             });
             if (changed) save(true);
         })();
+        // 웹툰 '내 비율'은 퍼센트(70)로 통일: 7처럼 10 이하로 적은 값은 7:3 = 70% 로 본다
+        // (예전엔 RS 10 × 비율 7 을 0.7% 로 계산해서 역산 총매출이 10배로 나왔음)
+        function normWebtoonRate(v) { return (v && v > 0 && v <= 10) ? Math.round(v * 10 * 10) / 10 : v; }
+        // 실제 내가 받는 RS: RS 10 · 비율 70 → 7, 비율이 없으면 RS 그대로
+        function webtoonEffRs(rs, wr) { return (rs && wr) ? Math.round(rs * wr / 100 * 10) / 10 : (rs || 0); }
+        // 카드에 적는 글: 맨 앞이 실제 받는 RS → 'RS 7 (10 × 70%)', 비율 없으면 'RS 10'
+        function webtoonRsLabel(w) {
+            if (w.rs && w.webtoonRate) return `RS ${webtoonEffRs(w.rs, w.webtoonRate)} (${w.rs} × ${w.webtoonRate}%)`;
+            if (w.rs) return `RS ${w.rs}`;
+            if (w.webtoonRate) return `비율 ${w.webtoonRate}%`;
+            return '';
+        }
+        function fixWebtoonRates() {
+            let changed = false;
+            masterWorks.forEach(w => {
+                if (!w.webtoonRate && !w.rs) return;
+                const wr = w.webtoonRate ? normWebtoonRate(w.webtoonRate) : w.webtoonRate;
+                const rate = w.rs ? webtoonEffRs(w.rs, wr) : w.rate;   // 실제 내가 받는 RS (비율 없으면 RS 그대로)
+                if (wr !== w.webtoonRate || rate !== w.rate) { w.webtoonRate = wr; w.rate = rate; changed = true; }
+            });
+            return changed;
+        }
+        if (fixWebtoonRates()) save(true);
         // 출판사 '업데이트' 날짜에서 31일 옵션을 없애고 '말일'로 통일했으므로, 예전에 31로 저장된 값을 마이그레이션
         (function migrateUpdateDay31ToLastDay() {
             let changed = false;
@@ -13625,9 +13649,9 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             const isWebtoonMemo = work.genre && work.genre.includes('웹툰');
             if (isWebtoonMemo) {
                 let rateText = '';
-                if (work.rs && work.webtoonRate) rateText = `RS ${work.rs} (비율 ${work.webtoonRate})`;
+                if (work.rs && work.webtoonRate) rateText = webtoonRsLabel(work);
                 else if (work.rs) rateText = `RS ${work.rs}`;
-                else if (work.webtoonRate) rateText = `비율 ${work.webtoonRate}`;
+                else if (work.webtoonRate) rateText = webtoonRsLabel(work);
                 else rateText = '-';
                 document.getElementById('memo-rate-display').innerText = rateText;
             } else {
@@ -15775,12 +15799,12 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 const rsVal = document.getElementById('new-work-rs').value;
                 const wrVal = document.getElementById('new-work-webtoon-rate').value;
                 rs = rsVal !== '' ? parseFloat(rsVal) : null;
-                webtoonRate = wrVal !== '' ? parseFloat(wrVal) : null;
+                webtoonRate = wrVal !== '' ? normWebtoonRate(parseFloat(wrVal)) : null;
                 // 둘 다 있으면 비율 계산, 아니면 0 (정산 비율 미정)
                 if (rs && webtoonRate) {
                     rate = Math.round(rs * webtoonRate / 100 * 10) / 10;
                 } else {
-                    rate = 0; // 미정
+                    rate = rs || 0; // 비율이 없으면 RS 그대로 (둘 다 없으면 미정)
                 }
             } else {
                 rate = document.getElementById('new-work-rate').value;
@@ -16108,9 +16132,9 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 
                 let rateLabel;
                 if (isWebtoonWork) {
-                    if (w.rs && w.webtoonRate) rateLabel = `RS ${w.rs} (비율 ${w.webtoonRate})`;
+                    if (w.rs && w.webtoonRate) rateLabel = webtoonRsLabel(w);
                     else if (w.rs) rateLabel = `RS ${w.rs}`;
-                    else if (w.webtoonRate) rateLabel = `비율 ${w.webtoonRate}`;
+                    else if (w.webtoonRate) rateLabel = webtoonRsLabel(w);
                     else rateLabel = '';
                 } else {
                     rateLabel = `${w.rate}%`;
@@ -16499,9 +16523,9 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             const info = webtoonManage[w.id] || {};
             const charGuideDate = getWebtoonCharGuideDate(w.id);
             let rsRateText = '';
-            if (w.rs && w.webtoonRate) rsRateText = `RS ${w.rs} (비율 ${w.webtoonRate})`;
+            if (w.rs && w.webtoonRate) rsRateText = webtoonRsLabel(w);
             else if (w.rs) rsRateText = `RS ${w.rs}`;
-            else if (w.webtoonRate) rsRateText = `비율 ${w.webtoonRate}`;
+            else if (w.webtoonRate) rsRateText = webtoonRsLabel(w);
             const websiteHref = info.website ? (info.website.startsWith('http') ? info.website : 'https://' + info.website) : '';
             const launchHref = info.launchUrl ? (info.launchUrl.startsWith('http') ? info.launchUrl : 'https://' + info.launchUrl) : '';
             const penColor = info.penName ? getPenColor(info.penName) : null;
@@ -17108,8 +17132,8 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 const rsVal = document.getElementById('wtm-rs').value;
                 const wrVal = document.getElementById('wtm-webtoon-rate').value;
                 w.rs = rsVal !== '' ? parseFloat(rsVal) : null;
-                w.webtoonRate = wrVal !== '' ? parseFloat(wrVal) : null;
-                if (w.rs && w.webtoonRate) w.rate = Math.round(w.rs * w.webtoonRate / 100 * 10) / 10;
+                w.webtoonRate = wrVal !== '' ? normWebtoonRate(parseFloat(wrVal)) : null;
+                if (w.rs) w.rate = webtoonEffRs(w.rs, w.webtoonRate);
                 commitAdvDraft('wtm', w);
             }
             save();
@@ -17192,7 +17216,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 <div class="pt-2.5 mt-1.5 space-y-1.5 text-[13px]">
                     <div class="flex gap-2">${lbl1('웹툰 스튜디오')}${val('studio', '레진')}</div>
                     <div class="flex gap-2">${lbl1('계약일')}${val('contract', '2026-01-05')}</div>
-                    <div class="flex gap-2">${lbl1('RS / 비율')}${val('rsrate', 'RS 10 (비율 70)')}</div>
+                    <div class="flex gap-2">${lbl1('RS / 비율')}${val('rsrate', 'RS 7 (10 × 70%)')}</div>
                     <div class="flex gap-2">${lbl1('MG')}${val('mg', '500만원')}</div>
                 </div>
                 <div class="border-t border-slate-100 my-2"></div>

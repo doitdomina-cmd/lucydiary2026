@@ -8079,11 +8079,29 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                                         <div class="grid grid-cols-2 gap-3">
                                             <div>
                                                 <label class="text-sm font-bold text-slate-600 ml-1 mb-1 block">RS <span class="text-slate-400 font-normal">(%)</span></label>
-                                                <input type="number" id="new-work-rs" placeholder="예: 10" class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100">
+                                                <div class="flex gap-1.5">
+                                                    <select id="new-work-rs-select" onchange="wtRateSelChange('rs')" class="flex-1 min-w-0 p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100 cursor-pointer">
+                                                        <option value="10">10</option>
+                                                        <option value="7">7</option>
+                                                        <option value="">미정</option>
+                                                        <option value="custom">직접 입력</option>
+                                                    </select>
+                                                    <input type="number" id="new-work-rs" value="10" placeholder="%" class="w-20 shrink-0 p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100 hidden">
+                                                </div>
                                             </div>
                                             <div>
                                                 <label class="text-sm font-bold text-slate-600 ml-1 mb-1 block">내 비율 <span class="text-slate-400 font-normal">(%)</span></label>
-                                                <input type="number" id="new-work-webtoon-rate" placeholder="예: 70" class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100">
+                                                <div class="flex gap-1.5">
+                                                    <select id="new-work-webtoon-rate-select" onchange="wtRateSelChange('webtoon-rate')" class="flex-1 min-w-0 p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100 cursor-pointer">
+                                                        <option value="">없음</option>
+                                                        <option value="60">60</option>
+                                                        <option value="70">70</option>
+                                                        <option value="80">80</option>
+                                                        <option value="90">90</option>
+                                                        <option value="custom">직접 입력</option>
+                                                    </select>
+                                                    <input type="number" id="new-work-webtoon-rate" placeholder="%" class="w-20 shrink-0 p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100 hidden">
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -15232,6 +15250,20 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         function deleteCurrentYear() { if (years.length <= 1) { alert("최소 하나의 연도는 유지해야 합니다."); return; } if (confirm(`${currentYear}년도를 삭제하시겠습니까?`)) { years = years.filter(y => y !== currentYear); currentYear = years[years.length - 1]; save(); updateUI(); } }
         function switchGenreTab(genre) { currentGenreTab = genre; renderRoyaltySheets(); }
         function switchLibraryTab(tab) { currentLibraryTab = tab; renderMasterWorksList(); }
+        // 작품 등록(웹툰): RS·내 비율 선택칸. 실제 값은 옆의 숫자칸(new-work-rs / new-work-webtoon-rate)에 들어가고, '직접 입력'일 때만 숫자칸이 보인다
+        function wtRateSelChange(kind) {
+            const sel = document.getElementById('new-work-' + kind + '-select'), inp = document.getElementById('new-work-' + kind);
+            if (sel.value === 'custom') { inp.classList.remove('hidden'); inp.value = ''; inp.focus(); }
+            else { inp.classList.add('hidden'); inp.value = sel.value; }
+        }
+        function wtRateSelSet(kind, value) {
+            const sel = document.getElementById('new-work-' + kind + '-select'), inp = document.getElementById('new-work-' + kind);
+            const v = (value === null || value === undefined) ? '' : String(value);
+            inp.value = v;
+            const has = [...sel.options].some(o => o.value === v && o.value !== 'custom');
+            sel.value = has ? v : 'custom';
+            inp.classList.toggle('hidden', has);
+        }
         function handleRateSelectChange(select) { const customInput = document.getElementById('new-work-rate-custom'); if(select.value === 'custom') { customInput.classList.remove('hidden'); customInput.focus(); } else { customInput.classList.add('hidden'); } }
         function handleNewWorkPlatformChange(select) { const customInput = document.getElementById('new-work-platform-custom'); if(select.value === 'custom') { customInput.classList.remove('hidden'); customInput.focus(); } else { customInput.classList.add('hidden'); customInput.value = ''; } }
         function handleNewWorkPromotionChange(select) { const customInput = document.getElementById('new-work-promotion-custom'); if(select.value === 'custom') { customInput.classList.remove('hidden'); customInput.focus(); } else { customInput.classList.add('hidden'); customInput.value = ''; } }
@@ -15593,8 +15625,8 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             document.getElementById('new-work-studio').value = '';
             const spReset = document.getElementById('new-work-settlement-publisher'); if (spReset) spReset.value = '';
             settlementPublisherTouched = false;
-            document.getElementById('new-work-rs').value = '';
-            document.getElementById('new-work-webtoon-rate').value = '';
+            wtRateSelSet('rs', 10);            // 신규 웹툰은 RS 10 이 기본
+            wtRateSelSet('webtoon-rate', '');
             document.getElementById('new-work-goal-nospace').value = '';
             document.getElementById('new-work-goal-withspace').value = '';
             document.getElementById('new-work-platform-select').value = '';
@@ -15693,8 +15725,8 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             const spFill = document.getElementById('new-work-settlement-publisher');
             if (spFill) spFill.value = (w.settlementPublisher && w.settlementPublisher !== w.publisher) ? w.settlementPublisher : '';
             settlementPublisherTouched = !!(w.settlementPublisher && w.settlementPublisher !== w.publisher);
-            document.getElementById('new-work-rs').value = w.rs || '';
-            document.getElementById('new-work-webtoon-rate').value = w.webtoonRate || w.rate || '';
+            wtRateSelSet('rs', w.rs || '');
+            wtRateSelSet('webtoon-rate', w.webtoonRate || (w.rs ? '' : w.rate) || '');   // RS만 있는 작품은 rate 가 RS 값이라 비율로 쓰면 안 된다
             document.getElementById('new-work-goal-nospace').value = w.goalNoSpace || '';
             const wmInfo = workManage[w.id] || {};
             const platformPresets = ['리디', '시리즈', '카카오', '봄툰', '미스터블루', '레진'];

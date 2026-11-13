@@ -3237,6 +3237,8 @@ body.menu-font-on #settings-panel-modal .settings-tabbtn, body.menu-font-on #the
         body.theme-candy #dash-memo-board .dmb-note::after { inset: 6px; border: 2px dotted rgba(255,255,255,.95); border-radius: 15px; }
         body.theme-candy #dash-memo-board .dmb-note::before { top: -11px; background: repeating-linear-gradient(45deg, #F6B3D0 0 6px, #fff 6px 12px); border-radius: 4px; }
         /* MEMO BOARD THEMES END */
+
+
         /* ── 대시보드 목표 보드 (올해 목표 + 필명별 작품 구상) — 큰 틀은 .cozy-launch-wrap 이라 테마 틀이 씌워짐 ── */
         #dash-goal-board { color: #4a3f33; }
         #dash-goal-board .dgb-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -8155,10 +8157,10 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                                     <!-- 외전 관리 영역 (수정 모드에서만 표시) -->
                                     <div id="extras-section" class="hidden pt-4 mt-2" style="border-top: 1.5px dashed var(--primary);">
                                         <div class="flex items-center justify-between mb-2">
-                                            <label class="text-sm font-bold" style="color: var(--text-main);"><i class="fa-solid fa-heart text-[11px] mr-1" style="color: var(--primary);"></i>외전 / 추가 집필</label>
-                                            <button type="button" onclick="openExtraModal()" class="text-xs font-bold px-2 py-1 rounded-lg" style="background: var(--primary-light); color: var(--text-main); border: 1px solid var(--primary);">+ 외전 추가</button>
+                                            <label class="text-sm font-bold" style="color: var(--text-main);"><i class="fa-solid fa-heart text-[11px] mr-1" style="color: var(--primary);"></i>외전 / 후속권</label>
+                                            <button type="button" onclick="openExtraModal()" class="text-xs font-bold px-2 py-1 rounded-lg" style="background: var(--primary-light); color: var(--text-main); border: 1px solid var(--primary);">+ 추가</button>
                                         </div>
-                                        <p class="text-[10px] mb-3" style="color: var(--text-main); opacity:.65;">외전은 집필 관리/상세 기록에만 표시되며 정산에는 영향 없습니다.</p>
+                                        <p class="text-[10px] mb-3" style="color: var(--text-main); opacity:.65;">외전·후속권은 집필 관리/상세 기록에만 표시되며 정산에는 영향 없습니다.</p>
                                         <div id="extras-list" class="space-y-2 scroll-invisible" style="max-height: 220px; overflow-y: auto;"></div>
                                     </div>
                                 </div>
@@ -9273,8 +9275,8 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 </div>
                 <div>
                     <label class="text-xs font-bold text-slate-500 ml-1 mb-1 flex items-center justify-between">
-                        <span>외전</span>
-                        <button type="button" onclick="addWmmExtraRow()" class="text-[11px] font-bold text-emerald-600 hover:text-emerald-700">+ 추가</button>
+                        <span>외전 / 후속권 <span class="font-normal text-slate-400">· 완고일·출간일은 스케줄 관리·출간 일정·작품 등록과 함께 바뀝니다</span></span>
+                        <button type="button" onclick="addWmmExtraRow()" class="shrink-0 whitespace-nowrap ml-2text-[11px] font-bold text-emerald-600 hover:text-emerald-700">+ 추가</button>
                     </label>
                     <div id="wmm-extras-list" class="space-y-1.5"></div>
                 </div>
@@ -9704,7 +9706,14 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             <input type="hidden" id="extra-edit-id" value="">
             <div class="space-y-4">
                 <div>
-                    <label class="text-sm font-bold text-slate-600 ml-1 mb-1 block">외전 이름</label>
+                    <label class="text-sm font-bold text-slate-600 ml-1 mb-1 block">구분</label>
+                    <select id="extra-kind" onchange="onExtraKindChange()" class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100">
+                        <option value="extra">외전</option>
+                        <option value="sequel">후속권 (2권·3권… 자동 이름)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-sm font-bold text-slate-600 ml-1 mb-1 block">이름</label>
                     <input type="text" id="extra-name" placeholder="예: 외전 1, 후기, 번외 등" class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100">
                 </div>
                 <div>
@@ -15372,7 +15381,8 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 const w = masterWorks.find(x => x.id === workId);
                 const ex = (w?.extras || []).find(e => e.id === extraId);
                 if (ex) {
-                    document.getElementById('extra-modal-title').textContent = '외전 수정';
+                    document.getElementById('extra-modal-title').textContent = '외전 / 후속권 수정';
+                    document.getElementById('extra-kind').value = extraKind(ex);
                     document.getElementById('extra-name').value = ex.name || '';
                     document.getElementById('extra-goal-nospace').value = ex.goalNoSpace || '';
                     document.getElementById('extra-goal-withspace').value = ex.goalWithSpace || '';
@@ -15380,7 +15390,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                     document.getElementById('extra-publish-date').value = ex.publishDate || '';
                 }
             } else {
-                document.getElementById('extra-modal-title').textContent = '외전 추가';
+                document.getElementById('extra-modal-title').textContent = '외전 / 후속권 추가';
                 document.getElementById('extra-name').value = '';
                 document.getElementById('extra-goal-nospace').value = '';
                 document.getElementById('extra-goal-withspace').value = '';
@@ -15388,10 +15398,23 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 document.getElementById('extra-publish-date').value = '';
                 // 자동 이름 제안
                 const w = masterWorks.find(x => x.id === workId);
-                const count = (w?.extras || []).length + 1;
-                document.getElementById('extra-name').value = `외전 ${count}`;
+                const lastEx = (w?.extras || []).slice(-1)[0];
+                document.getElementById('extra-kind').value = lastEx ? extraKind(lastEx) : 'extra';
+                onExtraKindChange(true);
             }
             document.getElementById('extra-modal').classList.add('open');
+        }
+        // 구분을 바꾸면 이름을 자동으로: 후속권 = 다음 권수(2권·3권…), 외전 = 외전 N. 직접 지은 이름은 건드리지 않는다
+        function onExtraKindChange(force) {
+            const nameEl = document.getElementById('extra-name');
+            const cur = nameEl.value.trim();
+            if (!force && cur && !/^\d+\s*권$/.test(cur) && !/^외전\s*\d+$/.test(cur)) return;
+            const kind = document.getElementById('extra-kind').value;
+            const editId = document.getElementById('extra-edit-id').value;
+            const w = masterWorks.find(x => x.id === extraEditingWorkId);
+            const others = (w?.extras || []).filter(e => e.id !== editId);
+            const same = others.filter(e => extraKind(e) === kind).length;
+            nameEl.value = kind === 'sequel' ? `${same + 2}권` : `외전 ${same + 1}`;
         }
 
         function closeExtraModal() {
@@ -15405,10 +15428,11 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             
             const editId = document.getElementById('extra-edit-id').value;
             const name = document.getElementById('extra-name').value.trim();
-            if (!name) { alert('외전 이름을 입력해주세요.'); return; }
-            
+            if (!name) { alert('이름을 입력해주세요.'); return; }
+
             const data = {
                 name,
+                kind: document.getElementById('extra-kind').value === 'sequel' ? 'sequel' : 'extra',
                 goalNoSpace: parseInt(document.getElementById('extra-goal-nospace').value) || 0,
                 goalWithSpace: parseInt(document.getElementById('extra-goal-withspace').value) || 0,
                 manuscriptDate: document.getElementById('extra-manuscript-date').value || '',
@@ -15442,22 +15466,22 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
 
         function syncExtraManuscriptTask(work, extra, oldDate, newDate) {
             const taskId = 'ts_auto_extra_' + extra.id;
-            // 기존 자동 태스크 제거
-            if (oldDate && taskSchedules[oldDate]) {
-                taskSchedules[oldDate] = taskSchedules[oldDate].filter(t => t.id !== taskId);
-                if (taskSchedules[oldDate].length === 0) delete taskSchedules[oldDate];
-            }
-            // 새 태스크 생성
+            // 기존 자동 태스크를 어느 날짜에 있든 찾아서 뺀다 (완료 표시 등은 그대로 들고 간다)
+            let found = null;
+            Object.keys(taskSchedules).forEach(d => {
+                const arr = taskSchedules[d] || [];
+                const hit = arr.find(t => t.id === taskId);
+                if (!hit) return;
+                found = found || hit;
+                taskSchedules[d] = arr.filter(t => t.id !== taskId);
+                if (taskSchedules[d].length === 0) delete taskSchedules[d];
+            });
+            // 새 날짜에 다시 넣는다 (이름이 바뀌었으면 메모의 [이름]도 같이)
             if (newDate) {
                 if (!taskSchedules[newDate]) taskSchedules[newDate] = [];
-                if (!taskSchedules[newDate].some(t => t.id === taskId)) {
-                    taskSchedules[newDate].push({
-                        id: taskId, date: newDate, workId: work.id,
-                        category: '완고 입고', memo: `[${extra.name}]`,
-                        isCompleted: false, isAutoManuscript: true,
-                        extraId: extra.id
-                    });
-                }
+                const base = found || { id: taskId, category: '완고 입고', isCompleted: false, isAutoManuscript: true };
+                const memo = (!base.memo || /^\[[^\]]*\]$/.test(base.memo)) ? `[${extra.name}]` : base.memo;
+                taskSchedules[newDate].push({ ...base, date: newDate, workId: work.id, extraId: extra.id, memo });
             }
         }
 
@@ -15468,7 +15492,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             const w = masterWorks.find(x => x.id === workId);
             const extras = w?.extras || [];
             if (extras.length === 0) {
-                cont.innerHTML = '<p class="text-xs text-slate-400 text-center py-3">등록된 외전이 없습니다.</p>';
+                cont.innerHTML = '<p class="text-xs text-slate-400 text-center py-3">등록된 외전·후속권이 없습니다.</p>';
                 return;
             }
             const today = getYYYYMMDD(new Date());
@@ -17362,7 +17386,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                     ${(w.extras && w.extras.length > 0) ? `
                     <div class="border-t border-slate-100 my-2"></div>
                     <div class="space-y-1.5 text-[13px]">
-                        <div class="font-bold" style="color:${workManageCardSettings.labelColor2}">외전</div>
+                        <div class="font-bold" style="color:${workManageCardSettings.labelColor2}">${(w.extras.some(e => extraKind(e) === 'sequel') ? (w.extras.some(e => extraKind(e) === 'extra') ? '외전 / 후속권' : '후속권') : '외전')}</div>
                         ${extraRowsHTML}
                     </div>` : ''}
                     </div>
@@ -17477,24 +17501,64 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             const list = document.getElementById('wmm-extras-list');
             if (!list) return;
             if (wmmExtrasDraft.length === 0) {
-                list.innerHTML = '<p class="text-xs text-slate-300 py-1">등록된 외전이 없습니다.</p>';
+                list.innerHTML = '<p class="text-xs text-slate-300 py-1">등록된 외전·후속권이 없습니다.</p>';
                 return;
             }
-            list.innerHTML = wmmExtrasDraft.map((ex, i) => `
-                <div class="flex gap-1.5">
-                    <input type="text" value="${ex.name || ''}" onchange="updateWmmExtraName(${i}, this.value)" class="flex-1 min-w-0 p-2 bg-slate-50 rounded-lg border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100">
-                    <button type="button" onclick="removeWmmExtraRow(${i})" class="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-rose-50 hover:text-rose-500 text-slate-400"><i class="fa-solid fa-xmark text-xs"></i></button>
-                </div>`).join('');
+            const inputCls = 'p-2 bg-slate-50 rounded-lg border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100';
+            const esc = s => String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+            list.innerHTML = wmmExtrasDraft.map((ex, i) => {
+                const kind = extraKind(ex);
+                return `
+                <div class="flex flex-wrap items-end gap-1.5">
+                    <select onchange="updateWmmExtraKind(${i}, this.value)" class="${inputCls} shrink-0" style="width:92px">
+                        <option value="extra"${kind === 'extra' ? ' selected' : ''}>외전</option>
+                        <option value="sequel"${kind === 'sequel' ? ' selected' : ''}>후속권</option>
+                    </select>
+                    <input type="text" value="${esc(ex.name)}" onchange="updateWmmExtraName(${i}, this.value)" class="${inputCls}" style="flex:1 1 150px; min-width:150px">
+                    <label class="flex flex-col" style="flex:1 1 118px; min-width:118px; max-width:150px"><span class="text-[10px] font-bold text-slate-400 ml-1">완고일</span>
+                        <input type="date" value="${ex.manuscriptDate || ''}" onchange="updateWmmExtraField(${i}, 'manuscriptDate', this.value)" class="${inputCls} w-full"></label>
+                    <label class="flex flex-col" style="flex:1 1 118px; min-width:118px; max-width:150px"><span class="text-[10px] font-bold text-slate-400 ml-1">출간일</span>
+                        <input type="date" value="${ex.publishDate || ''}" onchange="updateWmmExtraField(${i}, 'publishDate', this.value)" class="${inputCls} w-full"></label>
+                    <button type="button" onclick="removeWmmExtraRow(${i})" class="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-rose-50 hover:text-rose-500 text-slate-400" style="margin-bottom:3px"><i class="fa-solid fa-xmark text-xs"></i></button>
+                </div>`;
+            }).join('');
+        }
+        // 외전/후속권 구분: kind 가 없던 예전 자료는 이름이 'N권' 이면 후속권으로 본다
+        function extraKind(ex) {
+            if (ex && (ex.kind === 'sequel' || ex.kind === 'extra')) return ex.kind;
+            return /^\s*\d+\s*권\s*$/.test((ex && ex.name) || '') ? 'sequel' : 'extra';
+        }
+        // 자동 이름: 후속권은 순서대로 2권·3권…, 외전은 외전 1·2… (직접 지은 이름은 그대로 둔다)
+        function renumberExtras(list, forceIdx = -1) {
+            let vol = 2, side = 1;
+            list.forEach((ex, i) => {
+                const name = String(ex.name || '').trim();
+                const isAuto = !name || /^\d+\s*권$/.test(name) || /^외전\s*\d+$/.test(name) || i === forceIdx;
+                if (extraKind(ex) === 'sequel') { if (isAuto) ex.name = `${vol}권`; vol++; }
+                else { if (isAuto) ex.name = `외전 ${side}`; side++; }
+            });
         }
         function addWmmExtraRow() {
-            wmmExtrasDraft.push({ id: 'extra_' + Date.now(), name: `외전 ${wmmExtrasDraft.length + 1}` });
+            const last = wmmExtrasDraft[wmmExtrasDraft.length - 1];
+            wmmExtrasDraft.push({ id: 'ex_' + Date.now() + '_' + Math.floor(Math.random() * 1000), name: '', kind: last ? extraKind(last) : 'extra', manuscriptDate: '', publishDate: '' });
+            renumberExtras(wmmExtrasDraft);
             renderWmmExtrasList();
         }
         function updateWmmExtraName(idx, value) {
             if (wmmExtrasDraft[idx]) wmmExtrasDraft[idx].name = value;
         }
+        function updateWmmExtraKind(idx, value) {
+            if (!wmmExtrasDraft[idx]) return;
+            wmmExtrasDraft[idx].kind = value;
+            renumberExtras(wmmExtrasDraft, idx);
+            renderWmmExtrasList();
+        }
+        function updateWmmExtraField(idx, field, value) {
+            if (wmmExtrasDraft[idx]) wmmExtrasDraft[idx][field] = value || '';
+        }
         function removeWmmExtraRow(idx) {
             wmmExtrasDraft.splice(idx, 1);
+            renumberExtras(wmmExtrasDraft);
             renderWmmExtrasList();
         }
         // 선인세 입금 내역 편집 (작품 관리 'wmm' / 웹툰 관리 'wtm' 모달 공용) — 저장 버튼을 눌러야 반영된다
@@ -17636,12 +17700,28 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 const newManuscriptDate = document.getElementById('wmm-manuscript-date').value;
                 w.manuscriptDate = newManuscriptDate;
                 if (oldManuscriptDate !== newManuscriptDate) syncManuscriptTaskSchedule(w, oldManuscriptDate, newManuscriptDate);
-                w.extras = wmmExtrasDraft.filter(e => e.name && e.name.trim()).map(e => ({ ...e, name: e.name.trim() }));
+                // 외전/후속권: 완고일은 스케줄 관리의 '완고 입고' 카드와, 출간일은 출간 일정과 같은 자료를 쓴다
+                const oldExtras = w.extras || [];
+                const newExtras = wmmExtrasDraft.filter(e => e.name && e.name.trim()).map(e => ({ ...e, name: e.name.trim(), kind: extraKind(e) }));
+                let extraRemoved = false;
+                oldExtras.forEach(o => {
+                    if (!newExtras.some(n => n.id === o.id)) { syncExtraManuscriptTask(w, o, o.manuscriptDate || '', ''); extraRemoved = true; }
+                });
+                w.extras = newExtras;
+                newExtras.forEach(n => {
+                    const o = oldExtras.find(x => x.id === n.id);
+                    const oldMD = (o && o.manuscriptDate) || '', newMD = n.manuscriptDate || '';
+                    if (oldMD !== newMD || (o && o.name !== n.name)) syncExtraManuscriptTask(w, n, oldMD, newMD);
+                });
+                if (extraRemoved) { try { purgeOrphanSchedules(); } catch(e) {} }
                 commitAdvDraft('wmm', w);
             }
             save();
             closeWorkManageModal();
             renderWorkManage();
+            try { updateUI(); } catch(e) {}
+            try { if (typeof renderTaskCalendar === 'function') renderTaskCalendar(); } catch(e) {}
+            try { if (typeof renderPublishCal === 'function') renderPublishCal(); } catch(e) {}
         }
         function openWorkManageCardSettings() {
             document.getElementById('wms-differentiate').checked = !!workManageCardSettings.differentiatePublished;
@@ -30054,6 +30134,14 @@ updateEps(); render(); renderWorks();
             });
             document.addEventListener('scroll', hide, true);
         })();
+</script>
+<script>
+// PC 앱: 알림창/확인창을 닫은 뒤 글자가 안 쳐지는 문제 방지 (닫힌 직후 창 포커스를 되돌림)
+(function () { try { const { ipcRenderer } = require('electron'); const wa = window.alert.bind(window), wc = window.confirm.bind(window);
+  const fix = () => { setTimeout(() => { try { ipcRenderer.send('refocus-window'); } catch (e) {} }, 30); };
+  window.alert = function () { const r = wa.apply(null, arguments); fix(); return r; };
+  window.confirm = function () { const r = wc.apply(null, arguments); fix(); return r; };
+} catch (e) {} })();
 </script>
 </body>
 </html>

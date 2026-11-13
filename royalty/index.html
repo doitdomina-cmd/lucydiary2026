@@ -4050,7 +4050,7 @@ body.menu-font-on #settings-panel-modal .settings-tabbtn, body.menu-font-on #the
         .be-swatch-none:hover { border-color: #94a3b8; }
 
         /* 캘린더 드래그 효과 */
-        .cal-drag-over { background-color: #f1f5f9 !important; border-color: var(--primary) !important; border-width: 2px !important; }
+        .cal-drag-over { background-color: #f1f5f9 !important; box-shadow: inset 0 0 0 2px var(--primary) !important; transition: none !important; }
 
         #sidebar-toggle { display: none; }
         #sidebar-backdrop { display: none; }
@@ -27792,8 +27792,9 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
 
         // 🟢 [NEW] 드래그 앤 드롭 구현
         function handleDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
-        function handleDragEnter(e) { e.preventDefault(); if(e.currentTarget.dataset.date) e.currentTarget.classList.add('cal-drag-over'); }
-        function handleDragLeave(e) { if(e.currentTarget.dataset.date) e.currentTarget.classList.remove('cal-drag-over'); }
+        function handleDragEnter(e) { e.preventDefault(); const c = e.currentTarget; if (c.dataset.date && !c.classList.contains('cal-drag-over')) c.classList.add('cal-drag-over'); }
+        // 칸 안의 카드·글씨 위를 지날 때 나오는 leave는 무시 (깜빡임·재계산 방지)
+        function handleDragLeave(e) { const c = e.currentTarget; if (!c.dataset.date) return; if (e.relatedTarget && c.contains(e.relatedTarget)) return; c.classList.remove('cal-drag-over'); }
 
         function handleWriteDragStart(e, id, dateStr) {
             e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'write', id, originDate: dateStr }));

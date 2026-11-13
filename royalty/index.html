@@ -9246,8 +9246,8 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                         <input type="date" id="wmm-coverguide-date" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100">
                     </div>
                 </div>
-                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    <div>
+                <div id="wmm-promo-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div id="wmm-promotion-wrap">
                         <label class="text-xs font-bold text-slate-500 ml-1 mb-1 block">프로모션</label>
                         <div class="flex gap-1">
                             <select id="wmm-promotion-select" onchange="handleWmmPromotionChange(this)" class="flex-1 min-w-0 p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100">
@@ -17379,7 +17379,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                     </div>
                     <div class="border-t border-slate-100 my-2"></div>
                     <div class="space-y-1.5 text-[13px]">
-                        <div class="flex gap-2"><span class="min-w-[86px] shrink-0 whitespace-nowrap" style="color:${workManageCardSettings.labelColor2}">프로모션</span><span style="color:${workManageCardSettings.valueColors.promotion}">${promotionText}</span></div>
+                        ${String(w.genre || '').includes('초단') ? '' : `<div class="flex gap-2"><span class="min-w-[86px] shrink-0 whitespace-nowrap" style="color:${workManageCardSettings.labelColor2}">프로모션</span><span style="color:${workManageCardSettings.valueColors.promotion}">${promotionText}</span></div>`}
                         <div class="flex gap-2"><span class="min-w-[86px] shrink-0 whitespace-nowrap" style="color:${workManageCardSettings.labelColor2}">표지 제안서</span><span style="color:${workManageCardSettings.valueColors.charguide}">${coverGuideDate || ''}</span></div>
                         <div class="flex gap-2"><span class="min-w-[86px] shrink-0 whitespace-nowrap" style="color:${workManageCardSettings.labelColor2}">완고 입고일</span><span style="color:${workManageCardSettings.valueColors.cashsheet}">${w.manuscriptDate || ''}</span></div>
                     </div>
@@ -17475,6 +17475,10 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             if (!promoVal) { promoSel.value = ''; promoCustom.classList.add('hidden'); promoCustom.value = ''; }
             else if (promoPresets.includes(promoVal)) { promoSel.value = promoVal; promoCustom.classList.add('hidden'); promoCustom.value = ''; }
             else { promoSel.value = 'custom'; promoCustom.classList.remove('hidden'); promoCustom.value = promoVal; }
+            // 초단편(현로 초단·BL 초단)은 프로모션이 없어서 칸을 숨긴다
+            const isShort = String(w.genre || '').includes('초단');
+            document.getElementById('wmm-promotion-wrap').classList.toggle('hidden', isShort);
+            document.getElementById('wmm-promo-grid').classList.toggle('sm:grid-cols-3', !isShort);
             document.getElementById('wmm-coverguide-date').value = getCoverGuideDate(workId) || '';
             document.getElementById('wmm-manuscript-date').value = w.manuscriptDate || '';
             wmmExtrasDraft = (w.extras || []).map(e => ({ ...e }));

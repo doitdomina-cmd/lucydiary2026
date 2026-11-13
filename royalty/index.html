@@ -17515,6 +17515,10 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                         <option value="sequel"${kind === 'sequel' ? ' selected' : ''}>후속권</option>
                     </select>
                     <input type="text" value="${esc(ex.name)}" onchange="updateWmmExtraName(${i}, this.value)" class="${inputCls}" style="flex:1 1 150px; min-width:150px">
+                    <label class="flex flex-col" style="flex:1 1 100px; min-width:100px; max-width:120px"><span class="text-[10px] font-bold text-slate-400 ml-1">공미</span>
+                        <input type="number" id="wmm-ex-ns-${i}" value="${ex.goalNoSpace || ''}" placeholder="0" onchange="updateWmmExtraGoal(${i}, 'goalNoSpace', this.value)" class="${inputCls} w-full"></label>
+                    <label class="flex flex-col" style="flex:1 1 100px; min-width:100px; max-width:120px"><span class="text-[10px] font-bold text-slate-400 ml-1">공포</span>
+                        <input type="number" id="wmm-ex-ws-${i}" value="${ex.goalWithSpace || ''}" placeholder="0" onchange="updateWmmExtraGoal(${i}, 'goalWithSpace', this.value)" class="${inputCls} w-full"></label>
                     <label class="flex flex-col" style="flex:1 1 118px; min-width:118px; max-width:150px"><span class="text-[10px] font-bold text-slate-400 ml-1">완고일</span>
                         <input type="date" value="${ex.manuscriptDate || ''}" onchange="updateWmmExtraField(${i}, 'manuscriptDate', this.value)" class="${inputCls} w-full"></label>
                     <label class="flex flex-col" style="flex:1 1 118px; min-width:118px; max-width:150px"><span class="text-[10px] font-bold text-slate-400 ml-1">출간일</span>
@@ -17552,6 +17556,18 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             wmmExtrasDraft[idx].kind = value;
             renumberExtras(wmmExtrasDraft, idx);
             renderWmmExtrasList();
+        }
+        // 공미/공포 글자수: 한쪽만 적으면 비어 있는 다른 쪽을 비율로 채운다 (이미 적힌 값은 건드리지 않음)
+        function updateWmmExtraGoal(idx, field, value) {
+            const ex = wmmExtrasDraft[idx]; if (!ex) return;
+            const n = parseInt(value) || 0;
+            ex[field] = n;
+            const other = field === 'goalNoSpace' ? 'goalWithSpace' : 'goalNoSpace';
+            if (n > 0 && !ex[other]) {
+                ex[other] = field === 'goalNoSpace' ? Math.round(n / NOSPACE_TO_WITHSPACE_RATIO) : Math.round(n * NOSPACE_TO_WITHSPACE_RATIO);
+                const el = document.getElementById((other === 'goalNoSpace' ? 'wmm-ex-ns-' : 'wmm-ex-ws-') + idx);
+                if (el) el.value = ex[other];
+            }
         }
         function updateWmmExtraField(idx, field, value) {
             if (wmmExtrasDraft[idx]) wmmExtrasDraft[idx][field] = value || '';

@@ -3169,6 +3169,10 @@ body.menu-font-on #settings-panel-modal .settings-tabbtn, body.menu-font-on #the
         #dash-memo-board .dmb-note::before { content: ''; position: absolute; top: -10px; left: 50%; width: 64px; height: 20px; margin-left: -32px; background: rgba(255,255,255,.62); box-shadow: 0 1px 2px rgba(60,45,25,.18); transform: rotate(-3deg); }
         #dash-memo-board .dmb-grip { position: absolute; top: -10px; left: 0; right: 0; height: 30px; cursor: grab; touch-action: none; z-index: 2; }
         #dash-memo-board .dmb-note.dragging .dmb-grip { cursor: grabbing; }
+        #dash-memo-board .dmb-note { max-width: 100%; }
+        #dash-memo-board .dmb-rz { position: absolute; top: 28px; bottom: 6px; right: -5px; width: 14px; cursor: ew-resize; touch-action: none; z-index: 3; }
+        #dash-memo-board .dmb-rz::after { content: ''; position: absolute; top: 50%; right: 5px; width: 3px; height: 26px; margin-top: -13px; border-radius: 2px; background: rgba(74,63,51,.35); opacity: 0; transition: opacity .15s; }
+        #dash-memo-board .dmb-note:hover .dmb-rz::after { opacity: 1; }
         html body #dash-memo-board .dmb-note .dmb-text { display: block; width: 100%; min-height: 120px; flex: 1; border: 0 !important; outline: none !important; background: transparent !important; box-shadow: none !important; padding: 0 !important; margin: 0; font: inherit; font-size: 15px; line-height: 1.6; color: #4a3f33 !important; white-space: pre-wrap; overflow-wrap: anywhere; cursor: text; }
         html body #dash-memo-board .dmb-note .dmb-text::first-line { font-weight: 800; color: #2B2118; }
         html body #dash-memo-board .dmb-note .dmb-text:empty::before { content: attr(data-ph); color: rgba(74,63,51,.4); font-weight: 400; }
@@ -3454,7 +3458,7 @@ body.menu-font-on #settings-panel-modal .settings-tabbtn, body.menu-font-on #the
             html body #dash-goal-board .dgb-ctools { display: none !important; }
             html body #dash-memo-board .dmb-canvas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 14px; height: auto !important; min-height: 0; padding-top: 14px; }
             html body #dash-memo-board .dmb-note { position: relative; left: auto; top: auto; width: auto; min-width: 0; transform: none; }
-            html body #dash-memo-board .dmb-grip { display: none; }
+            html body #dash-memo-board .dmb-grip, html body #dash-memo-board .dmb-rz { display: none; }
             html body #dash-memo-board .dmb-tools { opacity: 1; }
         }
         /* dmb-auto: 메모지 높이는 글 길이에 맞게 (짧으면 짧게) */
@@ -21295,7 +21299,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         }
 
         // ═══ 대시보드 메모 보드 (포스트잇) ═══
-        const DMB_COLORS = ['#FFF4C2', '#FFE0E6', '#D9F1E3', '#DCEBFA', '#EDE5F8', '#FFE9D2'];   // 파스텔 포스트잇 6색
+        const DMB_COLORS = ['#FFF4C2', '#FFE0E6', '#D9F1E3', '#DCEBFA', '#EDE5F8', '#FFE9D2', '#F4EEDC', '#E3E3E6'];   // 파스텔 포스트잇 8색(아이보리·회색 포함)
         const DMB_OLD = { '#FFF1A8': 0, '#FFEEA9': 0, '#FFF3C9': 0, '#FFD6DE': 1, '#FFD3DC': 1, '#FDE4E9': 1, '#CDEBD9': 2, '#C9EAD7': 2, '#DDF0E6': 2, '#CFE3F7': 3, '#E3D6F5': 4, '#E9E1F7': 4, '#FFE0BE': 5 };
         function dmbShade(c) { return DMB_COLORS.includes(c) ? c : (c in DMB_OLD ? DMB_COLORS[DMB_OLD[c]] : DMB_COLORS[0]); }
         let _dmbTimer = null, _dmbSig = '';
@@ -21365,6 +21369,29 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             _dmbDrag = null; d.n.classList.remove('dragging');
             if (d.moved) dmbSave();
         }
+        // 메모 오른쪽 끝을 잡고 끌어서 너비 조절 (왼쪽 끝은 그대로)
+        let _dmbRz = null;
+        function dmbRzDown(e, id) {
+            if (e.button !== undefined && e.button !== 0) return;
+            const m = dashMemos.find(x => x.id === id); if (!m) return;
+            const n = e.currentTarget.closest('.dmb-note'), canvas = n.parentElement;
+            e.preventDefault(); e.stopPropagation();
+            const cw = canvas.clientWidth, W = n.offsetWidth;
+            _dmbRz = { m, n, canvas, sx: e.clientX, W0: W, left: (typeof m.fx === 'number' ? m.fx : 0) * Math.max(0, cw - W), moved: false };
+            try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {}
+        }
+        function dmbRzMove(e) {
+            const d = _dmbRz; if (!d) return;
+            d.moved = true;
+            const cw = d.canvas.clientWidth;
+            const maxW = Math.max(150, cw - d.left);   // 왼쪽 끝은 그대로 두니 오른쪽 벽까지만
+            const W = Math.round(Math.max(150, Math.min(maxW, d.W0 + e.clientX - d.sx)));
+            d.m.w = W;
+            d.m.fx = cw - W > 0 ? Math.min(1, d.left / (cw - W)) : 0;
+            d.n.style.setProperty('--w', W + 'px'); d.n.style.setProperty('--fx', d.m.fx);
+            dmbResize();
+        }
+        function dmbRzUp() { const d = _dmbRz; if (!d) return; _dmbRz = null; if (d.moved) dmbSave(); }
         let _dmbRO = null, _dmbW = 0;
         function dmbWatch() {
             if (_dmbRO || typeof ResizeObserver === 'undefined') return;
@@ -21424,8 +21451,9 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             if (!force && sig === _dmbSig && box.firstChild) return;
             _dmbSig = sig;
             const rots = [-1.6, 1.2, -0.8, 1.8, -1.3, 0.9];
-            const notes = dashMemos.map((m, i) => `<div class="dmb-note${m.dash === false ? ' no-dash' : ''}" data-tape="${dmbTape(m.id)}" style="--c:${dmbShade(m.color)};--rot:${rots[i % rots.length]}deg;${typeof m.fx === 'number' && typeof m.y === 'number' ? `--fx:${m.fx};--y:${m.y}px;` : ''}${m.z ? `z-index:${m.z};` : ''}">
+            const notes = dashMemos.map((m, i) => `<div class="dmb-note${m.dash === false ? ' no-dash' : ''}" data-tape="${dmbTape(m.id)}" style="--c:${dmbShade(m.color)};--rot:${rots[i % rots.length]}deg;${typeof m.w === 'number' ? `--w:${m.w}px;` : ''}${typeof m.fx === 'number' && typeof m.y === 'number' ? `--fx:${m.fx};--y:${m.y}px;` : ''}${m.z ? `z-index:${m.z};` : ''}">
                 <div class="dmb-grip" title="끌어서 옮기기" onpointerdown="dmbGripDown(event, '${m.id}')" onpointermove="dmbGripMove(event)" onpointerup="dmbGripUp(event)" onpointercancel="dmbGripUp(event)"></div>
+                <div class="dmb-rz" title="끌어서 너비 조절" onpointerdown="dmbRzDown(event, '${m.id}')" onpointermove="dmbRzMove(event)" onpointerup="dmbRzUp(event)" onpointercancel="dmbRzUp(event)"></div>
                 <div class="dmb-text" contenteditable="${DMB_CE}" spellcheck="false" data-ph="메모를 적어요" oninput="dmbInput('${m.id}', this)" onpaste="dmbPaste(event)">${escapeHtml(m.text || '')}</div>
                 <span class="dmb-date">${dmbFmt(m.ts)}</span>
                 <div class="dmb-tools">

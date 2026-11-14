@@ -22550,6 +22550,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 const color = _noWork ? '#cbd5e1' : getGenreColor(work.genre);
                 const titleForDisplay = _noWork ? (((s.checklist || []).find(it => it.text) || {}).text || '') : resolved.displayTitle;
                 let content = '';
+                let memoItems = null;
                 
                 if (s.category) {
                     const prefix = `[${s.category}]`;
@@ -22558,13 +22559,13 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                         // 메모 카드는 한 줄: 제목 왼쪽, 체크 진행(완료/전체) 오른쪽
                         const cl = s.checklist || [];
                         const countText = cl.length ? `${cl.filter(it => it.done).length}/${cl.length}` : '';
-                        // [메모] 글자 없이, 체크 항목을 전부 한 줄씩 보여준다 (앞에 체크 표시)
+                        // [메모] 글자 없이, 체크 항목마다 카드 한 장씩 (하트가 체크)
                         const _items = cl.filter(it => it.text);
                         if (_items.length) {
-                            content = _items.map((it, ii) => `<div class="flex items-center justify-between gap-1 ${opacity}">
-                                       <span class="font-bold text-slate-700 min-w-0" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;${it.done ? 'text-decoration:line-through; opacity:.55;' : ''}"><i class="fa-regular ${it.done ? 'fa-square-check' : 'fa-square'}" style="font-size:10px; margin-right:4px; opacity:.7;"></i>${it.text}</span>
-                                       ${ii === 0 && countText ? `<span class="text-[10px] font-bold text-slate-500 shrink-0">${countText}</span>` : ''}
-                                   </div>`).join('');
+                            memoItems = _items.map(it => ({ it, html: `<div class="flex items-center justify-between gap-1 ${opacity}">
+                                       <span class="font-bold text-slate-700 min-w-0" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;${it.done ? 'text-decoration:line-through; opacity:.55;' : ''}">${it.text}</span>
+                                       ${_items.length > 1 ? '' : (countText ? `<span class="text-[10px] font-bold text-slate-500 shrink-0">${countText}</span>` : '')}
+                                   </div>` }));
                         } else {
                             content = `<div class="flex items-center justify-between gap-1 ${opacity}">
                                        <span class="font-bold text-slate-700 min-w-0" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${titleForDisplay}</span>
@@ -22656,7 +22657,8 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 // 같은 동작을 하는 복사 버튼을 눈에 보이게 추가 — 탭 한 번이면 되니 터치/마우스 둘 다 동일하게 동작
                 let copyBtn = `<button type="button" onclick="event.stopPropagation(); duplicateWriteSchedule(event, '${s.id}', '${s.date}')" class="cal-copy-btn absolute top-1 right-6 opacity-0 group-hover/block:opacity-100 text-slate-300 hover:text-indigo-500 transition-opacity shrink-0 px-1" title="이 일정 복사"><i class="fa-regular fa-copy"></i></button>`;
 
-                return `<div class="cal-selectable border border-slate-200 border-l-4 p-1 rounded-lg relative group/block shadow-sm hover:shadow-md transition-all cursor-move" data-cal="write" data-done="${s.isCompleted ? 1 : 0}" data-gi="${Math.max(0, genreList.findIndex(g => g.name === work.genre))}" data-block-id="${s.id}" data-block-date="${s.date}" style="border-left-color: ${color}; ${cardBg} ${s.category ? '--cat: ' + (WRITE_COLORS[s.category] || '#94a3b8') + ';' : ''} ${cardFontStyle}" draggable="true" ondragstart="handleWriteDragStart(event, '${s.id}', '${s.date}')" ondragover="handleCardDragOver(event, this)" ondragleave="handleCardDragLeave(event, this)" ondrop="handleWriteCardDrop(event, this, '${s.id}', '${s.date}')" onclick="event.stopPropagation(); openWriteEditModal('${s.id}', '${s.date}')" oncontextmenu="duplicateWriteSchedule(event, '${s.id}', '${s.date}')">
+                const mkCard = (content, doneFlag, heartBtn) => `<div class="cal-selectable border border-slate-200 border-l-4 p-1 rounded-lg relative group/block shadow-sm hover:shadow-md transition-all cursor-move" data-cal="write" data-done="${doneFlag ? 1 : 0}" data-gi="${Math.max(0, genreList.findIndex(g => g.name === work.genre))}" data-block-id="${s.id}" data-block-date="${s.date}" style="border-left-color: ${color}; ${cardBg} ${s.category ? '--cat: ' + (WRITE_COLORS[s.category] || '#94a3b8') + ';' : ''} ${cardFontStyle}" draggable="true" ondragstart="handleWriteDragStart(event, '${s.id}', '${s.date}')" ondragover="handleCardDragOver(event, this)" ondragleave="handleCardDragLeave(event, this)" ondrop="handleWriteCardDrop(event, this, '${s.id}', '${s.date}')" onclick="event.stopPropagation(); openWriteEditModal('${s.id}', '${s.date}')" oncontextmenu="duplicateWriteSchedule(event, '${s.id}', '${s.date}')">
+                    ${heartBtn || ''}
                     <div class="flex items-start">
                         <div class="flex-1 min-w-0">
                             ${content}
@@ -22665,6 +22667,11 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                         ${deleteBtn}
                     </div>
                 </div>`;
+                if (memoItems) {
+                    return memoItems.map(mi => mkCard(mi.html, mi.it.done,
+                        `<button type="button" onclick="event.stopPropagation(); toggleWriteMemoItem('${s.id}', '${s.date}', '${mi.it.id}')" title="체크" style="position:absolute; left:0; top:0; width:30px; height:100%; opacity:0; z-index:5; cursor:pointer;"></button>`)).join('');
+                }
+                return mkCard(content, s.isCompleted, '');
             }, 'openWriteModal', dragEvents, (daySchedules, dateStr) => {
                 // 그날 등록된 집필 블록의 goal 합산만 (실제 기록 사용 안 함)
                 return daySchedules.reduce((total, s) => {
@@ -23149,6 +23156,14 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 if (item.category === WRITE_MEMO_CATEGORY && item.checklist) item.checklist.forEach(it => { it.done = item.isCompleted; });
                 save(); renderWriteCalendar();
             }
+        }
+        function toggleWriteMemoItem(id, dateStr, itemId) {
+            const sch = writeSchedules[dateStr]?.find(s => s.id === id);
+            const it = sch && (sch.checklist || []).find(c => c.id === itemId);
+            if (!it) return;
+            it.done = !it.done;
+            sch.isCompleted = sch.checklist.length > 0 && sch.checklist.every(c => c.done);
+            save(); renderWriteCalendar();
         }
         function quickDeleteWrite(id, dateStr) {
             writeSchedules[dateStr] = writeSchedules[dateStr].filter(s => s.id !== id);

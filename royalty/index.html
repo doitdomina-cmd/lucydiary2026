@@ -11958,7 +11958,8 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
 
         let saveTimeout = null;
         let _savePendingSilent = null;
-        function save(silent = false) { 
+        let _ownSaveMtime = 0;   // 이 창이 마지막으로 쓴 데이터 파일의 수정 시각 (내 저장이 '파일이 바뀜' 신호로 되돌아온 것을 가려냄)
+        function save(silent = false) {
             if (saveTimeout) clearTimeout(saveTimeout);
             _savePendingSilent = silent;
             saveTimeout = setTimeout(() => runSave(silent), 300);
@@ -11985,6 +11986,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                     if (isNodeEnvironment) {
                         rotateBackup();
                         fs.writeFileSync(dataFilePath, jsonStr, 'utf-8');
+                        try { _ownSaveMtime = fs.statSync(dataFilePath).mtimeMs; } catch (e) {}
                         if (!fs.existsSync(TARGET_DIR)) { try { fs.mkdirSync(TARGET_DIR, { recursive: true }); } catch(e) {} }
                         if (fs.existsSync(TARGET_DIR)) {
                             writeGdriveCopyAsync(jsonStr);
@@ -15268,6 +15270,8 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                             // 미니창은 로컬(dataFilePath)에 저장하므로 항상 로컬 파일 읽기
                             const filePath = dataFilePath;
                             if (!filePath || !fs.existsSync(filePath)) return;
+                            // 방금 이 창이 저장한 그대로면(미니창 등 바깥에서 바뀐 게 아니면) 다시 읽고 다시 그릴 필요 없음 — 저장할 때마다 대시보드가 통째로 다시 그려져 버벅였음
+                            try { if (_ownSaveMtime && fs.statSync(filePath).mtimeMs === _ownSaveMtime) return; } catch (e) {}
                             const raw = fs.readFileSync(filePath, 'utf-8');
                             const parsed = JSON.parse(raw);
                             if (parsed.writerDailyData) writerDailyData = parsed.writerDailyData;

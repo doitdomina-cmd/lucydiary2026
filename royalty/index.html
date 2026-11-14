@@ -3405,8 +3405,8 @@ body.menu-font-on #settings-panel-modal .settings-tabbtn, body.menu-font-on #the
         #dash-goal-board .dgb-gic svg { width: 30px; height: 30px; }
         #dash-goal-board .dgb-gt { white-space: nowrap; }
         @media (max-width: 767px) { #dash-goal-board .dgb-grow { grid-template-columns: 24px auto minmax(0, 1fr); gap: 8px; } #dash-goal-board .dgb-gic svg { width: 24px; height: 24px; } #dash-goal-board .dgb-gt { font-size: .95rem; } }
-        /* dgb-four: 목표 메모는 한 줄에 4개씩 (좁으면 자리에 맞게 줄어듦) */
-        #dash-goal-board .dgb-itl { display: grid; grid-template-columns: repeat(auto-fit, minmax(max(150px, calc(25% - 14px)), 1fr)); gap: 2px 16px; align-content: start; }
+        /* dgb-four: 목표 메모는 한 줄에 3개씩 (좁으면 자리에 맞게 줄어듦) */
+        #dash-goal-board .dgb-itl { display: grid; grid-template-columns: repeat(auto-fit, minmax(max(150px, calc(33.333% - 14px)), 1fr)); gap: 2px 16px; align-content: start; }
         #dash-goal-board .dgb-item { min-width: 0; }
         /* memo-icon: 메모 제목 앞 하트 말풍선 */
         #dash-goal-board img.dgb-pin { position: absolute; left: -22px; top: -16px; width: 40px; height: 40px; }
@@ -3421,6 +3421,8 @@ body.menu-font-on #settings-panel-modal .settings-tabbtn, body.menu-font-on #the
         #dash-goal-board .dgb-cw { font-size: 12px; line-height: 1.35; min-height: 0; }
         #dash-goal-board .dgb-addc { width: 22px; height: 22px; line-height: 20px; font-size: 17px; margin: 0 0 2px auto; }
         #dash-goal-board .dgb-cols { padding-bottom: 2px; }
+        /* 작품 구상 칸: 양옆 남는 너비를 칸 사이 간격으로 고르게 나눈다 */
+        #dash-goal-board .dgb-cols { justify-content: space-between; }
         /* dgb-align: 아이콘·제목 세로 가운데, 제목 칸 폭 통일, 아래 여백 */
         #dash-goal-board .dgb-grow { grid-template-columns: 34px 118px minmax(0, 1fr); padding: 16px 18px 22px; }
         #dash-goal-board .dgb-goals { gap: 20px 34px; }
@@ -9210,7 +9212,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
     <div id="work-manage-modal" class="modal-overlay">
         <div class="modal-content w-full" style="max-width:960px;">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-bold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-layer-group text-yellow-500"></i> <span id="wmm-modal-title">작품 정보 수정</span></h3>
+                <h3 class="text-lg font-bold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-layer-group text-yellow-500"></i> <input type="text" id="wmm-modal-title" placeholder="작품 제목" title="클릭해서 제목 수정" class="flex-1 min-w-0 bg-transparent border-b border-dashed border-transparent hover:border-slate-300 focus:border-emerald-400 outline-none font-bold text-lg text-slate-700" style="background:transparent !important; box-shadow:none !important; padding:2px 4px !important; border-radius:0 !important;"></h3>
                 <button onclick="closeWorkManageModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-times text-xl"></i></button>
             </div>
             <div class="space-y-3">
@@ -17595,7 +17597,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             if (!w) return;
             currentWorkManageWorkId = workId;
             const info = workManage[workId] || {};
-            document.getElementById('wmm-modal-title').innerText = w.title;
+            document.getElementById('wmm-modal-title').value = w.title;
             populatePenNameSelect();
             const penSel = document.getElementById('wmm-pen-name');
             if (penSel) penSel.value = penNames.includes(info.penName) ? info.penName : '';
@@ -17846,6 +17848,8 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             // 아래 항목들은 '작품 등록'의 데이터를 직접 갱신 → 쌍방 연동
             const w = masterWorks.find(x => x.id === workId);
             if (w) {
+                const newTitle = document.getElementById('wmm-modal-title').value.trim();
+                if (newTitle) w.title = newTitle;
                 w.publisher = document.getElementById('wmm-publisher').value.trim() || '-';
                 w.contractDate = document.getElementById('wmm-contract-date').value;
                 w.rate = document.getElementById('wmm-rate').value ? parseFloat(document.getElementById('wmm-rate').value) : '';
@@ -21495,6 +21499,16 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             _dgbEdit = ''; save(true); renderDashGoalBoard(true);
         }
         function dgbToggleItem(id) { const it = getYearGoalItems(dgbYr()).find(x => x.id === id); if (!it) return; it.done = !it.done; save(true); renderDashGoalBoard(true); }
+        function dgbEditItem(id, span) {
+            const it = getYearGoalItems(dgbYr()).find(x => x.id === id); if (!it || span.querySelector('input')) return;
+            const inp = document.createElement('input'); inp.type = 'text'; inp.value = it.text;
+            inp.style.cssText = 'width:100%;min-width:0;font:inherit;color:inherit;background:rgba(255,255,255,.7);border:0;border-bottom:1px dashed #999;outline:none;padding:0 2px;';
+            let fin = false;
+            const done = ok => { if (fin) return; fin = true; const t = inp.value.trim(); if (ok && t && t !== it.text) { it.text = t; save(true); } renderDashGoalBoard(true); };
+            inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); done(true); } else if (e.key === 'Escape') done(false); };
+            inp.onblur = () => done(true);
+            span.textContent = ''; span.appendChild(inp); inp.focus(); inp.select();
+        }
         function dgbDelItem(id) { const yr = dgbYr(); taxGoalItems[yr] = getYearGoalItems(yr).filter(x => x.id !== id); save(true); renderDashGoalBoard(true); }
         function dgbAddItem(inp) {
             const t = inp.value.trim(); if (!t) return;
@@ -21596,7 +21610,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 ${goalRow('inc', '수익 목표', pct(net, goal), `순수익 <b>₩ ${taxFmt(net)}</b> / 목표 ₩ ${taxFmt(goal)} <em>${goal > 0 ? '(' + pct(net, goal) + '%)' : ''}</em>`, goal, DGB_ART.coin, pct(net, goal))}
                 ${goalRow('chr', '글자수 목표', pct(chars, cg), `누적 <b>${chars.toLocaleString()}자</b> / 목표 ${cg.toLocaleString()}자 <em>${cg > 0 ? '(' + pct(chars, cg) + '%)' : ''}</em>`, cg, DGB_ART.pencil, pct(chars, cg))}
                 <div class="dgb-items"><div class="dgb-memotitle"><img class="dgb-pin" src="deco/free-icon-love-arrow-7721890.png" alt=""><b>목표 메모</b></div><div class="dgb-itl">
-                    ${items.map((it, i) => `<div class="dgb-item${it.done ? ' done' : ''}" style="--c:${DMB_COLORS[i % DMB_COLORS.length]};--rot:${[-1.2, 1, -0.6, 1.4][i % 4]}deg"><button type="button" class="dgb-chk" onclick="dgbToggleItem('${it.id}')" title="${it.done ? '완료 취소' : '완료'}">${it.done ? '✓' : ''}</button><span class="dgb-itx" onclick="dgbToggleItem('${it.id}')">${escapeHtml(it.text)}</span><button type="button" class="dgb-x" onclick="dgbDelItem('${it.id}')" title="지우기">✕</button></div>`).join('')}
+                    ${items.map((it, i) => `<div class="dgb-item${it.done ? ' done' : ''}" style="--c:${DMB_COLORS[i % DMB_COLORS.length]};--rot:${[-1.2, 1, -0.6, 1.4][i % 4]}deg"><button type="button" class="dgb-chk" onclick="dgbToggleItem('${it.id}')" title="${it.done ? '완료 취소' : '완료'}">${it.done ? '✓' : ''}</button><span class="dgb-itx" onclick="dgbEditItem('${it.id}',this)" title="클릭해서 수정" style="cursor:text">${escapeHtml(it.text)}</span><button type="button" class="dgb-x" onclick="dgbDelItem('${it.id}')" title="지우기">✕</button></div>`).join('')}
                     </div><input id="dgb-newitem" class="dgb-add" placeholder="적고 Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();dgbAddItem(this)}">
                 </div></div>`;
             const groups = dgbGroups();

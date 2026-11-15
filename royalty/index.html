@@ -21602,6 +21602,25 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             const el = im.closest('.dmb-img'), note = el.closest('.dmb-note');
             _dmbImgDrag = { el, note, id: note.getAttribute('data-mid'), from: +el.getAttribute('data-bi'), sy: e.clientY, on: false, to: -1 };
         });
+        // 글 칸 안에서 포인터가 가리키는 '줄' 경계(윗줄 위 / 아랫줄 아래)의 글자 위치와 화면 좌표를 구한다
+        function dmbLineAt(el, x, y) {
+            const tn = el.firstChild; if (!tn || tn.nodeType !== 3 || !tn.data) return null;
+            let r = null;
+            if (document.caretRangeFromPoint) r = document.caretRangeFromPoint(x, y);
+            else if (document.caretPositionFromPoint) { const cp = document.caretPositionFromPoint(x, y); if (cp) { r = document.createRange(); r.setStart(cp.offsetNode, cp.offset); } }
+            if (!r || r.startContainer !== tn) return null;
+            const data = tn.data, len = data.length;
+            const rc = o => { const g = document.createRange(); o = Math.max(0, Math.min(o, len - 1)); g.setStart(tn, o); g.setEnd(tn, o + 1); const q = g.getClientRects(); return q.length ? q[0] : null; };
+            let off = Math.min(r.startOffset, len);
+            let line = rc(off === len || data[off] === '\n' ? off - 1 : off); if (!line) return null;
+            const same = o => { const q = rc(o); return q && Math.abs(q.top - line.top) < 3; };
+            const upper = y < (line.top + line.bottom) / 2;
+            let at;
+            if (upper) { at = Math.min(off, len); while (at > 0 && data[at - 1] !== '\n' && same(at - 1)) at--; }
+            else { at = Math.min(off, len); while (at < len && data[at] !== '\n' && same(at)) at++; if (at < len && data[at] === '\n') at++; }
+            const box = el.getBoundingClientRect();
+            return { off: at, y: upper ? line.top : line.bottom, left: box.left, width: box.width };
+        }
         document.addEventListener('pointermove', e => {
             const d = _dmbImgDrag; if (!d) return;
             const dy = e.clientY - d.sy;
@@ -21610,6 +21629,22 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             d.el.style.transform = `translateY(${dy}px)`;
             const bl = [...d.note.querySelectorAll('[data-bi]')].filter(x => x !== d.el);
             bl.forEach(x => x.classList.remove('drop-before', 'drop-after'));
+            let line = document.getElementById('dmb-dropline'); d.split = null;
+            // 글 칸 위에 있으면 그 줄 사이에 끼워 넣는다
+            for (const x of bl) {
+                if (x.classList.contains('dmb-img')) continue;
+                const r = x.getBoundingClientRect();
+                if (e.clientY > r.top + 2 && e.clientY < r.bottom - 2 && x.textContent) {
+                    const ln = dmbLineAt(x, e.clientX, e.clientY);
+                    if (ln && ln.off > 0 && ln.off < x.firstChild.data.length) {
+                        d.split = { k: +x.getAttribute('data-bi'), off: ln.off }; d.to = -1;
+                        if (!line) { line = document.createElement('div'); line.id = 'dmb-dropline'; line.style.cssText = 'position:fixed;height:3px;background:#6FA8C8;z-index:99999;pointer-events:none;border-radius:2px'; document.body.appendChild(line); }
+                        line.style.left = ln.left + 'px'; line.style.width = ln.width + 'px'; line.style.top = (ln.y - 1) + 'px';
+                        return;
+                    }
+                }
+            }
+            if (line) line.remove();
             let tgt = null; for (const x of bl) { const r = x.getBoundingClientRect(); if (e.clientY < r.top + r.height / 2) { tgt = x; break; } }
             if (tgt) { tgt.classList.add('drop-before'); d.to = +tgt.getAttribute('data-bi'); }
             else { const l = bl[bl.length - 1]; if (l) l.classList.add('drop-after'); d.to = d.note.querySelectorAll('[data-bi]').length; }
@@ -21618,9 +21653,17 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             const d = _dmbImgDrag; _dmbImgDrag = null; if (!d || !d.on) return;
             d.el.classList.remove('dragging'); d.el.style.transform = '';
             d.note.querySelectorAll('.drop-before,.drop-after').forEach(x => x.classList.remove('drop-before', 'drop-after'));
-            const m = dashMemos.find(x => x.id === d.id); if (!m || !Array.isArray(m.blocks) || d.to < 0 || e.type === 'pointercancel') return;
-            let to = d.to; if (to > d.from) to--;
-            if (to !== d.from) { const [b] = m.blocks.splice(d.from, 1); m.blocks.splice(to, 0, b); dmbNorm(m); m.ts = Date.now(); }
+            const ln = document.getElementById('dmb-dropline'); if (ln) ln.remove();
+            const m = dashMemos.find(x => x.id === d.id); if (!m || !Array.isArray(m.blocks) || e.type === 'pointercancel') return;
+            if (d.split) {
+                const [img] = m.blocks.splice(d.from, 1);
+                const k = d.split.k > d.from ? d.split.k - 1 : d.split.k, t = m.blocks[k].t || '';
+                m.blocks.splice(k, 1, { t: t.slice(0, d.split.off).replace(/\n$/, '') }, img, { t: t.slice(d.split.off).replace(/^\n/, '') });
+                dmbNorm(m); m.ts = Date.now();
+            } else if (d.to >= 0) {
+                let to = d.to; if (to > d.from) to--;
+                if (to !== d.from) { const [bk] = m.blocks.splice(d.from, 1); m.blocks.splice(to, 0, bk); dmbNorm(m); m.ts = Date.now(); }
+            } else return;
             save(true); _dmbSig = ''; renderDashMemoBoard(true);
         };
         document.addEventListener('pointerup', dmbImgDragEnd);

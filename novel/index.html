@@ -792,6 +792,7 @@ body:is(.th-label, .th-polaroid) .wfr-title { font-family: var(--home-font, 'Gae
 .wb-colhead { display: flex; align-items: center; gap: 6px; padding: 12px 14px 0; font-weight: 700; font-size: 15px; color: var(--tc); font-family: 'Pretendard', sans-serif; }
 .wb-colhead b { width: 26px; height: 26px; border-radius: 50%; background: var(--tc); display: flex; align-items: center; justify-content: center; }
 .wb-colhead b .ic { background-color: #fff; width: 15px; height: 15px; }
+.lay-topic .wb-colhead { pointer-events: auto; cursor: grab; touch-action: none; }
 .wb-colhead small { font-weight: 400; color: var(--muted); font-size: 12px; }
 .wb-colempty { margin: 40px 14px 0; text-align: center; color: var(--muted); font-size: 12px; line-height: 1.7; }
 .lay-topic .pi { transform: none; }
@@ -4862,20 +4863,28 @@ function wbTopicLayout(world) {
     $$('.pi', world).forEach(el => { els[el.dataset.note] = el; });
     const others = wbTags().filter(t => !wbTopic(t));
     const keys = [...WB_TOPICS.map(x => x.t), ...others, ''];
+    const saved = (pref.wbColOrder || {})[curWorkId()];
+    if (saved) keys.sort((a, b) => { const i = saved.indexOf(a), j = saved.indexOf(b); return (i < 0 ? 999 : i) - (j < 0 ? 999 : j); });
     const groups = keys.map(k => [k, all.filter(n => (n.tag || '').trim() === k)]).filter(([k, l]) => l.length || wbTopic(k));
     let x = 0, html = '';
     const cols = [];
     groups.forEach(([k, list]) => {
         list.sort((a, b) => ((a.gy || 0) - (b.gy || 0)) || ((a.gx || 0) - (b.gx || 0)));
-        const w = Math.max(WB_W, ...list.map(n => els[n.id]?.offsetWidth || 0));
-        let y = 64;
-        list.forEach(n => { const el = els[n.id]; if (!el) return; el.style.left = x + 'px'; el.style.top = y + 'px'; y += el.offsetHeight + 24; });
+        // 직접 놓은 자리(tx·ty)가 있으면 그대로, 없으면 아래로 차곡차곡. 한 줄에 여러 개 가능.
+        let ext = WB_W, y = 64;
+        list.forEach(n => { const el = els[n.id]; if (el && n.tx != null) { ext = Math.max(ext, n.tx + el.offsetWidth); y = Math.max(y, 64 + (n.ty || 0) + el.offsetHeight + 24); } });
+        list.forEach(n => {
+            const el = els[n.id]; if (!el) return;
+            if (n.tx != null) { el.style.left = (x + n.tx) + 'px'; el.style.top = (64 + (n.ty || 0)) + 'px'; }
+            else { el.style.left = x + 'px'; el.style.top = y + 'px'; ext = Math.max(ext, el.offsetWidth); y += el.offsetHeight + 24; }
+        });
+        const w = list.length ? ext + WB_W * 0.6 + 24 : WB_W; // 옆에 놓을 빈 자리를 한 칸 더 열어 둠
         const tp = wbTopic(k), c = k ? wbTagColor(k) : '#8a8f84';
         const dim = wbFilter !== '*' && wbFilter !== k ? ' dim' : '';
         html += `<div class="wb-col${dim}" data-col="${esc(k)}" style="left:${x - 16}px;top:-14px;width:${w + 32}px;height:${Math.max(y, 260) + 6}px;--tc:${c}">
             <div class="wb-colhead">${tp ? `<b><i class="ic ic-${tp.icon}"></i></b>${esc(tp.name)}` : `<i class="dot"></i>${esc(k || '주제 없음')}`}<small>${list.length}</small></div>
             ${list.length ? '' : '<div class="wb-colempty">포스트잇을 여기로 끌어 오면<br>이 주제가 붙어요</div>'}</div>`;
-        cols.push({ k, x0: x - 35, x1: x + w + 35 });
+        cols.push({ k, x, x0: x - 35, x1: x + w + 35 });
         x += w + 70;
     });
     world.insertAdjacentHTML('afterbegin', html);
@@ -5252,6 +5261,15 @@ function wbBind(view, mode) {
             try { view.setPointerCapture(e.pointerId); } catch (_) {}
             return;
         }
+        const ch = !el && wbLay(mode) === 'topic' && e.target.closest('.wb-colhead');
+        if (ch) { // 주제 칸 이름줄을 끌면 포스트잇 묶음째 이동
+            e.preventDefault();
+            const ce = ch.closest('.wb-col'), key = ce.dataset.col;
+            const mem = $$('.pi', view).filter(pe => (get(pe.dataset.note)?.tag || '').trim() === key).map(pe => ({ el: pe, x0: pe.offsetLeft }));
+            op = { kind: 'cmove', ce, key, p, moved: false, x0: ce.offsetLeft, z: c.z, mem };
+            try { view.setPointerCapture(e.pointerId); } catch (_) {}
+            return;
+        }
         if (!el) {
             if (wbSel[mode] || wbSel.link) { document.activeElement?.closest?.('.pi') && document.activeElement.blur(); }
             e.preventDefault();
@@ -5286,7 +5304,14 @@ function wbBind(view, mode) {
             op.moved = true;
             if (op.kind === 'move' || op.kind === 'resize') { wbPush(); op.el.classList.add('dragging'); op.el.style.zIndex = 9999; }
             if (op.kind === 'fmove' || op.kind === 'fresize') { wbPush(); op.fr.classList.add('dragging'); }
+            if (op.kind === 'cmove') { wbPush(); op.ce.style.zIndex = 5; op.ce.style.opacity = '.85'; }
             if (op.kind !== 'pan') { wbBusy = true; wbPlaceFloat(mode); }
+        }
+        if (op.kind === 'cmove') {
+            const ddx = Math.round(dx / op.z);
+            op.ce.style.left = (op.x0 + ddx) + 'px';
+            op.mem.forEach(m => { m.el.style.left = (m.x0 + ddx) + 'px'; });
+            wbDrawLines(mode);
         }
         if (op.kind === 'pan') { wbSetCam(mode, { x: op.c0.x + dx, y: op.c0.y + dy, z: op.c0.z }); wbApplyCam(mode); }
         if (op.kind === 'fmove') {
@@ -5320,6 +5345,17 @@ function wbBind(view, mode) {
         if (wbBusy) { wbBusy = false; if (wbPending) { wbPending = false; setTimeout(renderNotes, 0); } }
         if (e.type === 'pointercancel') { if (o.el) { o.el.classList.remove('dragging'); renderNotes(); } return; }
         if (o.kind === 'link-tap') { wbLinkPop(mode, o.key, e.clientX, e.clientY); return; }
+        if (o.kind === 'cmove') {
+            if (!o.moved) return;
+            // 놓은 자리 기준으로 주제 칸 순서 바꾸기
+            const cols = (wbWorld(mode)._cols || []).filter(cc => cc.k !== o.key);
+            const cx = o.ce.offsetLeft + o.ce.offsetWidth / 2;
+            const before = cols.find(cc => (cc.x0 + cc.x1) / 2 > cx);
+            const order = cols.map(cc => cc.k);
+            order.splice(before ? order.indexOf(before.k) : order.length, 0, o.key);
+            pref.wbColOrder = { ...(pref.wbColOrder || {}), [curWorkId()]: order }; savePref();
+            renderNotes(); return;
+        }
         if (o.kind === 'pan') {
             if (o.moved) return;
             const now = Date.now(), p = local(e);
@@ -5373,7 +5409,18 @@ function wbBind(view, mode) {
         n.z = maxZ() + 1; o.el.style.zIndex = n.z;
         if (o.kind === 'move' && wbLay(mode) === 'topic') {
             const cx = o.el.offsetLeft + o.el.offsetWidth / 2, col = (wbWorld(mode)._cols || []).find(c => cx >= c.x0 && cx < c.x1);
-            if (col && col.k !== (n.tag || '').trim()) { n.tag = col.k; touch(n); toast(col.k ? `주제를 '${wbTagLabel(col.k)}'(으)로 바꿨어요.` : '주제를 뗐어요.'); }
+            if (col && col.k !== (n.tag || '').trim()) { n.tag = col.k; toast(col.k ? `주제를 '${wbTagLabel(col.k)}'(으)로 바꿨어요.` : '주제를 뗐어요.'); }
+            if (col) {
+                // 이 주제 칸 안의 자리를 기억: 같은 줄에 여러 개 놓을 수 있음
+                const world = wbWorld(mode), key = (n.tag || '').trim();
+                notesOfWork().forEach(m => {
+                    if (m.id === n.id || (m.tag || '').trim() !== key || m.tx != null) return;
+                    const me = $(`.pi[data-note="${m.id}"]`, world);
+                    if (me) { m.tx = Math.max(0, me.offsetLeft - col.x); m.ty = Math.max(0, me.offsetTop - 64); touch(m); }
+                });
+                n.tx = Math.max(0, Math.round(o.el.offsetLeft - col.x)); n.ty = Math.max(0, Math.round(o.el.offsetTop - 64));
+            }
+            touch(n);
             renderNotes(); return;
         }
         if (o.kind === 'move') { n.gx = o.el.offsetLeft; n.gy = o.el.offsetTop; }

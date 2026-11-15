@@ -4866,26 +4866,29 @@ function wbTopicLayout(world) {
     const saved = (pref.wbColOrder || {})[curWorkId()];
     if (saved) keys.sort((a, b) => { const i = saved.indexOf(a), j = saved.indexOf(b); return (i < 0 ? 999 : i) - (j < 0 ? 999 : j); });
     const groups = keys.map(k => [k, all.filter(n => (n.tag || '').trim() === k)]).filter(([k, l]) => l.length || wbTopic(k));
-    let x = 0, html = '';
-    const cols = [];
+    let ax = 0, html = '';
+    const cols = [], posAll = (pref.wbColPos || {})[curWorkId()] || {};
     groups.forEach(([k, list]) => {
         list.sort((a, b) => ((a.gy || 0) - (b.gy || 0)) || ((a.gx || 0) - (b.gx || 0)));
+        // 직접 옮긴 칸 자리(pos)가 있으면 그 자리, 없으면 옆으로 나란히
+        const ps = posAll[k], x = ps ? ps.x : ax, oy = ps ? ps.y : 0;
         // 직접 놓은 자리(tx·ty)가 있으면 그대로, 없으면 아래로 차곡차곡. 한 줄에 여러 개 가능.
         let ext = WB_W, y = 64;
         list.forEach(n => { const el = els[n.id]; if (el && n.tx != null) { ext = Math.max(ext, n.tx + el.offsetWidth); y = Math.max(y, 64 + (n.ty || 0) + el.offsetHeight + 24); } });
         list.forEach(n => {
             const el = els[n.id]; if (!el) return;
-            if (n.tx != null) { el.style.left = (x + n.tx) + 'px'; el.style.top = (64 + (n.ty || 0)) + 'px'; }
-            else { el.style.left = x + 'px'; el.style.top = y + 'px'; ext = Math.max(ext, el.offsetWidth); y += el.offsetHeight + 24; }
+            if (n.tx != null) { el.style.left = (x + n.tx) + 'px'; el.style.top = (oy + 64 + (n.ty || 0)) + 'px'; }
+            else { el.style.left = x + 'px'; el.style.top = (oy + y) + 'px'; ext = Math.max(ext, el.offsetWidth); y += el.offsetHeight + 24; }
         });
         const w = list.length ? ext + WB_W * 0.6 + 24 : WB_W; // 옆에 놓을 빈 자리를 한 칸 더 열어 둠
+        const h = Math.max(y, 260) + 6;
         const tp = wbTopic(k), c = k ? wbTagColor(k) : '#8a8f84';
         const dim = wbFilter !== '*' && wbFilter !== k ? ' dim' : '';
-        html += `<div class="wb-col${dim}" data-col="${esc(k)}" style="left:${x - 16}px;top:-14px;width:${w + 32}px;height:${Math.max(y, 260) + 6}px;--tc:${c}">
+        html += `<div class="wb-col${dim}" data-col="${esc(k)}" style="left:${x - 16}px;top:${oy - 14}px;width:${w + 32}px;height:${h}px;--tc:${c}">
             <div class="wb-colhead">${tp ? `<b><i class="ic ic-${tp.icon}"></i></b>${esc(tp.name)}` : `<i class="dot"></i>${esc(k || '주제 없음')}`}<small>${list.length}</small></div>
             ${list.length ? '' : '<div class="wb-colempty">포스트잇을 여기로 끌어 오면<br>이 주제가 붙어요</div>'}</div>`;
-        cols.push({ k, x, x0: x - 35, x1: x + w + 35 });
-        x += w + 70;
+        cols.push({ k, x, oy, x0: x - 35, x1: x + w + 35, y0: oy - 14, y1: oy - 14 + h + 35 });
+        ax += w + 70;
     });
     world.insertAdjacentHTML('afterbegin', html);
     world._cols = cols;
@@ -5265,8 +5268,8 @@ function wbBind(view, mode) {
         if (ch) { // 주제 칸 이름줄을 끌면 포스트잇 묶음째 이동
             e.preventDefault();
             const ce = ch.closest('.wb-col'), key = ce.dataset.col;
-            const mem = $$('.pi', view).filter(pe => (get(pe.dataset.note)?.tag || '').trim() === key).map(pe => ({ el: pe, x0: pe.offsetLeft }));
-            op = { kind: 'cmove', ce, key, p, moved: false, x0: ce.offsetLeft, z: c.z, mem };
+            const mem = $$('.pi', view).filter(pe => (get(pe.dataset.note)?.tag || '').trim() === key).map(pe => ({ el: pe, x0: pe.offsetLeft, y0: pe.offsetTop }));
+            op = { kind: 'cmove', ce, key, p, moved: false, x0: ce.offsetLeft, y0: ce.offsetTop, z: c.z, mem };
             try { view.setPointerCapture(e.pointerId); } catch (_) {}
             return;
         }
@@ -5308,9 +5311,9 @@ function wbBind(view, mode) {
             if (op.kind !== 'pan') { wbBusy = true; wbPlaceFloat(mode); }
         }
         if (op.kind === 'cmove') {
-            const ddx = Math.round(dx / op.z);
-            op.ce.style.left = (op.x0 + ddx) + 'px';
-            op.mem.forEach(m => { m.el.style.left = (m.x0 + ddx) + 'px'; });
+            const ddx = Math.round(dx / op.z), ddy = Math.round(dy / op.z);
+            op.ce.style.left = (op.x0 + ddx) + 'px'; op.ce.style.top = (op.y0 + ddy) + 'px';
+            op.mem.forEach(m => { m.el.style.left = (m.x0 + ddx) + 'px'; m.el.style.top = (m.y0 + ddy) + 'px'; });
             wbDrawLines(mode);
         }
         if (op.kind === 'pan') { wbSetCam(mode, { x: op.c0.x + dx, y: op.c0.y + dy, z: op.c0.z }); wbApplyCam(mode); }
@@ -5347,13 +5350,10 @@ function wbBind(view, mode) {
         if (o.kind === 'link-tap') { wbLinkPop(mode, o.key, e.clientX, e.clientY); return; }
         if (o.kind === 'cmove') {
             if (!o.moved) return;
-            // 놓은 자리 기준으로 주제 칸 순서 바꾸기
-            const cols = (wbWorld(mode)._cols || []).filter(cc => cc.k !== o.key);
-            const cx = o.ce.offsetLeft + o.ce.offsetWidth / 2;
-            const before = cols.find(cc => (cc.x0 + cc.x1) / 2 > cx);
-            const order = cols.map(cc => cc.k);
-            order.splice(before ? order.indexOf(before.k) : order.length, 0, o.key);
-            pref.wbColOrder = { ...(pref.wbColOrder || {}), [curWorkId()]: order }; savePref();
+            // 놓은 자리를 칸 위치로 저장 (가로·세로 자유)
+            const allPos = (pref.wbColPos || {})[curWorkId()] || {};
+            allPos[o.key] = { x: o.ce.offsetLeft + 16, y: o.ce.offsetTop + 14 };
+            pref.wbColPos = { ...(pref.wbColPos || {}), [curWorkId()]: allPos }; savePref();
             renderNotes(); return;
         }
         if (o.kind === 'pan') {
@@ -5362,7 +5362,7 @@ function wbBind(view, mode) {
             if (lastTap && now - lastTap.t < 380 && Math.hypot(p.x - lastTap.x, p.y - lastTap.y) < 30) {
                 lastTap = null;
                 const q = wbToBoard(mode, e.clientX, e.clientY);
-                const col = wbLay(mode) === 'topic' && (wbWorld(mode)._cols || []).find(c => q.x >= c.x0 && q.x < c.x1);
+                const col = wbLay(mode) === 'topic' && (wbWorld(mode)._cols || []).find(c => q.x >= c.x0 && q.x < c.x1 && q.y >= c.y0 && q.y < c.y1);
                 addNote(mode, { at: { x: q.x - WB_W / 2, y: q.y - 20 }, ...(col ? { tag: col.k } : {}) });
                 return;
             }
@@ -5408,7 +5408,7 @@ function wbBind(view, mode) {
         o.el.classList.remove('dragging');
         n.z = maxZ() + 1; o.el.style.zIndex = n.z;
         if (o.kind === 'move' && wbLay(mode) === 'topic') {
-            const cx = o.el.offsetLeft + o.el.offsetWidth / 2, col = (wbWorld(mode)._cols || []).find(c => cx >= c.x0 && cx < c.x1);
+            const cx = o.el.offsetLeft + o.el.offsetWidth / 2, cy = o.el.offsetTop + o.el.offsetHeight / 2, col = (wbWorld(mode)._cols || []).find(c => cx >= c.x0 && cx < c.x1 && cy >= c.y0 && cy < c.y1);
             if (col && col.k !== (n.tag || '').trim()) { n.tag = col.k; toast(col.k ? `주제를 '${wbTagLabel(col.k)}'(으)로 바꿨어요.` : '주제를 뗐어요.'); }
             if (col) {
                 // 이 주제 칸 안의 자리를 기억: 같은 줄에 여러 개 놓을 수 있음
@@ -5416,9 +5416,9 @@ function wbBind(view, mode) {
                 notesOfWork().forEach(m => {
                     if (m.id === n.id || (m.tag || '').trim() !== key || m.tx != null) return;
                     const me = $(`.pi[data-note="${m.id}"]`, world);
-                    if (me) { m.tx = Math.max(0, me.offsetLeft - col.x); m.ty = Math.max(0, me.offsetTop - 64); touch(m); }
+                    if (me) { m.tx = Math.max(0, me.offsetLeft - col.x); m.ty = Math.max(0, me.offsetTop - 64 - col.oy); touch(m); }
                 });
-                n.tx = Math.max(0, Math.round(o.el.offsetLeft - col.x)); n.ty = Math.max(0, Math.round(o.el.offsetTop - 64));
+                n.tx = Math.max(0, Math.round(o.el.offsetLeft - col.x)); n.ty = Math.max(0, Math.round(o.el.offsetTop - 64 - col.oy));
             }
             touch(n);
             renderNotes(); return;

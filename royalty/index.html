@@ -3556,12 +3556,18 @@ body.menu-font-on #settings-panel-modal .settings-tabbtn, body.menu-font-on #the
         html body #dash-memo-board .dmb-note { min-height: 0 !important; padding-bottom: 34px; }
         html body #dash-memo-board .dmb-note .dmb-text { min-height: 1.6em !important; flex: none; }
         /* 메모 사진 */
-        html body #dash-memo-board .dmb-imgs { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
-        html body #dash-memo-board .dmb-img { position: relative; }
-        html body #dash-memo-board .dmb-img img { display: block; width: 100%; height: auto; border-radius: 4px; box-shadow: 0 1px 3px rgba(60,40,20,.25); }
+        html body #dash-memo-board .dmb-img { position: relative; margin: 6px 0; }
+        html body #dash-memo-board .dmb-img img { display: block; width: 100%; height: auto; border-radius: 4px; box-shadow: 0 1px 3px rgba(60,40,20,.25); cursor: grab; touch-action: none; user-select: none; -webkit-user-drag: none; }
+        html body #dash-memo-board .dmb-img.dragging { z-index: 20; opacity: .85; pointer-events: none; }
+        html body #dash-memo-board .dmb-img.dragging img { cursor: grabbing; box-shadow: 0 6px 16px rgba(60,40,20,.35); }
         html body #dash-memo-board .dmb-imgx { position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; border: 0; border-radius: 50%; background: rgba(255,255,255,.92); color: #6b4a3a; font-size: 14px; line-height: 1; cursor: pointer; opacity: 0; transition: opacity .15s; }
         html body #dash-memo-board .dmb-img:hover .dmb-imgx { opacity: 1; }
-        html body #dash-memo-board .dmb-note.folded .dmb-imgs { display: none !important; }
+        html body #dash-memo-board .dmb-note .dmb-text.dmb-tb { min-height: 1.6em !important; margin-top: 0 !important; font-weight: 400; }
+        html body #dash-memo-board .dmb-note .dmb-text.dmb-tb::first-line { font-weight: 400 !important; line-height: inherit !important; }
+        html body #dash-memo-board .dmb-note .dmb-text.dmb-tb:empty::before { content: '' !important; }
+        html body #dash-memo-board [data-bi].drop-before { box-shadow: 0 -3px 0 #6FA8C8 !important; }
+        html body #dash-memo-board [data-bi].drop-after { box-shadow: 0 3px 0 #6FA8C8 !important; }
+        html body #dash-memo-board .dmb-note.folded :is(.dmb-img, .dmb-tb) { display: none !important; }
         html body #dash-memo-board .dmb-note .dmb-date { position: absolute; left: 18px; bottom: 10px; margin: 0; }
         @media (max-width: 767px) { html body #dash-memo-board .dmb-canvas { align-items: start; } html body #dash-memo-board .dmb-note { padding-bottom: 32px; } html body #dash-memo-board .dmb-note .dmb-date { left: 10px; } }
         /* dgb-align2: 왼쪽 수익 목표 윗선을 오른쪽 메모장 윗선과 맞춤 (PC) */
@@ -21517,14 +21523,35 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             if (files.length) {
                 e.preventDefault();
                 const noteEl = e.target.closest('.dmb-note'); const mid = noteEl ? noteEl.getAttribute('data-mid') : '';
-                files.forEach(f => dmbAddImage(mid, f));
+                const bi = e.target.closest('[data-bi]'); const idx = bi ? +bi.getAttribute('data-bi') : 0;
+                files.forEach((f, n) => dmbAddImage(mid, f, idx + n));
                 return;
             }
             e.preventDefault();
             const t = (e.clipboardData || window.clipboardData).getData('text/plain');
             document.execCommand('insertText', false, t);
         }
-        function dmbAddImage(id, file) {
+        // 메모 본문 = 글 칸과 사진을 번갈아 쌓은 블록 목록(m.blocks: {t:글} 또는 {i:사진}). 사진 아래·사이에도 글을 쓸 수 있다
+        function dmbNorm(m) {
+            if (!Array.isArray(m.blocks)) return;
+            let bl = m.blocks.filter(b => b && (typeof b.i === 'string' || typeof b.t === 'string'));
+            if (!bl.some(b => b.i)) { m.text = bl.map(b => b.t).join('\n').replace(/\n+$/, ''); delete m.blocks; return; }   // 사진이 없으면 예전 글 메모로
+            const out = [];
+            bl.forEach(b => {
+                const last = out[out.length - 1];
+                if (!b.i && last && !last.i) last.t = last.t && b.t ? last.t + '\n' + b.t : last.t + b.t;   // 글 칸이 붙으면 합침
+                else out.push(b.i ? { i: b.i } : { t: b.t });
+            });
+            if (out[0].i) out.unshift({ t: '' });
+            for (let k = 0; k < out.length; k++) if (out[k].i && (k === out.length - 1 || out[k + 1].i)) out.splice(k + 1, 0, { t: '' });   // 사진 아래엔 늘 글 칸
+            m.blocks = out;
+            m.text = out.filter(b => !b.i).map(b => b.t).join('\n').replace(/^\n+/, '');
+        }
+        function dmbEnsureBlocks(m) {
+            if (!Array.isArray(m.blocks)) { m.blocks = [{ t: m.text || '' }].concat((m.imgs || []).map(i => ({ i }))); delete m.imgs; }
+            dmbNorm(m);
+        }
+        function dmbAddImage(id, file, after) {
             const m = dashMemos.find(x => x.id === id); if (!m) return;
             const img = new Image(), url = URL.createObjectURL(file);
             img.onload = () => {
@@ -21534,9 +21561,10 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                     const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
                     const data = c.toDataURL('image/jpeg', 0.85);
                     const name = assetDir ? assetStoreDataUrl(data) : null;
-                    if (!Array.isArray(m.imgs)) m.imgs = [];
-                    m.imgs.push(name ? ASSET_PREFIX + name : data);
-                    m.ts = Date.now();
+                    if (!Array.isArray(m.blocks)) m.blocks = [{ t: m.text || '' }].concat((m.imgs || []).map(i => ({ i }))); delete m.imgs;
+                    const at = Math.min(m.blocks.length, (typeof after === 'number' && after >= 0 ? after : 0) + 1);
+                    m.blocks.splice(at, 0, { i: name ? ASSET_PREFIX + name : data });
+                    dmbNorm(m); m.ts = Date.now();
                     save(true); _dmbSig = ''; renderDashMemoBoard(true);
                 } finally { URL.revokeObjectURL(url); }
             };
@@ -21544,18 +21572,59 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             img.src = url;
         }
         function dmbImgDel(id, k) {
-            const m = dashMemos.find(x => x.id === id); if (!m || !Array.isArray(m.imgs)) return;
-            m.imgs.splice(k, 1); if (!m.imgs.length) delete m.imgs;
+            const m = dashMemos.find(x => x.id === id); if (!m || !Array.isArray(m.blocks)) return;
+            m.blocks.splice(k, 1); dmbNorm(m);
             save(true); _dmbSig = ''; renderDashMemoBoard(true);
         }
-        function dmbImgsHtml(m) {
-            if (!Array.isArray(m.imgs) || !m.imgs.length) return '';
-            return `<div class="dmb-imgs">${m.imgs.map((v, k) => {
-                const nm = typeof v === 'string' && v.startsWith(ASSET_PREFIX) ? assetNameFromUrl(v) : null;
-                const src = nm ? (assetDir ? assetDisplayUrl(v) : ASSET_BLANK) : v;
-                return `<div class="dmb-img"><img src="${src}"${nm ? ` data-asset="${nm}"` : ''} alt="" draggable="false"><button type="button" class="dmb-imgx" onclick="dmbImgDel('${m.id}',${k})" title="사진 지우기">×</button></div>`;
-            }).join('')}</div>`;
+        function dmbBlkIn(id, k, el) {
+            const m = dashMemos.find(x => x.id === id); const b = m && m.blocks && m.blocks[k]; if (!b || b.i !== undefined) return;
+            b.t = ((t0, br) => (br ? t0.replace(/\n$/, '') : t0))(el.innerText, el.lastChild && el.lastChild.nodeName === 'BR').replace(/\u00a0/g, ' ');
+            if (!b.t) el.innerHTML = '';
+            m.text = m.blocks.filter(x => x.i === undefined).map(x => x.t).join('\n').replace(/^\n+/, '');
+            m.ts = Date.now(); dmbFit(el);
+            const dt = el.closest('.dmb-note').querySelector('.dmb-date'); if (dt) dt.textContent = dmbFmt(m.ts);
+            dmbSave();
         }
+        function dmbBlocksHtml(m) {
+            return m.blocks.map((b, k) => {
+                if (b.i !== undefined) {
+                    const v = b.i, nm = typeof v === 'string' && v.startsWith(ASSET_PREFIX) ? assetNameFromUrl(v) : null;
+                    const src = nm ? (assetDir ? assetDisplayUrl(v) : ASSET_BLANK) : v;
+                    return `<div class="dmb-img" data-bi="${k}"><img src="${src}"${nm ? ` data-asset="${nm}"` : ''} alt="" draggable="false" title="끌어서 위아래로 옮기기"><button type="button" class="dmb-imgx" onclick="dmbImgDel('${m.id}',${k})" title="사진 지우기">×</button></div>`;
+                }
+                return `<div class="dmb-text${k === 0 ? '' : ' dmb-tb'}" data-bi="${k}" contenteditable="${DMB_CE}" spellcheck="false" data-ph="${k === 0 ? '메모를 적어요' : ''}" oninput="dmbBlkIn('${m.id}', ${k}, this)" onpaste="dmbPaste(event)">${escapeHtml(b.t || '')}</div>`;
+            }).join('');
+        }
+        // 사진을 잡고 위아래로 끌어 옮기기
+        let _dmbImgDrag = null;
+        document.addEventListener('pointerdown', e => {
+            const im = e.target && e.target.closest && e.target.closest('#dash-memo-board .dmb-img img'); if (!im || e.button > 0) return;
+            const el = im.closest('.dmb-img'), note = el.closest('.dmb-note');
+            _dmbImgDrag = { el, note, id: note.getAttribute('data-mid'), from: +el.getAttribute('data-bi'), sy: e.clientY, on: false, to: -1 };
+        });
+        document.addEventListener('pointermove', e => {
+            const d = _dmbImgDrag; if (!d) return;
+            const dy = e.clientY - d.sy;
+            if (!d.on) { if (Math.abs(dy) < 6) return; d.on = true; d.el.classList.add('dragging'); }
+            e.preventDefault();
+            d.el.style.transform = `translateY(${dy}px)`;
+            const bl = [...d.note.querySelectorAll('[data-bi]')].filter(x => x !== d.el);
+            bl.forEach(x => x.classList.remove('drop-before', 'drop-after'));
+            let tgt = null; for (const x of bl) { const r = x.getBoundingClientRect(); if (e.clientY < r.top + r.height / 2) { tgt = x; break; } }
+            if (tgt) { tgt.classList.add('drop-before'); d.to = +tgt.getAttribute('data-bi'); }
+            else { const l = bl[bl.length - 1]; if (l) l.classList.add('drop-after'); d.to = d.note.querySelectorAll('[data-bi]').length; }
+        }, { passive: false });
+        const dmbImgDragEnd = e => {
+            const d = _dmbImgDrag; _dmbImgDrag = null; if (!d || !d.on) return;
+            d.el.classList.remove('dragging'); d.el.style.transform = '';
+            d.note.querySelectorAll('.drop-before,.drop-after').forEach(x => x.classList.remove('drop-before', 'drop-after'));
+            const m = dashMemos.find(x => x.id === d.id); if (!m || !Array.isArray(m.blocks) || d.to < 0 || e.type === 'pointercancel') return;
+            let to = d.to; if (to > d.from) to--;
+            if (to !== d.from) { const [b] = m.blocks.splice(d.from, 1); m.blocks.splice(to, 0, b); dmbNorm(m); m.ts = Date.now(); }
+            save(true); _dmbSig = ''; renderDashMemoBoard(true);
+        };
+        document.addEventListener('pointerup', dmbImgDragEnd);
+        document.addEventListener('pointercancel', dmbImgDragEnd);
         function dmbSave() { save(true); }   // save() 가 이미 짧게 모아서 저장 — 이중 대기 없이 바로 넘김(탭을 숨겨도 flush 됨)
         function dmbFmt(ts) { const d = new Date(ts || Date.now()); return (d.getMonth() + 1) + '/' + d.getDate(); }
         function dmbAdd() {
@@ -21650,13 +21719,14 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         function dmbColor(id, c) { const m = dashMemos.find(x => x.id === id); if (!m) return; m.color = c; save(true); _dmbSig = ''; renderDashMemoBoard(true); }
         function dmbDel(id) {
             const m = dashMemos.find(x => x.id === id); if (!m) return;
-            if (((m.text || '').trim() || (m.imgs && m.imgs.length)) && !confirm('이 메모를 지울까요?')) return;
+            if (((m.text || '').trim() || (m.blocks && m.blocks.some(b => b.i))) && !confirm('이 메모를 지울까요?')) return;
             dashMemos = dashMemos.filter(x => x.id !== id);
             save(true); _dmbSig = ''; renderDashMemoBoard(true);
         }
         function renderDashMemoBoard(force) {
             const box = document.getElementById('dash-memo-board'); if (!box) return;
             if (!force && box.contains(document.activeElement) && (document.activeElement.classList.contains('dmb-text') || document.activeElement.classList.contains('dmb-ckt'))) return;   // 쓰는 중엔 다시 그리지 않음
+            dashMemos.forEach(m => { if (!m.check && ((m.imgs && m.imgs.length) || m.blocks)) dmbEnsureBlocks(m); });
             dashMemos.forEach(m => { if (m.check) { if (!Array.isArray(m.items)) m.items = []; while (m.items.length < 2) m.items.push({ t: '', d: 0 }); } });   // 체크보드: 윗줄=제목 + 항목 1개 이상
             const open = true;   // 접기 기능 없음
             const sig = JSON.stringify(dashMemos) + '|' + open;
@@ -21667,7 +21737,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 <div class="dmb-grip" title="끌어서 옮기기" onpointerdown="dmbGripDown(event, '${m.id}')" onpointermove="dmbGripMove(event)" onpointerup="dmbGripUp(event)" onpointercancel="dmbGripUp(event)"></div>
                 <div class="dmb-rz" title="끌어서 너비 조절" onpointerdown="dmbRzDown(event, '${m.id}')" onpointermove="dmbRzMove(event)" onpointerup="dmbRzUp(event)" onpointercancel="dmbRzUp(event)"></div>
                 ${m.fold ? '' : `<div class="dmb-fsz"><button type="button" onclick="dmbFont('${m.id}',-1,this)" title="글자 작게">−</button><button type="button" class="up" onclick="dmbFont('${m.id}',1,this)" title="글자 크게">+</button></div><button type="button" class="dmb-foldic" onclick="dmbFold('${m.id}')" title="접어서 제목만 보기"><i class="fa-solid fa-chevron-up"></i></button>`}
-                ${m.fold ? `<div class="dmb-ftitle" onclick="dmbFold('${m.id}')" title="눌러서 펴기">${escapeHtml(String(m.text || '').split('\n')[0].trim() || '(제목 없음)')}</div><div class="dmb-fh" onclick="dmbFold('${m.id}')" title="펴기"></div>` : (m.check ? `<div class="dmb-checks">${m.items.map((it, k) => `<div class="dmb-ck${k === 0 ? ' dmb-cktitle' : (it.d ? ' done' : '')}">${k === 0 ? '' : `<button type="button" class="dmb-ckb" onclick="dmbCkToggle('${m.id}',${k},this)" title="했으면 체크"><i class="fa-solid fa-check"></i></button>`}<span class="dmb-ckt" contenteditable="${DMB_CE}" spellcheck="false" data-ph="${k === 0 ? '제목' : '할 일'}" oninput="dmbCkInput('${m.id}',${k},this)" onkeydown="dmbCkKey(event,'${m.id}',${k})" onpaste="dmbCkPaste(event)">${escapeHtml(it.t || '')}</span></div>`).join('')}<button type="button" class="dmb-ckadd" onclick="dmbCkAdd('${m.id}')">+ 할 일 추가</button></div>` : `<div class="dmb-text" contenteditable="${DMB_CE}" spellcheck="false" data-ph="메모를 적어요" oninput="dmbInput('${m.id}', this)" onpaste="dmbPaste(event)">${escapeHtml(m.text || '')}</div>${dmbImgsHtml(m)}`)}
+                ${m.fold ? `<div class="dmb-ftitle" onclick="dmbFold('${m.id}')" title="눌러서 펴기">${escapeHtml(String(m.text || '').split('\n')[0].trim() || '(제목 없음)')}</div><div class="dmb-fh" onclick="dmbFold('${m.id}')" title="펴기"></div>` : (m.check ? `<div class="dmb-checks">${m.items.map((it, k) => `<div class="dmb-ck${k === 0 ? ' dmb-cktitle' : (it.d ? ' done' : '')}">${k === 0 ? '' : `<button type="button" class="dmb-ckb" onclick="dmbCkToggle('${m.id}',${k},this)" title="했으면 체크"><i class="fa-solid fa-check"></i></button>`}<span class="dmb-ckt" contenteditable="${DMB_CE}" spellcheck="false" data-ph="${k === 0 ? '제목' : '할 일'}" oninput="dmbCkInput('${m.id}',${k},this)" onkeydown="dmbCkKey(event,'${m.id}',${k})" onpaste="dmbCkPaste(event)">${escapeHtml(it.t || '')}</span></div>`).join('')}<button type="button" class="dmb-ckadd" onclick="dmbCkAdd('${m.id}')">+ 할 일 추가</button></div>` : `${m.blocks ? dmbBlocksHtml(m) : `<div class="dmb-text" contenteditable="${DMB_CE}" spellcheck="false" data-ph="메모를 적어요" oninput="dmbInput('${m.id}', this)" onpaste="dmbPaste(event)">${escapeHtml(m.text || '')}</div>`}`)}
                 <span class="dmb-date">${dmbFmt(m.ts)}</span>
                 <div class="dmb-tools">
                     <button type="button" class="dmb-tool colorc" onclick="dmbPal(this)" title="색 바꾸기"></button>

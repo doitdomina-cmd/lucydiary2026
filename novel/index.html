@@ -1420,11 +1420,9 @@ nav.mtabs button .ic { width: 20px; height: 20px; }
 .home-tabs { display: flex; gap: 18px; align-items: baseline; }
 .home-tabs button { font: inherit; background: none; border: 0; padding: 0 0 3px; color: var(--muted); cursor: pointer; border-bottom: 3px solid transparent; }
 .home-tabs button.on { color: inherit; border-bottom-color: var(--accent); }
-.icard { background: var(--panel); border: 1px solid var(--line); border-top: 4px solid var(--gc); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; cursor: pointer; min-height: 110px; }
-.icard:hover { box-shadow: 0 6px 16px -8px rgba(0,0,0,.25); }
-.icard .wc-genre { align-self: flex-start; }
-.ic-title { font-weight: 700; font-size: 15px; }
-.ic-body { font-size: 13px; line-height: 1.6; color: var(--muted); white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
+.icard .wc-log { -webkit-line-clamp: 4; }
+.icard.pol .pol-sub { font-size: 14px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.icard.pol .pol-big { font-size: 22px; overflow-wrap: anywhere; }
 .modal textarea[data-b] { width: 100%; box-sizing: border-box; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font: inherit; resize: vertical; background: var(--panel); color: inherit; }
 .home-group { max-width: 1100px; margin: 18px auto 0; }
 .home-group h2 { font-size: 14px; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
@@ -10426,14 +10424,23 @@ function renderHome() {
 // 아이디어 메모: 작품 전에 떠오른 간단한 아이디어를 카드로 모아 두는 곳 (장르 · 제목 · 메모)
 const ideas = () => Object.values(items).filter(i => i.kind === 'idea' && live(i)).sort((a, b) => b.order - a.order);
 function ideaGroups() {
-    const all = ideas();
+    const all = ideas(), pol = document.body.classList.contains('cozy') || document.body.classList.contains('th-polaroid');
     if (!all.length) return '<div class="modal-note" style="max-width:1100px;margin:30px auto;text-align:center">아직 아이디어가 없어요.<br>떠오른 장면이나 설정을 간단히 적어 두세요.</div>';
     return [...WORK_GENRES, ''].map(g => [g, all.filter(x => (WORK_GENRES.includes(x.genre) ? x.genre : '') === g)]).filter(([, l]) => l.length).map(([g, l]) => `<section class="home-group">
         <h2><span class="gdot" style="background:${GENRE_COLOR[g] || 'var(--muted)'};box-shadow:0 0 0 1px ${GENRE_INK[g] || 'transparent'}"></span> ${esc(g || '장르 없음')} <small>${l.length}</small></h2>
-        <div class="wgrid">${l.map(x => `<div class="icard" data-idea="${x.id}" tabindex="0" style="${genreVars(g)}">
-            <span class="wc-genre">${esc(g || '장르 없음')}</span>
-            ${x.title ? `<div class="ic-title">${esc(x.title)}</div>` : ''}
-            <div class="ic-body">${esc(x.body || '')}</div></div>`).join('')}</div></section>`).join('');
+        <div class="wgrid${pol ? ' pol-grid' : ''}">${l.map((x, i) => {
+            const d = new Date(x.rev || x.order), when = `${d.getMonth() + 1}/${d.getDate()}`, sty = `${genreVars(g)};--rot:${[-2.2, 1.6, -0.9, 2.1, -1.5][i % 5]}deg`;
+            const big = x.title || (x.body || '').split('\n')[0].slice(0, 24);
+            return pol
+                ? `<div class="wcard pol icard" data-idea="${x.id}" tabindex="0" style="${sty}"><i class="pol-tape"></i>
+                    <div class="pol-ph"><div class="wc-top"><span class="wc-genre">${esc(g || '장르 없음')}</span></div><div class="pol-big">${esc(big)}</div></div>
+                    <div class="pol-cap"><span class="pol-sub">${esc(x.title ? (x.body || '') : '')}</span><span class="pol-when">${when}</span></div></div>`
+                : `<div class="wcard icard" data-idea="${x.id}" tabindex="0" style="${sty}">
+                    <div class="wc-top"><span class="wc-genre">${esc(g || '장르 없음')}</span></div>
+                    <div class="wc-title">${esc(x.title || big)}</div>
+                    <div class="wc-log">${esc(x.title ? (x.body || '') : (x.body || '').split('\n').slice(1).join(' '))}</div>
+                    <div class="wc-meta"><span class="wc-when"><i class="ic ic-clock"></i> ${when}</span></div></div>`;
+        }).join('')}</div></section>`).join('');
 }
 // 아이디어 카드 만들기 · 고치기 (it이 없으면 새로)
 function ideaModal(it) {

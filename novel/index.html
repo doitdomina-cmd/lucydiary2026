@@ -10535,8 +10535,9 @@ async function wbMail(btn) {
         const cv = await wbExportPng('full', { asCanvas: true, maxPx: 6e6 });
         if (cv) {
             let url = cv.toDataURL('image/png'); if (url.length > 5.5e6) url = cv.toDataURL('image/jpeg', .85); // 너무 크면 줄여서
-            const jpg = url.startsWith('data:image/jpeg');
-            extra.push({ filename: `화이트보드_${name}_${tag}.${jpg ? 'jpg' : 'png'}`, content: url.split(',')[1], encoding: 'base64', contentType: jpg ? 'image/jpeg' : 'image/png' });
+            // 메일 서버는 글자 파일만 안전하게 보내서, 사진을 SVG(글자) 안에 담아 보냄 → 첨부를 눌러 열면 브라우저에서 사진처럼 보임
+            const svg = `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${cv.width}" height="${cv.height}" viewBox="0 0 ${cv.width} ${cv.height}"><image width="${cv.width}" height="${cv.height}" xlink:href="${url}" href="${url}"/></svg>`;
+            extra.push({ filename: `화이트보드_${name}_${tag}.svg`, content: svg, contentType: 'image/svg+xml; charset=utf-8' });
         }
     } catch (e) { console.warn(e); }
     await sendMailVia(btn, { ask: `화이트보드 메모 ${notes.length}개${extra.length ? '와 전체 사진' : ''}을(를) 내 메일로 보낼까요?`, subject: `[화이트보드] ${name} (${tag})`, text: wbMailText(w, notes, frames),

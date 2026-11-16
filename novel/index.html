@@ -3723,6 +3723,37 @@ document.addEventListener('click', e => {
     const x = e.target.closest('[data-msel-exp]'); if (x) { const it = get(x.dataset.mselExp); msel.clear(); (it.docIds || []).forEach(id => msel.add(id)); openExport('sel'); }
 });
 
+// 원고 커서 위치 기억: 회차마다 마지막으로 깜빡이던 자리(글자 몇 번째)를 이 기기에 저장해 두었다가, 그 회차를 열면 거기서 다시 깜빡이게 함
+let caretTimer = 0;
+document.addEventListener('selectionchange', () => {
+    clearTimeout(caretTimer);
+    caretTimer = setTimeout(() => {
+        const sel = getSelection(); if (!sel || !sel.rangeCount || !sel.anchorNode) return;
+        const el = sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement;
+        const ed = el && el.closest && el.closest('.manuscript[data-id]'); if (!ed || ed.closest('.ref-box') || ed.getAttribute('contenteditable') !== 'true') return;
+        const r = document.createRange(); r.selectNodeContents(ed); r.setEnd(sel.anchorNode, sel.anchorOffset);
+        const off = r.toString().length, id = ed.dataset.id;
+        if ((pref.caret || {})[id] === off) return;
+        pref.caret = { ...(pref.caret || {}), [id]: off };
+        const ids = Object.keys(pref.caret); if (ids.length > 200) delete pref.caret[ids[0]]; // 너무 쌓이지 않게
+        savePref();
+    }, 500);
+});
+function focusManuscript(ed) {
+    if (!ed) return;
+    ed.focus({ preventScroll: true });
+    let off = (pref.caret || {})[ed.dataset.id];
+    if (off == null) return;
+    const w = document.createTreeWalker(ed, NodeFilter.SHOW_TEXT); let n, acc = 0, node = null, at = 0;
+    while ((n = w.nextNode())) { const len = n.data.length; if (acc + len >= off) { node = n; at = off - acc; break; } acc += len; }
+    const r = document.createRange();
+    if (node) { r.setStart(node, Math.max(0, Math.min(at, node.data.length))); } else { r.selectNodeContents(ed); r.collapse(false); } // 글이 줄었으면 맨 끝
+    r.collapse(true);
+    const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    // 커서가 화면 가운데쯤 보이게 스크롤
+    const wrap = ed.closest('.ed-wrap'); const rc = (r.getClientRects()[0]) || (node && node.parentElement ? node.parentElement.getBoundingClientRect() : null);
+    if (wrap && rc) wrap.scrollTop += rc.top - wrap.getBoundingClientRect().top - wrap.clientHeight * 0.4;
+}
 function openDoc(id, how = 'auto') {
     const it = get(id); if (!it) return;
     setWL(W => {
@@ -3743,7 +3774,7 @@ function openDoc(id, how = 'auto') {
     });
     if (isPhone()) { pref.mtab = 'editor'; savePref(); }
     renderAll();
-    if (how !== 'ref') setTimeout(() => $(`.epane[data-pane="${WL().activeEditor}"] .ed-wrap[data-scroll] .manuscript`)?.focus({ preventScroll: true }), 0);
+    if (how !== 'ref') setTimeout(() => focusManuscript($(`.epane[data-pane="${WL().activeEditor}"] .ed-wrap[data-scroll] .manuscript`)), 0);
 }
 function openSynop(id) {
     setWL(W => {
@@ -10777,6 +10808,8 @@ function enterWork(id) {
     closeHome();
     layout().workId = id; touch(layout());
     renderAll();
+    // 컴퓨터에서는 마지막에 쓰던 자리에서 바로 커서가 깜빡이게 (폰은 키보드가 갑자기 뜨지 않게 건너뜀)
+    if (!isPhone()) setTimeout(() => focusManuscript($(`.epane[data-pane="${WL().activeEditor}"] .ed-wrap[data-scroll] .manuscript`)), 60);
 }
 function workMenu(anchor, w) {
     const g = workGenre(w.id);

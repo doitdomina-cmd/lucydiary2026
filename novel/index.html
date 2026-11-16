@@ -4684,7 +4684,7 @@ function wbHead(mode) {
         <button class="mini" data-b="style" title="보드 꾸미기 (글꼴 · 글자 크기 · 배경)"><i class="ic ic-palette"></i> 꾸미기</button><button class="mini" data-b="fit" title="모든 메모가 한 화면에 보이게 맞추기"><i class="ic ic-target"></i> 전체 보기</button><button class="mini" data-b="png" title="화이트보드를 사진(PNG)으로 저장"><i class="ic ic-file-down"></i> 사진 저장</button>`;
     const L = wbLay(mode);
     const lay = `<span class="wb-lay" title="보기 방식"><button class="${L === 'free' ? 'on' : ''}" data-lay="free" title="내가 놓은 자리 그대로">원래대로</button><button class="${L === 'topic' ? 'on' : ''}" data-lay="topic" title="주제마다 한 줄로 모아 보기 (끌어서 다른 줄에 놓으면 주제가 바뀌어요)">주제별</button></span>`;
-    if (mode === 'full') return `<div class="fb-left"><b class="wb-title"><i class="ic ic-layout-dashboard"></i> 화이트보드</b>${lay}${chips}</div><span class="bh-tools">${tools}<button class="mini" data-b="close" title="닫기 (Esc)">✕</button></span>`;
+    if (mode === 'full') return `<div class="fb-left"><b class="wb-title"><i class="ic ic-layout-dashboard"></i> 화이트보드</b>${lay}${chips}</div><span class="bh-tools">${tools}<button class="mini" data-b="mail" title="화이트보드 내용을 전부 내 메일로 보내요">✉ 메일</button><button class="mini" data-b="close" title="닫기 (Esc)">✕</button></span>`;
     // 원고 옆 칸: 한 줄 — 「화이트보드」 · 메모 · 캐릭터 · 사진 · 넓게 (되돌리기 · 꾸미기 · 전체 보기는 넓게 보기에서)
     return `<div class="bh-row"><b class="wb-title"><i class="ic ic-layout-dashboard"></i> 화이트보드</b>
         <span class="wb-cg"><button data-b="add" title="새 포스트잇"><i class="ic ic-plus"></i><span>메모</span></button><button data-b="add-char" title="시놉 보드의 내 캐릭터로 명함 붙이기"><i class="ic ic-user"></i><span>캐릭터</span></button><button data-b="add-img" title="사진 포스트잇"><i class="ic ic-image"></i><span>사진</span></button></span>
@@ -5185,6 +5185,7 @@ function wbHeadClick(e, mode) {
     if (chip) { wbFilter = chip.dataset.f; renderNotes(); return; }
     const bt = e.target.closest('[data-b]'), b = bt?.dataset.b; if (!b) return;
     if (b === 'close') closeFullBoard();
+    if (b === 'mail') wbMail(bt);
     if (b === 'full') openFullBoard();
     if (b === 'add') addNote(mode);
     if (b === 'add-img') { $('#file-img').dataset.forBoard = mode; $('#file-img').click(); }
@@ -10468,26 +10469,57 @@ function ideaMailText(list) {
     });
     return out.join('\n');
 }
-async function ideaMail(btn) {
-    const list = ideas().filter(x => x.title || x.body);
-    if (!list.length) { toast('보낼 아이디어가 없어요.'); return; }
+// 메일 보내기 공통: 확인 → 구글 로그인 토큰으로 서버 함수 호출 (btn은 누른 버튼: 보내는 동안 잠금)
+async function sendMailVia(btn, { ask, subject, text, files }) {
     const u = cloud.auth && cloud.auth.currentUser;
     if (!u || u.isAnonymous) { toast('먼저 구글 로그인을 해 주세요. (동기화 · 백업)'); return; }
-    if (!(await confirmBox(`아이디어 ${list.length}개를 내 메일로 보낼까요?`, '보내기'))) return;
+    if (!(await confirmBox(ask, '보내기'))) return;
     const old = btn.textContent; btn.disabled = true; btn.textContent = '보내는 중…';
     try {
-        const token = await u.getIdToken(), text = ideaMailText(list), tag = new Date().toISOString().slice(0, 10);
+        const token = await u.getIdToken();
         const resp = await fetch(IDEA_MAIL_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify({
-            action: 'send', subject: `[아이디어 메모] ${list.length}개 (${tag})`, text: text.length > 20000 ? text.slice(0, 20000) + '\n…(이하 첨부 파일 참고)' : text,
-            attachments: [
-                { filename: `아이디어메모_${tag}.txt`, content: text, contentType: 'text/plain; charset=utf-8' },
-                { filename: `아이디어메모_원본_${tag}.json`, content: JSON.stringify(list.map(({ genre, title, body, order, rev }) => ({ genre, title, body, order, rev })), null, 2), contentType: 'application/json; charset=utf-8' }
-            ] }) });
+            action: 'send', subject, text: text.length > 20000 ? text.slice(0, 20000) + '\n…(이하 첨부 파일 참고)' : text,
+            attachments: [{ filename: files.txt, content: text, contentType: 'text/plain; charset=utf-8' }, { filename: files.json, content: files.data, contentType: 'application/json; charset=utf-8' }] }) });
         let j = null; try { j = await resp.json(); } catch (e) {}
         if (j && j.ok) toast(`${j.to || '내 메일'} 로 보냈어요.`);
         else toast('보내지 못했어요: ' + ((j && j.error) || `서버 응답 ${resp.status}`) + ' (메일 설정은 시놉시스 ✉ 이메일로 기록 보내기에서)');
     } catch (e) { toast('보내지 못했어요: ' + e.message); }
     finally { btn.disabled = false; btn.textContent = old; }
+}
+const mailStamp = t => new Date(t).toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+async function ideaMail(btn) {
+    const list = ideas().filter(x => x.title || x.body);
+    if (!list.length) { toast('보낼 아이디어가 없어요.'); return; }
+    const tag = new Date().toISOString().slice(0, 10);
+    await sendMailVia(btn, { ask: `아이디어 ${list.length}개를 내 메일로 보낼까요?`, subject: `[아이디어 메모] ${list.length}개 (${tag})`, text: ideaMailText(list),
+        files: { txt: `아이디어메모_${tag}.txt`, json: `아이디어메모_원본_${tag}.json`, data: JSON.stringify(list.map(({ genre, title, body, order, rev }) => ({ genre, title, body, order, rev })), null, 2) } });
+}
+// 화이트보드 전체(메모 · 주제 · 선 · 묶음 이름)를 내 메일로
+function wbMailText(work, notes, frames) {
+    const byId = {}; notes.forEach(n => { byId[n.id] = n; });
+    const lab = n => (n.ch ? `[캐릭터] ${n.ch.name || '이름 없음'}` : (n.body || '').trim().split('\n')[0].slice(0, 30)) || '(빈 메모)';
+    const out = [`화이트보드 — ${work?.title || '작품'}`, `내보낸 시각: ${mailStamp(Date.now())}`, `메모 ${notes.length}개`, ''];
+    const keys = [...WB_TOPICS.map(x => x.t), ...wbTags().filter(t => !wbTopic(t)), ''];
+    keys.forEach(k => {
+        const l = notes.filter(n => (n.tag || '').trim() === k); if (!l.length) return;
+        out.push('='.repeat(40), `■ ${k ? wbTagLabel(k) : '주제 없음'} (${l.length})`, '='.repeat(40), '');
+        l.forEach(n => {
+            const ch = n.ch ? [`   이름: ${n.ch.name || ''}`, n.ch.role ? `   역할: ${n.ch.role}` : '', n.ch.job ? `   직업: ${n.ch.job}` : '', n.ch.age ? `   나이: ${wbAgeText(n.ch.age)}` : ''].filter(Boolean) : [];
+            const bl = (n.body || '').trim().split('\n');
+            out.push(`◆ ${n.ch ? lab(n) : (bl[0] || '(빈 메모)')}${n.img ? '  (사진 있음)' : ''}`, ...ch, ...(n.ch ? bl : bl.slice(1)).filter((x, i, a) => x || a.length > 1), '');
+        });
+    });
+    const links = notes.flatMap(n => (n.links || []).filter(l => byId[l.to]).map(l => `  - ${lab(n)}  →  ${lab(byId[l.to])}${l.t ? `  (${l.t})` : ''}`));
+    if (links.length) out.push('='.repeat(40), `■ 메모 사이의 선 (${links.length})`, '='.repeat(40), ...links, '');
+    if (frames.length) out.push('='.repeat(40), '■ 묶음 상자', '='.repeat(40), ...frames.map(f => `  - ${f.title || '(이름 없음)'}`), '');
+    return out.join('\n');
+}
+async function wbMail(btn) {
+    const notes = notesOfWork(), frames = framesOfWork();
+    if (!notes.length) { toast('보낼 메모가 없어요.'); return; }
+    const w = get(curWorkId()), tag = new Date().toISOString().slice(0, 10), name = w?.title || '작품';
+    await sendMailVia(btn, { ask: `화이트보드 메모 ${notes.length}개를 내 메일로 보낼까요?`, subject: `[화이트보드] ${name} (${tag})`, text: wbMailText(w, notes, frames),
+        files: { txt: `화이트보드_${name}_${tag}.txt`, json: `화이트보드_원본_${name}_${tag}.json`, data: JSON.stringify({ title: name, notes: notes.map(({ id, tag: tg, body, ch, links, gx, gy, w: ww, h, img }) => ({ id, tag: tg, body, ch, links, gx, gy, w: ww, h, hasImage: !!img })), frames: frames.map(({ title, gx, gy, w: ww, h }) => ({ title, gx, gy, w: ww, h })) }, null, 2) } });
 }
 // 카드에 바로 적으면 저장 (창 없이)
 document.addEventListener('input', e => {

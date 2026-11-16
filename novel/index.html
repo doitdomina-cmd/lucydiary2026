@@ -1420,9 +1420,13 @@ nav.mtabs button .ic { width: 20px; height: 20px; }
 .home-tabs { display: flex; gap: 18px; align-items: baseline; }
 .home-tabs button { font: inherit; background: none; border: 0; padding: 0 0 3px; color: var(--muted); cursor: pointer; border-bottom: 3px solid transparent; }
 .home-tabs button.on { color: inherit; border-bottom-color: var(--accent); }
-.icard .wc-log { -webkit-line-clamp: 4; }
-.icard.pol .pol-sub { font-size: 14px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.icard.pol .pol-big { font-size: 22px; overflow-wrap: anywhere; }
+.icard { cursor: text; min-height: 300px; }
+.ic-ti { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font: 700 17px/1.35 'Nanum Myeongjo', serif; color: inherit; padding: 2px 0; position: relative; z-index: 1; }
+.icard.pol .ic-ti { font: 700 24px/1.2 var(--home-font, 'Gaegu'), 'Nanum Myeongjo', cursive; }
+.icard .ic-del { opacity: .45; } .icard .ic-del:hover { opacity: 1; }
+.ic-ta { flex: 1; width: 100%; box-sizing: border-box; border: 0; outline: 0; background: transparent; resize: none; font: inherit; font-size: 14px; line-height: 1.7; color: inherit; padding: 4px 0; min-height: 0; position: relative; z-index: 1; }
+.icard.pol .pol-ph { aspect-ratio: 5 / 6; }
+.icard.pol .ic-ta { font-family: var(--home-font, 'Gaegu'), 'Nanum Myeongjo', cursive; font-size: 19px; line-height: 1.5; }
 .modal textarea[data-b] { width: 100%; box-sizing: border-box; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font: inherit; resize: vertical; background: var(--panel); color: inherit; }
 .home-group { max-width: 1100px; margin: 18px auto 0; }
 .home-group h2 { font-size: 14px; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
@@ -10425,52 +10429,44 @@ function renderHome() {
 const ideas = () => Object.values(items).filter(i => i.kind === 'idea' && live(i)).sort((a, b) => b.order - a.order);
 function ideaGroups() {
     const all = ideas(), pol = document.body.classList.contains('cozy') || document.body.classList.contains('th-polaroid');
-    if (!all.length) return '<div class="modal-note" style="max-width:1100px;margin:30px auto;text-align:center">아직 아이디어가 없어요.<br>떠오른 장면이나 설정을 간단히 적어 두세요.</div>';
+    if (!all.length) return '<div class="modal-note" style="max-width:1100px;margin:30px auto;text-align:center">아직 아이디어가 없어요.<br>＋ 새 아이디어를 눌러 장르를 고르고, 카드에 바로 적어 두세요.</div>';
     return [...WORK_GENRES, ''].map(g => [g, all.filter(x => (WORK_GENRES.includes(x.genre) ? x.genre : '') === g)]).filter(([, l]) => l.length).map(([g, l]) => `<section class="home-group">
         <h2><span class="gdot" style="background:${GENRE_COLOR[g] || 'var(--muted)'};box-shadow:0 0 0 1px ${GENRE_INK[g] || 'transparent'}"></span> ${esc(g || '장르 없음')} <small>${l.length}</small></h2>
         <div class="wgrid${pol ? ' pol-grid' : ''}">${l.map((x, i) => {
             const d = new Date(x.rev || x.order), when = `${d.getMonth() + 1}/${d.getDate()}`, sty = `${genreVars(g)};--rot:${[-2.2, 1.6, -0.9, 2.1, -1.5][i % 5]}deg`;
-            const big = x.title || (x.body || '').split('\n')[0].slice(0, 24);
+            const top = `<div class="wc-top"><input class="ic-ti" data-id="${x.id}" value="${esc(x.title || '')}" placeholder="제목" spellcheck="false"><button class="mini ic-del" data-idel="${x.id}" title="삭제">✕</button></div>`;
+            const ta = `<textarea class="ic-ta" data-id="${x.id}" placeholder="떠오른 장면 · 설정 · 대사를 바로 적어 보세요" spellcheck="false">${esc(x.body || '')}</textarea>`;
             return pol
-                ? `<div class="wcard pol icard" data-idea="${x.id}" tabindex="0" style="${sty}"><i class="pol-tape"></i>
-                    <div class="pol-ph"><div class="wc-top"><span class="wc-genre">${esc(g || '장르 없음')}</span></div><div class="pol-big">${esc(big)}</div></div>
-                    <div class="pol-cap"><span class="pol-sub">${esc(x.title ? (x.body || '') : '')}</span><span class="pol-when">${when}</span></div></div>`
-                : `<div class="wcard icard" data-idea="${x.id}" tabindex="0" style="${sty}">
-                    <div class="wc-top"><span class="wc-genre">${esc(g || '장르 없음')}</span></div>
-                    <div class="wc-title">${esc(x.title || big)}</div>
-                    <div class="wc-log">${esc(x.title ? (x.body || '') : (x.body || '').split('\n').slice(1).join(' '))}</div>
+                ? `<div class="wcard pol icard" data-idea="${x.id}" style="${sty}"><i class="pol-tape"></i>
+                    <div class="pol-ph">${top}${ta}</div>
+                    <div class="pol-cap"><span class="pol-sub"></span><span class="pol-when">${when}</span></div></div>`
+                : `<div class="wcard icard" data-idea="${x.id}" style="${sty}">${top}${ta}
                     <div class="wc-meta"><span class="wc-when"><i class="ic ic-clock"></i> ${when}</span></div></div>`;
         }).join('')}</div></section>`).join('');
 }
-// 아이디어 카드 만들기 · 고치기 (it이 없으면 새로)
-function ideaModal(it) {
-    return new Promise(resolve => {
-        let genre = WORK_GENRES.includes(it?.genre) ? it.genre : '';
-        const bg = document.createElement('div'); bg.className = 'modal-bg';
-        bg.innerHTML = `<div class="modal"><h3>${it ? '아이디어 카드' : '새 아이디어'}</h3>
-            <label>장르</label><div class="genre-pick">${WORK_GENRES.map(g => `<button class="gp${g === genre ? ' on' : ''}" data-g="${g}" style="${genreVars(g)}">${g}</button>`).join('')}</div>
-            <label>제목 (없어도 돼요)</label><input type="text" data-t value="${esc(it?.title || '')}" placeholder="한 줄 제목">
-            <label>아이디어</label><textarea data-b rows="6" placeholder="떠오른 장면 · 설정 · 대사 등 간단히">${esc(it?.body || '')}</textarea>
-            <div class="row2">${it ? '<button class="btn" data-x="del">삭제</button>' : ''}<button class="btn" data-x="0">취소</button><button class="btn primary" data-x="1">저장</button></div></div>`;
-        document.body.appendChild(bg);
-        const ti = $('[data-t]', bg), bo = $('[data-b]', bg); (it ? bo : ti).focus();
-        const done = r => { bg.remove(); resolve(r); };
-        bg.addEventListener('click', e => {
-            const g = e.target.closest('[data-g]');
-            if (g) { genre = genre === g.dataset.g ? '' : g.dataset.g; $$('.gp', bg).forEach(b => b.classList.toggle('on', b.dataset.g === genre)); return; }
-            if (e.target === bg || e.target.dataset.x === '0') done(null);
-            if (e.target.dataset.x === 'del') done({ del: true });
-            if (e.target.dataset.x === '1') done({ genre, title: ti.value.trim(), body: bo.value.trim() });
-        });
+// 카드에 바로 적으면 저장 (창 없이)
+document.addEventListener('input', e => {
+    const ta = e.target.closest && e.target.closest('.ic-ta, .ic-ti'); if (!ta) return;
+    const it = get(ta.dataset.id); if (!it) return;
+    if (ta.classList.contains('ic-ti')) it.title = ta.value; else it.body = ta.value;
+    touch(it);
+});
+function ideaGenreMenu(anchor, cur, onPick) {
+    const pop = showPop(anchor, WORK_GENRES.map(x => `<button data-m="g:${x}">${x === cur ? '● ' : ''}${x}</button>`).join('') + `<button data-m="g:">${cur ? '' : '● '}장르 없음</button>`);
+    pop.addEventListener('click', e => { const m = e.target.closest('[data-m]')?.dataset.m; if (m == null) return; closePop(); onPick(m.slice(2)); });
+}
+function ideaNew(anchor) {
+    ideaGenreMenu(anchor, null, g => {
+        const it = create('idea', { genre: g, title: '', body: '', order: Date.now() });
+        renderHome();
+        const ta = document.querySelector(`.ic-ti[data-id="${it.id}"]`);
+        if (ta) { ta.scrollIntoView({ block: 'center' }); ta.focus(); }
     });
 }
-async function ideaEdit(id) {
-    const it = id ? get(id) : null; if (id && !it) return;
-    const r = await ideaModal(it); if (!r) return;
-    if (r.del) { if (await confirmBox('이 아이디어 카드를 삭제할까요?', '삭제')) { it.deleted = true; it.body = ''; touch(it); renderHome(); } return; }
-    if (!r.title && !r.body) { toast('내용을 적어 주세요.'); return; }
-    if (it) { Object.assign(it, r); touch(it); } else create('idea', { ...r, order: Date.now() });
-    renderHome();
+async function ideaClick(t) {
+    const it = get(t.dataset.idel); if (!it) return;
+    if ((it.body || it.title) && !(await confirmBox('이 아이디어 카드를 삭제할까요?', '삭제'))) return;
+    it.deleted = true; it.body = ''; it.title = ''; touch(it); renderHome();
 }
 // 홈 작품 카드 끌어서 순서 바꾸기 (마우스: 그냥 끌기 / 폰: 꾹 눌렀다가 끌기). 같은 묶음(장르·완고) 안에서만, 순서는 작품에 저장(homeOrder)
 let homeDragQuiet = 0, homeDragId = null;
@@ -10513,11 +10509,12 @@ function homeDragInit(h) {
     h.addEventListener('touchcancel', stop);
 }
 async function homeClick(e) {
-    const t = e.target.closest('[data-hg], [data-h], [data-ht], [data-wm], .wcard, .hh-go, .icard'); if (!t) return;
+    const t = e.target.closest('[data-hg], [data-h], [data-ht], [data-wm], [data-idel], .wcard, .hh-go'); if (!t) return;
     if (t.classList.contains('hh-go')) { enterWork(t.dataset.work); return; }
     if (t.dataset.ht) { pref.homeTab = t.dataset.ht; savePref(); renderHome(); return; }
-    if (t.dataset.h === 'idea-new') { ideaEdit(null); return; }
-    if (t.classList.contains('icard')) { ideaEdit(t.dataset.idea); return; }
+    if (t.dataset.h === 'idea-new') { ideaNew(t); return; }
+    if (t.dataset.idel) { ideaClick(t); return; }
+    if (t.classList.contains('icard')) return;
     if (t.dataset.hg) { pref.homeGroup = t.dataset.hg; savePref(); renderHome(); return; }
     if (t.dataset.h === 'settings') { openSettings(); return; }
     if (t.dataset.h === 'cloud') { openCloud(); return; }

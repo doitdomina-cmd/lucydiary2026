@@ -1426,14 +1426,17 @@ nav.mtabs button .ic { width: 20px; height: 20px; }
 .home-tabs button:hover { opacity: .85; }
 .home-tabs button.on { opacity: 1; box-shadow: 0 3px 7px rgba(60,60,40,.2); }
 .wgrid.ic-grid { grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 280px)); justify-content: start; }
+.home-group.ic-group, .home-intro.ic-wide { max-width: 1760px; }
+/* PC: 한 줄에 6개 */
+@media (min-width: 1000px) { .wgrid.ic-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
 .wcard.icard { cursor: text; height: 280px; min-height: 280px; }
 /* 아이디어 카드 색: 장르 색을 아주 연한 파스텔로 */
 body .home .wgrid .wcard.icard[style*="--gc:#"] { --lb: color-mix(in srgb, var(--gc) 24%, #fffdf8); --spc: color-mix(in srgb, var(--gc) 20%, #fff); --spc2: color-mix(in srgb, var(--gc) 42%, #fff); }
 body .home .wgrid .wcard.icard:not(.pol):not([style*="--gc:#"]) { --lb: #f5f4f1; }
 .home .icard.pol .pol-ph { background: color-mix(in srgb, var(--gc) 26%, #fffdf8); }
 .home .icard:not(.pol) { background-color: color-mix(in srgb, var(--gc) 22%, var(--panel)); }
-.ic-ti { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font: 400 15px/1.35 var(--home-font, var(--note-font, 'Pretendard')), 'Pretendard', sans-serif; color: inherit; padding: 2px 0; position: relative; z-index: 1; }
-.icard.pol .ic-ti { font: 400 21px/1.2 var(--home-font, 'Gaegu'), 'Nanum Myeongjo', cursive; }
+.ic-ti { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font: 600 15px/1.35 var(--home-font, var(--note-font, 'Pretendard')), 'Pretendard', sans-serif; color: inherit; padding: 2px 0; position: relative; z-index: 1; }
+.icard.pol .ic-ti { font: 600 21px/1.2 var(--home-font, 'Gaegu'), 'Nanum Myeongjo', cursive; }
 .icard .ic-del { opacity: .45; } .icard .ic-del:hover { opacity: 1; }
 .ic-ta { flex: 1 1 auto; height: 0; width: 100%; box-sizing: border-box; border: 0; outline: 0; background: transparent; resize: none; font: inherit; font-family: var(--home-font, var(--note-font, 'Pretendard')), 'Pretendard', sans-serif; font-size: 11px; line-height: 1.7; color: inherit; padding: 4px 0; min-height: 0; position: relative; z-index: 1; }
 .icard.pol .pol-ph { aspect-ratio: auto; height: 232px; }
@@ -10432,7 +10435,7 @@ function renderHome() {
             <button class="icon-btn" data-h="settings" title="설정 (테마 · 글꼴)"><i class="ic ic-settings"></i></button></header>
         <main class="home-body">
             ${tab === 'works' && (pref.homeHero ?? cozy) ? homeHero(list) : ''}
-            <div class="home-intro"><h1 class="home-tabs"><button class="${tab === 'works' ? 'on' : ''}" data-ht="works">내 작품</button><button class="${tab === 'ideas' ? 'on' : ''}" data-ht="ideas">아이디어 메모</button></h1>
+            <div class="home-intro${tab === 'ideas' ? ' ic-wide' : ''}"><h1 class="home-tabs"><button class="${tab === 'works' ? 'on' : ''}" data-ht="works">내 작품</button><button class="${tab === 'ideas' ? 'on' : ''}" data-ht="ideas">아이디어 메모</button></h1>
                 ${tab === 'works' ? '<button class="btn primary" data-h="new"><i class="ic ic-book-plus"></i> 새 작품</button>' : '<span style="display:flex;gap:8px"><button class="btn" data-h="idea-mail" title="아이디어를 전부 내 메일로 보내요" aria-label="메일로 보내기"><i class="ic ic-mail"></i></button><button class="btn primary" data-h="idea-new">＋ 새 아이디어</button></span>'}</div>
             ${tab === 'ideas' ? ideaGroups() : groups.filter(([, l]) => l.length || mode === 'status').map(([name, l]) => `<section class="home-group">
                 <h2>${mode === 'genre' ? `<span class="gdot" style="background:${GENRE_COLOR[name] || 'var(--muted)'};box-shadow:0 0 0 1px ${GENRE_INK[name] || 'transparent'}"></span>` : name === '완고' ? '<i class="ic ic-circle-check"></i>' : '<i class="ic ic-pen-line"></i>'} ${esc(name)} <small>${l.length}</small></h2>
@@ -10444,7 +10447,7 @@ const ideas = () => Object.values(items).filter(i => i.kind === 'idea' && live(i
 function ideaGroups() {
     const all = ideas(), pol = document.body.classList.contains('cozy') || document.body.classList.contains('th-polaroid');
     if (!all.length) return '<div class="modal-note" style="max-width:1100px;margin:30px auto;text-align:center">아직 아이디어가 없어요.<br>＋ 새 아이디어를 눌러 장르를 고르고, 카드에 바로 적어 두세요.</div>';
-    return [...WORK_GENRES, ''].map(g => [g, all.filter(x => (WORK_GENRES.includes(x.genre) ? x.genre : '') === g)]).filter(([, l]) => l.length).map(([g, l]) => `<section class="home-group">
+    return [...WORK_GENRES, ''].map(g => [g, all.filter(x => (WORK_GENRES.includes(x.genre) ? x.genre : '') === g)]).filter(([, l]) => l.length).map(([g, l]) => `<section class="home-group ic-group">
         <h2><span class="gdot" style="background:${GENRE_COLOR[g] || 'var(--muted)'};box-shadow:0 0 0 1px ${GENRE_INK[g] || 'transparent'}"></span> ${esc(g || '장르 없음')} <small>${l.length}</small></h2>
         <div class="wgrid ic-grid${pol ? ' pol-grid' : ''}">${l.map((x, i) => {
             const d = new Date(x.rev || x.order), when = `${d.getMonth() + 1}/${d.getDate()}`, sty = `${genreVars(g)};--rot:${[-2.2, 1.6, -0.9, 2.1, -1.5][i % 5]}deg`;

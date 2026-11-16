@@ -10536,7 +10536,10 @@ function homeHero(list) {
     const today = at(0); let week = 0; for (let i = 0; i < 7; i++) week += Math.max(0, at(i));
     let streak = 0; for (let i = today > 0 ? 0 : 1; i < 400 && at(i) > 0; i++) streak++;
     const h = d0.getHours(), hi = h < 5 ? '아직 깨어 있네요' : h < 12 ? '좋은 아침이에요' : h < 18 ? '좋은 오후예요' : '오늘도 수고했어요';
-    const last = list[0], total = list.reduce((a, x) => a + x.s.chars, 0);
+    // 이어서 쓰기: 홈 카드 끌어서 정한 순서와 상관없이, 가장 최근에 원고를 고친 (완고 아닌) 작품
+    const lastEp = wid => Object.values(items).reduce((m, it) => (it.kind === 'episode' && it.workId === wid && live(it) && !inTrash(it) && !isRefDoc(it) && it.rev > m) ? it.rev : m, 0);
+    const pool = list.filter(x => !x.w.done), last = (pool.length ? pool : list).map(x => [x, lastEp(x.w.id)]).sort((a, b) => b[1] - a[1])[0]?.[0] || list[0];
+    const total = list.reduce((a, x) => a + x.s.chars, 0);
     const line = today > 0 ? `오늘 <b>${fmt(today)}자</b> 썼어요 ♡` : last ? '오늘의 첫 줄을 써 볼까요 ♡' : '첫 작품을 만들어 볼까요 ♡';
     const ph = hhPhoto(h), mode = pref.homeCover || 'photo';
     const cover = mode === 'art' ? `<div class="hh-cover">${hhScene()}</div>` : mode === 'none' ? '' : `<div class="hh-ph t${HH_PHOTOS.indexOf(ph)}"><img src="${ph.src}" alt=""><span>${ph.tag}</span></div>`;

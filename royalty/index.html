@@ -15973,7 +15973,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 if (wtMonthInput && mainMonthInput) mainMonthInput.value = wtMonthInput.value || '';
             }
             const date = document.getElementById('new-work-date').value;
-            const isPending = document.getElementById('new-work-pending').checked;
+            const isPending = document.getElementById('new-work-pending').checked || !date;   // 날짜를 안 적으면 저절로 출간 예정
             const pendingMonth = isPending ? (document.getElementById('new-work-pending-month')?.value || '') : '';
             const publisher = document.getElementById('new-work-publisher').value.trim() || '-';
             const studio = document.getElementById('new-work-studio').value.trim();
@@ -15998,7 +15998,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 if (rate === 'custom') rate = document.getElementById('new-work-rate-custom').value;
             }
 
-            if (!title || (!isWebtoon && !isPending && !date)) { alert("작품명, 출간일을 모두 입력해주세요."); return; }
+            if (!title) { alert("작품명을 입력해주세요."); return; }
 
             const goalNoSpace = parseInt(document.getElementById('new-work-goal-nospace').value) || 0;
             const goalWithSpace = parseInt(document.getElementById('new-work-goal-withspace').value) || 0;
@@ -16337,6 +16337,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 container.innerHTML += `<div class="rounded-xl p-3.5 transition-all group flex flex-col gap-2 relative overflow-hidden cursor-pointer ${cardClass}" data-gi="${Math.max(0, genreList.findIndex(g => g.name === w.genre))}" data-gv="${gvKey(w.genre)}" ${cardBgStyle} onclick="viewWork('${w.id}')">
                     ${isSelected ? '<div class="absolute top-0 left-0 w-full h-0.5" style="background:var(--primary)"></div>' : ''}
                     <div class="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2 bg-white/90 backdrop-blur-sm rounded-bl-xl z-10">
+                        <button onclick="event.stopPropagation();copyWork('${w.id}')" class="text-slate-400 hover:text-emerald-600 text-xs" title="복사 (작품명 뒤에 번호)"><i class="fa-regular fa-copy"></i></button>
                         <button onclick="event.stopPropagation();deleteWork('${w.id}')" class="text-slate-400 hover:text-red-600 text-xs" title="삭제"><i class="fa-solid fa-trash"></i></button>
                     </div>
                     <div class="flex items-start justify-between">
@@ -16463,6 +16464,19 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 document.addEventListener('keydown', onKey, true);
                 ov.appendChild(box); document.body.appendChild(ov);
             });
+        }
+        // 작품 복사: 래이니 초단 → 래이니 초단2 → 래이니 초단3. 웹툰 연결·외전·표지·메모·계약서는 가져오지 않는 완전히 다른 작품
+        function copyWork(id) {
+            const w = masterWorks.find(x => x.id === id); if (!w) return;
+            const base = String(w.title || '').replace(/\s*\d+$/, '').trim() || String(w.title || '');
+            let max = 1;
+            masterWorks.forEach(x => { const t = String(x.title || ''); if (t === base) return; const m = t.startsWith(base) && /^\d+$/.test(t.slice(base.length).trim()) ? parseInt(t.slice(base.length).trim(), 10) : 0; if (m > max) max = m; });
+            const keys = ['genre', 'publisher', 'studio', 'settlementPublisher', 'rate', 'rs', 'webtoonRate', 'goalNoSpace', 'goalWithSpace', 'manuscriptDate', 'publishDate', 'isPending', 'pendingMonth', 'volumes', 'advanceAmount', 'advanceDate', 'contractDate'];
+            const c = { id: Date.now().toString() + Math.floor(Math.random() * 100), title: base + (max + 1) };
+            keys.forEach(k => { if (w[k] !== undefined) c[k] = w[k]; });
+            masterWorks.push(c);
+            masterWorks.sort((a, b) => { const dA = sortKeyDate(a), dB = sortKeyDate(b); return dA < dB ? -1 : dA > dB ? 1 : 0; });
+            save(); updateUI();
         }
         function deleteWork(id) {
             const bw = masterWorks.find(x => x.id === id);

@@ -10431,7 +10431,7 @@ function renderHome() {
         <main class="home-body">
             ${tab === 'works' && (pref.homeHero ?? cozy) ? homeHero(list) : ''}
             <div class="home-intro"><h1 class="home-tabs"><button class="${tab === 'works' ? 'on' : ''}" data-ht="works">내 작품</button><button class="${tab === 'ideas' ? 'on' : ''}" data-ht="ideas">아이디어 메모</button></h1>
-                ${tab === 'works' ? '<button class="btn primary" data-h="new"><i class="ic ic-book-plus"></i> 새 작품</button>' : '<button class="btn primary" data-h="idea-new">＋ 새 아이디어</button>'}</div>
+                ${tab === 'works' ? '<button class="btn primary" data-h="new"><i class="ic ic-book-plus"></i> 새 작품</button>' : '<span style="display:flex;gap:8px"><button class="btn" data-h="idea-mail" title="아이디어를 전부 내 메일로 보내요">✉ 메일</button><button class="btn primary" data-h="idea-new">＋ 새 아이디어</button></span>'}</div>
             ${tab === 'ideas' ? ideaGroups() : groups.filter(([, l]) => l.length || mode === 'status').map(([name, l]) => `<section class="home-group">
                 <h2>${mode === 'genre' ? `<span class="gdot" style="background:${GENRE_COLOR[name] || 'var(--muted)'};box-shadow:0 0 0 1px ${GENRE_INK[name] || 'transparent'}"></span>` : name === '완고' ? '<i class="ic ic-circle-check"></i>' : '<i class="ic ic-pen-line"></i>'} ${esc(name)} <small>${l.length}</small></h2>
                 <div class="wgrid${polCards ? ' pol-grid' : ''}">${(l.map(card).join('') + (polCards && mode === 'genre' && name === groups.filter(([, gl]) => gl.length).slice(-1)[0]?.[0] ? newPol : '')) || '<div class="modal-note">아직 없어요</div>'}</div></section>`).join('')}
@@ -10455,6 +10455,39 @@ function ideaGroups() {
                 : `<div class="wcard icard" data-idea="${x.id}" style="${sty}">${top}${ta}
                     <div class="wc-meta"><span class="wc-when"><i class="ic ic-clock"></i> ${when}</span></div></div>`;
         }).join('')}</div></section>`).join('');
+}
+// 아이디어 전부를 내 메일로: 시놉시스의 '이메일로 기록 보내기'와 같은 서버 함수 · 같은 구글 로그인 · 저장해 둔 메일 설정을 그대로 씀
+const IDEA_MAIL_URL = 'https://asia-northeast3-writer-routine.cloudfunctions.net/synopMail';
+function ideaMailText(list) {
+    const fmt2 = t => new Date(t).toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    const out = ['아이디어 메모', `내보낸 시각: ${fmt2(Date.now())}`, `카드 ${list.length}개`, ''];
+    [...WORK_GENRES, ''].forEach(g => {
+        const l = list.filter(x => (WORK_GENRES.includes(x.genre) ? x.genre : '') === g); if (!l.length) return;
+        out.push('='.repeat(40), `■ ${g || '장르 없음'} (${l.length})`, '='.repeat(40), '');
+        l.forEach(x => { out.push(`◆ ${x.title || '(제목 없음)'}   [${fmt2(x.order)}${x.rev && x.rev - x.order > 60000 ? ` · 수정 ${fmt2(x.rev)}` : ''}]`, x.body || '', ''); });
+    });
+    return out.join('\n');
+}
+async function ideaMail(btn) {
+    const list = ideas().filter(x => x.title || x.body);
+    if (!list.length) { toast('보낼 아이디어가 없어요.'); return; }
+    const u = cloud.auth && cloud.auth.currentUser;
+    if (!u || u.isAnonymous) { toast('먼저 구글 로그인을 해 주세요. (동기화 · 백업)'); return; }
+    if (!(await confirmBox(`아이디어 ${list.length}개를 내 메일로 보낼까요?`, '보내기'))) return;
+    const old = btn.textContent; btn.disabled = true; btn.textContent = '보내는 중…';
+    try {
+        const token = await u.getIdToken(), text = ideaMailText(list), tag = new Date().toISOString().slice(0, 10);
+        const resp = await fetch(IDEA_MAIL_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify({
+            action: 'send', subject: `[아이디어 메모] ${list.length}개 (${tag})`, text: text.length > 20000 ? text.slice(0, 20000) + '\n…(이하 첨부 파일 참고)' : text,
+            attachments: [
+                { filename: `아이디어메모_${tag}.txt`, content: text, contentType: 'text/plain; charset=utf-8' },
+                { filename: `아이디어메모_원본_${tag}.json`, content: JSON.stringify(list.map(({ genre, title, body, order, rev }) => ({ genre, title, body, order, rev })), null, 2), contentType: 'application/json; charset=utf-8' }
+            ] }) });
+        let j = null; try { j = await resp.json(); } catch (e) {}
+        if (j && j.ok) toast(`${j.to || '내 메일'} 로 보냈어요.`);
+        else toast('보내지 못했어요: ' + ((j && j.error) || `서버 응답 ${resp.status}`) + ' (메일 설정은 시놉시스 ✉ 이메일로 기록 보내기에서)');
+    } catch (e) { toast('보내지 못했어요: ' + e.message); }
+    finally { btn.disabled = false; btn.textContent = old; }
 }
 // 카드에 바로 적으면 저장 (창 없이)
 document.addEventListener('input', e => {
@@ -10525,6 +10558,7 @@ async function homeClick(e) {
     if (t.classList.contains('hh-go')) { enterWork(t.dataset.work); return; }
     if (t.dataset.ht) { pref.homeTab = t.dataset.ht; savePref(); renderHome(); return; }
     if (t.dataset.h === 'idea-new') { ideaNew(t); return; }
+    if (t.dataset.h === 'idea-mail') { ideaMail(t); return; }
     if (t.dataset.idel) { ideaClick(t); return; }
     if (t.classList.contains('icard')) return;
     if (t.dataset.hg) { pref.homeGroup = t.dataset.hg; savePref(); renderHome(); return; }

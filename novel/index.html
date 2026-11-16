@@ -4684,7 +4684,7 @@ function wbHead(mode) {
         <button class="mini" data-b="style" title="보드 꾸미기 (글꼴 · 글자 크기 · 배경)"><i class="ic ic-palette"></i> 꾸미기</button><button class="mini" data-b="fit" title="모든 메모가 한 화면에 보이게 맞추기"><i class="ic ic-target"></i> 전체 보기</button><button class="mini" data-b="png" title="화이트보드를 사진(PNG)으로 저장"><i class="ic ic-file-down"></i> 사진 저장</button>`;
     const L = wbLay(mode);
     const lay = `<span class="wb-lay" title="보기 방식"><button class="${L === 'free' ? 'on' : ''}" data-lay="free" title="내가 놓은 자리 그대로">원래대로</button><button class="${L === 'topic' ? 'on' : ''}" data-lay="topic" title="주제마다 한 줄로 모아 보기 (끌어서 다른 줄에 놓으면 주제가 바뀌어요)">주제별</button></span>`;
-    if (mode === 'full') return `<div class="fb-left"><b class="wb-title"><i class="ic ic-layout-dashboard"></i> 화이트보드</b>${lay}${chips}</div><span class="bh-tools">${tools}<button class="mini" data-b="mail" title="화이트보드 내용을 전부 내 메일로 보내요">✉ 메일</button><button class="mini" data-b="close" title="닫기 (Esc)">✕</button></span>`;
+    if (mode === 'full') return `<div class="fb-left"><b class="wb-title"><i class="ic ic-layout-dashboard"></i> 화이트보드</b>${lay}${chips}</div><span class="bh-tools">${tools}<button class="mini" data-b="mail" title="화이트보드 내용을 전부 내 메일로 보내요" aria-label="메일로 보내기">💌</button><button class="mini" data-b="close" title="닫기 (Esc)">✕</button></span>`;
     // 원고 옆 칸: 한 줄 — 「화이트보드」 · 메모 · 캐릭터 · 사진 · 넓게 (되돌리기 · 꾸미기 · 전체 보기는 넓게 보기에서)
     return `<div class="bh-row"><b class="wb-title"><i class="ic ic-layout-dashboard"></i> 화이트보드</b>
         <span class="wb-cg"><button data-b="add" title="새 포스트잇"><i class="ic ic-plus"></i><span>메모</span></button><button data-b="add-char" title="시놉 보드의 내 캐릭터로 명함 붙이기"><i class="ic ic-user"></i><span>캐릭터</span></button><button data-b="add-img" title="사진 포스트잇"><i class="ic ic-image"></i><span>사진</span></button></span>
@@ -10432,7 +10432,7 @@ function renderHome() {
         <main class="home-body">
             ${tab === 'works' && (pref.homeHero ?? cozy) ? homeHero(list) : ''}
             <div class="home-intro"><h1 class="home-tabs"><button class="${tab === 'works' ? 'on' : ''}" data-ht="works">내 작품</button><button class="${tab === 'ideas' ? 'on' : ''}" data-ht="ideas">아이디어 메모</button></h1>
-                ${tab === 'works' ? '<button class="btn primary" data-h="new"><i class="ic ic-book-plus"></i> 새 작품</button>' : '<span style="display:flex;gap:8px"><button class="btn" data-h="idea-mail" title="아이디어를 전부 내 메일로 보내요">✉ 메일</button><button class="btn primary" data-h="idea-new">＋ 새 아이디어</button></span>'}</div>
+                ${tab === 'works' ? '<button class="btn primary" data-h="new"><i class="ic ic-book-plus"></i> 새 작품</button>' : '<span style="display:flex;gap:8px"><button class="btn" data-h="idea-mail" title="아이디어를 전부 내 메일로 보내요" aria-label="메일로 보내기">💌</button><button class="btn primary" data-h="idea-new">＋ 새 아이디어</button></span>'}</div>
             ${tab === 'ideas' ? ideaGroups() : groups.filter(([, l]) => l.length || mode === 'status').map(([name, l]) => `<section class="home-group">
                 <h2>${mode === 'genre' ? `<span class="gdot" style="background:${GENRE_COLOR[name] || 'var(--muted)'};box-shadow:0 0 0 1px ${GENRE_INK[name] || 'transparent'}"></span>` : name === '완고' ? '<i class="ic ic-circle-check"></i>' : '<i class="ic ic-pen-line"></i>'} ${esc(name)} <small>${l.length}</small></h2>
                 <div class="wgrid${polCards ? ' pol-grid' : ''}">${(l.map(card).join('') + (polCards && mode === 'genre' && name === groups.filter(([, gl]) => gl.length).slice(-1)[0]?.[0] ? newPol : '')) || '<div class="modal-note">아직 없어요</div>'}</div></section>`).join('')}
@@ -10474,7 +10474,7 @@ async function sendMailVia(btn, { ask, subject, text, files }) {
     const u = cloud.auth && cloud.auth.currentUser;
     if (!u || u.isAnonymous) { toast('먼저 구글 로그인을 해 주세요. (동기화 · 백업)'); return; }
     if (!(await confirmBox(ask, '보내기'))) return;
-    const old = btn.textContent; btn.disabled = true; btn.textContent = '보내는 중…';
+    const old = btn.innerHTML; btn.disabled = true; btn.textContent = '⏳';
     try {
         const token = await u.getIdToken();
         const resp = await fetch(IDEA_MAIL_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify({
@@ -10484,7 +10484,7 @@ async function sendMailVia(btn, { ask, subject, text, files }) {
         if (j && j.ok) toast(`${j.to || '내 메일'} 로 보냈어요.`);
         else toast('보내지 못했어요: ' + ((j && j.error) || `서버 응답 ${resp.status}`) + ' (메일 설정은 시놉시스 ✉ 이메일로 기록 보내기에서)');
     } catch (e) { toast('보내지 못했어요: ' + e.message); }
-    finally { btn.disabled = false; btn.textContent = old; }
+    finally { btn.disabled = false; btn.innerHTML = old; }
 }
 const mailStamp = t => new Date(t).toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
 async function ideaMail(btn) {

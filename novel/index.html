@@ -4790,17 +4790,18 @@ function wbTapeFill(g, k) {
 }
 function wbFont(el) { const cs = getComputedStyle(el); return `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`; }
 function wbColor(g, v, fb) { g.fillStyle = fb; try { g.fillStyle = v; } catch (_) {} return g.fillStyle; }
-async function wbExportPng(mode) {
-    const world = wbWorld(mode), view = wbView(mode); if (!world || !view) return;
+// opt.asCanvas: 파일로 받지 않고 그림판(canvas)만 돌려줌 (메일 첨부용) · opt.maxPx: 그림 크기 상한
+async function wbExportPng(mode, opt = {}) {
+    const world = wbWorld(mode), view = wbView(mode); if (!world || !view) return null;
     const pis = $$('.pi', world), frs = $$('.wb-frame', world);
-    if (!pis.length && !frs.length) { toast('사진으로 저장할 메모가 없어요.'); return; }
+    if (!pis.length && !frs.length) { toast('사진으로 저장할 메모가 없어요.'); return null; }
     toast('사진으로 만드는 중이에요…');
     try { await document.fonts.ready; } catch (_) {}
     const box = el => ({ x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight });
     const all = [...pis, ...frs].map(box);
     const pad = 48, x0 = Math.min(...all.map(b => b.x)) - pad, y0 = Math.min(...all.map(b => b.y)) - pad;
     const x1 = Math.max(...all.map(b => b.x + b.w)) + pad, y1 = Math.max(...all.map(b => b.y + b.h)) + pad;
-    const W = x1 - x0, H = y1 - y0, S = Math.max(1, Math.min(2, Math.sqrt(16e6 / (W * H)))); // 너무 큰 보드는 크기를 줄여서
+    const W = x1 - x0, H = y1 - y0, S = Math.max(1, Math.min(2, Math.sqrt((opt.maxPx || 16e6) / (W * H)))); // 너무 큰 보드는 크기를 줄여서
     const cv = document.createElement('canvas'); cv.width = Math.round(W * S); cv.height = Math.round(H * S);
     const g = cv.getContext('2d'); g.scale(S, S); g.translate(-x0, -y0);
     // 사진 미리 불러오기
@@ -4881,6 +4882,7 @@ async function wbExportPng(mode) {
         g.restore();
     });
     const name = (get(curWorkId())?.title || '작품') + '_화이트보드.png';
+    if (opt.asCanvas) return cv;
     cv.toBlob(bl => { if (!bl) { toast('사진을 만들지 못했어요. 보드가 너무 크면 메모를 조금 모아 주세요.'); return; } download(name, bl, 'image/png'); }, 'image/png');
 }
 // 주제별 보기: 주제마다 세로 한 줄 (캐릭터 · 배경 · 회심 · 다른 주제 · 주제 없음)
@@ -10483,7 +10485,7 @@ async function sendMailVia(btn, { ask, subject, text, files }) {
         const token = await u.getIdToken();
         const resp = await fetch(IDEA_MAIL_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify({
             action: 'send', subject, text: text.length > 20000 ? text.slice(0, 20000) + '\n…(이하 첨부 파일 참고)' : text,
-            attachments: [{ filename: files.txt, content: text, contentType: 'text/plain; charset=utf-8' }, { filename: files.json, content: files.data, contentType: 'application/json; charset=utf-8' }] }) });
+            attachments: [{ filename: files.txt, content: text, contentType: 'text/plain; charset=utf-8' }, { filename: files.json, content: files.data, contentType: 'application/json; charset=utf-8' }, ...(files.extra || [])] }) });
         let j = null; try { j = await resp.json(); } catch (e) {}
         if (j && j.ok) toast(`${j.to || '내 메일'} 로 보냈어요.`);
         else toast('보내지 못했어요: ' + ((j && j.error) || `서버 응답 ${resp.status}`) + ' (메일 설정은 시놉시스 ✉ 이메일로 기록 보내기에서)');
@@ -10522,8 +10524,18 @@ async function wbMail(btn) {
     const notes = notesOfWork(), frames = framesOfWork();
     if (!notes.length) { toast('보낼 메모가 없어요.'); return; }
     const w = get(curWorkId()), tag = new Date().toISOString().slice(0, 10), name = w?.title || '작품';
-    await sendMailVia(btn, { ask: `화이트보드 메모 ${notes.length}개를 내 메일로 보낼까요?`, subject: `[화이트보드] ${name} (${tag})`, text: wbMailText(w, notes, frames),
-        files: { txt: `화이트보드_${name}_${tag}.txt`, json: `화이트보드_원본_${name}_${tag}.json`, data: JSON.stringify({ title: name, notes: notes.map(({ id, tag: tg, body, ch, links, gx, gy, w: ww, h, img }) => ({ id, tag: tg, body, ch, links, gx, gy, w: ww, h, hasImage: !!img })), frames: frames.map(({ title, gx, gy, w: ww, h }) => ({ title, gx, gy, w: ww, h })) }, null, 2) } });
+    // 보드 전체 사진 (메모가 보드 밖까지 다 나오게). 만들지 못해도 글 내용은 그대로 보냄
+    const extra = [];
+    try {
+        const cv = await wbExportPng('full', { asCanvas: true, maxPx: 6e6 });
+        if (cv) {
+            let url = cv.toDataURL('image/png'); if (url.length > 5.5e6) url = cv.toDataURL('image/jpeg', .85); // 너무 크면 줄여서
+            const jpg = url.startsWith('data:image/jpeg');
+            extra.push({ filename: `화이트보드_${name}_${tag}.${jpg ? 'jpg' : 'png'}`, content: url.split(',')[1], encoding: 'base64', contentType: jpg ? 'image/jpeg' : 'image/png' });
+        }
+    } catch (e) { console.warn(e); }
+    await sendMailVia(btn, { ask: `화이트보드 메모 ${notes.length}개${extra.length ? '와 전체 사진' : ''}을(를) 내 메일로 보낼까요?`, subject: `[화이트보드] ${name} (${tag})`, text: wbMailText(w, notes, frames),
+        files: { extra, txt: `화이트보드_${name}_${tag}.txt`, json: `화이트보드_원본_${name}_${tag}.json`, data: JSON.stringify({ title: name, notes: notes.map(({ id, tag: tg, body, ch, links, gx, gy, w: ww, h, img }) => ({ id, tag: tg, body, ch, links, gx, gy, w: ww, h, hasImage: !!img })), frames: frames.map(({ title, gx, gy, w: ww, h }) => ({ title, gx, gy, w: ww, h })) }, null, 2) } });
 }
 // 카드에 바로 적으면 저장 (창 없이)
 document.addEventListener('input', e => {

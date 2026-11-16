@@ -1515,9 +1515,13 @@ body .home .wgrid .wcard.icard:not(.pol):not([style*="--gc:#"]) { --lb: #f5f4f1;
 .ic-ti { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font: 600 15px/1.35 var(--home-font, var(--note-font, 'Pretendard')), 'Pretendard', sans-serif; color: inherit; padding: 2px 0; position: relative; z-index: 1; }
 .icard.pol .ic-ti { font: 600 21px/1.2 var(--home-font, 'Gaegu'), 'Nanum Myeongjo', cursive; }
 .icard .ic-del { opacity: .45; } .icard .ic-del:hover { opacity: 1; }
-.ic-ta { flex: 1 1 auto; height: 0; width: 100%; box-sizing: border-box; border: 0; outline: 0; background: transparent; resize: none; font: inherit; font-family: var(--home-font, var(--note-font, 'Pretendard')), 'Pretendard', sans-serif; font-size: 12px; line-height: 1.5; color: inherit; padding: 4px 0; min-height: 0; position: relative; z-index: 1; }
+.ic-ta { flex: 1 1 auto; height: 0; width: 100%; box-sizing: border-box; border: 0; outline: 0; background: transparent; resize: none; font: inherit; font-family: var(--home-font, var(--note-font, 'Pretendard')), 'Pretendard', sans-serif; font-size: var(--ic-fs, 12px); line-height: 1.5; color: inherit; padding: 4px 0; min-height: 0; position: relative; z-index: 1; }
 .icard.pol .pol-ph { aspect-ratio: auto; height: 232px; }
 .icard.pol { height: auto; min-height: 0; }
+.ic-fsbox { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: var(--panel); }
+.ic-fsbox button { width: 30px; height: 30px; border: 0; background: none; color: var(--muted); font-size: 15px; line-height: 1; cursor: pointer; }
+.ic-fsbox button:hover { background: var(--accent-soft); color: var(--accent); }
+.ic-fsbox button + button { border-left: 1px solid var(--line); }
 .ic-ta { scrollbar-width: none; } .ic-ta::-webkit-scrollbar { width: 0; height: 0; background: transparent; }
 .icard.pol .ic-ta { font-family: var(--home-font, 'Gaegu'), 'Nanum Myeongjo', cursive; font-size: 17px; line-height: 1.5; }
 .modal textarea[data-b] { width: 100%; box-sizing: border-box; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font: inherit; resize: vertical; background: var(--panel); color: inherit; }
@@ -10574,6 +10578,7 @@ function renderHome() {
         <div class="wc-title">${esc(x.w.title || '제목 없음')}</div>
         <div class="wc-log">${esc(x.plan?.guideWhen || String(x.plan?.intro || '').split('\n').find(Boolean) || x.plan?.logline || '')}</div>
         <div class="wc-meta"><span>원고 ${x.s.docs}편</span><span>${fmt(x.s.chars)}자</span><span class="wc-when"><i class="ic ic-clock"></i> ${when(x.s.last)}</span></div></div>`;
+    h.style.setProperty('--ic-fs', (pref.ideaFs || 12) + 'px');
     h.innerHTML = `<header class="home-head"><span class="brand"><i class="ic ic-feather"></i> 루시의 작업실</span>
             <nav class="home-tabs"><button class="${tab === 'works' ? 'on' : ''}" data-ht="works">내 작품</button><button class="${tab === 'ideas' ? 'on' : ''}" data-ht="ideas">아이디어 메모</button></nav><span style="flex:1"></span>
             <button class="sync-badge" data-h="cloud" title="동기화 · 백업">이 기기에 저장</button><div class="seg"><button class="${mode === 'genre' ? 'on' : ''}" data-hg="genre">장르별</button><button class="${mode === 'status' ? 'on' : ''}" data-hg="status">완고 · 미완고</button></div>
@@ -10581,7 +10586,7 @@ function renderHome() {
         <main class="home-body">
             ${tab === 'works' && (pref.homeHero ?? cozy) ? homeHero(list) : ''}
             <div class="home-intro${tab === 'ideas' ? ' ic-wide' : ''}">
-                ${tab === 'works' ? '<button class="btn primary" data-h="new"><i class="ic ic-book-plus"></i> 새 작품</button>' : '<span style="display:flex;gap:8px"><button class="btn" data-h="idea-mail" title="아이디어를 전부 내 메일로 보내요" aria-label="메일로 보내기"><i class="ic ic-mail"></i></button><button class="btn primary" data-h="idea-new">＋ 새 아이디어</button></span>'}</div>
+                ${tab === 'works' ? '<button class="btn primary" data-h="new"><i class="ic ic-book-plus"></i> 새 작품</button>' : '<span style="display:flex;gap:8px;align-items:center"><span class="ic-fsbox" title="카드 본문 글자 크기"><button data-h="idea-fs-" aria-label="글자 작게">－</button><button data-h="idea-fs+" aria-label="글자 크게">＋</button></span><button class="btn" data-h="idea-mail" title="아이디어를 전부 내 메일로 보내요" aria-label="메일로 보내기"><i class="ic ic-mail"></i></button><button class="btn primary" data-h="idea-new">＋ 새 아이디어</button></span>'}</div>
             ${tab === 'ideas' ? ideaGroups() : groups.filter(([, l]) => l.length || mode === 'status').map(([name, l]) => `<section class="home-group">
                 <h2>${mode === 'genre' ? `<span class="gdot" style="background:${GENRE_COLOR[name] || 'var(--muted)'};box-shadow:0 0 0 1px ${GENRE_INK[name] || 'transparent'}"></span>` : name === '완고' ? '<i class="ic ic-circle-check"></i>' : '<i class="ic ic-pen-line"></i>'} ${esc(name)} <small>${l.length}</small></h2>
                 <div class="wgrid${polCards ? ' pol-grid' : ''}">${(l.map(card).join('') + (polCards && mode === 'genre' && name === groups.filter(([, gl]) => gl.length).slice(-1)[0]?.[0] ? newPol : '')) || '<div class="modal-note">아직 없어요</div>'}</div></section>`).join('')}
@@ -10752,6 +10757,10 @@ async function homeClick(e) {
     if (t.dataset.ht) { pref.homeTab = t.dataset.ht; savePref(); renderHome(); return; }
     if (t.dataset.h === 'idea-new') { ideaNew(t); return; }
     if (t.dataset.h === 'idea-mail') { ideaMail(t); return; }
+    if (t.dataset.h === 'idea-fs-' || t.dataset.h === 'idea-fs+') {
+        pref.ideaFs = Math.max(9, Math.min(22, (pref.ideaFs || 12) + (t.dataset.h === 'idea-fs+' ? 1 : -1))); savePref();
+        $('.home')?.style.setProperty('--ic-fs', pref.ideaFs + 'px'); toast(`카드 글자 크기 ${pref.ideaFs}`); return;
+    }
     if (t.dataset.idel) { ideaClick(t); return; }
     if (t.classList.contains('icard')) return;
     if (t.dataset.hg) { pref.homeGroup = t.dataset.hg; savePref(); renderHome(); return; }

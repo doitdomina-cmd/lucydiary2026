@@ -12754,7 +12754,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 ov = document.createElement('div'); ov.id = 'pubcard-modal';
                 ov.style.cssText = 'position:fixed;inset:0;z-index:9000;background:rgba(40,30,20,.45);display:flex;align-items:center;justify-content:center;padding:16px;';
                 ov.onclick = e => { if (e.target === ov) pcClose(); };
-                ov.innerHTML = `<div class="modal-content" style="background:#fff;border-radius:16px;width:min(1120px,96vw) !important;max-width:none !important;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.25);">
+                ov.innerHTML = `<div class="modal-content" style="background:#fff;border-radius:16px;width:min(960px,96vw) !important;max-width:none !important;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.25);">
                     <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid #eee;flex-wrap:wrap;">
                         <b style="font-size:16px;white-space:nowrap;">출간 일정 카드</b>
                         <button type="button" onclick="pcYear(-1)" style="padding:2px 9px;border:1px solid #ddd;border-radius:8px;">‹</button>
@@ -12765,9 +12765,9 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                         <button type="button" onclick="pcDownload()" style="padding:6px 14px;border-radius:10px;font-size:12px;font-weight:800;background:var(--primary,#87ada1);color:#fff;">PNG 저장</button>
                         <button type="button" onclick="pcClose()" style="padding:4px 10px;font-size:18px;color:#888;">✕</button>
                     </div>
-                    <div style="display:flex;gap:18px;padding:14px 18px;overflow:auto;flex:1;min-height:0;flex-wrap:wrap;align-items:flex-start;">
-                        <div id="pc-editor" style="flex:1 1 400px;min-width:300px;"></div>
-                        <div style="flex:0 0 420px;max-width:100%;position:sticky;top:0;margin:0 auto;"><div id="pc-opts"></div><canvas id="pc-canvas" style="width:100%;border:1px solid #eee;border-radius:8px;background:#fff;"></canvas></div>
+                    <div style="display:flex;gap:0;padding:14px 18px;overflow:auto;flex:1;min-height:0;flex-wrap:wrap;align-items:flex-start;">
+                        <div id="pc-editor" style="flex:0 0 390px;max-width:100%;min-width:300px;padding-right:26px;box-sizing:border-box;"></div>
+                        <div style="flex:0 0 446px;max-width:100%;position:sticky;top:0;margin:0 auto;border-left:1px solid #e4e4ea;padding-left:26px;box-sizing:border-box;"><div id="pc-opts"></div><canvas id="pc-canvas" style="width:100%;border:1px solid #eee;border-radius:8px;background:#fff;"></canvas></div>
                     </div>
                 </div>`;
                 document.body.appendChild(ov);
@@ -12809,8 +12809,9 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         }
         // 카드 글꼴·디자인 (그림에 쓰이는 글꼴은 구글 폰트라 미리 불러온 뒤 다시 그린다)
         const PC_FONTS = {
-            sans: ['고딕', `'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif`, ''],
-            serif: ['명조', `'Noto Serif KR','Nanum Myeongjo','Batang',serif`, 'Noto Serif KR'],
+            sans: ['프리텐다드', `'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif`, ''],
+            serif: ['세리프', `'Noto Serif KR','Nanum Myeongjo','Batang',serif`, 'Noto Serif KR'],
+            poor: ['푸어스토리', `'Poor Story','Pretendard',sans-serif`, 'Poor Story'],
             gowun: ['고운바탕', `'Gowun Batang','Noto Serif KR',serif`, 'Gowun Batang'],
             dodum: ['고운돋움', `'Gowun Dodum','Pretendard',sans-serif`, 'Gowun Dodum'],
             gaegu: ['개구', `'Gaegu','Pretendard',sans-serif`, 'Gaegu'],
@@ -12836,13 +12837,14 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         // 카드 그림 (논리 폭 480, 2배로 그림)
         function pcDraw() {
             const cv = document.getElementById('pc-canvas'); if (!cv) return;
-            const card = pcGet(_pcYear), S = 2, W = 480, PAD = 22, DES = PC_DESIGNS[card.design] ? card.design : 'simple';
+            const card = pcGet(_pcYear), S = 2, W = 480, DES = PC_DESIGNS[card.design] ? card.design : 'simple';
             const fk = PC_FONTS[card.font] ? card.font : 'sans';
             const FONT = PC_FONTS[fk][1], SERIF = fk === 'sans' ? PC_FONTS.serif[1] : PC_FONTS[fk][1], NUM = `'Bodoni MT','Didot','Playfair Display','Bodoni 72','Noto Serif KR','Batang',serif`;
+            const FR = DES === 'gaming' || DES === 'spiral', PAD = FR ? 34 : 22, TP = DES === 'gaming' ? 62 : DES === 'spiral' ? 52 : 22;   // 게이밍·스프링은 카드 전체가 창/노트
             const T = {
                 simple: { bg: '#FBFAF8', ink: '#2B2B47', month: '#4A4E78', sub: '#8A8A9A', line: '#EFEEF3', top: 10, bot: 4 },
-                spiral: { bg: '#F2FBF5', ink: '#1F2D27', month: '#1F2D27', sub: '#5B6B62', line: 'rgba(31,45,39,.25)', top: 26, bot: 6 },
-                gaming: { bg: '#E9F6EE', ink: '#2F3A5C', month: '#2F3A5C', sub: '#5E6A8C', line: 'rgba(47,58,92,.22)', top: 32, bot: 6 },
+                spiral: { bg: '#DDF3E6', ink: '#1F2D27', month: '#1F2D27', sub: '#5B6B62', line: 'rgba(31,45,39,.28)', top: 4, bot: 4 },
+                gaming: { bg: '#F4B9D0', ink: '#2F3A5C', month: '#2F3A5C', sub: '#5E6A8C', line: 'rgba(47,58,92,.22)', top: 8, bot: 6 },
                 label: { bg: '#FFFAEB', ink: '#3A2E22', month: '#3A2E22', sub: '#8A7A66', line: 'rgba(90,70,40,.3)', top: 12, bot: 6 },
                 postcard: { bg: '#FCF8EE', ink: '#3A2E22', month: '#7A4A3A', sub: '#8A7A66', line: 'rgba(120,90,70,.25)', top: 12, bot: 8 }
             }[DES];
@@ -12851,43 +12853,53 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             const dated = rows.filter(r => !isUnset(r)), unset = rows.filter(isUnset);
             const rowH = r => r.sub ? 44 : 32;
             const datedH = dated.reduce((n, r) => n + rowH(r), 0);
-            let H = PAD + 78;
+            let H = TP + 78;
             if (dated.length) H += T.top + datedH + T.bot + 14;
             if (unset.length) H += Math.max(40, 22 + unset.length * 20) + 14;
-            H += PAD;
+            H += FR ? 40 : 22;
             cv.width = W * S; cv.height = H * S;
             const g = cv.getContext('2d'); g.scale(S, S);
             const rr = (x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
             const fit = (t, w) => { t = String(t || ''); if (g.measureText(t).width <= w) return t; while (t.length > 1 && g.measureText(t + '…').width > w) t = t.slice(0, -1); return t + '…'; };
             // 바탕
             g.fillStyle = T.bg; g.fillRect(0, 0, W, H);
-            if (DES === 'spiral') { g.strokeStyle = 'rgba(80,160,120,.18)'; g.lineWidth = 1; for (let x = 0; x < W; x += 18) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); } for (let y2 = 0; y2 < H; y2 += 18) { g.beginPath(); g.moveTo(0, y2); g.lineTo(W, y2); g.stroke(); } }
-            if (DES === 'gaming') { g.fillStyle = '#FBD3E3'; g.fillRect(0, 0, W, 5); g.fillStyle = '#BFE3F6'; g.fillRect(0, H - 5, W, 5); }
+            if (DES === 'spiral') {
+                g.strokeStyle = 'rgba(80,160,120,.16)'; g.lineWidth = 1; for (let x = 0; x < W; x += 18) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); } for (let y2 = 0; y2 < H; y2 += 18) { g.beginPath(); g.moveTo(0, y2); g.lineTo(W, y2); g.stroke(); }
+                const M = 14, py = M + 10, pw = W - M * 2, ph = H - py - M;
+                g.fillStyle = '#1F2D27'; g.fillRect(M + 4, py + 5, pw, ph); g.fillStyle = '#FFFEF6'; g.fillRect(M, py, pw, ph);
+                g.strokeStyle = 'rgba(80,160,120,.22)'; g.lineWidth = 1; for (let x = M + 18; x < M + pw; x += 18) { g.beginPath(); g.moveTo(x, py + 2); g.lineTo(x, py + ph - 2); g.stroke(); } for (let y2 = py + 18; y2 < py + ph; y2 += 18) { g.beginPath(); g.moveTo(M + 2, y2); g.lineTo(M + pw - 2, y2); g.stroke(); }
+                g.strokeStyle = '#1F2D27'; g.lineWidth = 2.6; g.strokeRect(M, py, pw, ph);
+                for (let cx = M + 16; cx < M + pw - 10; cx += 24) { g.beginPath(); g.arc(cx, py, 7, 0, 7); g.fillStyle = '#fff'; g.fill(); g.strokeStyle = '#1F2D27'; g.lineWidth = 2.4; g.stroke(); g.beginPath(); g.arc(cx, py, 2.2, 0, 7); g.fillStyle = '#1F2D27'; g.fill(); }
+            }
+            if (DES === 'gaming') {
+                g.strokeStyle = '#EC9DBA'; g.lineWidth = 1; for (let x = -H; x < W + H; x += 16) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x + H, H); g.stroke(); }
+                const M = 12, wx = M, wy = M, ww = W - M * 2 - 4, wh = H - M * 2 - 4;
+                g.fillStyle = '#2F3A5C'; g.fillRect(wx + 4, wy + 5, ww, wh); g.fillStyle = '#FFF4F8'; g.fillRect(wx, wy, ww, wh);
+                g.fillStyle = '#FBD9E6'; for (let x = wx + 8; x < wx + ww - 4; x += 12) for (let y2 = wy + 36; y2 < wy + wh - 4; y2 += 12) g.fillRect(x, y2, 1.5, 1.5);
+                const gr = g.createLinearGradient(wx, 0, wx + ww, 0); gr.addColorStop(0, '#8FD3F0'); gr.addColorStop(1, '#BDE6F8'); g.fillStyle = gr; g.fillRect(wx, wy, ww, 26);
+                g.fillStyle = '#2F3A5C'; g.fillRect(wx, wy + 26, ww, 2.5);
+                g.font = `700 12px ${FONT}`; g.fillStyle = '#2F3A5C'; g.fillText('♥ system.exe', wx + 10, wy + 18);
+                [0, 1, 2].forEach(i => { const bx = wx + ww - 22 - i * 20; g.fillStyle = '#FFF4F8'; g.fillRect(bx, wy + 6, 15, 15); g.strokeStyle = '#2F3A5C'; g.lineWidth = 2; g.strokeRect(bx, wy + 6, 15, 15); });
+                g.strokeStyle = '#2F3A5C'; g.lineWidth = 3; g.strokeRect(wx, wy, ww, wh);
+            }
             if (DES === 'postcard') { const bw = 7; for (let i = 0; i < W + H; i += 14) { } g.save(); g.beginPath(); g.rect(0, 0, W, H); g.rect(bw, bw, W - bw * 2, H - bw * 2); g.clip('evenodd'); for (let i = -H; i < W + H; i += 18) { g.fillStyle = (i / 18) % 2 ? '#9FB7CC' : '#D8A39D'; g.beginPath(); g.moveTo(i, 0); g.lineTo(i + 9, 0); g.lineTo(i + 9 + H, H); g.lineTo(i + H, H); g.fill(); } g.restore(); }
             // 머리
-            g.textBaseline = 'alphabetic'; g.fillStyle = DES === 'simple' ? '#C9C6E2' : T.ink;
-            if (DES === 'simple') g.fillRect(PAD, PAD - 6, W - PAD * 2, 1);
+            g.textBaseline = 'alphabetic'; g.fillStyle = '#C9C6E2';
+            if (DES === 'simple') g.fillRect(PAD, TP - 6, W - PAD * 2, 1);
             g.fillStyle = T.ink;
-            g.font = `800 38px ${SERIF}`; const t1 = card.title || ''; g.fillText(t1, PAD, PAD + 42);
+            g.font = `800 38px ${SERIF}`; const t1 = card.title || ''; g.fillText(t1, PAD, TP + 42);
             const w1 = g.measureText(t1).width;
-            g.font = `700 22px ${SERIF}`; g.fillText(' ' + (card.sub || ''), PAD + w1, PAD + 42);
+            g.font = `700 22px ${SERIF}`; g.fillText(' ' + (card.sub || ''), PAD + w1, TP + 42);
             const d = new Date(); g.font = `500 10.5px ${FONT}`; g.fillStyle = T.sub; g.textAlign = 'right';
-            g.fillText(`${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()} 기준`, W - PAD, PAD + 62); g.textAlign = 'left';
-            g.fillStyle = DES === 'simple' ? '#E5E3EC' : T.line; g.fillRect(PAD, PAD + 70, W - PAD * 2, DES === 'simple' ? 1 : 2);
-            let y = PAD + 78 + 4;
+            g.fillText(`${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()} 기준`, W - PAD, TP + 62); g.textAlign = 'left';
+            g.fillStyle = DES === 'simple' ? '#E5E3EC' : T.line; g.fillRect(PAD, TP + 70, W - PAD * 2, DES === 'simple' ? 1 : 2);
+            let y = TP + 78 + 4;
             // 목록 상자
             if (dated.length) {
                 const h = T.top + datedH + T.bot, x0 = PAD, w0 = W - PAD * 2;
                 if (DES === 'simple') { rr(x0, y, w0, h, 12); g.fillStyle = '#fff'; g.fill(); g.strokeStyle = '#E8E6EE'; g.lineWidth = 1; g.stroke(); }
-                else if (DES === 'spiral') {
-                    g.fillStyle = '#1F2D27'; g.fillRect(x0 + 3, y + 3, w0, h); g.fillStyle = '#FFFEF8'; g.fillRect(x0, y, w0, h); g.strokeStyle = '#1F2D27'; g.lineWidth = 2.4; g.strokeRect(x0, y, w0, h);
-                    for (let cx = x0 + 14; cx < x0 + w0 - 10; cx += 22) { g.beginPath(); g.arc(cx, y + 6, 5, 0, 7); g.fillStyle = '#fff'; g.fill(); g.strokeStyle = '#1F2D27'; g.lineWidth = 2; g.stroke(); g.beginPath(); g.arc(cx, y + 6, 1.6, 0, 7); g.fillStyle = '#1F2D27'; g.fill(); }
-                } else if (DES === 'gaming') {
-                    g.fillStyle = '#2F3A5C'; g.fillRect(x0 + 3, y + 4, w0, h); g.fillStyle = '#fff'; g.fillRect(x0, y, w0, h);
-                    const gr = g.createLinearGradient(x0, 0, x0 + w0, 0); gr.addColorStop(0, '#8FD3F0'); gr.addColorStop(1, '#F6A9CC'); g.fillStyle = gr; g.fillRect(x0, y, w0, 22);
-                    g.fillStyle = '#2F3A5C'; g.font = `700 11px ${FONT}`; g.fillText('♥ publish_' + _pcYear + '.exe', x0 + 8, y + 15);
-                    [0, 1, 2].forEach(i => { g.fillStyle = '#fff'; g.fillRect(x0 + w0 - 18 - i * 17, y + 4, 13, 13); g.strokeStyle = '#2F3A5C'; g.lineWidth = 1.5; g.strokeRect(x0 + w0 - 18 - i * 17, y + 4, 13, 13); });
-                    g.strokeStyle = '#2F3A5C'; g.lineWidth = 2.5; g.strokeRect(x0, y, w0, h);
+                else if (DES === 'spiral') { /* 노트 위에 바로 줄 노트처럼 */ }
+                else if (DES === 'gaming') { g.fillStyle = '#2F3A5C'; g.fillRect(x0 + 3, y + 4, w0, h); g.fillStyle = '#fff'; g.fillRect(x0, y, w0, h); g.strokeStyle = '#2F3A5C'; g.lineWidth = 2.5; g.strokeRect(x0, y, w0, h);
                 } else if (DES === 'label') { g.fillStyle = '#FFFEF8'; g.fillRect(x0, y, w0, h); g.setLineDash([5, 3]); g.strokeStyle = 'rgba(90,70,40,.55)'; g.lineWidth = 1.6; g.strokeRect(x0 + 0.8, y + 0.8, w0 - 1.6, h - 1.6); g.setLineDash([]); }
                 else if (DES === 'postcard') { g.fillStyle = '#FFFDF6'; g.fillRect(x0, y, w0, h); g.strokeStyle = '#D8C9B0'; g.lineWidth = 1; g.strokeRect(x0, y, w0, h); }
                 let ry = y + T.top; const pal = ['#FFE59A', '#F9C3CF', '#BDEBD6', '#B5D9F5', '#D5C6F0'];
@@ -12912,12 +12924,13 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                     if (r.range) { const tw2 = g.measureText(tt).width; g.font = `300 9px ${NUM}`; g.fillStyle = T.sub; g.fillText(r.range, tx + tw2 + 7, cy + (r.sub ? -3 : 5)); }
                     if (r.sub) { g.font = `400 8.5px ${FONT}`; g.fillStyle = T.sub; g.fillText(fit(r.sub, maxW), tx, cy + 13); }
                     ry += rowH(r);
+                    if (DES === 'spiral') { g.fillStyle = 'rgba(31,45,39,.45)'; g.fillRect(x0, ry - 1, w0, 1.4); }
                 });
                 y += h + 14;
             }
             if (unset.length) {
                 const h = Math.max(40, 22 + unset.length * 20), x0 = PAD, w0 = W - PAD * 2;
-                if (DES === 'spiral' || DES === 'gaming') { g.fillStyle = T.ink; g.fillRect(x0 + 3, y + 3, w0, h); g.fillStyle = DES === 'gaming' ? '#E7E1FA' : '#EAF3EC'; g.fillRect(x0, y, w0, h); g.strokeStyle = T.ink; g.lineWidth = 2.2; g.strokeRect(x0, y, w0, h); }
+                if (DES === 'spiral' || DES === 'gaming') { g.fillStyle = T.ink; g.fillRect(x0 + 3, y + 3, w0, h); g.fillStyle = DES === 'gaming' ? '#E7E1FA' : '#E2F2E8'; g.fillRect(x0, y, w0, h); g.strokeStyle = T.ink; g.lineWidth = 2.2; g.strokeRect(x0, y, w0, h); }
                 else if (DES === 'label') { g.fillStyle = '#F6EBCF'; g.fillRect(x0, y, w0, h); g.setLineDash([5, 3]); g.strokeStyle = 'rgba(90,70,40,.55)'; g.lineWidth = 1.4; g.strokeRect(x0 + .7, y + .7, w0 - 1.4, h - 1.4); g.setLineDash([]); }
                 else { rr(x0, y, w0, h, 10); g.fillStyle = DES === 'postcard' ? '#F3E9D6' : '#F1EDF6'; g.fill(); }
                 g.font = `700 11px ${FONT}`; g.fillStyle = T.month; g.fillText('출간월 미정', x0 + 12, y + 24);

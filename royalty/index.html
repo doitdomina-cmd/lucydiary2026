@@ -25708,17 +25708,39 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                      `${num(wsChars)}자 <span style="opacity:.6;font-weight:500;">(공미 ${num(Math.round(wsChars * NOSPACE_TO_WITHSPACE_RATIO))}자)</span>`,
                      wsWorkDays ? `${num(Math.round(wsChars / wsWorkDays))}자/일` : '-', '']));
 
+            // 기간 일정 · 패시브 (연결 작품 목표 글자수 ÷ 쉬는 날 뺀 기간 = 하루 분량)
+            const passiveList = spans.filter(sp => sp.span.type === 'passive');
+            const passiveRows = passiveList.map(({ span: s }) => {
+                const ps = passiveStats(s);
+                const restTxt = s.restMode === 'days'
+                    ? (s.restWeekdays?.length ? `매주 ${s.restWeekdays.map(i => SPAN_DOW_NAMES[i]).join('·')}` : '없음')
+                    : ((Number(s.restPerWeek) || 0) ? `주 ${s.restPerWeek}회` : '없음');
+                const workTitle = s.workId ? (resolveWorkItem(s.workId).displayTitle || '-') : '-';
+                return [`${SPAN_TYPES.passive.iconHtml} ${s.title}`, workTitle, `${s.startDate} ~ ${s.endDate}`,
+                    `${ps.totalDays}일`, `${ps.workDays}일`, restTxt,
+                    `${num(ps.total)}자 <span style="color:#94a3b8;">(공미 ${num(Math.round(ps.total * NOSPACE_TO_WITHSPACE_RATIO))}자)</span>`,
+                    `${num(Math.round(ps.daily))}자/일`, s.memo || '-'];
+            });
+            const psTotalDays = passiveList.reduce((n, sp) => n + (Number(passiveStats(sp.span).totalDays) || 0), 0);
+            const psWorkDays = passiveList.reduce((n, sp) => n + (Number(passiveStats(sp.span).workDays) || 0), 0);
+            const psChars = passiveList.reduce((n, sp) => n + (Number(passiveStats(sp.span).total) || 0), 0);
+            const passiveHtml = wrap('■ 기간 일정 · 패시브', '#0f766e',
+                tableHtml(['일정 제목', '연결 작품', '기간', '총일수', '집필일', '쉬는 날', '목표 글자수', '하루 집필량', '메모'], passiveRows, '#0f766e',
+                    ['합계', `${passiveList.length}개`, '', `${psTotalDays}일`, `${psWorkDays}일`, '',
+                     `${num(psChars)}자 <span style="opacity:.6;font-weight:500;">(공미 ${num(Math.round(psChars * NOSPACE_TO_WITHSPACE_RATIO))}자)</span>`,
+                     psWorkDays ? `${num(Math.round(psChars / psWorkDays))}자/일` : '-', '']));
+
             // 확정 일정 + 기간 일정(집필) 합친 표
             const combinedHtml = wrap('■ 확정 일정 + 기간 일정 (집필) 합친 표', '#0e7490',
                 tableHtml(['구분', '작품 / 일정', '기간', '일수', '글자수', '평균'], tlCombinedRows(data), '#0e7490'));
 
             // 기간 일정 · 휴식 등 (휴식/교정/여행/시놉기획)
-            const restSpanRows = spans.filter(sp => (sp.span.type || 'write') !== 'write').map(({ span: s, stats: st }) => {
+            const restSpanRows = spans.filter(sp => (sp.span.type || 'write') !== 'write' && sp.span.type !== 'passive').map(({ span: s, stats: st }) => {
                 const t = SPAN_TYPES[s.type || 'write'];
                 const workTitle = s.workId ? (resolveWorkItem(s.workId).displayTitle || '-') : '-';
                 return [`${t.iconHtml || t.icon} ${t.label}`, s.title, workTitle, `${s.startDate} ~ ${s.endDate}`, `${st.totalDays}일`, s.memo || '-'];
             });
-            const restSpanDaysSum = spans.filter(sp => (sp.span.type || 'write') !== 'write').reduce((n, sp) => n + (Number(sp.stats.totalDays) || 0), 0);
+            const restSpanDaysSum = spans.filter(sp => (sp.span.type || 'write') !== 'write' && sp.span.type !== 'passive').reduce((n, sp) => n + (Number(sp.stats.totalDays) || 0), 0);
             const restSpanHtml = wrap('■ 기간 일정 · 휴식 등 (휴식·교정·여행·시놉기획)', '#92400e',
                 tableHtml(['종류', '일정 제목', '연결 작품', '기간', '총일수', '메모'], restSpanRows, '#92400e',
                     ['합계', `${restSpanRows.length}개`, '', '', `${restSpanDaysSum}일`, '']));
@@ -25758,7 +25780,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             const gapHtml = wrap('■ 일정이 비어 있는 구간 (2일 이상)', '#64748b',
                 tableHtml(['기간', '일수'], restRows, '#64748b'));
 
-            return confirmedHtml + writeSpanHtml + combinedHtml + restSpanHtml + monthHtml + gapHtml;
+            return confirmedHtml + writeSpanHtml + passiveHtml + combinedHtml + restSpanHtml + monthHtml + gapHtml;
         }
 
         // 창 크기가 바뀌면 가로 스크롤이 생기지 않도록 다시 그린다
@@ -26922,6 +26944,8 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 setSpanRestMode('count');
             }
             setSpanType(type);
+            // 새 패시브는 기본 '매일 1,000자' (작품 안 고르면 14,000자 → 14일)
+            if (type === 'passive' && !currentEditSpanId && !(parseInt(document.getElementById('span-passive-daily-input').value) > 0)) setSpanPassiveDaily(1000);
         }
 
         function setSpanType(type) {

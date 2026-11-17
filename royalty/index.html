@@ -12825,7 +12825,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             jua: ['주아', `'Jua','Pretendard',sans-serif`, 'Jua'],
             gamja: ['감자꽃', `'Gamja Flower','Pretendard',sans-serif`, 'Gamja Flower']
         };
-        const PC_DESIGNS = { simple: '심플', spiral: '스프링노트', gaming: '게이밍', label: '견출지', postcard: '엽서' };
+        const PC_DESIGNS = { simple: '심플', times: '타임지', spiral: '스프링노트', gaming: '게이밍', label: '견출지', postcard: '엽서' };
         function pcOpt(k, v) {
             const c = pcGet(_pcYear); c[k] = v; pcSave();
             if (k === 'font' && PC_FONTS[v] && PC_FONTS[v][2] && document.fonts) {
@@ -12847,10 +12847,11 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             const card = pcGet(_pcYear), S = 2, W = 480, DES = PC_DESIGNS[card.design] ? card.design : 'simple';
             const fk = PC_FONTS[card.font] ? card.font : 'sans';
             const FONT = PC_FONTS[fk][1], SERIF = fk === 'sans' ? PC_FONTS.serif[1] : PC_FONTS[fk][1], NUM = `'Bodoni MT','Didot','Playfair Display','Bodoni 72','Noto Serif KR','Batang',serif`;
-            const FR = DES === 'gaming' || DES === 'spiral', PAD = FR ? 34 : 22, TP = DES === 'gaming' ? 62 : DES === 'spiral' ? 52 : 22;   // 게이밍·스프링은 카드 전체가 창/노트
+            const FR = DES === 'gaming' || DES === 'spiral', PAD = FR ? 34 : DES === 'times' ? 38 : 22, TP = DES === 'gaming' ? 62 : DES === 'spiral' ? 52 : DES === 'times' ? 44 : 22;   // 게이밍·스프링은 카드 전체가 창/노트
             const MCOL = ['#3E7CC9', '#D8527E', '#2E9C85', '#E08A1E', '#8E5BD0', '#C9483C', '#3D8F4F', '#B8860B', '#1F8FA8', '#C2549C', '#6B7B2E', '#5E5CC8'];   // 월마다 다른 색
             const T = {
                 simple: { bg: '#F8F3E6', ink: '#2B2B47', month: '#4A4E78', sub: '#8A8A9A', line: '#DADADA', top: 10, bot: 4 },
+                times: { bg: '#F6F6F6', ink: '#1C1C1C', month: '#2A2A2A', sub: '#7A7A7A', line: '#D2D2D2', top: 4, bot: 4 },
                 spiral: { bg: '#D9F2E3', ink: '#1F2D27', month: '#1F2D27', sub: '#55635B', line: 'rgba(31,45,39,.3)', top: 4, bot: 4 },
                 gaming: { bg: '#F4B9D0', ink: '#2F3A5C', month: '#2F3A5C', sub: '#5E6A8C', line: 'rgba(47,58,92,.22)', top: 8, bot: 6 },
                 label: { bg: '#FFFAEB', ink: '#3A2E22', month: '#3A2E22', sub: '#8A7A66', line: 'rgba(90,70,40,.3)', top: 12, bot: 6 },
@@ -12864,13 +12865,14 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             let H = TP + 78;
             if (dated.length) H += T.top + datedH + T.bot + 14;
             if (unset.length) H += Math.max(40, 22 + unset.length * 20) + 14;
-            H += FR ? 40 : 22;
+            H += FR || DES === 'times' ? 40 : 22;
             cv.width = W * S; cv.height = H * S;
             const g = cv.getContext('2d'); g.scale(S, S);
             const rr = (x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
             const fit = (t, w) => { t = String(t || ''); if (g.measureText(t).width <= w) return t; while (t.length > 1 && g.measureText(t + '…').width > w) t = t.slice(0, -1); return t + '…'; };
             // 바탕
             g.fillStyle = T.bg; g.fillRect(0, 0, W, H);
+            if (DES === 'times') { g.strokeStyle = '#555'; g.lineWidth = 2.5; g.strokeRect(9, 9, W - 18, H - 18); g.strokeStyle = '#A8A8A8'; g.lineWidth = 1; g.strokeRect(15, 15, W - 30, H - 30); }
             if (DES === 'spiral') {
                 const M = 16, py = M + 14, pw = W - M * 2 - 4, ph = H - py - M - 4;
                 g.fillStyle = '#1F2D27'; g.fillRect(M + 4, py + 5, pw, ph); g.fillStyle = '#FFF4C9'; g.fillRect(M, py, pw, ph);
@@ -12893,12 +12895,20 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             g.textBaseline = 'alphabetic'; g.fillStyle = '#BDBDBD';
             if (DES === 'simple') g.fillRect(PAD, TP - 6, W - PAD * 2, 1);
             g.fillStyle = T.ink;
+            if (DES === 'times') {
+                g.fillStyle = T.ink; g.font = `400 40px ${SERIF}`; g.fillText(card.sub || '', PAD, TP + 36);
+                g.font = `italic 800 44px 'Playfair Display','Bodoni MT','Didot',${SERIF}`; g.textAlign = 'right'; g.fillText(card.title || '', W - PAD, TP + 36); g.textAlign = 'left';
+                g.fillStyle = '#333'; g.fillRect(PAD, TP + 46, W - PAD * 2, 1.5);
+                const d0 = new Date(); g.font = `400 9.5px ${FONT}`; g.fillStyle = T.sub; g.textAlign = 'right'; g.fillText(`${d0.getFullYear()}.${d0.getMonth() + 1}.${d0.getDate()} 기준`, W - PAD, TP + 62); g.textAlign = 'left';
+                g.fillStyle = '#CFCFCF'; g.fillRect(PAD, TP + 70, W - PAD * 2, 1);
+            } else {
             const HF = FR ? FONT : SERIF; g.font = `800 38px ${HF}`; const t1 = card.title || ''; g.fillText(t1, PAD, TP + 42);
             const w1 = g.measureText(t1).width;
             g.font = `800 22px ${HF}`; g.fillText(' ' + (card.sub || ''), PAD + w1, TP + 42);
             const d = new Date(); g.font = `500 10.5px ${FONT}`; g.fillStyle = T.sub; g.textAlign = 'right';
             g.fillText(`${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()} 기준`, W - PAD, TP + 62); g.textAlign = 'left';
             g.fillStyle = DES === 'simple' ? '#CFCFCF' : T.line; g.fillRect(PAD, TP + 70, W - PAD * 2, DES === 'simple' ? 1 : 2);
+            }
             let y = TP + 78 + 4;
             // 목록 상자
             if (dated.length) {
@@ -12910,15 +12920,17 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 else if (DES === 'postcard') { g.fillStyle = '#FFFDF6'; g.fillRect(x0, y, w0, h); g.strokeStyle = '#D8C9B0'; g.lineWidth = 1; g.strokeRect(x0, y, w0, h); }
                 let ry = y + T.top; const pal = ['#FFE59A', '#F9C3CF', '#BDEBD6', '#B5D9F5', '#D5C6F0'];
                 dated.forEach((r, ri) => {
-                    if (ri) { g.fillStyle = T.line; if (DES === 'label') { g.setLineDash([3, 3]); g.strokeStyle = T.line; g.beginPath(); g.moveTo(x0 + 12, ry + .5); g.lineTo(x0 + w0 - 12, ry + .5); g.stroke(); g.setLineDash([]); } else g.fillRect(x0 + 12, ry, w0 - 24, 1); }
+                    if (ri) { g.fillStyle = T.line; if (DES === 'label') { g.setLineDash([3, 3]); g.strokeStyle = T.line; g.beginPath(); g.moveTo(x0 + 12, ry + .5); g.lineTo(x0 + w0 - 12, ry + .5); g.stroke(); g.setLineDash([]); } else if (DES === 'times') g.fillRect(x0, ry, w0, 1); else g.fillRect(x0 + 12, ry, w0 - 24, 1); }
                     const cy = ry + rowH(r) / 2, mm = /^(\d+)(.*)$/.exec(String(r.when || '').trim()), by = cy + (hs(r) ? 2 : 7);
                     if (DES === 'label' && mm) { g.save(); g.translate(x0 + 50, cy - (hs(r) ? 2 : 0)); g.rotate(-0.04); rr(-26, -15, 52, 30, 4); g.fillStyle = pal[(+mm[1]) % 5]; g.fill(); g.restore(); }
                     g.fillStyle = (mm && DES === 'spiral') ? MCOL[(+mm[1] - 1 + 12) % 12] : T.month;
-                    if (mm) { const mcx = x0 + 50; g.font = `${FR ? 800 : 700} 30px ${NUM}`; const nw = g.measureText(mm[1]).width; g.font = `600 13px ${FONT}`; const mt = fit(mm[2], 40), mw = g.measureText(mt).width, tot = nw + 2 + mw, mx = mcx - tot / 2;
+                    if (DES === 'times') { g.font = `400 23px ${SERIF}`; g.fillText(String(r.when || '').trim(), x0 + 2, cy + 8); }
+                    else if (mm) { const mcx = x0 + 50; g.font = `${FR ? 800 : 700} 30px ${NUM}`; const nw = g.measureText(mm[1]).width; g.font = `600 13px ${FONT}`; const mt = fit(mm[2], 40), mw = g.measureText(mt).width, tot = nw + 2 + mw, mx = mcx - tot / 2;
                       g.font = `${FR ? 800 : 700} 30px ${NUM}`; g.fillText(mm[1], mx, by - (DES === 'label' ? 1 : 0)); g.font = `600 13px ${FONT}`; g.fillText(mt, mx + nw + 2, by - (DES === 'label' ? 1 : 0)); }
                     else { g.font = `700 13px ${FONT}`; g.textAlign = 'center'; g.fillText(fit(r.when, 70), x0 + 50, by); g.textAlign = 'left'; }
                     const tag = r.tag ? (PC_TAGS[r.tag] || ['#EEEDF5', '#5A5680']) : null; let tw = 0;
-                    if (tag) {
+                    if (DES === 'times' && r.tag) { g.font = `500 11px ${FONT}`; const lab = (r.tag === '확정' ? '● ' : '○ ') + r.tag; tw = g.measureText(lab).width; g.fillStyle = T.ink; g.textAlign = 'right'; g.fillText(lab, x0 + w0 - 2, cy + 4); g.textAlign = 'left'; }
+                    else if (tag) {
                         g.font = `600 8.5px ${FONT}`; tw = g.measureText(r.tag).width + 16;
                         const sq = DES === 'gaming' || DES === 'spiral';
                         rr(x0 + w0 - 12 - tw, cy - 8.5, tw, 17, sq ? 3 : 8.5); g.fillStyle = tag[0]; g.fill();
@@ -12927,19 +12939,21 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                     }
                     const tx = x0 + 12 + 92, maxW = x0 + w0 - 12 - tw - 8 - tx;
                     g.font = `400 9.5px ${FONT}`; const rw = SR && r.range ? g.measureText(r.range).width + 8 : 0;
-                    g.font = `${FR ? 700 : 500} 15px ${FONT}`; g.fillStyle = T.ink; const tt = fit(r.title, maxW - rw); g.fillText(tt, tx, cy + (hs(r) ? -3 : 5));
+                    g.font = `${FR || DES === 'times' ? 700 : 500} 15px ${FONT}`; g.fillStyle = T.ink; const tt = fit(r.title, maxW - rw); g.fillText(tt, tx, cy + (hs(r) ? -3 : 5));
                     if (SR && r.range) { const tw2 = g.measureText(tt).width; g.font = `400 9.5px ${FONT}`; g.fillStyle = T.sub; g.fillText(r.range, tx + tw2 + 7, cy + (hs(r) ? -3 : 5)); }
                     if (hs(r)) { g.font = `400 8.5px ${FONT}`; g.fillStyle = T.sub; g.fillText(fit(r.sub, maxW), tx, cy + 13); }
                     ry += rowH(r);
                     if (DES === 'spiral') { g.fillStyle = 'rgba(31,45,39,.28)'; g.fillRect(x0, ry - 1, w0, 1); }
                 });
+                if (DES === 'times') { g.fillStyle = '#333'; g.fillRect(x0, ry, w0, 1.5); }
                 y += h + 14;
             }
             if (unset.length) {
-                const h = Math.max(40, 22 + unset.length * 20), x0 = PAD, w0 = W - PAD * 2, UC = ({ simple: ['#EFE8D6', null], postcard: ['#F3E9D6', null], label: ['#F6EBCF', 'rgba(90,70,40,.55)'], gaming: ['#E7E1FA', null], spiral: ['#DDEEFA', '#2F6FA8'] })[DES] || ['#EFE8D6', null];
+                const h = Math.max(40, 22 + unset.length * 20), x0 = PAD, w0 = W - PAD * 2, UC = ({ simple: ['#EFE8D6', null], postcard: ['#F3E9D6', null], label: ['#F6EBCF', 'rgba(90,70,40,.55)'], gaming: ['#E7E1FA', null], spiral: ['#DDEEFA', '#2F6FA8'], times: ['#EBEBEB', null] })[DES] || ['#EFE8D6', null];
                 if (DES === 'gaming') { g.fillStyle = T.ink; g.fillRect(x0 + 3, y + 3, w0, h); g.fillStyle = UC[0]; g.fillRect(x0, y, w0, h); g.strokeStyle = T.ink; g.lineWidth = 2.2; g.strokeRect(x0, y, w0, h); }
                 else if (DES === 'spiral') { g.fillStyle = UC[0]; g.fillRect(x0, y, w0, h); g.setLineDash([6, 4]); g.strokeStyle = UC[1]; g.lineWidth = 1.8; g.strokeRect(x0 + .9, y + .9, w0 - 1.8, h - 1.8); g.setLineDash([]); }
                 else if (DES === 'label') { g.fillStyle = UC[0]; g.fillRect(x0, y, w0, h); g.setLineDash([5, 3]); g.strokeStyle = UC[1]; g.lineWidth = 1.4; g.strokeRect(x0 + .7, y + .7, w0 - 1.4, h - 1.4); g.setLineDash([]); }
+                else if (DES === 'times') { g.fillStyle = UC[0]; g.fillRect(x0, y, w0, h); g.fillStyle = '#BDBDBD'; g.fillRect(x0, y, w0, 1); g.fillRect(x0, y + h - 1, w0, 1); }
                 else { rr(x0, y, w0, h, 10); g.fillStyle = UC[0]; g.fill(); }
                 g.font = `700 11px ${FONT}`; g.fillStyle = UC[1] && DES === 'spiral' ? UC[1] : T.month; g.fillText('출간월 미정', x0 + 12, y + 24);
                 unset.forEach((r, i) => { g.font = `500 12.5px ${FONT}`; g.fillStyle = T.ink; g.fillText(fit(r.title, w0 - 24 - 92), x0 + 12 + 92, y + 24 + i * 20); });

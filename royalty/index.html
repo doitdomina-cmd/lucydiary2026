@@ -11347,6 +11347,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                     <div id="span-passive-total-wrap" class="flex items-center justify-between mb-3">
                         <label class="text-sm font-bold text-slate-600">총 글자수 <span class="text-xs font-normal text-slate-400">(작품 연결 안 했을 때)</span></label>
                         <div class="flex items-center gap-1.5">
+                            <span id="span-passive-total-ns" class="text-xs text-slate-400 mr-1 whitespace-nowrap"></span>
                             <input type="number" id="span-passive-total-input" min="0" step="1000" placeholder="14000" oninput="onSpanPassiveTotalInput()" class="w-28 p-2 bg-slate-50 rounded-lg border border-slate-200 text-sm text-right outline-none focus:border-amber-400">
                             <span class="text-sm text-slate-500">자</span>
                         </div>
@@ -27550,7 +27551,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 document.getElementById('span-daily-input').value = span.dailyChars ?? SPAN_DEFAULT_DAILY;
                 document.getElementById('span-split-input').value = span.dailySplit ?? 1;
                 document.getElementById('span-memo-input').value = span.memo || '';
-                { const ti = document.getElementById('span-passive-total-input'); if (ti) ti.value = span.passiveTotal > 0 ? span.passiveTotal : ''; }
+                { const ti = document.getElementById('span-passive-total-input'); if (ti) ti.value = span.passiveTotal > 0 ? span.passiveTotal : ''; spanPassiveNsLabel(); }
                 currentSpanRestWeekdays = Array.isArray(span.restWeekdays) ? [...span.restWeekdays] : [];
                 currentSpanMidBreaks = Array.isArray(span.midBreaks) ? span.midBreaks.map(b => ({ ...b })) : [];
                 currentSpanDailyRanges = spanDailyRanges(span).map(r => ({ ...r }));
@@ -27569,7 +27570,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 document.getElementById('span-daily-input').value = SPAN_DEFAULT_DAILY;
                 document.getElementById('span-split-input').value = 1;
                 document.getElementById('span-memo-input').value = '';
-                { const ti = document.getElementById('span-passive-total-input'); if (ti) ti.value = ''; }
+                { const ti = document.getElementById('span-passive-total-input'); if (ti) ti.value = ''; spanPassiveNsLabel(); }
                 currentSpanRestWeekdays = [...SPAN_DEFAULT_RESTDAYS];   // 기본: 화·금 휴식
                 currentSpanMidBreaks = [];
                 currentSpanDailyRanges = [];
@@ -27783,7 +27784,12 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             }
         }
         function spanPassiveTotalVal() { const el = document.getElementById('span-passive-total-input'); const n = el ? parseInt(el.value) || 0 : 0; return n > 0 ? n : PASSIVE_DEFAULT_CHARS; }
-        function onSpanPassiveTotalInput() { updateSpanPreview(); }
+        function spanPassiveNsLabel() {
+            const el = document.getElementById('span-passive-total-ns'), ti = document.getElementById('span-passive-total-input'); if (!el || !ti) return;
+            const n = parseInt(ti.value) || 0;
+            el.textContent = n > 0 ? `공미 약 ${Math.round(n * NOSPACE_TO_WITHSPACE_RATIO).toLocaleString()}자` : '';
+        }
+        function onSpanPassiveTotalInput() { spanPassiveNsLabel(); updateSpanPreview(); }
         function onSpanPassiveDailyInput() {
             spanPassiveAuto = (parseInt(document.getElementById('span-passive-daily-input').value) || 0) > 0;
             updateSpanPreview();

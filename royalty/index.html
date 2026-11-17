@@ -12826,7 +12826,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             serif: ['세리프', `'Noto Serif KR','Nanum Myeongjo','Batang',serif`, 'Noto Serif KR'],
             poor: ['푸어스토리', `'Poor Story','Pretendard',sans-serif`, 'Poor Story']
         };
-        const PC_NUMS = { bodoni: ['Bodoni Moda', 500, 'Bodoni'], cormorant: ['Cormorant Garamond', 700, 'Cormorant'], dm: ['DM Serif Display', 400, 'DM Serif'], bask: ['Libre Baskerville', 700, 'Baskerville'] };
+        const PC_NUMS = { bodoni: ['Bodoni Moda', 500, 'Bodoni'], cormorant: ['Cormorant Garamond', 700, 'Cormorant', 1.2], dm: ['DM Serif Display', 400, 'DM Serif'], bask: ['Libre Baskerville', 700, 'Baskerville'] };
         const PC_DESIGNS = { simple: '심플', times: '타임지', label: '견출지', postcard: '엽서' };
         function pcOpt(k, v) {
             const c = pcGet(_pcYear); c[k] = v; pcSave();
@@ -12853,7 +12853,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             const cv = document.getElementById('pc-canvas'); if (!cv) return;
             const card = pcGet(_pcYear), S = 2, W = 480, DES = PC_DESIGNS[card.design] ? card.design : 'simple';
             const fk = PC_FONTS[card.font] ? card.font : 'sans';
-            const FONT = PC_FONTS[fk][1], SERIF = fk === 'sans' ? PC_FONTS.serif[1] : PC_FONTS[fk][1], NK = PC_NUMS[card.numFont] ? card.numFont : 'bodoni', NW = PC_NUMS[NK][1], NUM = `'${PC_NUMS[NK][0]}','Bodoni MT','Didot','Playfair Display','Bodoni 72','Noto Serif KR','Batang',serif`;
+            const FONT = PC_FONTS[fk][1], SERIF = fk === 'sans' ? PC_FONTS.serif[1] : PC_FONTS[fk][1], NK = PC_NUMS[card.numFont] ? card.numFont : 'bodoni', NW = PC_NUMS[NK][1], NS = PC_NUMS[NK][3] || 1, NUM = `'${PC_NUMS[NK][0]}','Bodoni MT','Didot','Playfair Display','Bodoni 72','Noto Serif KR','Batang',serif`;
             const FR = DES === 'gaming' || DES === 'spiral', PAD = FR ? 34 : DES === 'times' ? 38 : 22, TP = DES === 'gaming' ? 62 : DES === 'spiral' ? 52 : DES === 'times' ? 44 : 22;   // 게이밍·스프링은 카드 전체가 창/노트
             const MCOL = ['#3E7CC9', '#D8527E', '#2E9C85', '#E08A1E', '#8E5BD0', '#C9483C', '#3D8F4F', '#B8860B', '#1F8FA8', '#C2549C', '#6B7B2E', '#5E5CC8'];   // 월마다 다른 색
             const T = {
@@ -12867,7 +12867,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             const rows = card.rows.filter(r => r.title || r.when);
             const isUnset = r => { const w = String(r.when || '').trim(); return !w || w === '미정'; };
             const dated = rows.filter(r => !isUnset(r)), unset = rows.filter(isUnset);
-            const SP = !!card.showPub, SR = card.showRange !== false, hs = r => SP && r.sub, rowH = r => 44, FMT_NUM = card.dateFmt === 'num', HASDAY = dated.some(r => /월\s*\d+일/.test(String(r.when || ''))), DS = HASDAY ? 25 : 31;
+            const SP = !!card.showPub, SR = card.showRange !== false, hs = r => SP && r.sub, rowH = r => 44, FMT_NUM = card.dateFmt === 'num', HASDAY = dated.some(r => /월\s*\d+일/.test(String(r.when || ''))), DS = (HASDAY ? 25 : 31) * NS;
             const datedH = dated.reduce((n, r) => n + rowH(r), 0);
             let H = TP + 78;
             if (dated.length) H += T.top + datedH + T.bot + 14;
@@ -12903,10 +12903,10 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             g.fillStyle = T.ink;
             if (DES === 'times') {
                 g.fillStyle = T.ink; g.font = `500 29px ${FONT}`; g.fillText(card.sub || '', PAD, TP + 36);
-                g.font = `italic ${NW} 44px ${NUM}`; g.textAlign = 'right'; g.fillText(card.title || '', W - PAD, TP + 36); g.textAlign = 'left';
+                g.font = `italic ${NW} ${44 * NS}px ${NUM}`; g.textAlign = 'right'; g.fillText(card.title || '', W - PAD, TP + 36); g.textAlign = 'left';
                 g.fillStyle = '#9A9A9A'; g.fillRect(PAD, TP + 46, W - PAD * 2, 1);
             } else {
-            const HF = FR ? FONT : SERIF; g.font = `${NW} 38px ${NUM}`; const t1 = card.title || ''; g.fillText(t1, PAD, TP + 42);
+            const HF = FR ? FONT : SERIF; g.font = `${NW} ${38 * NS}px ${NUM}`; const t1 = card.title || ''; g.fillText(t1, PAD, TP + 42);
             const w1 = g.measureText(t1).width;
             g.font = `800 22px ${FONT}`; g.fillText(' ' + (card.sub || ''), PAD + w1, TP + 42);
             if (DES !== 'simple') { g.fillStyle = T.line; g.fillRect(PAD, TP + 70, W - PAD * 2, 2); }   // 심플은 목록 상자 윗줄이 곧 제목 밑 선

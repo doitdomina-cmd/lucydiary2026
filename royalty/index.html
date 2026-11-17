@@ -12840,10 +12840,14 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         function pcOptsHtml() {
             const c = pcGet(_pcYear), f = c.font || 'sans', d = c.design || 'simple';
             const chip = (on, label, act) => `<button type="button" onclick="${act}" style="padding:3px 7px;border-radius:999px;font-size:11.5px;font-weight:700;white-space:nowrap;border:1px solid ${on ? '#C9A978' : '#b8b0a6'};background:${on ? '#F3E6CC' : '#fff'};color:${on ? '#5A3E22' : '#2b2118'};">${label}</button>`;
-            return `<div style="display:flex;flex-wrap:wrap;gap:6px 8px;margin-bottom:6px;"><div style="display:flex;flex-wrap:nowrap;gap:3px;align-items:center;"><span style="font-size:12.5px;font-weight:800;color:#2b2118;align-self:center;margin-right:4px;">글꼴</span>${Object.entries(PC_FONTS).map(([k, v]) => chip(f === k, v[0], `pcOpt('font','${k}')`)).join('')}</div>
-                <div style="display:flex;flex-wrap:nowrap;gap:3px;align-items:center;"><span style="font-size:12.5px;font-weight:800;color:#2b2118;align-self:center;margin-right:4px;">디자인</span>${Object.entries(PC_DESIGNS).map(([k, v]) => chip(d === k, v, `pcOpt('design','${k}')`)).join('')}</div>
-                </div><div style="display:flex;flex-wrap:wrap;gap:6px 8px;margin-bottom:6px;"><div style="display:flex;flex-wrap:nowrap;gap:3px;align-items:center;"><span style="font-size:12.5px;font-weight:800;color:#2b2118;align-self:center;margin-right:4px;">숫자</span>${Object.entries(PC_NUMS).map(([k, v]) => chip((c.numFont || 'bodoni') === k, v[2], `pcOpt('numFont','${k}')`)).join('')}</div>
-                <div style="display:flex;flex-wrap:nowrap;gap:3px;align-items:center;"><span style="font-size:12.5px;font-weight:800;color:#2b2118;align-self:center;margin-right:4px;">표시</span>${chip(!!c.showPub, '출판사 ' + (c.showPub ? '켬' : '끔'), `pcOpt('showPub',${!c.showPub})`)}${chip(c.showRange !== false, '집필 기간 ' + (c.showRange !== false ? '켬' : '끔'), `pcOpt('showRange',${c.showRange === false})`)}</div></div>`;
+            const grp = (label, chips) => `<div style="display:flex;flex-wrap:nowrap;gap:3px;align-items:center;"><span style="font-size:12.5px;font-weight:800;color:#2b2118;align-self:center;margin-right:4px;">${label}</span>${chips}</div>`;
+            const row = (...g) => `<div style="display:flex;flex-wrap:wrap;gap:6px 10px;margin-bottom:6px;">${g.join('')}</div>`;
+            const fmt = c.dateFmt === 'num' ? 'num' : 'txt';
+            return row(grp('글꼴', Object.entries(PC_FONTS).map(([k, v]) => chip(f === k, v[0], `pcOpt('font','${k}')`)).join('')),
+                       grp('표기', chip(fmt === 'num', '6/6 · 6', `pcOpt('dateFmt','num')`) + chip(fmt === 'txt', '6월 6일 · 6월', `pcOpt('dateFmt','txt')`)))
+                + row(grp('디자인', Object.entries(PC_DESIGNS).map(([k, v]) => chip(d === k, v, `pcOpt('design','${k}')`)).join('')),
+                      grp('표시', chip(!!c.showPub, '출판사 ' + (c.showPub ? '켬' : '끔'), `pcOpt('showPub',${!c.showPub})`) + chip(c.showRange !== false, '집필 기간 ' + (c.showRange !== false ? '켬' : '끔'), `pcOpt('showRange',${c.showRange === false})`)))
+                + row(grp('숫자', Object.entries(PC_NUMS).map(([k, v]) => chip((c.numFont || 'bodoni') === k, v[2], `pcOpt('numFont','${k}')`)).join('')));
         }
         // 카드 그림 (논리 폭 480, 2배로 그림)
         function pcDraw() {
@@ -12864,7 +12868,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             const rows = card.rows.filter(r => r.title || r.when);
             const isUnset = r => { const w = String(r.when || '').trim(); return !w || w === '미정'; };
             const dated = rows.filter(r => !isUnset(r)), unset = rows.filter(isUnset);
-            const SP = !!card.showPub, SR = card.showRange !== false, hs = r => SP && r.sub, rowH = r => 44;
+            const SP = !!card.showPub, SR = card.showRange !== false, hs = r => SP && r.sub, rowH = r => 44, FMT_NUM = card.dateFmt === 'num', HASDAY = dated.some(r => /월\s*\d+일/.test(String(r.when || ''))), DS = HASDAY ? 25 : 31;
             const datedH = dated.reduce((n, r) => n + rowH(r), 0);
             let H = TP + 78;
             if (dated.length) H += T.top + datedH + T.bot + 14;
@@ -12924,7 +12928,16 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                     const cy = ry + rowH(r) / 2, mm = /^(\d+)(.*)$/.exec(String(r.when || '').trim()), by = cy + 10;
                     if (DES === 'label' && mm) { g.save(); g.translate(x0 + 50, cy - (hs(r) ? 2 : 0)); g.rotate(-0.04); rr(-26, -15, 52, 30, 4); g.fillStyle = pal[(+mm[1]) % 5]; g.fill(); g.restore(); }
                     g.fillStyle = (mm && DES === 'spiral') ? MCOL[(+mm[1] - 1 + 12) % 12] : T.month;
-                    if (mm) { const mcx = x0 + 50; g.font = `${NW} 31px ${NUM}`; const nw = g.measureText(mm[1]).width; g.font = `600 13px ${FONT}`; const dd = /^월\s*(\d+)일/.exec(mm[2]), mt = dd ? '월' : fit(mm[2], 40), dT = dd ? ' ' + dd[1] + '일' : '', mw = g.measureText(mt).width; g.font = `500 11px ${FONT}`; const dw = dT ? g.measureText(dT).width : 0; const tot = nw + 2 + mw + dw, mx = mcx - tot / 2;
+                    const pm = /^(\d+)월(?:\s*(\d+)일)?\s*$/.exec(String(r.when || '').trim());
+                    if (pm) {
+                        const big = `${NW} ${DS}px ${NUM}`, sml = `600 12px ${FONT}`, seg = [[pm[1], big]];
+                        if (FMT_NUM) { if (pm[2]) { seg.push(['/', big], [pm[2], big]); } }
+                        else { seg.push(['월', sml]); if (pm[2]) seg.push([pm[2], big], ['일', sml]); }
+                        const gp = 2; let tot = -gp; seg.forEach(q => { g.font = q[1]; q.push(g.measureText(q[0]).width); tot += q[2] + gp; });
+                        let sx = x0 + 50 - tot / 2; const lo2 = DES === 'label' ? 1 : 0;
+                        seg.forEach(q => { g.font = q[1]; const bb = g.measureText(q[0]); g.fillText(q[0], sx, cy + (bb.actualBoundingBoxAscent - bb.actualBoundingBoxDescent) / 2 - lo2); sx += q[2] + gp; });
+                    }
+                    else if (mm) { const mcx = x0 + 50; g.font = `${NW} 31px ${NUM}`; const nw = g.measureText(mm[1]).width; g.font = `600 13px ${FONT}`; const dd = /^월\s*(\d+)일/.exec(mm[2]), mt = dd ? '월' : fit(mm[2], 40), dT = dd ? ' ' + dd[1] + '일' : '', mw = g.measureText(mt).width; g.font = `500 11px ${FONT}`; const dw = dT ? g.measureText(dT).width : 0; const tot = nw + 2 + mw + dw, mx = mcx - tot / 2;
                       g.font = `${NW} 31px ${NUM}`; const lo = DES === 'label' ? 1 : 0, dm = g.measureText(mm[1]); g.fillText(mm[1], mx, cy + (dm.actualBoundingBoxAscent - dm.actualBoundingBoxDescent) / 2 - lo); g.font = `600 13px ${FONT}`; const um = g.measureText(mt); g.fillText(mt, mx + nw + 2, cy + (um.actualBoundingBoxAscent - um.actualBoundingBoxDescent) / 2 - lo); if (dT) { g.font = `500 11px ${FONT}`; const dm2 = g.measureText(dT); g.fillText(dT, mx + nw + 2 + mw, cy + (dm2.actualBoundingBoxAscent - dm2.actualBoundingBoxDescent) / 2 - lo); } }
                     else { g.font = `700 13px ${FONT}`; g.textAlign = 'center'; g.fillText(fit(r.when, 70), x0 + 50, by); g.textAlign = 'left'; }
                     const tag = r.tag ? (PC_TAGS[r.tag] || ['#EEEDF5', '#5A5680']) : null; let tw = 0;

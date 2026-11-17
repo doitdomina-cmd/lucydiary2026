@@ -2327,6 +2327,11 @@ body.theme-cozy #work-form-card label.block > span { font-family: var(--cozy-han
         body.theme-cozy #work-form-card label.block { white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 body.theme-cozy #work-form-card input:not([type="checkbox"]), body.theme-cozy #work-form-card select { background: #FFFDF8; border: 1.5px dashed #DDD0B4; border-radius: 8px; }
 body.theme-cozy #work-form-card input:not([type="checkbox"]):focus, body.theme-cozy #work-form-card select:focus { border-color: #C9AE7C; border-style: solid; box-shadow: 0 0 0 3px rgba(169,143,103,.15); }
+/* 폰을 가로로 눕힌 화면(낮은 화면): 연간 집필 일정 창이 화면 안에 들어오고 안쪽 표가 스크롤되게 */
+@media (max-height: 520px) and (min-width: 768px) {
+    #year-timeline-content { zoom: 0.6; height: calc((100vh - 16px) / 0.6) !important; max-height: calc((100vh - 16px) / 0.6) !important; height: calc((100dvh - 16px) / 0.6) !important; max-height: calc((100dvh - 16px) / 0.6) !important; padding: 12px 16px !important; }
+    #year-timeline-content #year-timeline-body { min-height: 0; flex: 1 1 auto; -webkit-overflow-scrolling: touch; }
+}
         /* ── 연간 집필 일정(타임라인 팝업): 크림 종이 · 로즈→골드 선 · 차분한 점/표 ── */
 body.theme-cozy #year-timeline-content { padding: 30px 34px; }
 body.theme-cozy #year-timeline-content h3 { font-family: var(--cozy-serif); font-size: 1.35rem; color: var(--cozy-ink); }
@@ -4236,7 +4241,7 @@ body.menu-font-on #settings-panel-modal .settings-tabbtn, body.menu-font-on #the
             #write-span-modal .modal-content { zoom: 0.78; }
 
             /* 연간 집필 일정(타임라인) 모달 — 폰에서 너무 크니 전체를 많이 축소 */
-            #year-timeline-content { zoom: 0.5; padding: 12px !important; }
+            #year-timeline-content { zoom: 0.5; padding: 12px !important; height: calc((100vh - 24px) / 0.5) !important; max-height: calc((100vh - 24px) / 0.5) !important; height: calc((100dvh - 24px) / 0.5) !important; max-height: calc((100dvh - 24px) / 0.5) !important; }   /* 화면 가득 채워서 안쪽 표가 아래로 스크롤되게 */
             #write-main-modal h3 { font-size: 0.8rem !important; }
             #write-main-modal .mb-6 { margin-bottom: 5px !important; }
             #write-modal-date { font-size: 0.6rem !important; padding: 2px 6px !important; margin-bottom: 4px !important; }
@@ -26179,8 +26184,25 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 });
             });
 
-            const monthRows = d.monthly.map((m, i) => [`${i+1}월`, `${num(m.chars)}자`, `${m.days.size}일`,
-                m.days.size ? `${num(Math.round(m.chars / m.days.size))}자/일` : '-']);
+            // 월별 목표: 화면 표와 같은 8칸 (확정 / 예정 / 합계 글자수, 집필 일수, 하루 평균) + 합계 줄
+            const _confIds = new Set();
+            Object.values(tlSched()).forEach(list => (list || []).forEach(s => { if (s.spanId) _confIds.add(s.spanId); }));
+            const _pendSpans = d.spans.filter(sp => (sp.span.type || 'write') === 'write' && !_confIds.has(sp.span.id));
+            const monthRows = d.monthly.map((m, i) => {
+                const ms = `${y}-${String(i + 1).padStart(2, '0')}`, dim = new Date(y, i + 1, 0).getDate();
+                const a = `${ms}-01`, b = `${ms}-${String(dim).padStart(2, '0')}`;
+                const pc = _pendSpans.reduce((n, sp) => n + spanCharsInRange(sp.span, a, b), 0);
+                const pd = _pendSpans.reduce((n, sp) => n + spanWorkDaysInRange(sp.span, a, b), 0);
+                const cc = m.chars, cd = m.days.size;
+                return [`${i+1}월`, `${num(cc)}자`, `${num(pc)}자`, `${num(cc + pc)}자`, `${cd}일`, `${cd + pd}일`,
+                    `${num(Math.round(cc / dim))}자/일`, `${num(Math.round((cc + pc) / dim))}자/일`];
+            });
+            {
+                const sum = i => monthRows.reduce((n, r) => n + (Number(String(r[i]).replace(/[^0-9]/g, '')) || 0), 0);
+                const yd = ((y % 4 === 0 && y % 100 !== 0) || y % 400 === 0) ? 366 : 365;
+                monthRows.push(['합계', `${num(sum(1))}자`, `${num(sum(2))}자`, `${num(sum(3))}자`, `${sum(4)}일`, `${sum(5)}일`,
+                    `${num(Math.round(sum(1) / yd))}자/일`, `${num(Math.round(sum(3) / yd))}자/일`]);
+            }
 
             const restRows = d.restSegs.map(sg => {
                 const sd = tlIndexToDate(sg.startIdx, y), ed = tlIndexToDate(sg.endIdx, y);
@@ -26235,7 +26257,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                   + 62                                    // 요약
                   + 40 + laneCount * (BAR_H + BAR_GAP) + 46 + 30  // 간트(월축+막대+쉬는띠)
                   + table(workRows) + table(writeSpanRows) + table(restSpanRows)
-                  + TITLE_H + HH + 12 * RH + 26           // 월별 표
+                  + TITLE_H + HH + 13 * RH + 26           // 월별 표
                   + table(restRows)
                   + 60;                                   // 푸터
 
@@ -26357,8 +26379,8 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             drawTable('■ 기간 일정 · 휴식 등 (휴식·교정·여행·시놉기획)', ['종류','일정 제목','연결 작품','기간','총일수','집필일','쉬는 날','예상 글자수','하루 집필량','메모'],
                       [95, 250, 215, 285, 78, 78, 130, 140, 120, 233], restSpanRows, '#92400e');
 
-            drawTable('■ 월별 목표', ['월','목표 글자수','집필 일수','하루 평균'],
-                      [140, 220, 180, 200], monthRows, '#4f46e5');
+            drawTable('■ 월별 목표', ['월','확정 글자수','예정 글자수','합계','집필 일수(확정)','집필 일수(합계)','하루 평균(확정)','하루 평균(합계)'],
+                      [124, 210, 210, 210, 215, 215, 220, 220], monthRows, '#4f46e5');
 
             drawTable('■ 일정이 비어 있는 구간 (2일 이상)', ['기간','일수'], [420, 140], restRows, '#64748b');
 

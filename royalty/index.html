@@ -12725,8 +12725,18 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 if (!w.isPending && w.publishDate && w.publishDate.startsWith(y + '-')) mo = +w.publishDate.slice(5, 7);
                 else if (w.isPending && /^\d{4}-\d{2}$/.test(w.pendingMonth || '') && w.pendingMonth.startsWith(y + '-')) mo = +w.pendingMonth.slice(5, 7);
                 const sp = span[w.id];
-                if (!mo && !(w.isPending && sp)) return;   // 출간월이 없으면 집필 확정 카드가 있는 미출간 작품만 '출간월 미정'에
+                if (!mo && !w.isPending) return;   // 출간월이 없는 미출간 작품은 '출간월 미정'에
                 out.push({ id: pcUid(), ref: w.id, half: 1, when: mo ? mo + '월' : '미정', title: w.title, sub: (w.publisher && w.publisher !== '-') ? w.publisher : '', tag: sp ? '확정' : '희망', range: sp ? `${md(sp.a)} ~ ${md(sp.b)}` : '', _k: mo ? String(mo).padStart(2, '0') : '99' });
+            });
+            // 외전: 출간일이 그 해면 그 달에, 출간일이 없으면 '출간월 미정'에
+            masterWorks.forEach(w => {
+                if (!w.genre || !w.genre.includes('장편')) return;
+                (w.extras || []).forEach(ex => {
+                    const has = ex.publishDate && ex.publishDate.startsWith(y + '-');
+                    if (ex.publishDate && !has) return;
+                    const sp = span[w.id + '::' + ex.id], mo = has ? +ex.publishDate.slice(5, 7) : 0;
+                    out.push({ id: pcUid(), ref: w.id + '::' + ex.id, half: 1, when: mo ? mo + '월' : '미정', title: `${w.title} [${ex.name}]`, sub: (w.publisher && w.publisher !== '-') ? w.publisher : '', tag: sp ? '확정' : '희망', range: sp ? `${md(sp.a)} ~ ${md(sp.b)}` : '', _k: mo ? String(mo).padStart(2, '0') : '99' });
+                });
             });
             out.sort((a, b) => a._k.localeCompare(b._k) || a.title.localeCompare(b.title)); out.forEach(r => delete r._k);
             return out;
@@ -12744,9 +12754,9 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 ov = document.createElement('div'); ov.id = 'pubcard-modal';
                 ov.style.cssText = 'position:fixed;inset:0;z-index:9000;background:rgba(40,30,20,.45);display:flex;align-items:center;justify-content:center;padding:16px;';
                 ov.onclick = e => { if (e.target === ov) pcClose(); };
-                ov.innerHTML = `<div class="modal-content" style="background:#fff;border-radius:16px;width:min(1080px,100%);max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.25);">
+                ov.innerHTML = `<div class="modal-content" style="background:#fff;border-radius:16px;width:min(1120px,96vw) !important;max-width:none !important;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.25);">
                     <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid #eee;flex-wrap:wrap;">
-                        <b style="font-size:16px;">출간 일정 카드</b>
+                        <b style="font-size:16px;white-space:nowrap;">출간 일정 카드</b>
                         <button type="button" onclick="pcYear(-1)" style="padding:2px 9px;border:1px solid #ddd;border-radius:8px;">‹</button>
                         <span id="pc-year" style="font-weight:800;min-width:48px;text-align:center;"></span>
                         <button type="button" onclick="pcYear(1)" style="padding:2px 9px;border:1px solid #ddd;border-radius:8px;">›</button>
@@ -12755,9 +12765,9 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                         <button type="button" onclick="pcDownload()" style="padding:6px 14px;border-radius:10px;font-size:12px;font-weight:800;background:var(--primary,#87ada1);color:#fff;">PNG 저장</button>
                         <button type="button" onclick="pcClose()" style="padding:4px 10px;font-size:18px;color:#888;">✕</button>
                     </div>
-                    <div style="display:flex;gap:16px;padding:14px 18px;overflow:auto;flex:1;min-height:0;flex-wrap:wrap;">
-                        <div id="pc-editor" style="flex:1 1 440px;min-width:300px;"></div>
-                        <div style="flex:0 0 auto;width:min(100%,400px);margin:0 auto;"><canvas id="pc-canvas" style="width:100%;border:1px solid #eee;border-radius:8px;background:#fff;"></canvas></div>
+                    <div style="display:flex;gap:18px;padding:14px 18px;overflow:auto;flex:1;min-height:0;flex-wrap:wrap;align-items:flex-start;">
+                        <div id="pc-editor" style="flex:1 1 400px;min-width:300px;"></div>
+                        <div style="flex:0 0 420px;max-width:100%;position:sticky;top:0;margin:0 auto;"><canvas id="pc-canvas" style="width:100%;border:1px solid #eee;border-radius:8px;background:#fff;"></canvas></div>
                     </div>
                 </div>`;
                 document.body.appendChild(ov);
@@ -12801,12 +12811,13 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             const card = pcGet(_pcYear), S = 2, W = 480, PAD = 22;
             const FONT = `'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif`, SERIF = `'Noto Serif KR','Nanum Myeongjo','Batang',serif`;
             const rows = card.rows.filter(r => r.title || r.when);
-            const groups = rows.length ? [{ nm: '', col: '#5C7F70', rows }] : [];
-            const unset = [];
+            const isUnset = r => { const w = String(r.when || '').trim(); return !w || w === '미정'; };
+            const dated = rows.filter(r => !isUnset(r)), unset = rows.filter(isUnset);
+            const groups = dated.length ? [{ nm: '', col: '#5C7F70', rows: dated }] : [];
             const rowH = r => r.sub ? 44 : 32;
             let H = PAD + 78;
             groups.forEach(g => { H += 14 + 10 + g.rows.reduce((n, r) => n + rowH(r), 0) + 10; });
-            if (unset.length) H += 14 + Math.max(40, 18 + unset.length * 20);
+            if (unset.length) H += 14 + Math.max(40, 22 + unset.length * 20);
             H += PAD;
             cv.width = W * S; cv.height = H * S;
             const g = cv.getContext('2d'); g.scale(S, S);
@@ -12843,7 +12854,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 y += h + 14;
             });
             if (unset.length) {
-                const h = Math.max(40, 18 + unset.length * 20);
+                const h = Math.max(40, 22 + unset.length * 20);
                 rr(PAD, y, W - PAD * 2, h, 10); g.fillStyle = '#F1EDF6'; g.fill();
                 g.font = `700 11px ${FONT}`; g.fillStyle = '#7A6A8C'; g.fillText('출간월 미정', PAD + 12, y + 24);
                 unset.forEach((r, i) => { g.font = `800 12.5px ${FONT}`; g.fillStyle = '#2B2B47'; g.fillText(fit(r.title + (r.sub ? ' · ' + r.sub.split(' · ')[0] : ''), W - PAD * 2 - 24 - 92), PAD + 12 + 92, y + 24 + i * 20); });

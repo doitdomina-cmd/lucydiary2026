@@ -12949,10 +12949,16 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                         g.fillStyle = tag[1]; g.textAlign = 'center'; g.fillText(r.tag, x0 + w0 - 12 - tw / 2, cy + 3); g.textAlign = 'left';
                     }
                     const tx = x0 + 12 + 92, maxW = x0 + w0 - 12 - tw - 8 - tx;
-                    g.font = `400 9.5px ${FONT}`; const rw = SR && r.range ? g.measureText(r.range).width + 8 : 0;
-                    g.font = `${FR || DES === 'times' ? 700 : 500} 15px ${FONT}`; g.fillStyle = T.ink; const tt = fit(r.title, maxW - rw); g.fillText(tt, tx, cy + 5);
-                    let px = tx; if (SR && r.range) { const tw2 = g.measureText(tt).width; px = tx + tw2 + 7; g.font = `400 9.5px ${FONT}`; g.fillStyle = T.sub; g.fillText(r.range, px, cy + 5); }
-                    if (hs(r)) { g.font = `400 8.5px ${FONT}`; g.fillStyle = T.sub; g.fillText(fit(r.sub, maxW - (px - tx)), px, cy + 16); }
+                    const hasR = SR && r.range, hasP = hs(r);
+                    g.font = `400 9.5px ${FONT}`; const rw0 = hasR ? g.measureText(r.range).width : 0;
+                    g.font = `400 8.5px ${FONT}`; const pw0 = hasP ? g.measureText(r.sub).width : 0;
+                    const rw = (hasR || hasP) ? Math.max(rw0, Math.min(pw0, 120)) + 8 : 0;
+                    g.font = `${FR || DES === 'times' ? 700 : 500} 15px ${FONT}`; g.fillStyle = T.ink; const tt = fit(r.title, maxW - rw); g.fillText(tt, tx, cy + 5);   // 제목은 항상 줄의 위아래 가운데
+                    // 집필 기간 + 출판사는 한 덩어리로 보고, 덩어리 전체를 위아래 가운데에 놓는다
+                    const bx = tx + g.measureText(tt).width + 7;
+                    if (hasR && hasP) { g.font = `400 9.5px ${FONT}`; g.fillStyle = T.sub; g.fillText(r.range, bx, cy - 3); g.font = `400 8.5px ${FONT}`; g.fillText(fit(r.sub, x0 + w0 - 12 - tw - 8 - bx), bx, cy + 10); }
+                    else if (hasR) { g.font = `400 9.5px ${FONT}`; g.fillStyle = T.sub; g.fillText(r.range, bx, cy + 3.5); }
+                    else if (hasP) { g.font = `400 8.5px ${FONT}`; g.fillStyle = T.sub; g.fillText(fit(r.sub, x0 + w0 - 12 - tw - 8 - bx), bx, cy + 3.5); }
                     ry += rowH(r);
                     if (DES === 'spiral') { g.fillStyle = 'rgba(31,45,39,.28)'; g.fillRect(x0, ry - 1, w0, 1); }
                 });

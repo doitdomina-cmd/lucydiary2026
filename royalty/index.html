@@ -12718,6 +12718,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 const e = span[c.workId] || (span[c.workId] = { a: d, b: d }); if (d < e.a) e.a = d; if (d > e.b) e.b = d;
             }));
             const md = d => `${+d.slice(5, 7)}월 ${+d.slice(8, 10)}일`;
+            const dayOf = d => /^\d{4}-\d{2}-\d{2}/.test(d || '') ? ' ' + (+d.slice(8, 10)) + '일' : '';
             const out = [];
             masterWorks.forEach(w => {
                 if (!w.genre || !w.genre.includes('장편')) return;
@@ -12726,7 +12727,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 else if (w.isPending && /^\d{4}-\d{2}$/.test(w.pendingMonth || '') && w.pendingMonth.startsWith(y + '-')) mo = +w.pendingMonth.slice(5, 7);
                 const sp = span[w.id];
                 if (!mo) { if (!w.isPending || w.pendingMonth) return; }   // 다른 해(예: 2028)로 잡힌 작품은 이 해 카드에서 뺀다. 출간월을 아직 안 정한 미출간 작품만 '출간월 미정'에
-                out.push({ id: pcUid(), ref: w.id, half: 1, when: mo ? mo + '월' : '미정', title: w.title, sub: (w.publisher && w.publisher !== '-') ? w.publisher : '', tag: sp ? '확정' : '희망', range: sp ? `${md(sp.a)} ~ ${md(sp.b)}` : '', _k: mo ? String(mo).padStart(2, '0') : '99' });
+                out.push({ id: pcUid(), ref: w.id, half: 1, when: mo ? mo + '월' + ((!w.isPending && w.publishDate && w.publishDate.startsWith(y + '-')) ? dayOf(w.publishDate) : '') : '미정', title: w.title, sub: (w.publisher && w.publisher !== '-') ? w.publisher : '', tag: sp ? '확정' : '희망', range: sp ? `${md(sp.a)} ~ ${md(sp.b)}` : '', _k: mo ? String(mo).padStart(2, '0') : '99' });
             });
             // 외전: 출간일이 그 해면 그 달에, 출간일이 없으면 '출간월 미정'에
             masterWorks.forEach(w => {
@@ -12735,7 +12736,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                     const has = ex.publishDate && ex.publishDate.startsWith(y + '-');
                     if (ex.publishDate && !has) return;
                     const sp = span[w.id + '::' + ex.id], mo = has ? +ex.publishDate.slice(5, 7) : 0;
-                    out.push({ id: pcUid(), ref: w.id + '::' + ex.id, half: 1, when: mo ? mo + '월' : '미정', title: `${w.title} [${ex.name}]`, sub: (w.publisher && w.publisher !== '-') ? w.publisher : '', tag: sp ? '확정' : '희망', range: sp ? `${md(sp.a)} ~ ${md(sp.b)}` : '', _k: mo ? String(mo).padStart(2, '0') : '99' });
+                    out.push({ id: pcUid(), ref: w.id + '::' + ex.id, half: 1, when: mo ? mo + '월' + (has ? dayOf(ex.publishDate) : '') : '미정', title: `${w.title} [${ex.name}]`, sub: (w.publisher && w.publisher !== '-') ? w.publisher : '', tag: sp ? '확정' : '희망', range: sp ? `${md(sp.a)} ~ ${md(sp.b)}` : '', _k: mo ? String(mo).padStart(2, '0') : '99' });
                 });
             });
             out.sort((a, b) => a._k.localeCompare(b._k) || a.title.localeCompare(b.title)); out.forEach(r => delete r._k);
@@ -12923,8 +12924,8 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                     const cy = ry + rowH(r) / 2, mm = /^(\d+)(.*)$/.exec(String(r.when || '').trim()), by = cy + 10;
                     if (DES === 'label' && mm) { g.save(); g.translate(x0 + 50, cy - (hs(r) ? 2 : 0)); g.rotate(-0.04); rr(-26, -15, 52, 30, 4); g.fillStyle = pal[(+mm[1]) % 5]; g.fill(); g.restore(); }
                     g.fillStyle = (mm && DES === 'spiral') ? MCOL[(+mm[1] - 1 + 12) % 12] : T.month;
-                    if (mm) { const mcx = x0 + 50; g.font = `${NW} 31px ${NUM}`; const nw = g.measureText(mm[1]).width; g.font = `600 13px ${FONT}`; const mt = fit(mm[2], 40), mw = g.measureText(mt).width, tot = nw + 2 + mw, mx = mcx - tot / 2;
-                      g.font = `${NW} 31px ${NUM}`; const lo = DES === 'label' ? 1 : 0, dm = g.measureText(mm[1]); g.fillText(mm[1], mx, cy + (dm.actualBoundingBoxAscent - dm.actualBoundingBoxDescent) / 2 - lo); g.font = `600 13px ${FONT}`; const um = g.measureText(mt); g.fillText(mt, mx + nw + 2, cy + (um.actualBoundingBoxAscent - um.actualBoundingBoxDescent) / 2 - lo); }
+                    if (mm) { const mcx = x0 + 50; g.font = `${NW} 31px ${NUM}`; const nw = g.measureText(mm[1]).width; g.font = `600 13px ${FONT}`; const dd = /^월\s*(\d+)일/.exec(mm[2]), mt = dd ? '월' : fit(mm[2], 40), dT = dd ? ' ' + dd[1] + '일' : '', mw = g.measureText(mt).width; g.font = `500 11px ${FONT}`; const dw = dT ? g.measureText(dT).width : 0; const tot = nw + 2 + mw + dw, mx = mcx - tot / 2;
+                      g.font = `${NW} 31px ${NUM}`; const lo = DES === 'label' ? 1 : 0, dm = g.measureText(mm[1]); g.fillText(mm[1], mx, cy + (dm.actualBoundingBoxAscent - dm.actualBoundingBoxDescent) / 2 - lo); g.font = `600 13px ${FONT}`; const um = g.measureText(mt); g.fillText(mt, mx + nw + 2, cy + (um.actualBoundingBoxAscent - um.actualBoundingBoxDescent) / 2 - lo); if (dT) { g.font = `500 11px ${FONT}`; const dm2 = g.measureText(dT); g.fillText(dT, mx + nw + 2 + mw, cy + (dm2.actualBoundingBoxAscent - dm2.actualBoundingBoxDescent) / 2 - lo); } }
                     else { g.font = `700 13px ${FONT}`; g.textAlign = 'center'; g.fillText(fit(r.when, 70), x0 + 50, by); g.textAlign = 'left'; }
                     const tag = r.tag ? (PC_TAGS[r.tag] || ['#EEEDF5', '#5A5680']) : null; let tw = 0;
                     if (DES === 'times' && r.tag) { g.font = `500 11px ${FONT}`; const lab = (r.tag === '확정' ? '● ' : '○ ') + r.tag; tw = g.measureText(lab).width; g.fillStyle = T.ink; g.textAlign = 'right'; g.fillText(lab, x0 + w0 - 2, cy + 4); g.textAlign = 'left'; }

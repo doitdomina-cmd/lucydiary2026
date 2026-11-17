@@ -3311,11 +3311,15 @@ body.menu-font-on #settings-panel-modal .settings-tabbtn, body.menu-font-on #the
             #dash-memo-board .dmb-pal.below::after { top: auto; bottom: 100%; }
         }
         /* 메모 한 장 안의 글을 신문처럼 칸 나누기 */
-        html body #dash-memo-board .dmb-note[data-cols]:not([data-manual]) .dmb-text { padding-top: 1.7em; column-gap: 26px; column-rule: 0.5px solid rgba(74,63,51,.32); }
-        html body #dash-memo-board .dmb-note[data-cols="2"]:not([data-manual]) .dmb-text { column-count: 2; }
-        html body #dash-memo-board .dmb-note[data-cols="3"]:not([data-manual]) .dmb-text { column-count: 3; }
-        html body #dash-memo-board .dmb-note[data-cols="4"]:not([data-manual]) .dmb-text { column-count: 4; }
+        html body #dash-memo-board .dmb-note[data-cols]:not([data-manual]) .dmb-text:not(.dmb-ttl) { padding-top: 1.7em; column-gap: 26px; column-rule: 0.5px solid rgba(74,63,51,.32); }
+        html body #dash-memo-board .dmb-note[data-cols="2"]:not([data-manual]) .dmb-text:not(.dmb-ttl) { column-count: 2; }
+        html body #dash-memo-board .dmb-note[data-cols="3"]:not([data-manual]) .dmb-text:not(.dmb-ttl) { column-count: 3; }
+        html body #dash-memo-board .dmb-note[data-cols="4"]:not([data-manual]) .dmb-text:not(.dmb-ttl) { column-count: 4; }
         html body #dash-memo-board .dmb-note[data-cols][data-norule] .dmb-text { column-rule: none; }
+        /* 여러 단: 맨 왼쪽 위 제목은 단 위에 혼자 */
+        html body #dash-memo-board .dmb-note[data-cols] .dmb-text.dmb-ttl { padding-top: 1.7em; column-count: auto; }
+        html body #dash-memo-board .dmb-note[data-cols]:not([data-manual]) .dmb-text.dmb-bd { padding-top: .3em; }
+        html body #dash-memo-board .dmb-note .dmb-ttl + .dmb-mcols { padding-top: .3em; }
         /* 단마다 따로 쓰기(자동 끔) */
         html body #dash-memo-board .dmb-note .dmb-mcols { display: flex; align-items: stretch; gap: 26px; padding-top: 1.7em; width: 100%; }
         html body #dash-memo-board .dmb-note .dmb-mcols .dmb-mc { flex: 1 1 0; width: auto !important; min-width: 0; margin: 0 !important; }
@@ -21935,10 +21939,52 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             save(true); _dmbSig = ''; renderDashMemoBoard(true); dmbReopen(id);
         }
         function dmbManualHtml(m) {
-            return '<div class="dmb-mcols">' + m.cc.map((c, k) => `<div class="dmb-text dmb-mc" contenteditable="true" spellcheck="false" data-ph="${k + 1}단" oninput="dmbColIn('${m.id}', ${k}, this)" onpaste="dmbPaste(event)">${dmbRichHtml(c)}</div>`).join('') + '</div>';
+            const sp = dmbTSplit(m.cc[0]);
+            return dmbTtlDiv(m, sp[0]) + '<div class="dmb-mcols">' + m.cc.map((c, k) => `<div class="dmb-text dmb-mc${k === 0 ? ' dmb-tb' : ''}" contenteditable="true" spellcheck="false" data-ph="${k + 1}단" oninput="dmbColIn('${m.id}', ${k}, this)" onpaste="dmbPaste(event)">${dmbRichHtml(k === 0 ? sp[1] : c)}</div>`).join('') + '</div>';
+        }
+        // 여러 단: 첫 줄(제목)은 단 위에 따로, 나머지는 단으로 나눠 흐름 (저장은 예전처럼 한 덩어리 — 첫 줄이 제목)
+        function dmbTSplit(o) {
+            const t = (o && o.t) || '', h = (o && o.h) || '', i = t.indexOf('\n');
+            if (i < 0) return [{ t, h }, { t: '', h: '' }];
+            const a = { t: t.slice(0, i), h: '' }, b = { t: t.slice(i + 1), h: '' };
+            if (h) { const j = h.indexOf('\n'); if (j >= 0) { a.h = dmbClean(h.slice(0, j)); b.h = dmbClean(h.slice(j + 1)); if (!/<span /.test(a.h)) a.h = ''; if (!/<span /.test(b.h)) b.h = ''; } else a.h = h; }
+            return [a, b];
+        }
+        function dmbTJoin(a, b) {
+            const t = a.t + (b.t ? '\n' + b.t : '');
+            const h = (a.h || b.h) ? (a.h || escapeHtml(a.t)) + (b.t ? '\n' + (b.h || escapeHtml(b.t)) : '') : '';
+            return { t, h };
+        }
+        function dmbTtlDiv(m, a) { return `<div class="dmb-text dmb-ttl" contenteditable="true" spellcheck="false" data-ph="메모를 적어요" oninput="dmbTbIn('${m.id}', this)" onkeydown="dmbTtlKey(event, this)" onpaste="dmbPaste(event)">${dmbRichHtml(a)}</div>`; }
+        function dmbAutoHtml(m) {
+            const sp = dmbTSplit({ t: m.text || '', h: m.h || '' });
+            return dmbTtlDiv(m, sp[0]) + `<div class="dmb-text dmb-tb dmb-bd" contenteditable="true" spellcheck="false" data-ph="" oninput="dmbTbIn('${m.id}', this)" onpaste="dmbPaste(event)">${dmbRichHtml(sp[1])}</div>`;
+        }
+        function dmbTbIn(id, el) {
+            const m = dashMemos.find(x => x.id === id); if (!m) return;
+            const n = el.closest('.dmb-note'), ttl = n.querySelector('.dmb-ttl'), ta = dmbRead(ttl);
+            if (m.manual && Array.isArray(m.cc)) {
+                const j = dmbTJoin(ta, dmbRead(n.querySelector('.dmb-mc')));
+                m.cc[0] = j.h ? { t: j.t, h: j.h } : { t: j.t };
+                m.text = m.cc.filter(c => c.t).map(c => c.t).join('\n'); delete m.h;
+            } else {
+                const j = dmbTJoin(ta, dmbRead(n.querySelector('.dmb-bd')));
+                m.text = j.t; if (j.h) m.h = j.h; else delete m.h;
+            }
+            if (!dmbRead(el).t) el.innerHTML = '';
+            m.ts = Date.now(); dmbFit(el);
+            const dt = n.querySelector('.dmb-date'); if (dt) dt.textContent = dmbFmt(m.ts);
+            dmbSave();
+        }
+        function dmbTtlKey(e, el) {   // 제목에서 엔터 = 아래 내용 칸으로
+            if (e.key !== 'Enter' || e.isComposing) return;
+            e.preventDefault();
+            const b = el.closest('.dmb-note').querySelector('.dmb-bd, .dmb-mc'); if (!b) return;
+            b.focus(); const r = document.createRange(); r.selectNodeContents(b); r.collapse(true); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
         }
         function dmbColIn(id, k, el) {
             const m = dashMemos.find(x => x.id === id); if (!m || !m.cc || !m.cc[k]) return;
+            if (k === 0 && el.closest('.dmb-note').querySelector('.dmb-ttl')) return dmbTbIn(id, el);
             const rd = dmbRead(el); m.cc[k] = rd.h ? { t: rd.t, h: rd.h } : { t: rd.t };
             if (!rd.t) el.innerHTML = '';
             m.text = m.cc.filter(c => c.t).map(c => c.t).join('\n'); delete m.h;
@@ -22038,7 +22084,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 <div class="dmb-grip" title="끌어서 옮기기" onpointerdown="dmbGripDown(event, '${m.id}')" onpointermove="dmbGripMove(event)" onpointerup="dmbGripUp(event)" onpointercancel="dmbGripUp(event)"></div>
                 <div class="dmb-rz" title="끌어서 너비 조절" onpointerdown="dmbRzDown(event, '${m.id}')" onpointermove="dmbRzMove(event)" onpointerup="dmbRzUp(event)" onpointercancel="dmbRzUp(event)"></div>
                 ${m.fold ? '' : `<button type="button" class="dmb-foldic" onclick="dmbFold('${m.id}')" title="접어서 제목만 보기"><i class="fa-solid fa-chevron-up"></i></button>`}
-                ${m.fold ? `<div class="dmb-ftitle" onclick="dmbFold('${m.id}')" title="눌러서 펴기">${escapeHtml(String(m.text || '').split('\n')[0].trim() || '(제목 없음)')}</div><div class="dmb-fh" onclick="dmbFold('${m.id}')" title="펴기"></div>` : (m.check ? `<div class="dmb-checks">${m.items.map((it, k) => `<div class="dmb-ck${k === 0 ? ' dmb-cktitle' : (it.d ? ' done' : '')}">${k === 0 ? '' : `<button type="button" class="dmb-ckb" onclick="dmbCkToggle('${m.id}',${k},this)" title="했으면 체크"><i class="fa-solid fa-check"></i></button>`}<span class="dmb-ckt" contenteditable="${DMB_CE}" spellcheck="false" data-ph="${k === 0 ? '제목' : '할 일'}" oninput="dmbCkInput('${m.id}',${k},this)" onkeydown="dmbCkKey(event,'${m.id}',${k})" onpaste="dmbCkPaste(event)">${escapeHtml(it.t || '')}</span></div>`).join('')}<button type="button" class="dmb-ckadd" onclick="dmbCkAdd('${m.id}')">+ 할 일 추가</button></div>` : `${m.cols > 1 && m.manual && Array.isArray(m.cc) ? dmbManualHtml(m) : m.blocks ? dmbBlocksHtml(m) : `<div class="dmb-text" contenteditable="true" spellcheck="false" data-ph="메모를 적어요" oninput="dmbInput('${m.id}', this)" onpaste="dmbPaste(event)">${m.h ? dmbClean(m.h) : escapeHtml(m.text || '')}</div>`}`)}
+                ${m.fold ? `<div class="dmb-ftitle" onclick="dmbFold('${m.id}')" title="눌러서 펴기">${escapeHtml(String(m.text || '').split('\n')[0].trim() || '(제목 없음)')}</div><div class="dmb-fh" onclick="dmbFold('${m.id}')" title="펴기"></div>` : (m.check ? `<div class="dmb-checks">${m.items.map((it, k) => `<div class="dmb-ck${k === 0 ? ' dmb-cktitle' : (it.d ? ' done' : '')}">${k === 0 ? '' : `<button type="button" class="dmb-ckb" onclick="dmbCkToggle('${m.id}',${k},this)" title="했으면 체크"><i class="fa-solid fa-check"></i></button>`}<span class="dmb-ckt" contenteditable="${DMB_CE}" spellcheck="false" data-ph="${k === 0 ? '제목' : '할 일'}" oninput="dmbCkInput('${m.id}',${k},this)" onkeydown="dmbCkKey(event,'${m.id}',${k})" onpaste="dmbCkPaste(event)">${escapeHtml(it.t || '')}</span></div>`).join('')}<button type="button" class="dmb-ckadd" onclick="dmbCkAdd('${m.id}')">+ 할 일 추가</button></div>` : `${m.cols > 1 && m.manual && Array.isArray(m.cc) ? dmbManualHtml(m) : m.blocks ? dmbBlocksHtml(m) : m.cols > 1 ? dmbAutoHtml(m) : `<div class="dmb-text" contenteditable="true" spellcheck="false" data-ph="메모를 적어요" oninput="dmbInput('${m.id}', this)" onpaste="dmbPaste(event)">${m.h ? dmbClean(m.h) : escapeHtml(m.text || '')}</div>`}`)}
                 <span class="dmb-date">${dmbFmt(m.ts)}</span>
                 <div class="dmb-tools">
                     <button type="button" class="dmb-tool colorc" onclick="dmbPal(this)" title="설정 (색·모양·장식)"><i class="fa-solid fa-gear"></i></button>

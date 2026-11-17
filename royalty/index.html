@@ -3311,6 +3311,13 @@ body.menu-font-on #settings-panel-modal .settings-tabbtn, body.menu-font-on #the
         #dash-memo-board .dmb-pal .dmb-pbtns .dmb-foldbtn { flex: 1 1 0; min-width: 0; padding: 0 2px; height: 22px; border-radius: 7px; font-size: 11px; text-align: center; }
         #dash-memo-board .dmb-pal .dmb-pdots { justify-content: space-between; }
         #dash-memo-board .dmb-pal .dmb-pdots .dmb-dot { flex: none; width: 17px; height: 17px; }
+        /* PC·태블릿: 설정창은 메모 안이 아니라 메모 바로 위에 (위 공간이 없으면 아래) */
+        @media (min-width: 768px) {
+            html body #dash-memo-board .dmb-note .dmb-pal { top: auto; bottom: calc(100% + 12px); right: 0; }
+            html body #dash-memo-board .dmb-note .dmb-pal.below { bottom: auto; top: calc(100% + 12px); }
+            #dash-memo-board .dmb-pal::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: 14px; }
+            #dash-memo-board .dmb-pal.below::after { top: auto; bottom: 100%; }
+        }
         /* 메모 한 장 안의 글을 신문처럼 칸 나누기 */
         html body #dash-memo-board .dmb-note[data-cols] .dmb-text { column-gap: 26px; column-rule: 1px solid rgba(74,63,51,.4); }
         html body #dash-memo-board .dmb-note[data-cols="2"] .dmb-text { column-count: 2; }
@@ -21864,8 +21871,9 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         }
         // 설정창이 화면 밖으로 나가면 안쪽으로 밀어 넣기
         function dmbPalFit(n) {
-            const p = n && n.querySelector('.dmb-pal'); if (!p) return; p.style.right = '';
-            const r = p.getBoundingClientRect(); let sh = 0;
+            const p = n && n.querySelector('.dmb-pal'); if (!p) return; p.style.right = ''; p.classList.remove('below');
+            let r = p.getBoundingClientRect(); let sh = 0;
+            if (window.matchMedia && matchMedia('(min-width: 768px)').matches && r.top < 8) { p.classList.add('below'); r = p.getBoundingClientRect(); }
             if (r.left < 8) sh = r.left - 8; else if (r.right > innerWidth - 8) sh = r.right - (innerWidth - 8);
             if (sh) p.style.right = (6 + sh) + 'px';
         }

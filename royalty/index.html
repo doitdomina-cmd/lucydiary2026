@@ -25240,6 +25240,8 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             const pendingWriteSpans = spans.filter(sp => (sp.span.type || 'write') === 'write' && !confirmedSpanIds.has(sp.span.id));
             const contractSpans = pendingWriteSpans.filter(sp => sp.span.workId && !confirmedWorkIds.has(sp.span.workId));
             const freeSpans = pendingWriteSpans.filter(sp => !sp.span.workId);
+            // 이미 확정된(카드 있는) 작품에 연결된 미확정 기간 일정: 작품 수는 이미 확정에 셌으니 글자·집필일만 계약작 쪽에 더한다 (월별 표와 같은 합계가 되게)
+            const confirmedLinkedSpans = pendingWriteSpans.filter(sp => sp.span.workId && confirmedWorkIds.has(sp.span.workId));
             // 패시브 기간 일정과 초단편에 연결된 집필 기간 일정은 위 막대·표에는 안 그리지만, 계약작/자유작 목표에는 포함한다
             const exContractIds = new Set(), exFreeCount = { n: 0 };
             let exContractChars = 0, exContractDays = 0, exFreeChars = 0, exFreeDays = 0;
@@ -25266,8 +25268,8 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             const contractWorkCount = new Set(contractSpans.map(sp => sp.span.workId)).size + exContractIds.size;
             const freeWorkCount = freeSpans.length + exFreeCount.n;   // 자유작은 연결된 작품이 없어 하나로 묶을 수 없으니, 기간 일정 하나당 1개로 센다
 
-            const contractChars = contractSpans.reduce((n, sp) => n + sp.stats.totalChars, 0) + exContractChars;
-            const contractWriteDays = contractSpans.reduce((n, sp) => n + (Number(sp.stats.workDays) || 0), 0) + exContractDays;
+            const contractChars = contractSpans.concat(confirmedLinkedSpans).reduce((n, sp) => n + sp.stats.totalChars, 0) + exContractChars;
+            const contractWriteDays = contractSpans.concat(confirmedLinkedSpans).reduce((n, sp) => n + (Number(sp.stats.workDays) || 0), 0) + exContractDays;
             const freeChars = freeSpans.reduce((n, sp) => n + sp.stats.totalChars, 0) + exFreeChars;
             const freeWriteDays = freeSpans.reduce((n, sp) => n + (Number(sp.stats.workDays) || 0), 0) + exFreeDays;
 

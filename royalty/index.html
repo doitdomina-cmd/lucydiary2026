@@ -25345,6 +25345,23 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 </div>`;
         }
 
+        // 확정 일정(달력 카드) + 기간 일정(집필)을 날짜순으로 한 표에 합친 줄들 (화면 표·이미지 저장 공용)
+        function tlCombinedRows(data) {
+            const num = n => (Number(n) || 0).toLocaleString();
+            const items = [];
+            (data.works || []).forEach(w => items.push({ k: '확정', start: w.firstDate, name: w.title, period: `${w.firstDate} ~ ${w.lastDate}`, days: Number(w.workDays) || 0, chars: Number(w.totalChars) || 0 }));
+            (data.spans || []).filter(sp => (sp.span.type || 'write') === 'write').forEach(({ span: s, stats: st }) => {
+                const wt = s.workId ? (resolveWorkItem(s.workId).displayTitle || '') : '';
+                items.push({ k: '기간', start: s.startDate, name: wt ? `${s.title} (${wt})` : s.title, period: `${s.startDate} ~ ${s.endDate}`, days: Number(st.workDays) || 0, chars: Number(st.totalChars) || 0 });
+            });
+            items.sort((a, b) => String(a.start).localeCompare(String(b.start)));
+            const rows = items.map(it => [it.k, it.name, it.period, `${it.days}일`, `${num(it.chars)}자`, it.days ? `${num(Math.round(it.chars / it.days))}자/일` : '-']);
+            if (rows.length) {
+                const dd = items.reduce((n, it) => n + it.days, 0), cc = items.reduce((n, it) => n + it.chars, 0);
+                rows.push(['합계', `${items.length}건`, '', `${dd}일`, `${num(cc)}자`, dd ? `${num(Math.round(cc / dd))}자/일` : '-']);
+            }
+            return rows;
+        }
         // 화면용 표(확정 일정 / 기간일정·집필 / 기간일정·휴식 등) — 이미지 저장(exportYearTimelineImage)과 같은 데이터를 그대로 HTML 표로 보여준다
         function renderTimelineTablesHtml(data, y) {
             const { works, spans, restSegs } = data;
@@ -25401,6 +25418,10 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                      `${num(wsChars)}자 <span style="opacity:.6;font-weight:500;">(공미 ${num(Math.round(wsChars * NOSPACE_TO_WITHSPACE_RATIO))}자)</span>`,
                      wsWorkDays ? `${num(Math.round(wsChars / wsWorkDays))}자/일` : '-', '']));
 
+            // 확정 일정 + 기간 일정(집필) 합친 표
+            const combinedHtml = wrap('■ 확정 일정 + 기간 일정 (집필) 합친 표', '#0e7490',
+                tableHtml(['구분', '작품 / 일정', '기간', '일수', '글자수', '평균'], tlCombinedRows(data), '#0e7490'));
+
             // 기간 일정 · 휴식 등 (휴식/교정/여행/시놉기획)
             const restSpanRows = spans.filter(sp => (sp.span.type || 'write') !== 'write').map(({ span: s, stats: st }) => {
                 const t = SPAN_TYPES[s.type || 'write'];
@@ -25447,7 +25468,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             const gapHtml = wrap('■ 일정이 비어 있는 구간 (2일 이상)', '#64748b',
                 tableHtml(['기간', '일수'], restRows, '#64748b'));
 
-            return confirmedHtml + writeSpanHtml + restSpanHtml + monthHtml + gapHtml;
+            return confirmedHtml + writeSpanHtml + combinedHtml + restSpanHtml + monthHtml + gapHtml;
         }
 
         // 창 크기가 바뀌면 가로 스크롤이 생기지 않도록 다시 그린다
@@ -26179,6 +26200,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 restSpanRows.push(['합계', `${restList.length}개`, '', '', `${restList.reduce((n, sp) => n + (Number(sp.stats.totalDays) || 0), 0)}일`, '']);
             }
 
+            const combinedRows = tlCombinedRows(d);
             const workRows = d.works.map(w => [w.title, w.genre || '-', `${w.firstDate} ~ ${w.lastDate}`, `${w.workDays}일`,
                 `${num(w.totalChars)}자`, w.workDays ? `${num(Math.round(w.totalChars / w.workDays))}자/일` : '-']);
             if (workRows.length) {
@@ -26259,7 +26281,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             let H = 132                                   // 헤더
                   + 62                                    // 요약
                   + 40 + laneCount * (BAR_H + BAR_GAP) + 46 + 30  // 간트(월축+막대+쉬는띠)
-                  + table(workRows) + table(writeSpanRows) + table(restSpanRows)
+                  + table(workRows) + table(writeSpanRows) + table(combinedRows) + table(restSpanRows)
                   + TITLE_H + HH + 13 * RH + 26           // 월별 표
                   + table(restRows)
                   + 60;                                   // 푸터
@@ -26378,6 +26400,9 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
 
             drawTable('■ 기간 일정 · 집필', ['일정 제목','연결 작품','기간','총일수','집필일','쉬는 날','예상 글자수','하루 집필량','메모'],
                       [200, 230, 300, 100, 100, 150, 230, 160, 154], writeSpanRows, '#b45309');
+
+            drawTable('■ 확정 일정 + 기간 일정 (집필) 합친 표', ['구분','작품 / 일정','기간','일수','글자수','평균'],
+                      [120, 560, 380, 160, 220, 184], combinedRows, '#0e7490');
 
             drawTable('■ 기간 일정 · 휴식 등 (휴식·교정·여행·시놉기획)', ['종류','일정 제목','연결 작품','기간','총일수','메모'],
                       [140, 300, 300, 420, 200, 264], restSpanRows, '#92400e');

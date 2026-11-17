@@ -3177,6 +3177,7 @@ body.menu-font-on #settings-panel-modal .settings-tabbtn, body.menu-font-on #the
         #dash-memo-board .dmb-note { max-width: 100%; }
         #dash-memo-board .dmb-foldbtn { border: 0; background: #EFEAE2; color: #6b5a47; border-radius: 999px; font-size: 11px; font-weight: 700; padding: 0 9px; height: 18px; cursor: pointer; white-space: nowrap; }
         /* 포스트잇 위 장식: 테이프(기본) 또는 핀(하트·꽃·병아리 중 무작위) */
+        html body #dash-memo-board .dmb-note::before { zoom: var(--ps, 1); }
         html body #dash-memo-board .dmb-note[data-deco="pin"]::before { content: '' !important; display: block !important; top: -26px !important; left: 50% !important; right: auto !important; width: 48px !important; height: 48px !important; margin: 0 0 0 -24px !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; transform: rotate(-4deg) !important; background-color: transparent !important; background-repeat: no-repeat !important; background-position: center !important; background-size: contain !important; filter: drop-shadow(0 2px 2px rgba(60,45,25,.28)); }
         html body #dash-memo-board .dmb-note[data-deco="none"]::before { display: none !important; }
         #dash-memo-board .dmb-foldbtn.on { background: #4a3f33; color: #fff; }
@@ -21560,7 +21561,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             const W = Math.round(Math.max(150, Math.min(maxW, d.W0 + e.clientX - d.sx)));
             d.m.w = W;
             d.m.fx = cw - W > 0 ? Math.min(1, d.left / (cw - W)) : 0;
-            d.n.style.setProperty('--w', W + 'px'); d.n.style.setProperty('--fx', d.m.fx);
+            d.n.style.setProperty('--w', W + 'px'); d.n.style.setProperty('--ps', dmbPinScale(W)); d.n.style.setProperty('--fx', d.m.fx);
             dmbResize();
         }
         function dmbRzUp() { const d = _dmbRz; if (!d) return; _dmbRz = null; if (d.moved) dmbSave(); }
@@ -21902,6 +21903,8 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         const DMB_PIN_FILES = {"common": ["bulldog-blue.png", "bulldog-cream.png", "bulldog-green.png", "bulldog-olive.png", "bulldog-pink.png", "bulldog-stripe.png", "clip-apple.png", "clip-bear.png", "clip-heart.png", "clip-star.png", "patch-star.png", "sticker-bear.png", "sticker-cherry.png", "sticker-frog.png", "sticker-rainbow.png", "sticker-sun.png"], "pixel": ["pixel-01.png", "pixel-02.png", "pixel-03.png", "pixel-04.png", "pixel-05.png", "pixel-06.png", "pixel-07.png", "pixel-08.png", "pixel-09.png", "sticker-cake.png", "sticker-star.png", "sticker-tulip.png"]};
         const DMB_PIN_THEMES = {"cozy": "common", "label": "common", "polaroid": "common", "postcard": "common", "retro": "common", "galaxy": "common", "candy": "common", "spiral": "pixel", "gaming": "pixel"};
         // PINS END
+        // 메모 가로(230px 기준)가 넓어지면 위 장식(테이프·핀)도 같이 커짐 — 최대 1.4배
+        function dmbPinScale(w) { return Math.max(1, Math.min(1.4, 1 + (w - 230) * 0.0017)).toFixed(3); }
         // 핀 위치: 메모 id 로 왼쪽('l')/가운데('c')를 정한다 (id 가 없으면 순서로)
         function dmbPinSide(m, i) { const k = String(m.id || ('i' + i)); let h = 2166136261; for (let n = 0; n < k.length; n++) { h ^= k.charCodeAt(n); h = Math.imul(h, 16777619); } return ((h >>> 0) >> 7) % 2 ? 'l' : 'c'; }
         function dmbPinSet() { const set = DMB_PIN_THEMES[activeTheme]; return set ? (DMB_PIN_FILES[set] || []).map(f => ({ name: f.replace(/\.[^.]+$/, ''), set, file: f })) : []; }
@@ -21982,7 +21985,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             if (!force && sig === _dmbSig && box.firstChild) return;
             _dmbSig = sig;
             const rots = [-1.6, 1.2, -0.8, 1.8, -1.3, 0.9];
-            const notes = dashMemos.map((m, i) => `<div class="dmb-note${m.dash === false ? ' no-dash' : ''}${m.fold ? ' folded' : ''}" data-mid="${m.id}" data-tape="${typeof m.tape === 'number' ? m.tape : dmbTape(m.id)}"${m.look === 'note' || m.look === 'dot' || m.look === 'grid' ? ` data-look="${m.look}"` : ''}${m.check ? ' data-check="1"' : ''}${m.cols > 1 && !m.check ? ` data-cols="${m.cols}"${m.rule === false ? ' data-norule="1"' : ''}` : ''}${typeof m.fs === 'number' ? ' data-fs="1"' : ''}${m.deco === 'none' ? ' data-deco="none"' : ''}${m.deco === 'pin' ? ` data-deco="pin" data-pin="${m.pin || 'heart'}" data-pl="${dmbPinSide(m, i)}"` : ''} style="--c:${dmbShade(m.color)};--rot:${m.flat && !m.fold ? 0 : rots[i % rots.length]}deg;${typeof m.fs === 'number' ? `--fs:${m.fs}px;` : ''}${typeof m.w === 'number' && !m.fold ? `--w:${m.w}px;` : ''}${typeof m.fx === 'number' && typeof m.y === 'number' ? `--fx:${m.fx};--y:${m.y}px;` : ''}${m.z ? `z-index:${m.z};` : ''}">
+            const notes = dashMemos.map((m, i) => `<div class="dmb-note${m.dash === false ? ' no-dash' : ''}${m.fold ? ' folded' : ''}" data-mid="${m.id}" data-tape="${typeof m.tape === 'number' ? m.tape : dmbTape(m.id)}"${m.look === 'note' || m.look === 'dot' || m.look === 'grid' ? ` data-look="${m.look}"` : ''}${m.check ? ' data-check="1"' : ''}${m.cols > 1 && !m.check ? ` data-cols="${m.cols}"${m.rule === false ? ' data-norule="1"' : ''}` : ''}${typeof m.fs === 'number' ? ' data-fs="1"' : ''}${m.deco === 'none' ? ' data-deco="none"' : ''}${m.deco === 'pin' ? ` data-deco="pin" data-pin="${m.pin || 'heart'}" data-pl="${dmbPinSide(m, i)}"` : ''} style="--c:${dmbShade(m.color)};--rot:${m.flat && !m.fold ? 0 : rots[i % rots.length]}deg;${typeof m.fs === 'number' ? `--fs:${m.fs}px;` : ''}${typeof m.w === 'number' && !m.fold ? `--w:${m.w}px;--ps:${dmbPinScale(m.w)};` : ''}${typeof m.fx === 'number' && typeof m.y === 'number' ? `--fx:${m.fx};--y:${m.y}px;` : ''}${m.z ? `z-index:${m.z};` : ''}">
                 <div class="dmb-grip" title="끌어서 옮기기" onpointerdown="dmbGripDown(event, '${m.id}')" onpointermove="dmbGripMove(event)" onpointerup="dmbGripUp(event)" onpointercancel="dmbGripUp(event)"></div>
                 <div class="dmb-rz" title="끌어서 너비 조절" onpointerdown="dmbRzDown(event, '${m.id}')" onpointermove="dmbRzMove(event)" onpointerup="dmbRzUp(event)" onpointercancel="dmbRzUp(event)"></div>
                 ${m.fold ? '' : `<button type="button" class="dmb-foldic" onclick="dmbFold('${m.id}')" title="접어서 제목만 보기"><i class="fa-solid fa-chevron-up"></i></button>`}

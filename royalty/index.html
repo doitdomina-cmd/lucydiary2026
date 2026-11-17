@@ -12809,7 +12809,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         function pcDraw() {
             const cv = document.getElementById('pc-canvas'); if (!cv) return;
             const card = pcGet(_pcYear), S = 2, W = 480, PAD = 22;
-            const FONT = `'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif`, SERIF = `'Noto Serif KR','Nanum Myeongjo','Batang',serif`;
+            const FONT = `'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif`, SERIF = `'Noto Serif KR','Nanum Myeongjo','Batang',serif`, NUM = `'Bodoni MT','Didot','Playfair Display','Bodoni 72','Noto Serif KR','Batang',serif`;
             const rows = card.rows.filter(r => r.title || r.when);
             const isUnset = r => { const w = String(r.when || '').trim(); return !w || w === '미정'; };
             const dated = rows.filter(r => !isUnset(r)), unset = rows.filter(isUnset);
@@ -12841,14 +12841,16 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 gr.rows.forEach((r, ri) => {
                     if (ri) { g.fillStyle = '#EFEEF3'; g.fillRect(PAD + 12, ry, W - PAD * 2 - 24, 1); }
                     const cy = ry + rowH(r) / 2;
-                    g.font = `800 12.5px ${FONT}`; g.fillStyle = '#4A4E78'; g.fillText(fit(r.when, 78), PAD + 12, cy + (r.sub ? -2 : 4));
+                    { const mm = /^(\d+)(.*)$/.exec(String(r.when || '').trim()), by = cy + (r.sub ? 2 : 7); g.fillStyle = '#4A4E78';
+                      if (mm) { g.font = `700 21px ${NUM}`; g.fillText(mm[1], PAD + 12, by); const nw = g.measureText(mm[1]).width; g.font = `600 11.5px ${FONT}`; g.fillText(fit(mm[2], 60), PAD + 12 + nw + 1, by); }
+                      else { g.font = `700 13px ${FONT}`; g.fillText(fit(r.when, 78), PAD + 12, by); } }
                     const tag = r.tag ? (PC_TAGS[r.tag] || ['#EEEDF5', '#5A5680']) : null; let tw = 0;
-                    if (tag) { g.font = `700 10.5px ${FONT}`; tw = g.measureText(r.tag).width + 20; rr(W - PAD - 12 - tw, cy - 10, tw, 20, 10); g.fillStyle = tag[0]; g.fill(); g.fillStyle = tag[1]; g.textAlign = 'center'; g.fillText(r.tag, W - PAD - 12 - tw / 2, cy + 3.5); g.textAlign = 'left'; }
+                    if (tag) { g.font = `600 8.5px ${FONT}`; tw = g.measureText(r.tag).width + 16; rr(W - PAD - 12 - tw, cy - 8.5, tw, 17, 8.5); g.fillStyle = tag[0]; g.fill(); g.fillStyle = tag[1]; g.textAlign = 'center'; g.fillText(r.tag, W - PAD - 12 - tw / 2, cy + 3); g.textAlign = 'left'; }
                     const tx = PAD + 12 + 92, maxW = W - PAD - 12 - tw - 8 - tx;
-                    g.font = `500 9.5px ${FONT}`; const rw = r.range ? g.measureText(r.range).width + 6 : 0;
-                    g.font = `800 15px ${FONT}`; g.fillStyle = '#2B2B47'; const tt = fit(r.title, maxW - rw); g.fillText(tt, tx, cy + (r.sub ? -3 : 5));
-                    if (r.range) { const tw2 = g.measureText(tt).width; g.font = `600 9.5px ${FONT}`; g.fillStyle = '#7A8A9A'; g.fillText(r.range, tx + tw2 + 6, cy + (r.sub ? -3 : 5)); }
-                    if (r.sub) { g.font = `500 9.5px ${FONT}`; g.fillStyle = '#8A8A9A'; g.fillText(fit(r.sub, maxW), tx, cy + 13); }
+                    g.font = `300 9px ${NUM}`; const rw = r.range ? g.measureText(r.range).width + 8 : 0;
+                    g.font = `500 15px ${FONT}`; g.fillStyle = '#2B2B47'; const tt = fit(r.title, maxW - rw); g.fillText(tt, tx, cy + (r.sub ? -3 : 5));
+                    if (r.range) { const tw2 = g.measureText(tt).width; g.font = `300 9px ${NUM}`; g.fillStyle = '#7A8A9A'; g.fillText(r.range, tx + tw2 + 7, cy + (r.sub ? -3 : 5)); }
+                    if (r.sub) { g.font = `400 8.5px ${FONT}`; g.fillStyle = '#8A8A9A'; g.fillText(fit(r.sub, maxW), tx, cy + 13); }
                     ry += rowH(r);
                 });
                 y += h + 14;

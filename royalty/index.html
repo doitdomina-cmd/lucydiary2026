@@ -12847,6 +12847,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             const fk = PC_FONTS[card.font] ? card.font : 'sans';
             const FONT = PC_FONTS[fk][1], SERIF = fk === 'sans' ? PC_FONTS.serif[1] : PC_FONTS[fk][1], NUM = `'Bodoni MT','Didot','Playfair Display','Bodoni 72','Noto Serif KR','Batang',serif`;
             const FR = DES === 'gaming' || DES === 'spiral', PAD = FR ? 34 : 22, TP = DES === 'gaming' ? 62 : DES === 'spiral' ? 52 : 22;   // 게이밍·스프링은 카드 전체가 창/노트
+            const MCOL = ['#3E7CC9', '#D8527E', '#2E9C85', '#E08A1E', '#8E5BD0', '#C9483C', '#3D8F4F', '#B8860B', '#1F8FA8', '#C2549C', '#6B7B2E', '#5E5CC8'];   // 월마다 다른 색
             const T = {
                 simple: { bg: '#F8F3E6', ink: '#2B2B47', month: '#4A4E78', sub: '#8A8A9A', line: '#DADADA', top: 10, bot: 4 },
                 spiral: { bg: '#D9F2E3', ink: '#1F2D27', month: '#1F2D27', sub: '#55635B', line: 'rgba(31,45,39,.3)', top: 4, bot: 4 },
@@ -12910,10 +12911,11 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 dated.forEach((r, ri) => {
                     if (ri) { g.fillStyle = T.line; if (DES === 'label') { g.setLineDash([3, 3]); g.strokeStyle = T.line; g.beginPath(); g.moveTo(x0 + 12, ry + .5); g.lineTo(x0 + w0 - 12, ry + .5); g.stroke(); g.setLineDash([]); } else g.fillRect(x0 + 12, ry, w0 - 24, 1); }
                     const cy = ry + rowH(r) / 2, mm = /^(\d+)(.*)$/.exec(String(r.when || '').trim()), by = cy + (r.sub ? 2 : 7);
-                    if (DES === 'label' && mm) { g.save(); g.translate(x0 + 20 + 22, cy - (r.sub ? 2 : 0)); g.rotate(-0.04); rr(-26, -15, 52, 30, 4); g.fillStyle = pal[(+mm[1]) % 5]; g.fill(); g.restore(); }
-                    g.fillStyle = T.month;
-                    if (mm) { g.font = `${FR ? 800 : 700} 30px ${NUM}`; g.fillText(mm[1], x0 + 20 + (DES === 'label' ? 5 : 0), by - (DES === 'label' ? 1 : 0)); const nw = g.measureText(mm[1]).width; g.font = `600 13px ${FONT}`; g.fillText(fit(mm[2], 60), x0 + 20 + nw + 2 + (DES === 'label' ? 5 : 0), by - (DES === 'label' ? 1 : 0)); }
-                    else { g.font = `700 13px ${FONT}`; g.fillText(fit(r.when, 78), x0 + 20, by); }
+                    if (DES === 'label' && mm) { g.save(); g.translate(x0 + 50, cy - (r.sub ? 2 : 0)); g.rotate(-0.04); rr(-26, -15, 52, 30, 4); g.fillStyle = pal[(+mm[1]) % 5]; g.fill(); g.restore(); }
+                    g.fillStyle = (mm && DES !== 'label') ? MCOL[(+mm[1] - 1 + 12) % 12] : T.month;
+                    if (mm) { const mcx = x0 + 50; g.font = `${FR ? 800 : 700} 30px ${NUM}`; const nw = g.measureText(mm[1]).width; g.font = `600 13px ${FONT}`; const mt = fit(mm[2], 40), mw = g.measureText(mt).width, tot = nw + 2 + mw, mx = mcx - tot / 2;
+                      g.font = `${FR ? 800 : 700} 30px ${NUM}`; g.fillText(mm[1], mx, by - (DES === 'label' ? 1 : 0)); g.font = `600 13px ${FONT}`; g.fillText(mt, mx + nw + 2, by - (DES === 'label' ? 1 : 0)); }
+                    else { g.font = `700 13px ${FONT}`; g.textAlign = 'center'; g.fillText(fit(r.when, 70), x0 + 50, by); g.textAlign = 'left'; }
                     const tag = r.tag ? (PC_TAGS[r.tag] || ['#EEEDF5', '#5A5680']) : null; let tw = 0;
                     if (tag) {
                         g.font = `600 8.5px ${FONT}`; tw = g.measureText(r.tag).width + 16;
@@ -12933,12 +12935,12 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 y += h + 14;
             }
             if (unset.length) {
-                const h = Math.max(40, 22 + unset.length * 20), x0 = PAD, w0 = W - PAD * 2;
-                if (DES === 'gaming') { g.fillStyle = T.ink; g.fillRect(x0 + 3, y + 3, w0, h); g.fillStyle = '#E7E1FA'; g.fillRect(x0, y, w0, h); g.strokeStyle = T.ink; g.lineWidth = 2.2; g.strokeRect(x0, y, w0, h); }
-                else if (DES === 'spiral') { g.setLineDash([6, 4]); g.strokeStyle = T.ink; g.lineWidth = 1.8; g.strokeRect(x0 + .9, y + .9, w0 - 1.8, h - 1.8); g.setLineDash([]); }
-                else if (DES === 'label') { g.fillStyle = '#F6EBCF'; g.fillRect(x0, y, w0, h); g.setLineDash([5, 3]); g.strokeStyle = 'rgba(90,70,40,.55)'; g.lineWidth = 1.4; g.strokeRect(x0 + .7, y + .7, w0 - 1.4, h - 1.4); g.setLineDash([]); }
-                else { rr(x0, y, w0, h, 10); g.fillStyle = DES === 'postcard' ? '#F3E9D6' : '#EFE8D6'; g.fill(); }
-                g.font = `700 11px ${FONT}`; g.fillStyle = T.month; g.fillText('출간월 미정', x0 + 12, y + 24);
+                const h = Math.max(40, 22 + unset.length * 20), x0 = PAD, w0 = W - PAD * 2, UC = ({ simple: ['#E4ECFA', '#3E6FB5'], postcard: ['#DCEBE4', '#2E7D66'], label: ['#F9DDE5', '#B8456B'], gaming: ['#E7E1FA', '#6A4FC0'], spiral: ['#DDEEFA', '#2F6FA8'] })[DES] || ['#E4ECFA', '#3E6FB5'];
+                if (DES === 'gaming') { g.fillStyle = T.ink; g.fillRect(x0 + 3, y + 3, w0, h); g.fillStyle = UC[0]; g.fillRect(x0, y, w0, h); g.strokeStyle = T.ink; g.lineWidth = 2.2; g.strokeRect(x0, y, w0, h); }
+                else if (DES === 'spiral') { g.fillStyle = UC[0]; g.fillRect(x0, y, w0, h); g.setLineDash([6, 4]); g.strokeStyle = UC[1]; g.lineWidth = 1.8; g.strokeRect(x0 + .9, y + .9, w0 - 1.8, h - 1.8); g.setLineDash([]); }
+                else if (DES === 'label') { g.fillStyle = UC[0]; g.fillRect(x0, y, w0, h); g.setLineDash([5, 3]); g.strokeStyle = UC[1]; g.lineWidth = 1.4; g.strokeRect(x0 + .7, y + .7, w0 - 1.4, h - 1.4); g.setLineDash([]); }
+                else { rr(x0, y, w0, h, 10); g.fillStyle = UC[0]; g.fill(); }
+                g.font = `700 11px ${FONT}`; g.fillStyle = UC[1]; g.fillText('출간월 미정', x0 + 12, y + 24);
                 unset.forEach((r, i) => { g.font = `500 12.5px ${FONT}`; g.fillStyle = T.ink; g.fillText(fit(r.title, w0 - 24 - 104), x0 + 12 + 104, y + 24 + i * 20); });
             }
         }

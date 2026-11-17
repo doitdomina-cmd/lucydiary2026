@@ -26152,37 +26152,40 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
 
             // ── 표에 넣을 줄들을 먼저 만들어서 전체 높이를 계산한다
             // 기간 일정은 '집필'과 '휴식 등(휴식·교정·여행·시놉기획)'으로 나눠서 각각 따로 보여준다
-            const buildSpanRow = ({ span: s, stats: st }) => {
-                const t = SPAN_TYPES[s.type || 'write'];
-                const rest = st.noChars ? '—'
-                    : (s.restMode === 'days'
-                        ? (s.restWeekdays?.length ? `매주 ${s.restWeekdays.map(i => SPAN_DOW_NAMES[i]).join('·')}` : '없음')
-                        : `주 ${s.restPerWeek || 0}회`);
-                const workTitle = s.workId ? (resolveWorkItem(s.workId).displayTitle || '-') : '-';
-                return [`${t.iconHtml || t.icon} ${t.label}`, s.title, workTitle,
-                        `${fmt(s.startDate)} ~ ${fmt(s.endDate)}`, `${st.totalDays}일`,
-                        st.noChars ? '—' : `${st.workDays}일`, rest,
-                        st.noChars ? '—' : `${num(st.totalChars)}자 (공미 ${num(Math.round(st.totalChars * NOSPACE_TO_WITHSPACE_RATIO))}자)`,
-                        st.noChars ? '—' : `${num(s.dailyChars)}자/일`, s.memo || ''];
-            };
-            const writeSpanRows = d.spans.filter(sp => (sp.span.type || 'write') === 'write').map(buildSpanRow);
-            const restSpanRows = d.spans.filter(sp => (sp.span.type || 'write') !== 'write').map(buildSpanRow);
-
-            const workRows = [];
-            d.works.forEach(w => {
-                w.segs.forEach((sg, i) => {
-                    const sd = tlIndexToDate(sg.startIdx, y), ed = tlIndexToDate(sg.endIdx, y);
-                    workRows.push([
-                        i === 0 ? w.title : '   ↳',
-                        i === 0 ? (w.genre || '-') : '',
-                        w.segs.length > 1 ? `${i+1}/${w.segs.length}` : '-',
-                        `${fmt(sd)} ~ ${fmt(ed)}`, `${sg.days}일`, `${num(sg.chars)}자`,
-                        sg.days ? `${num(Math.round(sg.chars / sg.days))}자/일` : '-',
-                        i === 0 ? `${num(w.totalChars)}자 / ${w.workDays}일` : '',
-                        i === 0 ? (w.catText || '-') : ''
-                    ]);
-                });
+            // 화면 표(renderTimelineTablesHtml)와 같은 칸·같은 합계 줄로 만든다
+            const workTitleOf = s => s.workId ? (resolveWorkItem(s.workId).displayTitle || '-') : '-';
+            const writeList = d.spans.filter(sp => (sp.span.type || 'write') === 'write');
+            const restList = d.spans.filter(sp => (sp.span.type || 'write') !== 'write');
+            const writeSpanRows = writeList.map(({ span: s, stats: st }) => {
+                const restTxt = s.restMode === 'days'
+                    ? (s.restWeekdays?.length ? `매주 ${s.restWeekdays.map(i => SPAN_DOW_NAMES[i]).join('·')}` : '없음')
+                    : `주 ${s.restPerWeek || 0}회`;
+                return [s.title, workTitleOf(s), `${s.startDate} ~ ${s.endDate}`, `${st.totalDays}일`, `${st.workDays}일`, restTxt,
+                    `${num(st.totalChars)}자 (공미 ${num(Math.round(st.totalChars * NOSPACE_TO_WITHSPACE_RATIO))}자)`,
+                    `${num(s.dailyChars)}자/일`, s.memo || '-'];
             });
+            if (writeSpanRows.length) {
+                const td = writeList.reduce((n, sp) => n + (Number(sp.stats.totalDays) || 0), 0);
+                const wd = writeList.reduce((n, sp) => n + (Number(sp.stats.workDays) || 0), 0);
+                const ch = writeList.reduce((n, sp) => n + (Number(sp.stats.totalChars) || 0), 0);
+                writeSpanRows.push(['합계', `${writeList.length}개`, '', `${td}일`, `${wd}일`, '',
+                    `${num(ch)}자 (공미 ${num(Math.round(ch * NOSPACE_TO_WITHSPACE_RATIO))}자)`, wd ? `${num(Math.round(ch / wd))}자/일` : '-', '']);
+            }
+            const restSpanRows = restList.map(({ span: s, stats: st }) => {
+                const t = SPAN_TYPES[s.type || 'write'];
+                return [t.label, s.title, workTitleOf(s), `${s.startDate} ~ ${s.endDate}`, `${st.totalDays}일`, s.memo || '-'];
+            });
+            if (restSpanRows.length) {
+                restSpanRows.push(['합계', `${restList.length}개`, '', '', `${restList.reduce((n, sp) => n + (Number(sp.stats.totalDays) || 0), 0)}일`, '']);
+            }
+
+            const workRows = d.works.map(w => [w.title, w.genre || '-', `${w.firstDate} ~ ${w.lastDate}`, `${w.workDays}일`,
+                `${num(w.totalChars)}자`, w.workDays ? `${num(Math.round(w.totalChars / w.workDays))}자/일` : '-']);
+            if (workRows.length) {
+                const wd = d.works.reduce((n, w) => n + (Number(w.workDays) || 0), 0);
+                const wc = d.works.reduce((n, w) => n + (Number(w.totalChars) || 0), 0);
+                workRows.push(['합계', `${d.works.length}작품`, '', `${wd}일`, `${num(wc)}자`, wd ? `${num(Math.round(wc / wd))}자/일` : '-']);
+            }
 
             // 월별 목표: 화면 표와 같은 8칸 (확정 / 예정 / 합계 글자수, 집필 일수, 하루 평균) + 합계 줄
             const _confIds = new Set();
@@ -26370,14 +26373,14 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 Y += 26;
             };
 
-            drawTable('■ 확정 일정 (달력 카드 기준)', ['작품','장르','구간','집필 기간','일수','구간 글자수','평균','작품 합계','기타 작업'],
-                      [300, 150, 70, 300, 78, 140, 120, 210, 256], workRows, '#0f766e');
+            drawTable('■ 확정 일정 (달력 카드 기준)', ['작품','장르','집필 기간','일수','글자수','평균'],
+                      [420, 200, 380, 140, 240, 244], workRows, '#0f766e');
 
-            drawTable('■ 기간 일정 · 집필', ['종류','일정 제목','연결 작품','기간','총일수','집필일','쉬는 날','예상 글자수','하루 집필량','메모'],
-                      [95, 250, 215, 285, 78, 78, 130, 140, 120, 233], writeSpanRows, '#b45309');
+            drawTable('■ 기간 일정 · 집필', ['일정 제목','연결 작품','기간','총일수','집필일','쉬는 날','예상 글자수','하루 집필량','메모'],
+                      [200, 230, 300, 100, 100, 150, 230, 160, 154], writeSpanRows, '#b45309');
 
-            drawTable('■ 기간 일정 · 휴식 등 (휴식·교정·여행·시놉기획)', ['종류','일정 제목','연결 작품','기간','총일수','집필일','쉬는 날','예상 글자수','하루 집필량','메모'],
-                      [95, 250, 215, 285, 78, 78, 130, 140, 120, 233], restSpanRows, '#92400e');
+            drawTable('■ 기간 일정 · 휴식 등 (휴식·교정·여행·시놉기획)', ['종류','일정 제목','연결 작품','기간','총일수','메모'],
+                      [140, 300, 300, 420, 200, 264], restSpanRows, '#92400e');
 
             drawTable('■ 월별 목표', ['월','확정 글자수','예정 글자수','합계','집필 일수(확정)','집필 일수(합계)','하루 평균(확정)','하루 평균(합계)'],
                       [124, 210, 210, 210, 215, 215, 220, 220], monthRows, '#4f46e5');

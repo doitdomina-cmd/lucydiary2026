@@ -3291,6 +3291,26 @@ body.menu-font-on #settings-panel-modal .settings-tabbtn, body.menu-font-on #the
         #dash-memo-board .dmb-empty { text-align: center; padding: 34px 8px 20px; font-size: 14px; opacity: .65; }
         @media (hover: none) { #dash-memo-board .dmb-tools { opacity: .75; } }
         @media (max-width: 767px) { #dash-memo-board .dmb-canvas { --w: 156px; } #dash-memo-board .dmb-note { padding: 22px 10px 8px; min-height: 150px; } html body #dash-memo-board .dmb-note .dmb-text { font-size: 13px; min-height: 96px; } }
+        /* 메모 보기 방식(자유/2단/3단/4단) */
+        #dash-memo-board .dmb-hr { display: flex; align-items: center; gap: 6px; }
+        #dash-memo-board .dmb-view { display: flex; gap: 1px; padding: 2px; border-radius: 999px; background: rgba(74,63,51,.08); }
+        #dash-memo-board .dmb-view button { border: 0; background: transparent; color: inherit; opacity: .6; font-size: 12px; font-weight: 700; line-height: 1; padding: 6px 10px; border-radius: 999px; cursor: pointer; font-family: inherit; white-space: nowrap; }
+        #dash-memo-board .dmb-view button:hover { opacity: .9; }
+        #dash-memo-board .dmb-view button.on { opacity: 1; background: #fff; color: #4a3f33; box-shadow: 0 1px 3px rgba(60,45,25,.2); }
+        html body #dash-memo-board .dmb-canvas.dmb-cols { display: flex; align-items: flex-start; gap: 28px; height: auto !important; min-height: 0; padding-top: 14px; }
+        html body #dash-memo-board .dmb-cols .dmb-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 30px; }
+        html body #dash-memo-board .dmb-cols .dmb-note { position: relative !important; left: auto !important; top: auto !important; width: 100% !important; max-width: 100% !important; transform: none !important; z-index: auto !important; }
+        html body #dash-memo-board .dmb-cols .dmb-grip, html body #dash-memo-board .dmb-cols .dmb-rz { display: none !important; }
+        @media (max-width: 767px) { html body #dash-memo-board .dmb-canvas.dmb-cols { gap: 12px; } html body #dash-memo-board .dmb-cols .dmb-col { gap: 20px; } #dash-memo-board .dmb-view button { padding: 6px 7px; } }
+        /* 글자 서식 도구줄 (글자를 드래그하면 뜸) */
+        #dmb-fmt { position: fixed; z-index: 99999; display: none; flex-wrap: wrap; align-items: center; gap: 2px; padding: 5px; max-width: 350px; background: #fff; border: 1px solid rgba(74,63,51,.2); border-radius: 12px; box-shadow: 0 6px 18px rgba(60,45,25,.28); user-select: none; -webkit-user-select: none; }
+        #dmb-fmt button { width: 30px; height: 30px; border: 0; border-radius: 8px; background: transparent; color: #4a3f33; cursor: pointer; padding: 0; font-family: inherit; font-size: 14px; font-weight: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        #dmb-fmt button:hover { background: #F1ECE3; }
+        #dmb-fmt .sp { width: 1px; height: 18px; background: rgba(74,63,51,.2); margin: 0 3px; }
+        #dmb-fmt .bar { width: 14px; height: 3px; border-radius: 2px; margin-top: 1px; background: #D6336C; }
+        #dmb-fmt .pr { display: none; width: 100%; flex-wrap: wrap; gap: 5px; padding: 6px 3px 3px; }
+        #dmb-fmt .pr button { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid rgba(74,63,51,.3); }
+        #dmb-fmt .pr button.none { background: #fff linear-gradient(135deg, transparent 45%, #d33 45% 55%, transparent 55%); }
         /* MEMO BOARD THEMES START */
         /* 견출지: 점선 윤곽 + 줄무늬 견출 스티커 */
         body.theme-label #dash-memo-board .dmb-note { border: 0; border-radius: 5px; box-shadow: 0 3px 8px rgba(60,45,25,.2); }
@@ -21444,14 +21464,18 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             if (one) dmbResize(); else dmbPlace();
         }
         // 판 높이: 가장 아래 메모에 맞춤
+        // 보기 방식: 0=자유 배치, 2·3·4=단 보기 (기기마다 따로 기억 — 폰은 2단, PC 는 자유 같은 식으로)
+        function dmbColsN() { try { const n = +localStorage.getItem('dmbCols_v1'); return n >= 2 && n <= 4 ? n : 0; } catch (e) { return 0; } }
+        function dmbSetCols(n) { try { localStorage.setItem('dmbCols_v1', String(n)); } catch (e) {} _dmbSig = ''; renderDashMemoBoard(true); }
         function dmbResize() {
             const c = document.querySelector('#dash-memo-board .dmb-canvas'); if (!c || !c.offsetParent) return;
+            if (c.classList.contains('dmb-cols')) { c.style.height = ''; return; }
             let b = 0; c.querySelectorAll('.dmb-note').forEach(n => { b = Math.max(b, n.offsetTop + n.offsetHeight); });
             c.style.height = Math.max(260, b + 40) + 'px';
         }
         // 아직 자리가 없는 메모(새 메모)는 빈 자리에 놓는다. 이미 옮겨 둔 메모는 그대로
         function dmbPlace() {
-            const canvas = document.querySelector('#dash-memo-board .dmb-canvas'); if (!canvas || !canvas.offsetParent) return;
+            const canvas = document.querySelector('#dash-memo-board .dmb-canvas'); if (!canvas || !canvas.offsetParent || canvas.classList.contains('dmb-cols')) return;
             const cw = canvas.clientWidth; if (cw < 100) return;
             const notes = [...canvas.querySelectorAll('.dmb-note')];
             const W = notes[0] ? notes[0].offsetWidth : 230, H = 210, gapX = 28, gapY = 36;
@@ -21535,6 +21559,113 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         function dmbTape(id) { let h = 0; for (const c of String(id)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h % 6; }
         // 글자만 받는 편집 칸 (붙여넣어도 서식은 빼고 글자만)
         const DMB_CE = (() => { try { const d = document.createElement('div'); d.contentEditable = 'plaintext-only'; return d.contentEditable === 'plaintext-only' ? 'plaintext-only' : 'true'; } catch (e) { return 'true'; } })();
+        // ── 글자 서식(굵게·기울임·밑줄·크기·글자색·형광펜): 글 칸의 화면(DOM)을 안전한 모양만 남겨 {t:순수글자, h:서식 HTML} 로 바꿔 저장 ──
+        //    t 는 늘 순수 글자(접힌 제목·검색용), h 는 서식이 있을 때만 저장. 허용: <span style="font-weight|font-style|text-decoration|font-size|color|background-color">
+        function dmbRead(el) {
+            const BL = /^(DIV|P|LI|H[1-6]|BLOCKQUOTE|PRE)$/;
+            const okCol = v => /^(#[0-9a-f]{3,8}|rgba?\(\s*\d{1,3}\s*(,\s*\d{1,3}\s*){2}(,\s*[\d.]+\s*)?\))$/i.test(v || '');
+            let t = '', h = '';
+            const nl = () => { t += '\n'; h += '\n'; };
+            const walk = n => {
+                for (let c = n.firstChild; c; c = c.nextSibling) {
+                    if (c.nodeType === 3) { const s = c.data.replace(/ /g, ' '); t += s; h += escapeHtml(s); continue; }
+                    if (c.nodeType !== 1) continue;
+                    const tg = c.nodeName;
+                    if (tg === 'BR') { if (!(!c.nextSibling && (c.parentNode === n && (n === el || BL.test(n.nodeName))))) nl(); continue; }   // 줄 끝의 BR 은 자리표시라 글자가 아님
+                    if (BL.test(tg)) { if (t && !t.endsWith('\n')) nl(); const s0 = t.length; walk(c); if (t.length === s0) nl(); continue; }
+                    if (tg === 'IMG' || tg === 'SCRIPT' || tg === 'STYLE') continue;
+                    const st = c.style || {}, css = [];
+                    if (/^(B|STRONG)$/.test(tg) || /^(bold|[6-9]00)$/.test(st.fontWeight || '')) css.push('font-weight:700');
+                    if (/^(I|EM)$/.test(tg) || st.fontStyle === 'italic') css.push('font-style:italic');
+                    if (tg === 'U' || /underline/.test(st.textDecorationLine || st.textDecoration || '')) css.push('text-decoration:underline');
+                    if (/^\d+(\.\d+)?px$/.test(st.fontSize || '')) { const v = parseFloat(st.fontSize); if (v >= 9 && v <= 60) css.push('font-size:' + v + 'px'); }
+                    const col = st.color || (tg === 'FONT' ? c.getAttribute('color') : '');
+                    if (col && okCol(col)) css.push('color:' + col);
+                    const bg = st.backgroundColor;
+                    if (bg && okCol(bg) && !/^rgba\(\s*0,\s*0,\s*0,\s*0\s*\)$/.test(bg)) css.push('background-color:' + bg);
+                    if (css.length) h += '<span style="' + css.join(';') + '">';
+                    walk(c);
+                    if (css.length) h += '</span>';
+                }
+            };
+            walk(el);
+            t = t.replace(/\n+$/, ''); h = h.replace(/\n+$/, '');
+            return { t, h: /<span /.test(h) ? h : '' };
+        }
+        function dmbClean(h) { const body = new DOMParser().parseFromString('<body>' + h + '</body>', 'text/html').body; const r = dmbRead(body); return r.h || escapeHtml(r.t); }
+        function dmbRichHtml(o) { return o && o.h ? dmbClean(o.h) : escapeHtml((o && o.t) || ''); }
+        // 사진을 글 한가운데로 끌어 놓을 때: 서식을 지킨 채로 글자 위치 off 에서 둘로 자른다
+        function dmbSplitH(h, off) {
+            const body = new DOMParser().parseFromString('<body>' + h + '</body>', 'text/html').body, doc = body.ownerDocument;
+            const tw = doc.createTreeWalker(body, NodeFilter.SHOW_TEXT); let n, acc = 0, at = null;
+            while ((n = tw.nextNode())) { if (acc + n.data.length >= off) { at = [n, off - acc]; break; } acc += n.data.length; }
+            if (!at) return [dmbRead(body), { t: '', h: '' }];
+            const r1 = doc.createRange(); r1.setStart(body, 0); r1.setEnd(at[0], at[1]);
+            const r2 = doc.createRange(); r2.setStart(at[0], at[1]); r2.setEnd(body, body.childNodes.length);
+            const mk = (frag, trim) => { const d = document.createElement('div'); d.appendChild(frag); if (trim) { const w = document.createTreeWalker(d, NodeFilter.SHOW_TEXT), f = w.nextNode(); if (f && f.data.startsWith('\n')) f.data = f.data.slice(1); } return dmbRead(d); };
+            return [mk(r1.cloneContents(), false), mk(r2.cloneContents(), true)];
+        }
+        function dmbBlk(r) { return r.h ? { t: r.t, h: r.h } : { t: r.t }; }
+        // 글자 서식 도구줄: 글자를 드래그하면 그 위(폰에서는 아래)에 뜬다
+        const DMB_TXT = ['#2B2118', '#D6336C', '#E8590C', '#2F9E44', '#1C7ED6', '#7048E8', '#868E96'];
+        const DMB_HL = ['#FFF176', '#FFC4D6', '#B9F0D0', '#BFE0FF', '#E3D4FF', '#FFD9A8'];
+        let _dmbRange = null;
+        function dmbCurEl() {
+            const s = getSelection(); if (!s || !s.rangeCount) return null;
+            let n = s.anchorNode; n = n && (n.nodeType === 3 ? n.parentElement : n);
+            return n && n.closest ? n.closest('#dash-memo-board .dmb-text') : null;
+        }
+        function dmbFmtBar() {
+            let tb = document.getElementById('dmb-fmt'); if (tb) return tb;
+            tb = document.createElement('div'); tb.id = 'dmb-fmt';
+            tb.innerHTML = '<button data-a="bold" title="굵게 (Ctrl+B)"><b>B</b></button><button data-a="italic" title="기울임 (Ctrl+I)"><i>I</i></button><button data-a="underline" title="밑줄 (Ctrl+U)"><u>U</u></button><span class="sp"></span>'
+                + '<button data-a="sz" data-v="12" title="작은 글씨" style="font-size:11px">가</button><button data-a="sz" data-v="0" title="기본 크기" style="font-size:14px">가</button><button data-a="sz" data-v="20" title="큰 글씨" style="font-size:17px">가</button><button data-a="sz" data-v="26" title="아주 큰 글씨" style="font-size:21px">가</button><span class="sp"></span>'
+                + '<button data-a="pal" data-v="fg" title="글자 색"><span style="font-weight:800;line-height:1">A</span><span class="bar" id="dmb-fg-bar"></span></button><button data-a="pal" data-v="bg" title="배경 색(형광펜)"><i class="fa-solid fa-highlighter"></i></button><button data-a="clr" title="서식 지우기"><i class="fa-solid fa-eraser"></i></button><div class="pr"></div>';
+            ['pointerdown', 'mousedown'].forEach(ev => tb.addEventListener(ev, e => e.preventDefault()));   // 눌러도 글자 선택이 풀리지 않게
+            tb.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; dmbFmtDo(b.dataset.a, b.dataset.v); });
+            document.body.appendChild(tb); return tb;
+        }
+        function dmbFmtPal(kind) {
+            const tb = dmbFmtBar(), pr = tb.querySelector('.pr');
+            if (pr.dataset.k === kind && pr.style.display === 'flex') { pr.style.display = 'none'; pr.dataset.k = ''; dmbFmtPlace(); return; }
+            pr.dataset.k = kind;
+            pr.innerHTML = (kind === 'fg' ? DMB_TXT : DMB_HL).map(c => `<button data-a="${kind}" data-v="${c}" style="background:${c}" title="${c}"></button>`).join('') + (kind === 'bg' ? '<button class="none" data-a="bg" data-v="transparent" title="배경색 없애기"></button>' : '');
+            pr.style.display = 'flex'; dmbFmtPlace();
+        }
+        function dmbFmtDo(act, val) {
+            if (act === 'pal') return dmbFmtPal(val);
+            let el = dmbCurEl();
+            if (!el && _dmbRange) { const s = getSelection(); s.removeAllRanges(); s.addRange(_dmbRange); el = dmbCurEl(); }
+            if (!el) return;
+            const sel = getSelection(); if (!sel.rangeCount || sel.isCollapsed) { if (!_dmbRange) return; sel.removeAllRanges(); sel.addRange(_dmbRange); }
+            try { document.execCommand('styleWithCSS', false, true); } catch (e) {}
+            if (act === 'bold' || act === 'italic' || act === 'underline') document.execCommand(act);
+            else if (act === 'sz') {
+                const v = +val; document.execCommand('fontSize', false, '7');
+                el.querySelectorAll('span').forEach(s => { if (/xxx-large/.test(s.style.fontSize)) { if (v) s.style.fontSize = v + 'px'; else s.style.removeProperty('font-size'); } });
+                el.querySelectorAll('font[size="7"]').forEach(f => { const s = document.createElement('span'); if (v) s.style.fontSize = v + 'px'; while (f.firstChild) s.appendChild(f.firstChild); f.replaceWith(s); });
+            }
+            else if (act === 'fg') { document.execCommand('foreColor', false, val); const b = document.getElementById('dmb-fg-bar'); if (b) b.style.background = val; }
+            else if (act === 'bg') document.execCommand('hiliteColor', false, val);
+            else if (act === 'clr') document.execCommand('removeFormat');
+            try { _dmbRange = getSelection().getRangeAt(0).cloneRange(); } catch (e) {}
+            el.dispatchEvent(new Event('input', { bubbles: true }));   // 저장
+            dmbFmtPlace();
+        }
+        function dmbFmtPlace() {
+            const tb = dmbFmtBar(), s = getSelection(), el = dmbCurEl();
+            if (!s || !s.rangeCount || s.isCollapsed || !el) { tb.style.display = 'none'; const pr = tb.querySelector('.pr'); pr.style.display = 'none'; pr.dataset.k = ''; return; }
+            _dmbRange = s.getRangeAt(0).cloneRange();
+            const r = _dmbRange.getBoundingClientRect(); if (!r.width && !r.height) { tb.style.display = 'none'; return; }
+            tb.style.display = 'flex';
+            const w = tb.offsetWidth, h = tb.offsetHeight, coarse = window.matchMedia && matchMedia('(pointer:coarse)').matches;
+            let top = coarse ? r.bottom + 40 : r.top - h - 8; if (top < 8) top = r.bottom + 10;
+            if (top + h > innerHeight - 8) top = Math.max(8, r.top - h - 8);
+            tb.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + 'px'; tb.style.top = top + 'px';
+        }
+        let _dmbSelRaf = 0;
+        document.addEventListener('selectionchange', () => { cancelAnimationFrame(_dmbSelRaf); _dmbSelRaf = requestAnimationFrame(dmbFmtPlace); });
+        window.addEventListener('scroll', () => { const tb = document.getElementById('dmb-fmt'); if (tb && tb.style.display !== 'none') dmbFmtPlace(); }, true);
         // 사진 붙여넣기: 글자는 그대로 두고 메모 아래에 사진을 붙인다 (PC 는 ~/RoyaltyAssets/ 파일, 웹은 줄인 JPEG)
         function dmbPaste(e) {
             const cd = e.clipboardData || window.clipboardData;
@@ -21554,22 +21685,30 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         function dmbNorm(m) {
             if (!Array.isArray(m.blocks)) return;
             let bl = m.blocks.filter(b => b && (typeof b.i === 'string' || typeof b.t === 'string'));
-            if (!bl.some(b => b.i)) { m.text = bl.map(b => b.t).join('\n').replace(/\n+$/, ''); delete m.blocks; return; }   // 사진이 없으면 예전 글 메모로
+            if (!bl.some(b => b.i)) {   // 사진이 없으면 예전 글 메모로
+                m.text = bl.map(b => b.t).join('\n').replace(/\n+$/, ''); delete m.blocks;
+                if (bl.some(b => b.h)) m.h = bl.map(b => b.h || escapeHtml(b.t)).join('\n').replace(/\n+$/, ''); else delete m.h;
+                return;
+            }
             const out = [];
             bl.forEach(b => {
                 const last = out[out.length - 1];
-                if (!b.i && last && !last.i) last.t = last.t && b.t ? last.t + '\n' + b.t : last.t + b.t;   // 글 칸이 붙으면 합침
-                else out.push(b.i ? { i: b.i } : { t: b.t });
+                if (!b.i && last && !last.i) {   // 글 칸이 붙으면 합침 (서식도 함께)
+                    if (last.h || b.h) last.h = (last.h || escapeHtml(last.t)) + (last.t && b.t ? '\n' : '') + (b.h || escapeHtml(b.t));
+                    last.t = last.t && b.t ? last.t + '\n' + b.t : last.t + b.t;
+                }
+                else out.push(b.i ? { i: b.i } : (b.h ? { t: b.t, h: b.h } : { t: b.t }));
             });
             if (out[0].i) out.unshift({ t: '' });
             for (let k = 0; k < out.length; k++) if (out[k].i && (k === out.length - 1 || out[k + 1].i)) out.splice(k + 1, 0, { t: '' });   // 사진 아래엔 늘 글 칸
             m.blocks = out;
             m.text = out.filter(b => !b.i).map(b => b.t).join('\n').replace(/^\n+/, '');
         }
-        function dmbEnsureBlocks(m) {
-            if (!Array.isArray(m.blocks)) { m.blocks = [{ t: m.text || '' }].concat((m.imgs || []).map(i => ({ i }))); delete m.imgs; }
-            dmbNorm(m);
+        function dmbToBlocks(m) {
+            if (Array.isArray(m.blocks)) return;
+            m.blocks = [m.h ? { t: m.text || '', h: m.h } : { t: m.text || '' }].concat((m.imgs || []).map(i => ({ i }))); delete m.imgs; delete m.h;
         }
+        function dmbEnsureBlocks(m) { dmbToBlocks(m); dmbNorm(m); }
         function dmbAddImage(id, file, after) {
             const m = dashMemos.find(x => x.id === id); if (!m) return;
             const img = new Image(), url = URL.createObjectURL(file);
@@ -21580,7 +21719,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                     const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
                     const data = c.toDataURL('image/jpeg', 0.85);
                     const name = assetDir ? assetStoreDataUrl(data) : null;
-                    if (!Array.isArray(m.blocks)) m.blocks = [{ t: m.text || '' }].concat((m.imgs || []).map(i => ({ i }))); delete m.imgs;
+                    dmbToBlocks(m);
                     const at = Math.min(m.blocks.length, (typeof after === 'number' && after >= 0 ? after : 0) + 1);
                     m.blocks.splice(at, 0, { i: name ? ASSET_PREFIX + name : data });
                     dmbNorm(m); m.ts = Date.now();
@@ -21597,8 +21736,8 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         }
         function dmbBlkIn(id, k, el) {
             const m = dashMemos.find(x => x.id === id); const b = m && m.blocks && m.blocks[k]; if (!b || b.i !== undefined) return;
-            b.t = ((t0, br) => (br ? t0.replace(/\n$/, '') : t0))(el.innerText, el.lastChild && el.lastChild.nodeName === 'BR').replace(/\u00a0/g, ' ');
-            if (!b.t) el.innerHTML = '';
+            const rd = dmbRead(el); b.t = rd.t; if (rd.h) b.h = rd.h; else delete b.h;
+            if (!b.t) { el.innerHTML = ''; delete b.h; }
             m.text = m.blocks.filter(x => x.i === undefined).map(x => x.t).join('\n').replace(/^\n+/, '');
             m.ts = Date.now(); dmbFit(el);
             const dt = el.closest('.dmb-note').querySelector('.dmb-date'); if (dt) dt.textContent = dmbFmt(m.ts);
@@ -21611,7 +21750,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                     const src = nm ? (assetDir ? assetDisplayUrl(v) : ASSET_BLANK) : v;
                     return `<div class="dmb-img" data-bi="${k}"><img src="${src}"${nm ? ` data-asset="${nm}"` : ''} alt="" draggable="false" title="끌어서 위아래로 옮기기"><button type="button" class="dmb-imgx" onclick="dmbImgDel('${m.id}',${k})" title="사진 지우기">×</button></div>`;
                 }
-                return `<div class="dmb-text${k === 0 ? '' : ' dmb-tb'}" data-bi="${k}" contenteditable="${DMB_CE}" spellcheck="false" data-ph="${k === 0 ? '메모를 적어요' : ''}" oninput="dmbBlkIn('${m.id}', ${k}, this)" onpaste="dmbPaste(event)">${escapeHtml(b.t || '')}</div>`;
+                return `<div class="dmb-text${k === 0 ? '' : ' dmb-tb'}" data-bi="${k}" contenteditable="true" spellcheck="false" data-ph="${k === 0 ? '메모를 적어요' : ''}" oninput="dmbBlkIn('${m.id}', ${k}, this)" onpaste="dmbPaste(event)">${dmbRichHtml(b)}</div>`;
             }).join('');
         }
         // 사진을 잡고 위아래로 끌어 옮기기
@@ -21677,7 +21816,8 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             if (d.split) {
                 const [img] = m.blocks.splice(d.from, 1);
                 const k = d.split.k > d.from ? d.split.k - 1 : d.split.k, t = m.blocks[k].t || '';
-                m.blocks.splice(k, 1, { t: t.slice(0, d.split.off).replace(/\n$/, '') }, img, { t: t.slice(d.split.off).replace(/^\n/, '') });
+                if (m.blocks[k].h) { const [pa, pb] = dmbSplitH(m.blocks[k].h, d.split.off); m.blocks.splice(k, 1, dmbBlk(pa), img, dmbBlk(pb)); }
+                else m.blocks.splice(k, 1, { t: t.slice(0, d.split.off).replace(/\n$/, '') }, img, { t: t.slice(d.split.off).replace(/^\n/, '') });
                 dmbNorm(m); m.ts = Date.now();
             } else if (d.to >= 0) {
                 let to = d.to; if (to > d.from) to--;
@@ -21698,7 +21838,8 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         function dmbInput(id, el) {
             const m = dashMemos.find(x => x.id === id); if (!m) return;
             m.text = ((t0, br) => (br ? t0.replace(/\n$/, '') : t0))(el.innerText, el.lastChild && el.lastChild.nodeName === 'BR').replace(/\u00a0/g, ' ');
-            if (!m.text) el.innerHTML = '';   // 다 지우면 안내 문구가 다시 보이게
+            { const rd = dmbRead(el); m.text = rd.t; if (rd.h) m.h = rd.h; else delete m.h; }
+            if (!m.text) { el.innerHTML = ''; delete m.h; }   // 다 지우면 안내 문구가 다시 보이게
             m.ts = Date.now();
             dmbFit(el);
             const dt = el.closest('.dmb-note').querySelector('.dmb-date'); if (dt) dt.textContent = dmbFmt(m.ts);
@@ -21740,9 +21881,9 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         }
         function dmbFold(id) { const m = dashMemos.find(x => x.id === id); if (!m) return; m.fold = !m.fold; if (!m.fold) { m.z = 1 + Math.max(0, ...dashMemos.map(x => x.z || 0)); m.pfx = m.fx; m.py = m.y; m.fx = 0.5; m.y = 30; m.flat = true; } else { delete m.flat; if (typeof m.pfx === 'number') { m.fx = m.pfx; if (typeof m.py === 'number') m.y = m.py; } delete m.pfx; delete m.py; }   /* 접으면 원래 있던 자리로 */ save(true);   /* 펼치면 가운데에, 기울기 없이(넓은 창에서 기울면 버벅임) */ _dmbSig = ''; renderDashMemoBoard(true); }
         // ── 체크보드: 할 일을 한 줄씩 적고 앞 네모를 눌러 체크. m.items=[{t,d}], m.text 는 첫 줄(접은 제목)용으로 같이 맞춰 둠 ──
-        function dmbCkSync(m) { m.text = (m.items || []).map(x => x.t).join('\n'); m.ts = Date.now(); }
+        function dmbCkSync(m) { m.text = (m.items || []).map(x => x.t).join('\n'); delete m.h; m.ts = Date.now(); }
         function dmbCkFocus(id, k, end) {
-            const i = dashMemos.findIndex(x => x.id === id); const n = document.querySelectorAll('#dash-memo-board .dmb-note')[i]; if (!n) return;
+            const n = [...document.querySelectorAll('#dash-memo-board .dmb-note')].find(x => x.getAttribute('data-mid') === id); if (!n) return;
             const t = n.querySelectorAll('.dmb-ckt')[k]; if (!t) return;
             t.focus(); if (end !== false) { try { const r = document.createRange(); r.selectNodeContents(t); r.collapse(false); const s = getSelection(); s.removeAllRanges(); s.addRange(r); } catch (e) {} }
         }
@@ -21791,7 +21932,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             dashMemos.forEach(m => { if (!m.check && ((m.imgs && m.imgs.length) || m.blocks)) dmbEnsureBlocks(m); });
             dashMemos.forEach(m => { if (m.check) { if (!Array.isArray(m.items)) m.items = []; while (m.items.length < 2) m.items.push({ t: '', d: 0 }); } });   // 체크보드: 윗줄=제목 + 항목 1개 이상
             const open = true;   // 접기 기능 없음
-            const sig = JSON.stringify(dashMemos) + '|' + open;
+            const sig = JSON.stringify(dashMemos) + '|' + open + '|' + dmbColsN();
             if (!force && sig === _dmbSig && box.firstChild) return;
             _dmbSig = sig;
             const rots = [-1.6, 1.2, -0.8, 1.8, -1.3, 0.9];
@@ -21799,17 +21940,20 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 <div class="dmb-grip" title="끌어서 옮기기" onpointerdown="dmbGripDown(event, '${m.id}')" onpointermove="dmbGripMove(event)" onpointerup="dmbGripUp(event)" onpointercancel="dmbGripUp(event)"></div>
                 <div class="dmb-rz" title="끌어서 너비 조절" onpointerdown="dmbRzDown(event, '${m.id}')" onpointermove="dmbRzMove(event)" onpointerup="dmbRzUp(event)" onpointercancel="dmbRzUp(event)"></div>
                 ${m.fold ? '' : `<div class="dmb-fsz"><button type="button" onclick="dmbFont('${m.id}',-1,this)" title="글자 작게">−</button><button type="button" class="up" onclick="dmbFont('${m.id}',1,this)" title="글자 크게">+</button></div><button type="button" class="dmb-foldic" onclick="dmbFold('${m.id}')" title="접어서 제목만 보기"><i class="fa-solid fa-chevron-up"></i></button>`}
-                ${m.fold ? `<div class="dmb-ftitle" onclick="dmbFold('${m.id}')" title="눌러서 펴기">${escapeHtml(String(m.text || '').split('\n')[0].trim() || '(제목 없음)')}</div><div class="dmb-fh" onclick="dmbFold('${m.id}')" title="펴기"></div>` : (m.check ? `<div class="dmb-checks">${m.items.map((it, k) => `<div class="dmb-ck${k === 0 ? ' dmb-cktitle' : (it.d ? ' done' : '')}">${k === 0 ? '' : `<button type="button" class="dmb-ckb" onclick="dmbCkToggle('${m.id}',${k},this)" title="했으면 체크"><i class="fa-solid fa-check"></i></button>`}<span class="dmb-ckt" contenteditable="${DMB_CE}" spellcheck="false" data-ph="${k === 0 ? '제목' : '할 일'}" oninput="dmbCkInput('${m.id}',${k},this)" onkeydown="dmbCkKey(event,'${m.id}',${k})" onpaste="dmbCkPaste(event)">${escapeHtml(it.t || '')}</span></div>`).join('')}<button type="button" class="dmb-ckadd" onclick="dmbCkAdd('${m.id}')">+ 할 일 추가</button></div>` : `${m.blocks ? dmbBlocksHtml(m) : `<div class="dmb-text" contenteditable="${DMB_CE}" spellcheck="false" data-ph="메모를 적어요" oninput="dmbInput('${m.id}', this)" onpaste="dmbPaste(event)">${escapeHtml(m.text || '')}</div>`}`)}
+                ${m.fold ? `<div class="dmb-ftitle" onclick="dmbFold('${m.id}')" title="눌러서 펴기">${escapeHtml(String(m.text || '').split('\n')[0].trim() || '(제목 없음)')}</div><div class="dmb-fh" onclick="dmbFold('${m.id}')" title="펴기"></div>` : (m.check ? `<div class="dmb-checks">${m.items.map((it, k) => `<div class="dmb-ck${k === 0 ? ' dmb-cktitle' : (it.d ? ' done' : '')}">${k === 0 ? '' : `<button type="button" class="dmb-ckb" onclick="dmbCkToggle('${m.id}',${k},this)" title="했으면 체크"><i class="fa-solid fa-check"></i></button>`}<span class="dmb-ckt" contenteditable="${DMB_CE}" spellcheck="false" data-ph="${k === 0 ? '제목' : '할 일'}" oninput="dmbCkInput('${m.id}',${k},this)" onkeydown="dmbCkKey(event,'${m.id}',${k})" onpaste="dmbCkPaste(event)">${escapeHtml(it.t || '')}</span></div>`).join('')}<button type="button" class="dmb-ckadd" onclick="dmbCkAdd('${m.id}')">+ 할 일 추가</button></div>` : `${m.blocks ? dmbBlocksHtml(m) : `<div class="dmb-text" contenteditable="true" spellcheck="false" data-ph="메모를 적어요" oninput="dmbInput('${m.id}', this)" onpaste="dmbPaste(event)">${m.h ? dmbClean(m.h) : escapeHtml(m.text || '')}</div>`}`)}
                 <span class="dmb-date">${dmbFmt(m.ts)}</span>
                 <div class="dmb-tools">
                     <button type="button" class="dmb-tool colorc" onclick="dmbPal(this)" title="색 바꾸기"></button>
                     <button type="button" class="dmb-tool del" onclick="dmbDel('${m.id}')" title="메모 지우기"><i class="fa-solid fa-trash-can"></i></button>
                 </div>
                 <div class="dmb-pal"><div class="dmb-prow">${DMB_COLORS.map(c => `<button type="button" class="dmb-dot${dmbShade(m.color) === c ? ' on' : ''}" style="background:${c}" onclick="dmbColor('${m.id}','${c}')" title="이 색으로"></button>`).join('')}<label class="dmb-dot dmb-pick${DMB_COLORS.includes(dmbShade(m.color)) ? '' : ' on'}" title="원하는 색 고르기" onclick="event.stopPropagation(); this.closest('.dmb-note').classList.add('pal-keep')"><input type="color" value="${/^#[0-9a-fA-F]{6}$/.test(dmbShade(m.color)) ? dmbShade(m.color) : '#FFF4C2'}" onblur="this.closest('.dmb-note').classList.remove('pal-keep')" onchange="dmbColor('${m.id}', this.value.toUpperCase())"></label></div><div class="dmb-prow"><button type="button" class="dmb-foldbtn${m.look === 'note' || m.look === 'dot' || m.look === 'grid' ? '' : ' on'}" onclick="dmbLook('${m.id}','post')" title="포스트잇 모양">포스트잇</button><button type="button" class="dmb-foldbtn${m.look === 'note' ? ' on' : ''}" onclick="dmbLook('${m.id}','note')" title="줄 노트 모양">노트</button><button type="button" class="dmb-foldbtn${m.look === 'dot' ? ' on' : ''}" onclick="dmbLook('${m.id}','dot')" title="도트 용지 모양">도트</button><button type="button" class="dmb-foldbtn${m.look === 'grid' ? ' on' : ''}" onclick="dmbLook('${m.id}','grid')" title="모눈 용지 모양">모눈</button></div><div class="dmb-prow"><button type="button" class="dmb-foldbtn${m.check ? ' on' : ''}" onclick="dmbCheck('${m.id}')" title="할 일 체크보드로 바꾸기/되돌리기">체크보드</button><button type="button" class="dmb-foldbtn${m.deco === 'pin' || m.deco === 'none' ? '' : ' on'}" onclick="dmbDeco('${m.id}','tape')" title="위에 테이프 붙이기">테이프</button><button type="button" class="dmb-foldbtn${m.deco === 'pin' ? ' on' : ''}" onclick="dmbDeco('${m.id}','pin')" title="위에 핀 꽂기 (하트·꽃·병아리 무작위)">핀</button><button type="button" class="dmb-foldbtn${m.deco === 'none' ? ' on' : ''}" onclick="dmbDeco('${m.id}','none')" title="위 장식 없애기">없음</button><button type="button" class="dmb-dashbtn${m.dash === false ? '' : ' on'}" onclick="dmbDash('${m.id}', this)" title="점선 켜기/끄기"></button></div></div>
-            </div>`).join('');
+            </div>`);
+            const colN = dmbColsN();
+            const notesHtml = colN ? Array.from({ length: colN }, (_, c) => `<div class="dmb-col">${notes.filter((_, i) => i % colN === c).join('')}</div>`).join('') : notes.join('');
+            const viewHtml = `<div class="dmb-view" title="메모 보기 방식">${[[0, '자유'], [2, '2단'], [3, '3단'], [4, '4단']].map(([n, l]) => `<button type="button" class="${colN === n ? 'on' : ''}" onclick="dmbSetCols(${n})">${l}</button>`).join('')}</div>`;
             box.innerHTML = `<div class="cozy-launch-wrap dmb-card">
-                <div class="cozy-launch-head" style="align-items:center; margin-bottom:0"><div class="dmb-title"><img class="dmb-ic" src="deco/memo-icon.png" alt=""><span class="ko">MEMO</span></div><button type="button" class="dmb-add" onclick="dmbAdd()" title="메모 추가"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M16 5 C16.7 11 15.3 21 16.3 27"/><path d="M5 16.6 C11 15.5 21 16.7 27 15.7"/></svg></button></div>
-                ${open ? (dashMemos.length ? `<div class="dmb-canvas">${notes}</div>` : '<div class="dmb-empty">출판사와 의논 중인 일, 잊으면 안 되는 일을 붙여 두세요 📌</div>') : ''}
+                <div class="cozy-launch-head" style="align-items:center; margin-bottom:0"><div class="dmb-title"><img class="dmb-ic" src="deco/memo-icon.png" alt=""><span class="ko">MEMO</span></div><div class="dmb-hr">${viewHtml}<button type="button" class="dmb-add" onclick="dmbAdd()" title="메모 추가"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M16 5 C16.7 11 15.3 21 16.3 27"/><path d="M5 16.6 C11 15.5 21 16.7 27 15.7"/></svg></button></div></div>
+                ${open ? (dashMemos.length ? `<div class="dmb-canvas${colN ? ' dmb-cols' : ''}">${notesHtml}</div>` : '<div class="dmb-empty">출판사와 의논 중인 일, 잊으면 안 되는 일을 붙여 두세요 📌</div>') : ''}
             </div>`;
             dmbFit(); dmbWatch();
             try { if (!assetDir) assetWebFill(box); else assetFetchMissing(); } catch (e) {}
@@ -30802,4 +30946,4 @@ updateEps(); render(); renderWorks();
 } catch (e) {} })();
 </script>
 </body>
-</html>
+</html>

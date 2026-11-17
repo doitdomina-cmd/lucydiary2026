@@ -12804,7 +12804,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                     <input value="${esc(r.title)}" oninput="pcSet('${r.id}','title',this.value,1)" placeholder="작품 제목" style="${inp}font-weight:700;">
                     <button type="button" onclick="pcDel('${r.id}')" title="삭제" style="color:#c66;">✕</button>
                     <input value="${esc(r.tag)}" list="pc-tags" oninput="pcSet('${r.id}','tag',this.value,1)" placeholder="상태" style="${inp}">
-                    <input value="${esc(r.sub)}" oninput="pcSet('${r.id}','sub',this.value,1)" placeholder="출판사" style="${inp}">
+                    <span></span>
                     <span style="display:flex;flex-direction:column;"><button type="button" onclick="pcMove('${r.id}',-1)" style="font-size:10px;line-height:1;color:#888;">▲</button><button type="button" onclick="pcMove('${r.id}',1)" style="font-size:10px;line-height:1;color:#888;">▼</button></span>
                     <span></span><input value="${esc(r.range)}" oninput="pcSet('${r.id}','range',this.value,1)" placeholder="집필 기간 (예: 1월 5일 ~ 3월 2일)" style="${inp}"><span></span>
                 </div>`).join('')}
@@ -12838,7 +12838,8 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             const c = pcGet(_pcYear), f = c.font || 'sans', d = c.design || 'simple';
             const chip = (on, label, act) => `<button type="button" onclick="${act}" style="padding:4px 11px;border-radius:999px;font-size:12.5px;font-weight:700;border:1px solid ${on ? '#6b4a32' : '#b8b0a6'};background:${on ? '#6b4a32' : '#fff'};color:${on ? '#fff' : '#2b2118'};">${label}</button>`;
             return `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;"><span style="font-size:12.5px;font-weight:800;color:#2b2118;align-self:center;margin-right:4px;">글꼴</span>${Object.entries(PC_FONTS).map(([k, v]) => chip(f === k, v[0], `pcOpt('font','${k}')`)).join('')}</div>
-                <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;"><span style="font-size:12.5px;font-weight:800;color:#2b2118;align-self:center;margin-right:4px;">디자인</span>${Object.entries(PC_DESIGNS).map(([k, v]) => chip(d === k, v, `pcOpt('design','${k}')`)).join('')}</div>`;
+                <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;"><span style="font-size:12.5px;font-weight:800;color:#2b2118;align-self:center;margin-right:4px;">디자인</span>${Object.entries(PC_DESIGNS).map(([k, v]) => chip(d === k, v, `pcOpt('design','${k}')`)).join('')}</div>
+                <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;"><span style="font-size:12.5px;font-weight:800;color:#2b2118;align-self:center;margin-right:4px;">표시</span>${chip(!!c.showPub, '출판사 ' + (c.showPub ? '켬' : '끔'), `pcOpt('showPub',${!c.showPub})`)}${chip(c.showRange !== false, '집필 기간 ' + (c.showRange !== false ? '켬' : '끔'), `pcOpt('showRange',${c.showRange === false})`)}</div>`;
         }
         // 카드 그림 (논리 폭 480, 2배로 그림)
         function pcDraw() {
@@ -12858,7 +12859,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             const rows = card.rows.filter(r => r.title || r.when);
             const isUnset = r => { const w = String(r.when || '').trim(); return !w || w === '미정'; };
             const dated = rows.filter(r => !isUnset(r)), unset = rows.filter(isUnset);
-            const rowH = r => r.sub ? 44 : 32;
+            const SP = !!card.showPub, SR = card.showRange !== false, hs = r => SP && r.sub, rowH = r => hs(r) ? 44 : 32;
             const datedH = dated.reduce((n, r) => n + rowH(r), 0);
             let H = TP + 78;
             if (dated.length) H += T.top + datedH + T.bot + 14;
@@ -12910,8 +12911,8 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 let ry = y + T.top; const pal = ['#FFE59A', '#F9C3CF', '#BDEBD6', '#B5D9F5', '#D5C6F0'];
                 dated.forEach((r, ri) => {
                     if (ri) { g.fillStyle = T.line; if (DES === 'label') { g.setLineDash([3, 3]); g.strokeStyle = T.line; g.beginPath(); g.moveTo(x0 + 12, ry + .5); g.lineTo(x0 + w0 - 12, ry + .5); g.stroke(); g.setLineDash([]); } else g.fillRect(x0 + 12, ry, w0 - 24, 1); }
-                    const cy = ry + rowH(r) / 2, mm = /^(\d+)(.*)$/.exec(String(r.when || '').trim()), by = cy + (r.sub ? 2 : 7);
-                    if (DES === 'label' && mm) { g.save(); g.translate(x0 + 50, cy - (r.sub ? 2 : 0)); g.rotate(-0.04); rr(-26, -15, 52, 30, 4); g.fillStyle = pal[(+mm[1]) % 5]; g.fill(); g.restore(); }
+                    const cy = ry + rowH(r) / 2, mm = /^(\d+)(.*)$/.exec(String(r.when || '').trim()), by = cy + (hs(r) ? 2 : 7);
+                    if (DES === 'label' && mm) { g.save(); g.translate(x0 + 50, cy - (hs(r) ? 2 : 0)); g.rotate(-0.04); rr(-26, -15, 52, 30, 4); g.fillStyle = pal[(+mm[1]) % 5]; g.fill(); g.restore(); }
                     g.fillStyle = (mm && DES !== 'label') ? MCOL[(+mm[1] - 1 + 12) % 12] : T.month;
                     if (mm) { const mcx = x0 + 50; g.font = `${FR ? 800 : 700} 30px ${NUM}`; const nw = g.measureText(mm[1]).width; g.font = `600 13px ${FONT}`; const mt = fit(mm[2], 40), mw = g.measureText(mt).width, tot = nw + 2 + mw, mx = mcx - tot / 2;
                       g.font = `${FR ? 800 : 700} 30px ${NUM}`; g.fillText(mm[1], mx, by - (DES === 'label' ? 1 : 0)); g.font = `600 13px ${FONT}`; g.fillText(mt, mx + nw + 2, by - (DES === 'label' ? 1 : 0)); }
@@ -12925,10 +12926,10 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                         g.fillStyle = tag[1]; g.textAlign = 'center'; g.fillText(r.tag, x0 + w0 - 12 - tw / 2, cy + 3); g.textAlign = 'left';
                     }
                     const tx = x0 + 12 + 104, maxW = x0 + w0 - 12 - tw - 8 - tx;
-                    g.font = `400 9.5px ${FONT}`; const rw = r.range ? g.measureText(r.range).width + 8 : 0;
-                    g.font = `${FR ? 700 : 500} 15px ${FONT}`; g.fillStyle = T.ink; const tt = fit(r.title, maxW - rw); g.fillText(tt, tx, cy + (r.sub ? -3 : 5));
-                    if (r.range) { const tw2 = g.measureText(tt).width; g.font = `400 9.5px ${FONT}`; g.fillStyle = T.sub; g.fillText(r.range, tx + tw2 + 7, cy + (r.sub ? -3 : 5)); }
-                    if (r.sub) { g.font = `400 8.5px ${FONT}`; g.fillStyle = T.sub; g.fillText(fit(r.sub, maxW), tx, cy + 13); }
+                    g.font = `400 9.5px ${FONT}`; const rw = SR && r.range ? g.measureText(r.range).width + 8 : 0;
+                    g.font = `${FR ? 700 : 500} 15px ${FONT}`; g.fillStyle = T.ink; const tt = fit(r.title, maxW - rw); g.fillText(tt, tx, cy + (hs(r) ? -3 : 5));
+                    if (SR && r.range) { const tw2 = g.measureText(tt).width; g.font = `400 9.5px ${FONT}`; g.fillStyle = T.sub; g.fillText(r.range, tx + tw2 + 7, cy + (hs(r) ? -3 : 5)); }
+                    if (hs(r)) { g.font = `400 8.5px ${FONT}`; g.fillStyle = T.sub; g.fillText(fit(r.sub, maxW), tx, cy + 13); }
                     ry += rowH(r);
                     if (DES === 'spiral') { g.fillStyle = 'rgba(31,45,39,.28)'; g.fillRect(x0, ry - 1, w0, 1); }
                 });

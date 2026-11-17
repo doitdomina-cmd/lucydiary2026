@@ -12726,7 +12726,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 else if (w.isPending && /^\d{4}-\d{2}$/.test(w.pendingMonth || '') && w.pendingMonth.startsWith(y + '-')) mo = +w.pendingMonth.slice(5, 7);
                 const sp = span[w.id];
                 if (!mo && !(w.isPending && sp)) return;   // 출간월이 없으면 집필 확정 카드가 있는 미출간 작품만 '출간월 미정'에
-                out.push({ id: pcUid(), ref: w.id, half: mo ? (mo <= 6 ? 1 : 2) : 0, when: mo ? mo + '월' : '', title: w.title, sub: (w.publisher && w.publisher !== '-') ? w.publisher : '', tag: sp ? '확정' : '희망', range: sp ? `${md(sp.a)} ~ ${md(sp.b)}` : '', _k: mo ? String(mo).padStart(2, '0') : '99' });
+                out.push({ id: pcUid(), ref: w.id, half: 1, when: mo ? mo + '월' : '미정', title: w.title, sub: (w.publisher && w.publisher !== '-') ? w.publisher : '', tag: sp ? '확정' : '희망', range: sp ? `${md(sp.a)} ~ ${md(sp.b)}` : '', _k: mo ? String(mo).padStart(2, '0') : '99' });
             });
             out.sort((a, b) => a._k.localeCompare(b._k) || a.title.localeCompare(b.title)); out.forEach(r => delete r._k);
             return out;
@@ -12772,7 +12772,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             r[k] = k === 'half' ? +v : v; pcSave(); if (redrawOnly) pcDraw(); else pcRender();
         }
         function pcHead(k, v) { pcGet(_pcYear)[k] = v; pcSave(); pcDraw(); }
-        function pcAdd() { pcGet(_pcYear).rows.push({ id: pcUid(), half: 1, when: '', title: '', sub: '', tag: '예정' }); pcSave(); pcRender(); }
+        function pcAdd() { pcGet(_pcYear).rows.push({ id: pcUid(), half: 1, when: '', title: '', sub: '', tag: '희망', range: '' }); pcSave(); pcRender(); }
         function pcDel(id) { const c = pcGet(_pcYear); c.rows = c.rows.filter(x => x.id !== id); pcSave(); pcRender(); }
         function pcMove(id, d) { const a = pcGet(_pcYear).rows, i = a.findIndex(x => x.id === id), j = i + d; if (i < 0 || j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; pcSave(); pcRender(); }
         function pcRender() {
@@ -12783,16 +12783,14 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             ed.innerHTML = `<datalist id="pc-tags">${Object.keys(PC_TAGS).map(t => `<option value="${t}">`).join('')}</datalist>
                 <div style="display:flex;gap:6px;margin-bottom:10px;"><input value="${esc(c.title)}" oninput="pcHead('title', this.value)" placeholder="큰 글씨 (예: 2027)" style="${inp}width:34%;font-weight:800;"><input value="${esc(c.sub)}" oninput="pcHead('sub', this.value)" placeholder="제목 (예: 출간 일정)" style="${inp}flex:1;"></div>
                 ${c.rows.length ? '' : '<div style="padding:18px;text-align:center;color:#999;font-size:13px;border:1px dashed #ddd;border-radius:10px;">‘작품에서 불러오기’를 누르거나 줄을 직접 추가하세요.</div>'}
-                ${c.rows.map(r => `<div style="display:grid;grid-template-columns:76px 92px 1fr 26px;gap:5px;align-items:center;padding:6px 0;border-top:1px solid #f1f1f5;">
-                    <select onchange="pcSet('${r.id}','half',this.value)" style="${inp}"><option value="1"${r.half === 1 ? ' selected' : ''}>상반기</option><option value="2"${r.half === 2 ? ' selected' : ''}>하반기</option><option value="0"${r.half === 0 ? ' selected' : ''}>미정</option></select>
+                ${c.rows.map(r => `<div style="display:grid;grid-template-columns:70px 1fr 26px;gap:5px;align-items:center;padding:6px 0;border-top:1px solid #f1f1f5;">
                     <input value="${esc(r.when)}" oninput="pcSet('${r.id}','when',this.value,1)" placeholder="7월" style="${inp}">
                     <input value="${esc(r.title)}" oninput="pcSet('${r.id}','title',this.value,1)" placeholder="작품 제목" style="${inp}font-weight:700;">
                     <button type="button" onclick="pcDel('${r.id}')" title="삭제" style="color:#c66;">✕</button>
-                    <span></span>
                     <input value="${esc(r.tag)}" list="pc-tags" oninput="pcSet('${r.id}','tag',this.value,1)" placeholder="상태" style="${inp}">
                     <input value="${esc(r.sub)}" oninput="pcSet('${r.id}','sub',this.value,1)" placeholder="출판사" style="${inp}">
                     <span style="display:flex;flex-direction:column;"><button type="button" onclick="pcMove('${r.id}',-1)" style="font-size:10px;line-height:1;color:#888;">▲</button><button type="button" onclick="pcMove('${r.id}',1)" style="font-size:10px;line-height:1;color:#888;">▼</button></span>
-                    <span></span><input value="${esc(r.range)}" oninput="pcSet('${r.id}','range',this.value,1)" placeholder="집필 기간 (예: 1월 5일 ~ 3월 2일)" style="${inp}grid-column: span 2;"><span></span>
+                    <span></span><input value="${esc(r.range)}" oninput="pcSet('${r.id}','range',this.value,1)" placeholder="집필 기간 (예: 1월 5일 ~ 3월 2일)" style="${inp}"><span></span>
                 </div>`).join('')}
                 <button type="button" onclick="pcAdd()" style="margin-top:8px;padding:6px 12px;border:1px dashed #bbb;border-radius:10px;font-size:12px;font-weight:700;color:#666;">+ 줄 추가</button>`;
             pcDraw();
@@ -12803,11 +12801,11 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             const card = pcGet(_pcYear), S = 2, W = 480, PAD = 22;
             const FONT = `'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif`, SERIF = `'Noto Serif KR','Nanum Myeongjo','Batang',serif`;
             const rows = card.rows.filter(r => r.title || r.when);
-            const groups = [[1, '상반기', '#5C7F70'], [2, '하반기', '#7A5C8E']].map(([h, nm, col]) => ({ nm, col, rows: rows.filter(r => r.half === h) })).filter(g => g.rows.length);
-            const unset = rows.filter(r => !r.half);
+            const groups = rows.length ? [{ nm: '', col: '#5C7F70', rows }] : [];
+            const unset = [];
             const rowH = r => r.sub ? 44 : 32;
             let H = PAD + 78;
-            groups.forEach(g => { H += 14 + 34 + g.rows.reduce((n, r) => n + rowH(r), 0) + 10; });
+            groups.forEach(g => { H += 14 + 10 + g.rows.reduce((n, r) => n + rowH(r), 0) + 10; });
             if (unset.length) H += 14 + Math.max(40, 18 + unset.length * 20);
             H += PAD;
             cv.width = W * S; cv.height = H * S;
@@ -12826,13 +12824,11 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             g.fillStyle = '#E5E3EC'; g.fillRect(PAD, PAD + 70, W - PAD * 2, 1);
             let y = PAD + 78 + 4;
             groups.forEach(gr => {
-                const h = 34 + gr.rows.reduce((n, r) => n + rowH(r), 0) + 4;
+                const h = 10 + gr.rows.reduce((n, r) => n + rowH(r), 0) + 4;
                 rr(PAD, y, W - PAD * 2, h, 12); g.fillStyle = '#fff'; g.fill(); g.strokeStyle = '#E8E6EE'; g.lineWidth = 1; g.stroke();
-                g.fillStyle = gr.col; g.fillRect(PAD + 12, y + 12, 3, 14);
-                g.font = `800 14px ${FONT}`; g.fillStyle = gr.col; g.fillText(gr.nm, PAD + 22, y + 24);
-                let ry = y + 34;
-                gr.rows.forEach(r => {
-                    g.fillStyle = '#EFEEF3'; g.fillRect(PAD + 12, ry, W - PAD * 2 - 24, 1);
+                let ry = y + 10;
+                gr.rows.forEach((r, ri) => {
+                    if (ri) { g.fillStyle = '#EFEEF3'; g.fillRect(PAD + 12, ry, W - PAD * 2 - 24, 1); }
                     const cy = ry + rowH(r) / 2;
                     g.font = `800 12.5px ${FONT}`; g.fillStyle = '#4A4E78'; g.fillText(fit(r.when, 78), PAD + 12, cy + (r.sub ? -2 : 4));
                     const tag = r.tag ? (PC_TAGS[r.tag] || ['#EEEDF5', '#5A5680']) : null; let tw = 0;

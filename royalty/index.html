@@ -16614,21 +16614,17 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                 return a.title.localeCompare(b.title, 'ko');
             });
             if (badge) {
-                badge.innerText = worksToShow.length;
-                // 웹툰 제외 전체 권수 = 본편 volumes + 외전 수
-                const nonWebtoon = worksToShow.filter(w => !(w.genre && w.genre.includes('웹툰')));
-                if (nonWebtoon.length > 0) {
-                    const totalVols = nonWebtoon.reduce((sum, w) => {
-                        const vols = parseInt(w.volumes) || 1;
-                        const extras = (w.extras || []).length;
-                        return sum + vols + extras;
-                    }, 0);
-                    const volBadge = document.getElementById('total-volumes-badge');
-                    if (volBadge) { volBadge.textContent = `(총 ${totalVols}권)`; volBadge.classList.remove('hidden'); }
-                } else {
-                    const volBadge = document.getElementById('total-volumes-badge');
-                    if (volBadge) volBadge.classList.add('hidden');
-                }
+                // 알약: N종 M권(웹툰 제외 권수 = 본편 volumes + 외전 수) / 옆 괄호: 출간일이 지난 것만 센 종·권
+                const todayStr = getYYYYMMDD(new Date());
+                const isWt = w => w.genre && w.genre.includes('웹툰');
+                const done = d => !!d && d <= todayStr;
+                const nonWebtoon = worksToShow.filter(w => !isWt(w));
+                const totalVols = nonWebtoon.reduce((sum, w) => sum + (parseInt(w.volumes) || 1) + (w.extras || []).length, 0);
+                const pubWorks = worksToShow.filter(w => !w.isPending && done(w.publishDate));
+                const pubVols = nonWebtoon.reduce((sum, w) => sum + (!w.isPending && done(w.publishDate) ? (parseInt(w.volumes) || 1) : 0) + (w.extras || []).filter(e => done(e.publishDate)).length, 0);
+                badge.innerText = `${worksToShow.length}종 ${totalVols}권`;
+                const volBadge = document.getElementById('total-volumes-badge');
+                if (volBadge) { volBadge.textContent = `(출간 ${pubWorks.length}종 ${pubVols}권)`; volBadge.classList.remove('hidden'); }
             }
             if(worksToShow.length === 0) { container.innerHTML = `<div class="col-span-full text-center py-20 text-slate-400">작품 없음</div>`; return; }
             const editingId = document.getElementById('work-editing-id')?.value || '';

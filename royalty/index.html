@@ -8577,6 +8577,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                                     <h2 id="publish-cal-title" class="text-lg font-bold" style="color:var(--primary)"></h2>
                                     <button onclick="changePublishCalMonth(0,true)" class="px-3 py-1.5 bg-white border border-slate-200 rounded-full text-xs font-bold text-slate-500 shadow-sm">Today</button>
                                     <button onclick="togglePublishYearView()" id="publish-year-view-btn" class="px-3 py-1.5 bg-white border border-slate-200 rounded-full text-xs font-bold text-slate-500 shadow-sm flex items-center gap-1.5 transition-all"><i class="fa-solid fa-calendar-days text-[10px]"></i> 전체 보기</button>
+                                    <button type="button" onclick="pcOpen()" class="px-3 py-1.5 bg-white border border-slate-200 rounded-full text-xs font-bold text-slate-500 shadow-sm flex items-center gap-1.5 transition-all" title="출간 일정을 카드 그림으로 만들기"><i class="fa-solid fa-image text-[10px]"></i> 일정 카드</button>
                                     <button type="button" class="cal-design-btn" onclick="toggleCalDesignMenu(this, event, 'pub')" title="달력 카드 디자인"><i class="fa-solid fa-palette"></i></button>
                                 </div>
                                 <button onclick="changePublishCalMonth(1)" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-bold text-slate-600 transition-all flex items-center gap-1.5">다음 달 <i class="fa-solid fa-chevron-right text-xs"></i></button>
@@ -11678,6 +11679,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         let taxViewYear = new Date().getFullYear();
         let settingsPresets = [null, null, null, null, null];   // 설정 프리셋 5칸 ({name, savedAt, data})
         let workIdeas = { cards: [], groups: [], order: [], hidden: [] };   // 대시보드 목표 보드 '작품 구상': cards [{id, pen, title, when}], groups = 필명 말고 직접 만든 칸
+        let pubCards = {};   // 출간 일정 카드(연도별)
         let dashMemos = [];   // 대시보드 메모 보드: [{id, text, color, ts}]
         let calCardSizes = { pub: 12 };   // 출간 일정 카드 글자 크기(px)
         let calCardFonts = { pub: 'auto', task: 'auto', write: 'auto', tl: 'auto', works: 'auto' };   // 달력/목록 카드 글씨체(화면마다): auto | sans | serif | hand | pen | ink | single | dodum
@@ -12108,7 +12110,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
                     const dataToSave = { settingsPresets, uiTheme: { theme: activeTheme, customColor: localStorage.getItem('custom_color_v6') || '', bgMain: document.documentElement.style.getPropertyValue('--bg-main').trim() || localStorage.getItem('bg_main_v6') || '', appFont: localStorage.getItem('app_font_v1') || '', menuFont: localStorage.getItem('menu_font_v1') || '', appFs: localStorage.getItem('app_fs_v1') || '', menuFs: localStorage.getItem('menu_fs_v1') || '' },
                         masterWorks: _worksForSave, monthlyData, years, publisherData, analysisData, 
                         publisherSortOrder, publisherCardSortOrder, publisherViewMode, genreList, genreBadgeOpacity, tableFontSettings, crosshairSettings,
-                        writeSchedules, writeSpans, timelineScenarios, writeVolumes, writeMergedVolumeWorks, taskSchedules, contacts, penNames, widgetSettingsData, dashMemos, workIdeas, ddayCardDesigns, ddayCardFonts, modalDesign, calCardDesigns, calCardFonts, calCardSizes, writeCardSettings, taskCardSettings, taskColors: TASK_COLORS, taskCategoryList, writeColors: WRITE_COLORS, writeCategoryList,
+                        writeSchedules, writeSpans, timelineScenarios, writeVolumes, writeMergedVolumeWorks, taskSchedules, contacts, penNames, widgetSettingsData, dashMemos, pubCards, workIdeas, ddayCardDesigns, ddayCardFonts, modalDesign, calCardDesigns, calCardFonts, calCardSizes, writeCardSettings, taskCardSettings, taskColors: TASK_COLORS, taskCategoryList, writeColors: WRITE_COLORS, writeCategoryList,
                         writerWorks, writerDailyData, writerGlobalDailyGoal, writeCounterBase, writeCounterResetDate, submissions, webtoonSubs, webtoonSubOrder, incomeGoals, taxSettings, taxGoalMemos, charGoals, writerLastWorkKey, taxGoalItems, contactSortMode, webtoonManage, webtoonCardSettings, penNameColorOverrides, webtoonViewFilter, webtoonSortMode, workManage, workManageCardSettings, workManageViewFilter, workManageSortMode, refSchedWorks, refSchedHidden
                     };
                     const jsonStr = JSON.stringify(dataToSave);
@@ -12227,6 +12229,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             if (parsed.calCardFonts) Object.assign(calCardFonts, parsed.calCardFonts);
             if (parsed.calCardSizes) Object.assign(calCardSizes, parsed.calCardSizes);
             dashMemos = Array.isArray(parsed.dashMemos) ? parsed.dashMemos : [];
+            pubCards = (parsed.pubCards && typeof parsed.pubCards === 'object' && !Array.isArray(parsed.pubCards)) ? parsed.pubCards : {};
             workIdeas = (parsed.workIdeas && Array.isArray(parsed.workIdeas.cards)) ? { cards: parsed.workIdeas.cards, groups: Array.isArray(parsed.workIdeas.groups) ? parsed.workIdeas.groups : [], order: Array.isArray(parsed.workIdeas.order) ? parsed.workIdeas.order : [], hidden: Array.isArray(parsed.workIdeas.hidden) ? parsed.workIdeas.hidden : [] } : { cards: [], groups: [], order: [], hidden: [] };
             if (parsed.modalDesign) modalDesign = parsed.modalDesign;
             if (parsed.ddayCardFonts) Object.assign(ddayCardFonts, parsed.ddayCardFonts);
@@ -12687,6 +12690,157 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             renderPublishCal();
         }
 
+        // ════════════════════════════════════════════════════════
+        // 출간 일정 카드: 연도별 출간 일정을 한 장의 그림(PNG)으로 만들어 공유 — 줄은 직접 고치고, 작품 데이터에서 불러올 수도 있음
+        //   pubCards[연도] = { title, sub, rows: [{ id, half: 1|2|0, when, title, sub, tag }] }   (half 0 = 출간월 미정)
+        // ════════════════════════════════════════════════════════
+        let _pcYear = new Date().getFullYear();
+        const PC_TAGS = {
+            '예정': ['#E9EBF7', '#4A4F86'], '계획': ['#ECEAF5', '#5A5680'], '확정': ['#D9F0E4', '#2F7A55'], '희망': ['#FBE9D8', '#A0622A'],
+            '월 합의': ['#E5E8F6', '#3E4C8A'], '조건부': ['#F6E4EA', '#9A4A62'], '미정': ['#EEE', '#777']
+        };
+        function pcGet(y) {
+            if (!pubCards[y]) pubCards[y] = { title: String(y), sub: '출간 일정', rows: [] };
+            return pubCards[y];
+        }
+        function pcUid() { return 'pc' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+        function pcSave() { try { save(true); } catch (e) {} }
+        // 작품 데이터에서 그 해 출간 일정을 줄로 만들어 온다 (이미 같은 작품 줄이 있으면 건너뜀)
+        function pcImport() {
+            const y = _pcYear, card = pcGet(y), have = new Set(card.rows.map(r => r.ref).filter(Boolean));
+            const out = [];
+            const sub = w => [(w.genre && w.genre.includes('웹툰') ? (w.studio && w.studio !== '-' ? w.studio : '') : (w.publisher && w.publisher !== '-' ? w.publisher : '')), w.genre].filter(Boolean).join(' · ');
+            masterWorks.forEach(w => {
+                const add = (ref, date, month, title, tag) => {
+                    if (have.has(ref)) return;
+                    const mo = month || (date ? +date.slice(5, 7) : 0);
+                    out.push({ id: pcUid(), ref, half: mo ? (mo <= 6 ? 1 : 2) : 0, when: date ? `${+date.slice(5, 7)}월 ${+date.slice(8, 10)}일` : (month ? `${month}월` : ''), title, sub: sub(w), tag, _k: date || (month ? `${y}-${String(month).padStart(2, '0')}-99` : '9999') });
+                };
+                if (!w.isPending && w.publishDate && w.publishDate.startsWith(y + '-')) add(w.id, w.publishDate, 0, w.title, '확정');
+                else if (w.isPending && /^\d{4}-\d{2}$/.test(w.pendingMonth || '') && w.pendingMonth.startsWith(y + '-')) add(w.id, '', +w.pendingMonth.slice(5), w.title, '예정');
+                (w.extras || []).forEach(ex => { if (ex.publishDate && ex.publishDate.startsWith(y + '-')) add(w.id + '::' + ex.id, ex.publishDate, 0, `${w.title} [${ex.name}]`, '확정'); });
+            });
+            out.sort((a, b) => a._k.localeCompare(b._k)); out.forEach(r => delete r._k);
+            if (!out.length) { alert(`${y}년에 불러올 출간 일정이 없어요.`); return; }
+            card.rows.push(...out); pcSave(); pcRender();
+        }
+        function pcOpen(y) {
+            _pcYear = y || (typeof publishCalDate !== 'undefined' ? publishCalDate.getFullYear() : new Date().getFullYear());
+            let ov = document.getElementById('pubcard-modal');
+            if (!ov) {
+                ov = document.createElement('div'); ov.id = 'pubcard-modal';
+                ov.style.cssText = 'position:fixed;inset:0;z-index:9000;background:rgba(40,30,20,.45);display:flex;align-items:center;justify-content:center;padding:16px;';
+                ov.onclick = e => { if (e.target === ov) pcClose(); };
+                ov.innerHTML = `<div class="modal-content" style="background:#fff;border-radius:16px;width:min(1080px,100%);max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.25);">
+                    <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid #eee;flex-wrap:wrap;">
+                        <b style="font-size:16px;">출간 일정 카드</b>
+                        <button type="button" onclick="pcYear(-1)" style="padding:2px 9px;border:1px solid #ddd;border-radius:8px;">‹</button>
+                        <span id="pc-year" style="font-weight:800;min-width:48px;text-align:center;"></span>
+                        <button type="button" onclick="pcYear(1)" style="padding:2px 9px;border:1px solid #ddd;border-radius:8px;">›</button>
+                        <span style="flex:1"></span>
+                        <button type="button" onclick="pcImport()" style="padding:6px 12px;border:1px solid #ddd;border-radius:10px;font-size:12px;font-weight:700;">작품에서 불러오기</button>
+                        <button type="button" onclick="pcDownload()" style="padding:6px 14px;border-radius:10px;font-size:12px;font-weight:800;background:var(--primary,#87ada1);color:#fff;">PNG 저장</button>
+                        <button type="button" onclick="pcClose()" style="padding:4px 10px;font-size:18px;color:#888;">✕</button>
+                    </div>
+                    <div style="display:flex;gap:16px;padding:14px 18px;overflow:auto;flex:1;min-height:0;flex-wrap:wrap;">
+                        <div id="pc-editor" style="flex:1 1 440px;min-width:300px;"></div>
+                        <div style="flex:0 0 auto;width:min(100%,400px);margin:0 auto;"><canvas id="pc-canvas" style="width:100%;border:1px solid #eee;border-radius:8px;background:#fff;"></canvas></div>
+                    </div>
+                </div>`;
+                document.body.appendChild(ov);
+            }
+            ov.style.display = 'flex'; pcRender();
+        }
+        function pcClose() { const ov = document.getElementById('pubcard-modal'); if (ov) ov.style.display = 'none'; }
+        function pcYear(d) { _pcYear += d; pcRender(); }
+        function pcSet(id, k, v, redrawOnly) {
+            const r = pcGet(_pcYear).rows.find(x => x.id === id); if (!r) return;
+            r[k] = k === 'half' ? +v : v; pcSave(); if (redrawOnly) pcDraw(); else pcRender();
+        }
+        function pcHead(k, v) { pcGet(_pcYear)[k] = v; pcSave(); pcDraw(); }
+        function pcAdd() { pcGet(_pcYear).rows.push({ id: pcUid(), half: 1, when: '', title: '', sub: '', tag: '예정' }); pcSave(); pcRender(); }
+        function pcDel(id) { const c = pcGet(_pcYear); c.rows = c.rows.filter(x => x.id !== id); pcSave(); pcRender(); }
+        function pcMove(id, d) { const a = pcGet(_pcYear).rows, i = a.findIndex(x => x.id === id), j = i + d; if (i < 0 || j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; pcSave(); pcRender(); }
+        function pcRender() {
+            const y = _pcYear, c = pcGet(y), ye = document.getElementById('pc-year'); if (ye) ye.textContent = y + '년';
+            const ed = document.getElementById('pc-editor'); if (!ed) return;
+            const inp = 'padding:5px 7px;border:1px solid #e2e2ea;border-radius:7px;font-size:12px;min-width:0;';
+            const esc = s => escapeHtml(String(s == null ? '' : s));
+            ed.innerHTML = `<datalist id="pc-tags">${Object.keys(PC_TAGS).map(t => `<option value="${t}">`).join('')}</datalist>
+                <div style="display:flex;gap:6px;margin-bottom:10px;"><input value="${esc(c.title)}" oninput="pcHead('title', this.value)" placeholder="큰 글씨 (예: 2027)" style="${inp}width:34%;font-weight:800;"><input value="${esc(c.sub)}" oninput="pcHead('sub', this.value)" placeholder="제목 (예: 출간 일정)" style="${inp}flex:1;"></div>
+                ${c.rows.length ? '' : '<div style="padding:18px;text-align:center;color:#999;font-size:13px;border:1px dashed #ddd;border-radius:10px;">‘작품에서 불러오기’를 누르거나 줄을 직접 추가하세요.</div>'}
+                ${c.rows.map(r => `<div style="display:grid;grid-template-columns:76px 92px 1fr 26px;gap:5px;align-items:center;padding:6px 0;border-top:1px solid #f1f1f5;">
+                    <select onchange="pcSet('${r.id}','half',this.value)" style="${inp}"><option value="1"${r.half === 1 ? ' selected' : ''}>상반기</option><option value="2"${r.half === 2 ? ' selected' : ''}>하반기</option><option value="0"${r.half === 0 ? ' selected' : ''}>미정</option></select>
+                    <input value="${esc(r.when)}" oninput="pcSet('${r.id}','when',this.value,1)" placeholder="1월 29일" style="${inp}">
+                    <input value="${esc(r.title)}" oninput="pcSet('${r.id}','title',this.value,1)" placeholder="작품 제목" style="${inp}font-weight:700;">
+                    <button type="button" onclick="pcDel('${r.id}')" title="삭제" style="color:#c66;">✕</button>
+                    <span></span>
+                    <input value="${esc(r.tag)}" list="pc-tags" oninput="pcSet('${r.id}','tag',this.value,1)" placeholder="상태" style="${inp}">
+                    <input value="${esc(r.sub)}" oninput="pcSet('${r.id}','sub',this.value,1)" placeholder="플랫폼 · 레이블 · 메모" style="${inp}">
+                    <span style="display:flex;flex-direction:column;"><button type="button" onclick="pcMove('${r.id}',-1)" style="font-size:10px;line-height:1;color:#888;">▲</button><button type="button" onclick="pcMove('${r.id}',1)" style="font-size:10px;line-height:1;color:#888;">▼</button></span>
+                </div>`).join('')}
+                <button type="button" onclick="pcAdd()" style="margin-top:8px;padding:6px 12px;border:1px dashed #bbb;border-radius:10px;font-size:12px;font-weight:700;color:#666;">+ 줄 추가</button>`;
+            pcDraw();
+        }
+        // 카드 그림 (논리 폭 480, 2배로 그림)
+        function pcDraw() {
+            const cv = document.getElementById('pc-canvas'); if (!cv) return;
+            const card = pcGet(_pcYear), S = 2, W = 480, PAD = 22;
+            const FONT = `'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif`, SERIF = `'Noto Serif KR','Nanum Myeongjo','Batang',serif`;
+            const rows = card.rows.filter(r => r.title || r.when);
+            const groups = [[1, '상반기', '#5C7F70'], [2, '하반기', '#7A5C8E']].map(([h, nm, col]) => ({ nm, col, rows: rows.filter(r => r.half === h) })).filter(g => g.rows.length);
+            const unset = rows.filter(r => !r.half);
+            const rowH = r => r.sub ? 44 : 32;
+            let H = PAD + 78;
+            groups.forEach(g => { H += 14 + 34 + g.rows.reduce((n, r) => n + rowH(r), 0) + 10; });
+            if (unset.length) H += 14 + Math.max(40, 18 + unset.length * 20);
+            H += PAD;
+            cv.width = W * S; cv.height = H * S;
+            const g = cv.getContext('2d'); g.scale(S, S);
+            g.fillStyle = '#FBFAF8'; g.fillRect(0, 0, W, H);
+            const rr = (x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
+            const fit = (t, w) => { t = String(t || ''); if (g.measureText(t).width <= w) return t; while (t.length > 1 && g.measureText(t + '…').width > w) t = t.slice(0, -1); return t + '…'; };
+            // 머리
+            g.fillStyle = '#C9C6E2'; g.fillRect(PAD, PAD - 6, W - PAD * 2, 1);
+            g.textBaseline = 'alphabetic'; g.fillStyle = '#2B2B47';
+            g.font = `800 38px ${SERIF}`; const t1 = card.title || ''; g.fillText(t1, PAD, PAD + 42);
+            const w1 = g.measureText(t1).width;
+            g.font = `700 22px ${SERIF}`; g.fillText(' ' + (card.sub || ''), PAD + w1, PAD + 42);
+            const d = new Date(); g.font = `500 10.5px ${FONT}`; g.fillStyle = '#8A8A9A'; g.textAlign = 'right';
+            g.fillText(`${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()} 기준`, W - PAD, PAD + 62); g.textAlign = 'left';
+            g.fillStyle = '#E5E3EC'; g.fillRect(PAD, PAD + 70, W - PAD * 2, 1);
+            let y = PAD + 78 + 4;
+            groups.forEach(gr => {
+                const h = 34 + gr.rows.reduce((n, r) => n + rowH(r), 0) + 4;
+                rr(PAD, y, W - PAD * 2, h, 12); g.fillStyle = '#fff'; g.fill(); g.strokeStyle = '#E8E6EE'; g.lineWidth = 1; g.stroke();
+                g.fillStyle = gr.col; g.fillRect(PAD + 12, y + 12, 3, 14);
+                g.font = `800 14px ${FONT}`; g.fillStyle = gr.col; g.fillText(gr.nm, PAD + 22, y + 24);
+                let ry = y + 34;
+                gr.rows.forEach(r => {
+                    g.fillStyle = '#EFEEF3'; g.fillRect(PAD + 12, ry, W - PAD * 2 - 24, 1);
+                    const cy = ry + rowH(r) / 2;
+                    g.font = `800 12.5px ${FONT}`; g.fillStyle = '#4A4E78'; g.fillText(fit(r.when, 78), PAD + 12, cy + (r.sub ? -2 : 4));
+                    const tag = r.tag ? (PC_TAGS[r.tag] || ['#EEEDF5', '#5A5680']) : null; let tw = 0;
+                    if (tag) { g.font = `700 10.5px ${FONT}`; tw = g.measureText(r.tag).width + 20; rr(W - PAD - 12 - tw, cy - 10, tw, 20, 10); g.fillStyle = tag[0]; g.fill(); g.fillStyle = tag[1]; g.textAlign = 'center'; g.fillText(r.tag, W - PAD - 12 - tw / 2, cy + 3.5); g.textAlign = 'left'; }
+                    const tx = PAD + 12 + 92, maxW = W - PAD - 12 - tw - 8 - tx;
+                    g.font = `800 15px ${FONT}`; g.fillStyle = '#2B2B47'; g.fillText(fit(r.title, maxW), tx, cy + (r.sub ? -3 : 5));
+                    if (r.sub) { g.font = `500 9.5px ${FONT}`; g.fillStyle = '#8A8A9A'; g.fillText(fit(r.sub, maxW), tx, cy + 13); }
+                    ry += rowH(r);
+                });
+                y += h + 14;
+            });
+            if (unset.length) {
+                const h = Math.max(40, 18 + unset.length * 20);
+                rr(PAD, y, W - PAD * 2, h, 10); g.fillStyle = '#F1EDF6'; g.fill();
+                g.font = `700 11px ${FONT}`; g.fillStyle = '#7A6A8C'; g.fillText('출간월 미정', PAD + 12, y + 24);
+                unset.forEach((r, i) => { g.font = `800 12.5px ${FONT}`; g.fillStyle = '#2B2B47'; g.fillText(fit(r.title + (r.sub ? ' · ' + r.sub.split(' · ')[0] : ''), W - PAD * 2 - 24 - 92), PAD + 12 + 92, y + 24 + i * 20); });
+            }
+        }
+        function pcDownload() {
+            pcDraw(); const cv = document.getElementById('pc-canvas'); if (!cv) return;
+            cv.toBlob(b => { if (!b) { alert('이미지를 만들지 못했어요.'); return; } const u = URL.createObjectURL(b), a = document.createElement('a'); a.href = u; a.download = `출간일정_${_pcYear}.png`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 1000); }, 'image/png');
+        }
+
         function renderPublishCal() {
             const y = publishCalDate.getFullYear(), m = publishCalDate.getMonth();
             document.getElementById('publish-cal-title').innerText = `${y}년 ${m+1}월 출간 일정`;
@@ -13027,7 +13181,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
             const data = { settingsPresets, 
                 masterWorks: assetWorksForExport(), monthlyData, years, publisherData, analysisData, publisherSortOrder, publisherCardSortOrder, publisherViewMode, genreList, theme: localStorage.getItem('theme_v6'), customColor: localStorage.getItem('custom_color_v6'), genreBadgeOpacity, bgMain: localStorage.getItem('bg_main_v6'), tableFontSettings, crosshairSettings, 
                 writeSchedules, writeSpans, timelineScenarios, writeVolumes, writeMergedVolumeWorks, taskSchedules, writeCardSettings, taskCardSettings, taskColors: TASK_COLORS, taskCategoryList, writeColors: WRITE_COLORS, writeCategoryList,
-                contacts, penNames, widgetSettingsData, dashMemos, workIdeas, ddayCardDesigns, ddayCardFonts, modalDesign, calCardDesigns, calCardFonts, calCardSizes, submissions, webtoonSubs, webtoonSubOrder, contactSortMode, webtoonViewFilter, webtoonSortMode,
+                contacts, penNames, widgetSettingsData, dashMemos, pubCards, workIdeas, ddayCardDesigns, ddayCardFonts, modalDesign, calCardDesigns, calCardFonts, calCardSizes, submissions, webtoonSubs, webtoonSubOrder, contactSortMode, webtoonViewFilter, webtoonSortMode,
                 // [FIX] 글자수 관리 탭 데이터가 백업에서 빠져있던 문제 수정 — 아래 항목들이 누락되어 있었음
                 writerWorks, writerDailyData, writerGlobalDailyGoal, writeCounterBase, writeCounterResetDate, writerLastWorkKey,
                 incomeGoals, taxSettings, taxGoalMemos, taxGoalItems, charGoals, webtoonManage, webtoonCardSettings, penNameColorOverrides, workManage, workManageCardSettings, workManageViewFilter, workManageSortMode, refSchedWorks, refSchedHidden

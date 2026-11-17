@@ -3303,14 +3303,14 @@ body.menu-font-on #settings-panel-modal .settings-tabbtn, body.menu-font-on #the
         html body #dash-memo-board .dmb-cols .dmb-grip, html body #dash-memo-board .dmb-cols .dmb-rz { display: none !important; }
         @media (max-width: 767px) { html body #dash-memo-board .dmb-canvas.dmb-cols { gap: 12px; } html body #dash-memo-board .dmb-cols .dmb-col { gap: 20px; } #dash-memo-board .dmb-view button { padding: 6px 7px; } }
         /* 글자 서식 도구줄 (글자를 드래그하면 뜸) */
-        #dmb-fmt { position: fixed; z-index: 99999; display: none; flex-wrap: wrap; align-items: center; gap: 2px; padding: 5px; max-width: 350px; background: #fff; border: 1px solid rgba(74,63,51,.2); border-radius: 12px; box-shadow: 0 6px 18px rgba(60,45,25,.28); user-select: none; -webkit-user-select: none; }
-        #dmb-fmt button { width: 30px; height: 30px; border: 0; border-radius: 8px; background: transparent; color: #4a3f33; cursor: pointer; padding: 0; font-family: inherit; font-size: 14px; font-weight: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        #dmb-fmt { position: fixed; z-index: 99999; display: none; flex-direction: column; gap: 3px; padding: 5px 6px; background: #fff; border: 1px solid rgba(74,63,51,.2); border-radius: 12px; box-shadow: 0 6px 18px rgba(60,45,25,.28); user-select: none; -webkit-user-select: none; }
+        #dmb-fmt .row { display: flex; align-items: center; gap: 2px; }
+        #dmb-fmt button { width: 30px; height: 30px; border: 0; border-radius: 8px; background: transparent; color: #4a3f33; cursor: pointer; padding: 0; font-family: inherit; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
         #dmb-fmt button:hover { background: #F1ECE3; }
         #dmb-fmt .sp { width: 1px; height: 18px; background: rgba(74,63,51,.2); margin: 0 3px; }
-        #dmb-fmt .bar { width: 14px; height: 3px; border-radius: 2px; margin-top: 1px; background: #D6336C; }
-        #dmb-fmt .pr { display: none; width: 100%; flex-wrap: wrap; gap: 5px; padding: 6px 3px 3px; }
-        #dmb-fmt .pr button { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid rgba(74,63,51,.3); }
-        #dmb-fmt .pr button.none { background: #fff linear-gradient(135deg, transparent 45%, #d33 45% 55%, transparent 55%); }
+        #dmb-fmt button.dot { width: 22px; height: 22px; margin: 0 3px; border-radius: 50%; border: 1.5px solid rgba(74,63,51,.3); }
+        #dmb-fmt button.dot:hover { transform: scale(1.15); }
+        #dmb-fmt .hl-ic { width: 30px; text-align: center; color: #7A5A2A; font-size: 13px; }
         /* MEMO BOARD THEMES START */
         /* 견출지: 점선 윤곽 + 줄무늬 견출 스티커 */
         body.theme-label #dash-memo-board .dmb-note { border: 0; border-radius: 5px; box-shadow: 0 3px 8px rgba(60,45,25,.2); }
@@ -21607,8 +21607,8 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         }
         function dmbBlk(r) { return r.h ? { t: r.t, h: r.h } : { t: r.t }; }
         // 글자 서식 도구줄: 글자를 드래그하면 그 위(폰에서는 아래)에 뜬다
-        const DMB_TXT = ['#2B2118', '#D6336C', '#E8590C', '#2F9E44', '#1C7ED6', '#7048E8', '#868E96'];
-        const DMB_HL = ['#FFF176', '#FFC4D6', '#B9F0D0', '#BFE0FF', '#E3D4FF', '#FFD9A8'];
+        const DMB_TXT = [['#2B2118', '검정'], ['#E03131', '빨강'], ['#1C7ED6', '파랑'], ['#2F9E44', '초록']];
+        const DMB_HL = [['#FFF176', '노랑'], ['#FFC4D6', '분홍'], ['#B9F0D0', '민트'], ['#BFE0FF', '하늘'], ['#E3D4FF', '보라']];
         let _dmbRange = null;
         function dmbCurEl() {
             const s = getSelection(); if (!s || !s.rangeCount) return null;
@@ -21618,34 +21618,34 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         function dmbFmtBar() {
             let tb = document.getElementById('dmb-fmt'); if (tb) return tb;
             tb = document.createElement('div'); tb.id = 'dmb-fmt';
-            tb.innerHTML = '<button data-a="bold" title="굵게 (Ctrl+B)"><b>B</b></button><button data-a="italic" title="기울임 (Ctrl+I)"><i>I</i></button><button data-a="underline" title="밑줄 (Ctrl+U)"><u>U</u></button><span class="sp"></span>'
-                + '<button data-a="sz" data-v="12" title="작은 글씨" style="font-size:11px">가</button><button data-a="sz" data-v="0" title="기본 크기" style="font-size:14px">가</button><button data-a="sz" data-v="20" title="큰 글씨" style="font-size:17px">가</button><button data-a="sz" data-v="26" title="아주 큰 글씨" style="font-size:21px">가</button><span class="sp"></span>'
-                + '<button data-a="pal" data-v="fg" title="글자 색"><span style="font-weight:800;line-height:1">A</span><span class="bar" id="dmb-fg-bar"></span></button><button data-a="pal" data-v="bg" title="배경 색(형광펜)"><i class="fa-solid fa-highlighter"></i></button><button data-a="clr" title="서식 지우기"><i class="fa-solid fa-eraser"></i></button><div class="pr"></div>';
+            tb.innerHTML = '<div class="row"><button data-a="bold" title="굵게 (Ctrl+B)"><b>B</b></button><button data-a="italic" title="기울임 (Ctrl+I)"><i>I</i></button><button data-a="underline" title="밑줄 (Ctrl+U)"><u>U</u></button><span class="sp"></span>'
+                + '<button data-a="szd" data-v="-2" title="글자 작게" style="font-size:17px">−</button><button data-a="szd" data-v="2" title="글자 크게" style="font-size:17px">+</button><span class="sp"></span>'
+                + DMB_TXT.map(([c, n]) => `<button class="dot" data-a="fg" data-v="${c}" style="background:${c}" title="글자색 ${n}"></button>`).join('')
+                + '<span class="sp"></span><button data-a="clr" title="서식 지우기"><i class="fa-solid fa-eraser"></i></button></div>'
+                + '<div class="row"><i class="fa-solid fa-highlighter hl-ic"></i>' + DMB_HL.map(([c, n]) => `<button class="dot" data-a="bg" data-v="${c}" style="background:${c}" title="형광펜 ${n}"></button>`).join('') + '</div>';
             ['pointerdown', 'mousedown'].forEach(ev => tb.addEventListener(ev, e => e.preventDefault()));   // 눌러도 글자 선택이 풀리지 않게
             tb.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; dmbFmtDo(b.dataset.a, b.dataset.v); });
             document.body.appendChild(tb); return tb;
         }
-        function dmbFmtPal(kind) {
-            const tb = dmbFmtBar(), pr = tb.querySelector('.pr');
-            if (pr.dataset.k === kind && pr.style.display === 'flex') { pr.style.display = 'none'; pr.dataset.k = ''; dmbFmtPlace(); return; }
-            pr.dataset.k = kind;
-            pr.innerHTML = (kind === 'fg' ? DMB_TXT : DMB_HL).map(c => `<button data-a="${kind}" data-v="${c}" style="background:${c}" title="${c}"></button>`).join('') + (kind === 'bg' ? '<button class="none" data-a="bg" data-v="transparent" title="배경색 없애기"></button>' : '');
-            pr.style.display = 'flex'; dmbFmtPlace();
-        }
         function dmbFmtDo(act, val) {
-            if (act === 'pal') return dmbFmtPal(val);
             let el = dmbCurEl();
             if (!el && _dmbRange) { const s = getSelection(); s.removeAllRanges(); s.addRange(_dmbRange); el = dmbCurEl(); }
             if (!el) return;
             const sel = getSelection(); if (!sel.rangeCount || sel.isCollapsed) { if (!_dmbRange) return; sel.removeAllRanges(); sel.addRange(_dmbRange); }
             try { document.execCommand('styleWithCSS', false, true); } catch (e) {}
             if (act === 'bold' || act === 'italic' || act === 'underline') document.execCommand(act);
-            else if (act === 'sz') {
-                const v = +val; document.execCommand('fontSize', false, '7');
+            else if (act === 'sz' || act === 'szd') {
+                let v = +val;
+                if (act === 'szd') {   // 지금 글자 크기에서 2px 씩 키우고 줄이기
+                    let n = sel.anchorNode; n = n && (n.nodeType === 3 ? n.parentElement : n);
+                    const cur = Math.round(parseFloat(getComputedStyle(n || el).fontSize)) || 15;
+                    v = Math.max(10, Math.min(40, cur + v));
+                }
+                document.execCommand('fontSize', false, '7');
                 el.querySelectorAll('span').forEach(s => { if (/xxx-large/.test(s.style.fontSize)) { if (v) s.style.fontSize = v + 'px'; else s.style.removeProperty('font-size'); } });
                 el.querySelectorAll('font[size="7"]').forEach(f => { const s = document.createElement('span'); if (v) s.style.fontSize = v + 'px'; while (f.firstChild) s.appendChild(f.firstChild); f.replaceWith(s); });
             }
-            else if (act === 'fg') { document.execCommand('foreColor', false, val); const b = document.getElementById('dmb-fg-bar'); if (b) b.style.background = val; }
+            else if (act === 'fg') document.execCommand('foreColor', false, val);
             else if (act === 'bg') document.execCommand('hiliteColor', false, val);
             else if (act === 'clr') document.execCommand('removeFormat');
             try { _dmbRange = getSelection().getRangeAt(0).cloneRange(); } catch (e) {}
@@ -21654,7 +21654,7 @@ html body.theme-cozy.theme-polaroid #tab-dashboard .cozy-launch-wrap.cozy-launch
         }
         function dmbFmtPlace() {
             const tb = dmbFmtBar(), s = getSelection(), el = dmbCurEl();
-            if (!s || !s.rangeCount || s.isCollapsed || !el) { tb.style.display = 'none'; const pr = tb.querySelector('.pr'); pr.style.display = 'none'; pr.dataset.k = ''; return; }
+            if (!s || !s.rangeCount || s.isCollapsed || !el) { tb.style.display = 'none'; return; }
             _dmbRange = s.getRangeAt(0).cloneRange();
             const r = _dmbRange.getBoundingClientRect(); if (!r.width && !r.height) { tb.style.display = 'none'; return; }
             tb.style.display = 'flex';

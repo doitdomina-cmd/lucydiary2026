@@ -11389,6 +11389,7 @@ html body :is(#publish-dday-list, #task-dday-list)[data-design="fountain"][data-
                 </div>
                 <div class="flex items-center gap-2">
                     <div id="timeline-summary" class="text-sm text-slate-500 mr-2"></div>
+                    <button type="button" onclick="pcOpen(timelineYear, timelineWhatIf.on ? timelineWhatIf.id : null)" class="wr-timeline-btn" title="출간 일정 카드 만들기 (가정표를 열어 두면 그 가정표 기준)" style="width:32px;height:32px;"><i class="fa-solid fa-heart" style="color:#E8707E;"></i></button>
                     <button onclick="closeYearTimeline()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-times text-xl"></i></button>
                 </div>
             </div>
@@ -12895,14 +12896,15 @@ html body :is(#publish-dday-list, #task-dday-list)[data-design="fountain"][data-
         // 출간 일정 카드: 연도별 출간 일정을 한 장의 그림(PNG)으로 만들어 공유 — 줄은 직접 고치고, 작품 데이터에서 불러올 수도 있음
         //   pubCards[연도] = { title, sub, rows: [{ id, half: 1|2|0, when, title, sub, tag }] }   (half 0 = 출간월 미정)
         // ════════════════════════════════════════════════════════
-        let _pcYear = new Date().getFullYear();
+        let _pcYear = new Date().getFullYear(), _pcScn = null;   // _pcScn: 연간 집필 일정 가정표 id (없으면 실제 일정)
         const PC_TAGS = {
             '예정': ['#E9EBF7', '#4A4F86'], '계획': ['#ECEAF5', '#5A5680'], '확정': ['#D9F0E4', '#2F7A55'], '희망': ['#FBE9D8', '#A0622A'],
             '월 합의': ['#E5E8F6', '#3E4C8A'], '조건부': ['#F6E4EA', '#9A4A62'], '미정': ['#EEE', '#777']
         };
         function pcGet(y) {
-            if (!pubCards[y]) pubCards[y] = { title: String(y), sub: '출간 일정', rows: [] };
-            return pubCards[y];
+            const k = _pcScn ? _pcScn + ':' + y : y;   // 가정표마다 카드를 따로 저장
+            if (!pubCards[k]) pubCards[k] = { title: String(y), sub: '출간 일정', rows: [] };
+            return pubCards[k];
         }
         function pcUid() { return 'pc' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
         function pcSave() { try { save(true); } catch (e) {} }
@@ -12949,7 +12951,8 @@ html body :is(#publish-dday-list, #task-dday-list)[data-design="fountain"][data-
             if (!auto && card.rows.some(r => r.ref) && !confirm('작품에서 불러온 줄을 최신 내용으로 다시 만들까요? (그 줄을 직접 고친 내용은 사라져요. 직접 추가한 줄은 그대로예요)')) return;
             card.rows = out.concat(card.rows.filter(r => !r.ref)); pcSave(); pcRender();
         }
-        function pcOpen(y) {
+        function pcOpen(y, scn) {
+            _pcScn = scn || null;
             let _last = 0; try { _last = +localStorage.getItem('pc_year_v1') || 0; } catch (e) {}
             _pcYear = y || _last || (typeof publishCalDate !== 'undefined' ? publishCalDate.getFullYear() : new Date().getFullYear());
             if (!document.getElementById('pubcard-style')) {
@@ -12994,6 +12997,9 @@ html body :is(#publish-dday-list, #task-dday-list)[data-design="fountain"][data-
                 document.body.appendChild(ov);
             }
             ov.style.display = 'flex';
+            ov.style.zIndex = _pcScn ? '99999' : '9000';
+            const _sc = _pcScn && timelineScenarios.find(x => x.id === _pcScn), _tt = ov.querySelector('b');
+            if (_tt) _tt.textContent = _sc ? '출간 일정 카드 · 🧪 ' + _sc.name : '출간 일정 카드';
             if (!pcGet(_pcYear).rows.length) pcImport(true); else pcRender();
         }
         function pcClose() { const ov = document.getElementById('pubcard-modal'); if (ov) ov.style.display = 'none'; }

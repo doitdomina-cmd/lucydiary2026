@@ -29261,6 +29261,106 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             renderTaskCategoryManagerList();
         }
 
+
+        // ── 아이패드/폰 터치 드래그 ──
+        // 터치 기기는 HTML5 드래그(draggable)가 잘 안 되므로, 카드를 '꾹 눌렀다가' 끌면
+        // 기존 dragstart / dragover / drop 처리를 그대로 불러 주는 방식으로 옮긴다. (살짝 스크롤하는 건 그대로 스크롤)
+        (function setupTouchCardDrag() {
+            const SEL = '#write-calendar-body [draggable="true"], #task-calendar-body [draggable="true"], #publish-cal-body [draggable="true"]';
+            const HOLD_MS = 320, SLOP = 9;
+            let st = null;
+
+            function makeDT() {
+                try { return new DataTransfer(); } catch (e) {}
+                const d = {}; 
+                return { effectAllowed: 'move', dropEffect: 'move', setData(k, v) { d[k] = v; }, getData(k) { return d[k] || ''; }, setDragImage() {}, types: [] };
+            }
+            function fire(type, target, x, y, dt, related) {
+                if (!target) return false;
+                let ev;
+                try { ev = new DragEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, dataTransfer: dt, relatedTarget: related || null }); }
+                catch (e) { ev = new Event(type, { bubbles: true, cancelable: true }); ev.clientX = x; ev.clientY = y; }
+                if (!ev.dataTransfer) { try { Object.defineProperty(ev, 'dataTransfer', { value: dt }); } catch (e) {} }
+                return target.dispatchEvent(ev);
+            }
+            function below(x, y) {
+                if (st && st.ghost) st.ghost.style.display = 'none';
+                const el = document.elementFromPoint(x, y);
+                if (st && st.ghost) st.ghost.style.display = '';
+                return el;
+            }
+            function cleanup() {
+                if (!st) return;
+                clearTimeout(st.timer);
+                if (st.card) { st.card.style.touchAction = st.prevTA || ''; if (st.hadDraggable) st.card.setAttribute('draggable', 'true'); }
+                if (st.ghost) st.ghost.remove();
+                document.body.style.userSelect = st.prevUS || '';
+                st = null;
+            }
+            function begin() {
+                if (!st) return;
+                st.active = true;
+                const r = st.card.getBoundingClientRect();
+                const g = st.card.cloneNode(true);
+                g.removeAttribute('id'); g.removeAttribute('draggable');
+                g.style.cssText += `;position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;margin:0;z-index:99999;pointer-events:none;opacity:.88;transform:scale(1.03);box-shadow:0 10px 24px rgba(0,0,0,.28);`;
+                document.body.appendChild(g);
+                st.ghost = g; st.offX = st.x0 - r.left; st.offY = st.y0 - r.top;
+                st.dt = makeDT();
+                fire('dragstart', st.card, st.x0, st.y0, st.dt);
+                if (navigator.vibrate) { try { navigator.vibrate(15); } catch (e) {} }
+            }
+            document.addEventListener('touchstart', (e) => {
+                if (e.touches.length !== 1) { cleanup(); return; }
+                const card = e.target.closest && e.target.closest(SEL);
+                if (!card || e.target.closest('button, input, textarea, select, a')) return;
+                cleanup();
+                const t = e.touches[0];
+                st = { card, x0: t.clientX, y0: t.clientY, active: false, last: null, prevTA: card.style.touchAction, prevUS: document.body.style.userSelect, hadDraggable: card.getAttribute('draggable') === 'true' };
+                // 브라우저 자체 드래그(길게 눌러 끌기)와 겹치지 않게 잠깐 꺼 둔다
+                if (st.hadDraggable) card.removeAttribute('draggable');
+                document.body.style.userSelect = 'none';
+                st.timer = setTimeout(begin, HOLD_MS);
+            }, { passive: true });
+            document.addEventListener('touchmove', (e) => {
+                if (!st) return;
+                const t = e.touches[0];
+                if (!st.active) {
+                    if (Math.abs(t.clientX - st.x0) > SLOP || Math.abs(t.clientY - st.y0) > SLOP) cleanup();   // 꾹 누르기 전에 움직이면 그냥 스크롤
+                    return;
+                }
+                e.preventDefault();
+                st.ghost.style.left = (t.clientX - st.offX) + 'px';
+                st.ghost.style.top = (t.clientY - st.offY) + 'px';
+                const el = below(t.clientX, t.clientY);
+                if (el !== st.last) {
+                    if (st.last) fire('dragleave', st.last, t.clientX, t.clientY, st.dt, el);
+                    if (el) fire('dragenter', el, t.clientX, t.clientY, st.dt, st.last);
+                    st.last = el;
+                }
+                if (el) fire('dragover', el, t.clientX, t.clientY, st.dt);
+                // 화면 위/아래 가장자리에 가면 스크롤
+                const h = window.innerHeight;
+                if (t.clientY < 70) window.scrollBy(0, -14); else if (t.clientY > h - 70) window.scrollBy(0, 14);
+            }, { passive: false });
+            function finish(e, drop) {
+                if (!st) return;
+                if (!st.active) { cleanup(); return; }
+                const t = (e.changedTouches && e.changedTouches[0]) || { clientX: st.x0, clientY: st.y0 };
+                const el = below(t.clientX, t.clientY);
+                const dt = st.dt, card = st.card;
+                if (e.cancelable) e.preventDefault();   // 놓을 때 클릭(편집창 열림)이 같이 눌리지 않게
+                if (drop && el) fire('drop', el, t.clientX, t.clientY, dt);
+                else if (st.last) fire('dragleave', st.last, t.clientX, t.clientY, dt);
+                fire('dragend', card, t.clientX, t.clientY, dt);
+                document.querySelectorAll('.cal-drag-over, .cal-drop-before, .cal-drop-after').forEach(n => n.classList.remove('cal-drag-over', 'cal-drop-before', 'cal-drop-after'));
+                cleanup();
+            }
+            document.addEventListener('touchend', (e) => finish(e, true), { passive: false });
+            document.addEventListener('touchcancel', (e) => finish(e, false), { passive: false });
+            document.addEventListener('contextmenu', (e) => { if (st && st.active) e.preventDefault(); });
+        })();
+
         // 🟢 [NEW] 드래그 앤 드롭 구현
         function handleDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
         function handleDragEnter(e) { e.preventDefault(); const c = e.currentTarget; if (c.dataset.date && !c.classList.contains('cal-drag-over')) c.classList.add('cal-drag-over'); }

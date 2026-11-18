@@ -28519,6 +28519,22 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
 
         // 연간 집필 일정(타임라인)에서 '기간 일정' 막대를 드래그해서 날짜를 옮기는 처리
         // (다른 일정들은 건드리지 않고 드래그한 막대만 이동한다)
+        // iOS/iPad: 드래그 중 화면을 다시 그려 처음 잡은 요소가 사라지면 touchmove가 document까지 오지 않는다.
+        // 그래서 터치는 '처음 잡은 요소'에 직접 달아 둔다 (요소가 DOM에서 빠져도 이벤트는 계속 온다).
+        function tlTouchBind(e, move, end) {
+            if (!e.touches) return null;
+            const t = e.target;
+            t.addEventListener('touchmove', move, { passive: false });
+            t.addEventListener('touchend', end);
+            t.addEventListener('touchcancel', end);
+            return t;
+        }
+        function tlTouchUnbind(t, move, end) {
+            if (!t) return;
+            t.removeEventListener('touchmove', move);
+            t.removeEventListener('touchend', end);
+            t.removeEventListener('touchcancel', end);
+        }
         let timelineSpanMoveState = null;
 
         function tlDateLabel(dateStr) {
@@ -28554,8 +28570,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             document.body.style.userSelect = 'none';
             document.addEventListener('mousemove', onTimelineSpanMove);
             document.addEventListener('mouseup', endTimelineSpanMove);
-            document.addEventListener('touchmove', onTimelineSpanMove, { passive: false });
-            document.addEventListener('touchend', endTimelineSpanMove);
+            tlTouchMoveEl = tlTouchBind(e, onTimelineSpanMove, endTimelineSpanMove);
         }
 
         function onTimelineSpanMove(e) {
@@ -28596,8 +28611,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
         function endTimelineSpanMove(e) {
             document.removeEventListener('mousemove', onTimelineSpanMove);
             document.removeEventListener('mouseup', endTimelineSpanMove);
-            document.removeEventListener('touchmove', onTimelineSpanMove);
-            document.removeEventListener('touchend', endTimelineSpanMove);
+            tlTouchUnbind(tlTouchMoveEl, onTimelineSpanMove, endTimelineSpanMove); tlTouchMoveEl = null;
             document.body.style.userSelect = '';
             document.body.style.cursor = '';
             const badge = document.getElementById('tl-drag-date-badge');
@@ -28614,6 +28628,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
 
         // 연간 집필 일정에서 '기간 일정' 막대의 양쪽 끝을 드래그해서 시작일/종료일만 조절하는 처리
         let timelineSpanResizeState = null;
+        let tlTouchMoveEl = null, tlTouchResizeEl = null;
 
         function startTimelineSpanResize(e, spanId, edge) {
             if (e.type === 'mousedown' && e.button !== 0) return;
@@ -28636,8 +28651,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             document.body.style.cursor = 'ew-resize';
             document.addEventListener('mousemove', onTimelineSpanResize);
             document.addEventListener('mouseup', endTimelineSpanResize);
-            document.addEventListener('touchmove', onTimelineSpanResize, { passive: false });
-            document.addEventListener('touchend', endTimelineSpanResize);
+            tlTouchResizeEl = tlTouchBind(e, onTimelineSpanResize, endTimelineSpanResize);
         }
 
         function onTimelineSpanResize(e) {
@@ -28684,8 +28698,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
         function endTimelineSpanResize() {
             document.removeEventListener('mousemove', onTimelineSpanResize);
             document.removeEventListener('mouseup', endTimelineSpanResize);
-            document.removeEventListener('touchmove', onTimelineSpanResize);
-            document.removeEventListener('touchend', endTimelineSpanResize);
+            tlTouchUnbind(tlTouchResizeEl, onTimelineSpanResize, endTimelineSpanResize); tlTouchResizeEl = null;
             document.body.style.userSelect = '';
             document.body.style.cursor = '';
             const badge = document.getElementById('tl-drag-date-badge');

@@ -10730,11 +10730,11 @@ function hrTrendHtml(recs){
 }
 // 붙여넣은 글에서 칸 나누기 (⚠️ 이상 소견 / ✅ 정상 / 처치 / 조치 / 다음 예약 / 메모, 제목·날짜·병원)
 function hrParsePaste(text){
-  var res={title:'',date:'',hospital:'',abnormal:'',normal:'',treatment:'',action:'',nextAppt:'',note:''};
-  var heads=[['abnormal','이상\\s*소견'],['normal','정상\\s*(?:소견|범위)'],['treatment','(?:처치|처방|치료)(?:\\s*[\\/·]\\s*(?:처치|처방|치료))?'],['action','(?:추후\\s*)?조치'],['nextAppt','다음\\s*(?:예약|진료)'],['note','(?:진료\\s*내용|메모)'],['title','(?:제목|이름)(?:\\s*\\/\\s*날짜)?'],['hospital','병원']];
+  var res={title:'',date:'',hospital:'',abnormal:'',normal:'',treatment:'',action:'',nextAppt:'',note:'',metricsText:''};
+  var heads=[['abnormal','이상\\s*소견'],['normal','정상\\s*(?:소견|범위)'],['treatment','(?:처치|처방|치료)(?:\\s*[\\/·]\\s*(?:처치|처방|치료))?'],['action','(?:추후\\s*)?조치'],['nextAppt','다음\\s*(?:예약|진료)'],['note','(?:진료\\s*내용|메모)'],['title','(?:제목|이름)(?:\\s*\\/\\s*날짜)?'],['hospital','병원'],['metrics','수치(?:\\s*추이)?']];
   var lines=String(text||'').replace(/\r/g,'').split('\n'),cur=null,buf={},found=false;
   lines.forEach(function(raw){
-    var line=raw.replace(/[*#]/g,'').replace(/[⚠✅💊📌📅📝❗]️?/g,'').replace(/^\s*[\-•·]\s*/,'').trim();
+    var line=raw.replace(/[*#]/g,'').replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF\uFE0F]/gu,'').replace(/^\s*[\-•·]\s*/,'').trim();
     if(!line){ if(cur) buf[cur]=(buf[cur]||'')+'\n'; return; }
     var hit=null,rest='';
     heads.forEach(function(h){
@@ -10755,7 +10755,11 @@ function hrParsePaste(text){
   delete res.nextAppt;
   if(!found){ res.note=String(text).trim(); res.abnormal=''; }
   if(!res.title){var tm=/([가-힣]{2,6}과)/.exec(text); res.title=tm?(tm[1]+' 진료'):'검진 기록';}
-  res.metrics=hrExtractMetrics(text);
+  // '📈 수치' 머리말 아래에 '이름: 값 단위' 로 적은 줄은 그대로 수치로 (글에서 뽑은 것보다 우선)
+  var own=hrMetricsFromText(buf.metrics||''),names={};
+  own.forEach(function(m){names[m.name]=1;});
+  res.metrics=own.concat(hrExtractMetrics(String(text).replace(buf.metrics||'','')).filter(function(m){return !names[m.name];}));
+  delete res.metricsText;
   return res;
 }
 function hrApplyPaste(){

@@ -9174,7 +9174,7 @@ function renderHealth(){
   const H=S.health;
   if(!H.inbody) H.inbody=[];
   if(!H.tab) H.tab='summary';
-  if(!['summary','inbody','sched','records','supps','memo'].includes(H.tab)) H.tab='summary';
+  if(!['summary','inbody','sched','records','chart','supps','memo'].includes(H.tab)) H.tab='summary';
   const tab=H.tab;
 
   // ── 탭 헤더 ──
@@ -9184,15 +9184,17 @@ function renderHealth(){
     sched:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>',
     records:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M9 4h6a1 1 0 0 1 1 1v1h1a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h1V5a1 1 0 0 1 1-1z"/><rect x="8.5" y="2.5" width="7" height="3.5" rx="1"/><path d="M9 12h6M9 16h4"/></svg>',
     supps:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M10.5 3.5a4 4 0 0 1 0 5.66L5.16 14.5a4 4 0 1 1-5.66-5.66L4.84 3.5a4 4 0 0 1 5.66 0z" transform="translate(4 2)"/><line x1="8.5" y1="8.5" x2="15.5" y2="15.5"/></svg>',
+    chart:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg>',
     memo:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M3.5 20.5l1-4 12-12a1.6 1.6 0 0 1 2.3 0l0.7 0.7a1.6 1.6 0 0 1 0 2.3l-12 12z"/><path d="M14 6l4 4"/></svg>'
   };
-  const tabs=[{k:'summary',l:'건강 요약'},{k:'inbody',l:'인바디'},{k:'sched',l:'검진 일정'},{k:'records',l:'검진 기록'},{k:'supps',l:'식품 정리'},{k:'memo',l:'메모'}];
+  const tabs=[{k:'summary',l:'건강 요약'},{k:'inbody',l:'인바디'},{k:'sched',l:'검진 일정'},{k:'records',l:'검진 기록'},{k:'chart',l:'종합 차트'},{k:'supps',l:'식품 정리'},{k:'memo',l:'메모'}];
   // 인덱스(폴더 탭) 느낌을 위한 탭별 고유 색상
   const tabColors=[
     {bg:'#F5D976',text:'#7A5E16'},
     {bg:'#A9D9E8',text:'#255A6E'},
     {bg:'#E8A0A0',text:'#7A3535'},
     {bg:'#E8897E',text:'#7A2E22'},
+    {bg:'#D9B4E0',text:'#5A2E66'},
     {bg:'#8FCFA0',text:'#245C3A'},
     {bg:'#C9A06B',text:'#5C3E1A'}
   ];
@@ -9704,6 +9706,11 @@ function renderHealth(){
       }
     }
     html+='</div>';
+  }
+
+  // ══ 탭: 종합 차트 ══
+  else if(tab==='chart'){
+    html+=hrChartHtml();
   }
 
   // ══ 탭: 식품 정리 ══
@@ -10637,6 +10644,61 @@ function hrRecFieldsHtml(r){
     out='<div style="font-size:0.82em;color:var(--t3);margin-top:3px;white-space:pre-wrap">'+r.memo+'</div>'+out;
   }
   return out+hrMetricChipsHtml(r);
+}
+
+// ══ 종합 차트: 모든 병원·분야의 검진 결과를 한 화면에 (병명별 상태 + 수치 한눈에 + 추이) ══
+function hrFirstLine(t,n){
+  var l=String(t||'').split('\n').map(function(x){return x.replace(/^[\s•·\-]+/,'').trim();}).filter(Boolean)[0]||'';
+  return l.length>(n||60)?l.slice(0,n||60)+'…':l;
+}
+function hrChartHtml(){
+  var H=S.health||{},recs=(H.records||[]).slice().sort(function(a,b){return b.date.localeCompare(a.date);}),conds=H.conditions||[];
+  if(!recs.length) return '<div class="card" style="border:none;box-shadow:none"><div style="font-size:0.88em;color:var(--t3);padding:20px 4px">아직 검진 기록이 없어요. 「검진 기록」 탭에서 기록을 추가하면 여기에 분야별로 모여서 보여요.</div></div>';
+  var pal=[{bg:'#E8F0F2',text:'#6D898D'},{bg:'#F5E8D8',text:'#C17C3C'},{bg:'#E0EDEA',text:'#4A7C6F'},{bg:'#F5DDD8',text:'#C14A3C'},{bg:'#EDF3F5',text:'#5A8FA8'},{bg:'#F3EFEA',text:'#928980'},{bg:'#E6DFD0',text:'#7A6B50'},{bg:'#DFE3E8',text:'#838C94'}];
+  var hospitals={};recs.forEach(function(r){if(r.hospital)hospitals[r.hospital]=1;});
+  var upcoming=(H.schedules||[]).filter(function(x){return !x.done&&dLeft(x.date)>=0;}).sort(function(a,b){return a.date.localeCompare(b.date);});
+  var out='<div class="card" style="border:none;box-shadow:none;margin-bottom:12px">';
+  // 요약 줄
+  out+='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">'+
+    [['검진 기록',recs.length+'건'],['병원',Object.keys(hospitals).length+'곳'],['마지막 검진',recs[0].date],['다음 예약',upcoming.length?upcoming[0].date+' (D-'+dLeft(upcoming[0].date)+')':'없음']].map(function(x){
+      return '<div style="flex:1;min-width:120px;background:var(--s2);border-radius:10px;padding:8px 12px"><div style="font-size:0.68em;color:var(--t3);font-weight:700">'+x[0]+'</div><div style="font-size:0.95em;font-weight:700">'+x[1]+'</div></div>';
+    }).join('')+'</div>';
+  // 수치 한눈에: 이름 × 날짜 표 (최근 6번 검진 날짜)
+  var map=hrCollectMetrics(recs),names=Object.keys(map);
+  if(names.length){
+    var dates={};names.forEach(function(n){map[n].forEach(function(p){dates[p.date]=1;});});
+    var dl=Object.keys(dates).sort().slice(-6);
+    out+='<div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:14px;overflow-x:auto"><div style="font-size:0.78em;font-weight:700;color:var(--t2);margin-bottom:6px">📊 수치 한눈에 <span style="font-weight:400;color:var(--t3)">· 최근 '+dl.length+'번의 검진 날짜 기준</span></div>'+
+      '<table style="border-collapse:collapse;width:100%;font-size:0.8em;min-width:'+(120+dl.length*64)+'px"><tr><th style="text-align:left;padding:4px 6px;color:var(--t3);font-weight:600">항목</th>'+dl.map(function(d){return '<th style="padding:4px 6px;color:var(--t3);font-weight:600;white-space:nowrap">'+d.slice(2).replace(/-/g,'.')+'</th>';}).join('')+'<th style="padding:4px 6px;color:var(--t3);font-weight:600">변화</th></tr>'+
+      names.map(function(n){
+        var pts=map[n],byD={};pts.forEach(function(p){byD[p.date]=p;});
+        var cur=pts[pts.length-1],prev=pts.length>1?pts[pts.length-2]:null;
+        return '<tr style="border-top:1px solid var(--border)"><td style="padding:5px 6px;font-weight:600;white-space:nowrap">'+n+'</td>'+dl.map(function(d){var p=byD[d];return '<td style="padding:5px 6px;text-align:center;'+(p&&p===cur?'font-weight:800':'color:var(--t2)')+'">'+(p?hrFmtNum(p.value)+'<span style="font-size:0.75em;color:var(--t3)">'+(p.unit||'')+'</span>':'<span style="color:var(--t3)">·</span>')+'</td>';}).join('')+'<td style="padding:5px 6px;text-align:center;white-space:nowrap;font-size:0.9em">'+(prev?hrDeltaHtml(prev.value,cur.value,cur.unit):'<span style="color:var(--t3)">첫 기록</span>')+'</td></tr>';
+      }).join('')+'</table></div>';
+  }
+  // 병명(분야)별 카드
+  var groups=conds.map(function(c,ci){
+    return {c:c,name:c.name,cat:c.category||'',cp:c.color?{bg:c.color.bg,text:c.color.text}:pal[ci%pal.length],recs:recs.filter(function(r){return r.conditionIds&&r.conditionIds.indexOf(c.id)!==-1;})};
+  }).filter(function(g){return g.recs.length;});
+  var none=recs.filter(function(r){return !r.conditionIds||!r.conditionIds.length;});
+  if(none.length) groups.push({c:null,name:'병명 없음',cat:'',cp:{bg:'var(--s2)',text:'var(--t3)'},recs:none});
+  groups.forEach(function(g){
+    var last=g.recs[0],sched=g.c?upcoming.filter(function(x){return x.conditionId===g.c.id;})[0]:null;
+    var lastAbn=g.recs.filter(function(r){return r.abnormal;})[0],lastAct=g.recs.filter(function(r){return r.action;})[0];
+    out+='<div style="border:1px solid var(--border);border-left:5px solid '+g.cp.text+';border-radius:10px;padding:10px 14px;margin-bottom:12px;background:var(--surface,transparent)">'+
+      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-weight:800;font-size:1.02em;color:'+g.cp.text+'">'+g.name+'</span>'+
+        (g.cat?'<span style="font-size:0.7em;background:'+g.cp.bg+';color:'+g.cp.text+';padding:1px 8px;border-radius:99px;font-weight:700">'+g.cat+'</span>':'')+
+        '<span style="flex:1"></span><span style="font-size:0.74em;color:var(--t3)">기록 '+g.recs.length+'건 · 마지막 '+last.date+'</span>'+
+        (sched?'<span style="font-size:0.74em;font-weight:700;color:var(--accent)">다음 '+sched.date+' (D-'+dLeft(sched.date)+')</span>':'')+'</div>'+
+      (lastAbn?'<div style="margin-top:7px;font-size:0.82em"><span style="font-size:0.72em;font-weight:600;color:'+HR_LABELS.abnormal.c+';background:'+HR_LABELS.abnormal.bg+';padding:1px 6px;border-radius:4px">이상 소견</span> '+hrFirstLine(lastAbn.abnormal,90)+' <span style="color:var(--t3);font-size:0.9em">('+lastAbn.date.slice(2).replace(/-/g,'.')+')</span></div>':'')+
+      (lastAct?'<div style="margin-top:5px;font-size:0.82em"><span style="font-size:0.72em;font-weight:600;color:'+HR_LABELS.action.c+';background:'+HR_LABELS.action.bg+';padding:1px 6px;border-radius:4px">추후 조치</span> '+hrFirstLine(lastAct.action,90)+' <span style="color:var(--t3);font-size:0.9em">('+lastAct.date.slice(2).replace(/-/g,'.')+')</span></div>':'')+
+      (g.recs.some(function(r){return r.metrics&&r.metrics.length;})?'<div style="margin-top:8px">'+hrTrendHtml(g.recs).replace('margin-bottom:12px','margin-bottom:0;border:0;padding:0')+'</div>':'')+
+      '<div style="margin-top:8px;border-top:1px dashed var(--border);padding-top:6px">'+g.recs.slice(0,5).map(function(r){
+        return '<div onclick="editHealthRec(\''+r.id+'\')" style="cursor:pointer;display:flex;gap:8px;font-size:0.78em;padding:2px 0;color:var(--t2)"><span style="color:var(--t3);flex-shrink:0">'+r.date.slice(2).replace(/-/g,'.')+'</span><span style="font-weight:600;flex-shrink:0">'+(r.title||'기록')+'</span><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+hrFirstLine(r.abnormal||r.normal||r.note||r.treatment||'',50)+'</span></div>';
+      }).join('')+(g.recs.length>5?'<div style="font-size:0.72em;color:var(--t3);padding-top:2px">외 '+(g.recs.length-5)+'건 · 검진 기록 탭에서 전체 보기</div>':'')+'</div>'+
+    '</div>';
+  });
+  return out+'</div>';
 }
 
 // ══ 검진 기록: 수치 추적 · 한 번에 붙여넣기 ══

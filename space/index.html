@@ -9628,6 +9628,7 @@ function renderHealth(){
         '<button class="btn bp bsm" onclick="openHealthRecModal()">+ 기록 추가</button>'+
       '</div>'+
     '</div>';
+    html+=hrTrendHtml(S.health.records||[]);
     function hrRecRowHtml(r, isLast){
       return '<div class="row-hov" style="padding:10px 0;'+(isLast?'':'border-bottom:1px solid var(--border)')+'">'+
           '<div style="display:flex;align-items:flex-start;gap:10px">'+
@@ -10525,6 +10526,7 @@ function openCondReport(id){
     body+='<div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:10px">'+
       '<button class="btn bg bsm" onclick="closeMo();openHealthRecModal(null,\''+c.id+'\')">+ 검진 기록</button>'+
     '</div>';
+    body+=hrTrendHtml(timeline.map(function(it){return it.data;}).filter(function(r){return r&&r.metrics;}));
     if(!timeline.length){
       body+='<div style="font-size:0.82em;color:var(--t3);padding:4px 0">기록이 없어요. "+ 검진 기록"으로 병원 검진 결과나 경과 메모를 남겨보세요.</div>';
     } else {
@@ -10630,7 +10632,143 @@ function hrRecFieldsHtml(r){
   if(!r.abnormal&&!r.normal&&!r.treatment&&!r.action&&!r.nextApptDate&&!r.note&&r.memo){
     out='<div style="font-size:0.82em;color:var(--t3);margin-top:3px;white-space:pre-wrap">'+r.memo+'</div>'+out;
   }
+  return out+hrMetricChipsHtml(r);
+}
+
+// ══ 검진 기록: 수치 추적 · 한 번에 붙여넣기 ══
+// 기록마다 metrics:[{name,value,unit}] 를 두고, 같은 이름의 수치를 날짜순으로 모아 추이로 보여 줌
+var HR_UNITS='mm|cm|g\\/dL|g\\/dl|mg\\/dL|mg\\/dl|kg|%|mmHg|bpm|IU\\/L|U\\/L|ng\\/mL|pg\\/mL|mIU\\/mL|μg\\/dL|ug\\/dL';
+function hrMetricName(raw){
+  var n=String(raw||'').replace(/\([^)]*\)/g,' ').replace(/[*#:：=\-–—·,.]/g,' ').trim();
+  if(/내막/.test(n)) return '자궁내막';
+  if(/^(Hb|hb|HB)$/.test(n.split(/\s+/).pop())||/혈색소/.test(n)) return 'Hb';
+  var parts=n.split(/\s+/).filter(Boolean);
+  var last=parts.pop()||'';
+  if(/^(두께|크기|수치|결과|길이)$/.test(last)&&parts.length) last=parts.pop()+' '+last;
+  return last.replace(/^(오늘|현재|이번)/,'').replace(/(은|는|이|가|의)$/,'').trim();
+}
+function hrExtractMetrics(text){
+  var out=[],seen={};
+  function add(name,val,unit){
+    name=String(name||'').trim(); if(!name||isNaN(val)) return;
+    if(seen[name]) return; seen[name]=1;
+    out.push({name:name,value:Number(val),unit:unit||''});
+  }
+  var hasList=false;
+  // '근종 4개(6.24 / 3.69 / 1.69 / 1.64cm)' → 크기순으로 근종 1, 2, 3 …
+  var m=/근종[^\d\n]{0,14}?(?:\d+\s*개[^\d\n]{0,6})?(\d+(?:\.\d+)?(?:\s*(?:cm)?\s*[\/,·]\s*\d+(?:\.\d+)?){1,9})\s*cm/.exec(text);
+  if(m){
+    hasList=true;
+    var nums=m[1].split(/[\/,·]/).map(function(x){return parseFloat(x);}).filter(function(x){return !isNaN(x);}).sort(function(a,b){return b-a;});
+    nums.forEach(function(v,i){add('근종 '+(i+1),v,'cm');});
+  }
+  var re=new RegExp('([가-힣A-Za-z][가-힣A-Za-z() ]{0,18}?)\\s*[:：=]?\\s*(\\d+(?:\\.\\d+)?)\\s*('+HR_UNITS+')(?![A-Za-z])','g'),mm;
+  while((mm=re.exec(text))){
+    var nm=hrMetricName(mm[1]);
+    if(!nm||/^\d/.test(nm)||/^(개|번|회|건|번째)$/.test(nm)||(nm.length<2&&nm!=='Hb')) continue;
+    if(hasList&&/근종/.test(nm)) continue;
+    if(/근종/.test(mm[1])&&!hasList&&/^(큰|작은|두\s*번째|세\s*번째|근종)/.test(nm)){ /* 표에서 온 근종 크기 — 이름 그대로 */ }
+    add(nm,mm[2],mm[3].replace('dl','dL'));
+  }
+  var hb=/(Hb|HB|혈색소)[^\d\n]{0,8}(\d+(?:\.\d+)?)/.exec(text);
+  if(hb) add('Hb',hb[2],'g/dL');
   return out;
+}
+function hrMetricsToText(ms){return (ms||[]).map(function(m){return m.name+': '+m.value+(m.unit?' '+m.unit:'');}).join('\n');}
+function hrMetricsFromText(t){
+  var out=[];
+  String(t||'').split('\n').forEach(function(line){
+    var m=/^(.+?)\s*[:：]\s*(-?\d+(?:\.\d+)?)\s*(.*)$/.exec(line.trim());
+    if(m) out.push({name:m[1].trim(),value:parseFloat(m[2]),unit:m[3].trim()});
+  });
+  return out;
+}
+// 같은 이름의 수치를 날짜순으로 모음
+function hrCollectMetrics(recs){
+  var map={};
+  (recs||[]).forEach(function(r){
+    (r.metrics||[]).forEach(function(m){
+      if(!map[m.name]) map[m.name]=[];
+      map[m.name].push({date:r.date,value:m.value,unit:m.unit,rid:r.id});
+    });
+  });
+  Object.keys(map).forEach(function(k){map[k].sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:0;});});
+  return map;
+}
+function hrFmtNum(v){return (Math.round(v*100)/100).toString();}
+function hrDeltaHtml(prev,cur,unit){
+  if(prev==null) return '';
+  var d=Math.round((cur-prev)*100)/100; if(d===0) return '<span style="color:var(--t3)">변화 없음</span>';
+  return '<span style="color:'+(d<0?'#2d8653':'#C17C3C')+'">'+(d<0?'▼':'▲')+' '+hrFmtNum(Math.abs(d))+(unit||'')+'</span>';
+}
+function hrSpark(pts){
+  if(pts.length<2) return '';
+  var w=110,h=30,pad=3,vs=pts.map(function(p){return p.value;}),mn=Math.min.apply(null,vs),mx=Math.max.apply(null,vs),rg=(mx-mn)||1;
+  var xy=pts.map(function(p,i){return [pad+i*(w-2*pad)/(pts.length-1), h-pad-(p.value-mn)/rg*(h-2*pad)];});
+  return '<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" style="flex-shrink:0"><polyline fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linejoin="round" points="'+xy.map(function(q){return q[0].toFixed(1)+','+q[1].toFixed(1);}).join(' ')+'"/>'+
+    xy.map(function(q,i){return '<circle cx="'+q[0].toFixed(1)+'" cy="'+q[1].toFixed(1)+'" r="'+(i===xy.length-1?3:2)+'" fill="var(--accent)"/>';}).join('')+'</svg>';
+}
+// 수치 추이 카드 (여러 번 기록된 수치는 선으로, 한 번뿐이면 값만)
+function hrTrendHtml(recs){
+  var map=hrCollectMetrics(recs),names=Object.keys(map);
+  if(!names.length) return '';
+  var rows=names.map(function(n){
+    var pts=map[n],cur=pts[pts.length-1],prev=pts.length>1?pts[pts.length-2]:null,u=cur.unit||'';
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">'+
+      '<div style="flex:1;min-width:0"><div style="font-size:0.85em;font-weight:600">'+n+'</div>'+
+        '<div style="font-size:0.72em;color:var(--t3);margin-top:2px">'+pts.map(function(p){return p.date.slice(2).replace(/-/g,'.')+' '+hrFmtNum(p.value);}).join(' → ')+(u?' '+u:'')+'</div></div>'+
+      hrSpark(pts)+
+      '<div style="text-align:right;flex-shrink:0;min-width:64px"><div style="font-size:1.05em;font-weight:800">'+hrFmtNum(cur.value)+'<span style="font-size:0.7em;font-weight:500;color:var(--t3)"> '+u+'</span></div>'+
+        '<div style="font-size:0.7em">'+(prev?hrDeltaHtml(prev.value,cur.value,u):'')+'</div></div></div>';
+  }).join('');
+  return '<div style="border:1px solid var(--border);border-radius:10px;padding:4px 14px 2px;margin-bottom:12px"><div style="font-size:0.78em;font-weight:700;color:var(--t2);margin:8px 0 2px">📈 수치 추이 <span style="font-weight:400;color:var(--t3)">· 검진마다 같은 이름의 수치를 모아서 보여요</span></div>'+rows+'</div>';
+}
+// 붙여넣은 글에서 칸 나누기 (⚠️ 이상 소견 / ✅ 정상 / 처치 / 조치 / 다음 예약 / 메모, 제목·날짜·병원)
+function hrParsePaste(text){
+  var res={title:'',date:'',hospital:'',abnormal:'',normal:'',treatment:'',action:'',nextAppt:'',note:''};
+  var heads=[['abnormal','이상\\s*소견'],['normal','정상\\s*(?:소견|범위)'],['treatment','(?:처치|처방|치료)(?:\\s*[\\/·]\\s*(?:처치|처방|치료))?'],['action','(?:추후\\s*)?조치'],['nextAppt','다음\\s*(?:예약|진료)'],['note','(?:진료\\s*내용|메모)'],['title','(?:제목|이름)(?:\\s*\\/\\s*날짜)?'],['hospital','병원']];
+  var lines=String(text||'').replace(/\r/g,'').split('\n'),cur=null,buf={},found=false;
+  lines.forEach(function(raw){
+    var line=raw.replace(/[*#]/g,'').replace(/[⚠✅💊📌📅📝❗]️?/g,'').replace(/^\s*[\-•·]\s*/,'').trim();
+    if(!line){ if(cur) buf[cur]=(buf[cur]||'')+'\n'; return; }
+    var hit=null,rest='';
+    heads.forEach(function(h){
+      if(hit) return;
+      var m=new RegExp('^(?:'+h[1]+')\\s*[:：]\\s*(.*)$').exec(line)||new RegExp('^(?:'+h[1]+')\\s*$').exec(line);
+      if(m){hit=h[0];rest=m[1]||'';}
+    });
+    if(hit){found=true;cur=hit;buf[cur]=(buf[cur]||'')+(rest?rest+'\n':'');return;}
+    if(cur) buf[cur]=(buf[cur]||'')+raw.replace(/[*#]/g,'').trim()+'\n'; else buf._pre=(buf._pre||'')+line+'\n';
+  });
+  Object.keys(res).forEach(function(k){if(buf[k]) res[k]=buf[k].replace(/^\s*[\-•·]\s*/gm,'• ').trim();});
+  // 제목 줄 "제목 / 날짜: 산부인과 / 2026-11-20" 형태 정리
+  var dm=/(20\d\d)\s*[.\-\/년]\s*(\d{1,2})\s*[.\-\/월]\s*(\d{1,2})/.exec(text);
+  if(dm) res.date=dm[1]+'-'+('0'+dm[2]).slice(-2)+'-'+('0'+dm[3]).slice(-2);
+  if(res.title){res.title=res.title.split(/\s*\/\s*/)[0].replace(/\s*(20\d\d)[.\-\/년][^]*$/,'').trim();}
+  if(res.nextAppt&&!res.action) { /* 다음 예약 글은 조치 칸으로 */ res.action=res.nextAppt; }
+  delete res.nextAppt;
+  if(!found){ res.note=String(text).trim(); res.abnormal=''; }
+  if(!res.title){var tm=/([가-힣]{2,6}과)/.exec(text); res.title=tm?(tm[1]+' 진료'):'검진 기록';}
+  res.metrics=hrExtractMetrics(text);
+  return res;
+}
+function hrApplyPaste(){
+  var ta=document.getElementById('hr-paste'); if(!ta||!ta.value.trim()) return;
+  var r=hrParsePaste(ta.value);
+  function set(id,v){var el=document.getElementById(id); if(el&&v) el.value=v;}
+  set('hr-t',r.title); set('hr-d',r.date); set('hr-hospital',r.hospital);
+  set('hr-abnormal',r.abnormal); set('hr-normal',r.normal); set('hr-treatment',r.treatment); set('hr-action',r.action); set('hr-note',r.note);
+  set('hr-metrics',hrMetricsToText(r.metrics));
+  var msg=document.getElementById('hr-paste-msg'); if(msg) msg.textContent='칸을 채웠어요. 아래에서 확인하고 고친 뒤 저장해 주세요 · 수치 '+r.metrics.length+'개';
+}
+function hrMetricChipsHtml(r){
+  if(!r.metrics||!r.metrics.length) return '';
+  var all=(S.health&&S.health.records)||[];
+  return '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px">'+r.metrics.map(function(m){
+    var prev=null;
+    all.forEach(function(o){ if(o.id!==r.id&&o.date<r.date&&o.metrics) o.metrics.forEach(function(x){ if(x.name===m.name&&(!prev||o.date>prev.date)) prev={date:o.date,value:x.value}; }); });
+    return '<span style="font-size:0.74em;background:var(--s2);border-radius:99px;padding:2px 9px;color:var(--t2)"><b style="color:var(--text)">'+m.name+'</b> '+hrFmtNum(m.value)+(m.unit||'')+(prev?' <span style="font-size:0.9em">('+hrDeltaHtml(prev.value,m.value,m.unit)+')</span>':'')+'</span>';
+  }).join('')+'</div>';
 }
 function openHealthRecModal(id, presetCondId){
   if(!S.health) S.health={schedules:[],records:[],memo:''};
@@ -10656,6 +10794,7 @@ function openHealthRecModal(id, presetCondId){
     : '<div style="font-size:0.8em;color:var(--t3)">등록된 병명이 없어요. 건강 요약에서 먼저 추가해보세요.</div>';
   window._hrEditId=id||null;
   openHealthMo((id?'검진 기록 수정':'검진 기록 추가'),
+    (id?'':'<div class="fg" style="background:var(--s2);border-radius:10px;padding:10px"><label class="fl">📋 한 번에 붙여넣기</label><textarea class="ta" id="hr-paste" rows="4" placeholder="진료 내용을 통째로 붙여넣고 [칸 채우기]를 누르세요. ⚠️ 이상 소견 · ✅ 정상 · 처치 · 조치 · 메모 머리말이 있으면 칸마다 나눠 넣고, 수치(3.8mm, Hb 13.9 등)는 따로 뽑아 줘요."></textarea><div style="display:flex;align-items:center;gap:8px;margin-top:6px"><button type="button" class="btn bp bsm" onclick="hrApplyPaste()">칸 채우기</button><span id="hr-paste-msg" style="font-size:0.72em;color:var(--t3)"></span></div></div>')+
     '<div class="fg"><label class="fl">이름</label><input class="inp" id="hr-t" placeholder="예: 종합 건강검진, 항문외과 진료" value="'+(r.title||'')+'"></div>'+
     '<div class="fg"><label class="fl">날짜</label><input type="date" class="inp" id="hr-d" value="'+(r.date||todStr())+'"></div>'+
     '<div class="fg"><label class="fl">병원</label><input class="inp" id="hr-hospital" placeholder="예: 웰니스 병원" value="'+(r.hospital||'')+'"></div>'+
@@ -10672,6 +10811,7 @@ function openHealthRecModal(id, presetCondId){
       '<div style="font-size:0.72em;color:var(--t3);margin-top:4px">날짜를 입력하면 저장 시 검진 일정에 자동으로 추가·동기화돼요</div>'+
     '</div>'+
     '<div class="fg"><label class="fl">'+HR_LABELS.note.l+'</label><textarea class="ta" id="hr-note" rows="2" placeholder="">'+(r.note||'')+'</textarea></div>'+
+    '<div class="fg"><label class="fl">📈 수치 (추이로 모여요)</label><textarea class="ta" id="hr-metrics" rows="3" placeholder="한 줄에 하나: 자궁내막: 3.8 mm">'+hrMetricsToText(r.metrics)+'</textarea><div style="font-size:0.72em;color:var(--t3);margin-top:4px">‘이름: 값 단위’ 형식. 다음 검진에서 같은 이름으로 적으면 변화가 이어서 보여요</div></div>'+
     '<div class="fg"><label class="fl">파일 첨부 (이미지/PDF)</label>'+
       '<label class="btn bg bsm" style="cursor:pointer;display:inline-flex;align-items:center;gap:5px">📎 파일 선택<input type="file" id="hr-f" multiple accept="image/*,.pdf" style="display:none" onchange="previewHealthFiles(this)"></label>'+
       '<div id="hr-preview" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px"></div></div>',
@@ -10788,7 +10928,8 @@ function saveHealthRec(id){
   if(!S.health) S.health={schedules:[],records:[],memo:''};
   const files=window._hrFiles||[];
   const conditionIds=window._hrCondIds||[];
-  const entry={id:id||gid(),title:t,date:d,hospital,abnormal,normal,treatment,action,nextApptDate,nextApptNote,note,files,conditionIds};
+  const metrics=hrMetricsFromText((document.getElementById('hr-metrics')||{}).value);
+  const entry={id:id||gid(),title:t,date:d,hospital,abnormal,normal,treatment,action,nextApptDate,nextApptNote,note,files,conditionIds,metrics};
   var recRef;
   if(id){const r=S.health.records.find(x=>x.id===id);if(r){Object.assign(r,entry);recRef=r;}}
   else {S.health.records.push(entry);recRef=entry;}

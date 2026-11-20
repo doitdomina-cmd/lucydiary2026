@@ -10807,7 +10807,7 @@ function openHealthRecModal(id, presetCondId){
     '<div class="fg"><label class="fl">이름</label><input class="inp" id="hr-t" placeholder="예: 종합 건강검진, 항문외과 진료" value="'+(r.title||'')+'"></div>'+
     '<div class="fg"><label class="fl">날짜</label><input type="date" class="inp" id="hr-d" value="'+(r.date||todStr())+'"></div>'+
     '<div class="fg"><label class="fl">병원</label><input class="inp" id="hr-hospital" placeholder="예: 웰니스 병원" value="'+(r.hospital||'')+'"></div>'+
-    '<div class="fg"><label class="fl">관련 병명 (선택)</label>'+condChipsHtml+'</div>'+
+    '<div class="fg"><label class="fl">관련 병명 <span style="color:var(--red)">(필수)</span></label>'+condChipsHtml+'</div>'+
     '<div class="fg"><label class="fl" style="color:'+HR_LABELS.abnormal.c+'">'+HR_LABELS.abnormal.l+'</label><textarea class="ta" id="hr-abnormal" rows="3" placeholder="">'+(r.abnormal||r.memo||'')+'</textarea></div>'+
     '<div class="fg"><label class="fl" style="color:'+HR_LABELS.normal.c+'">'+HR_LABELS.normal.l+'</label><textarea class="ta" id="hr-normal" rows="2" placeholder="">'+(r.normal||'')+'</textarea></div>'+
     '<div class="fg"><label class="fl" style="color:'+HR_LABELS.treatment.c+'">'+HR_LABELS.treatment.l+'</label><textarea class="ta" id="hr-treatment" rows="2" placeholder="">'+(r.treatment||'')+'</textarea></div>'+
@@ -10937,6 +10937,13 @@ function saveHealthRec(id){
   if(!S.health) S.health={schedules:[],records:[],memo:''};
   const files=window._hrFiles||[];
   const conditionIds=window._hrCondIds||[];
+  // 병명을 하나도 고르지 않으면 저장하지 않음 (등록된 병명이 있을 때)
+  if((S.health.conditions||[]).length&&!conditionIds.length){
+    alert('관련 병명을 하나 이상 골라 주세요');
+    var chips=document.getElementById('hr-cond-chips');
+    if(chips){chips.scrollIntoView({block:'center',behavior:'smooth'});chips.style.outline='2px solid var(--red)';chips.style.outlineOffset='4px';chips.style.borderRadius='10px';setTimeout(function(){chips.style.outline='';},2500);}
+    return;
+  }
   const metrics=hrMetricsFromText((document.getElementById('hr-metrics')||{}).value);
   const entry={id:id||gid(),title:t,date:d,hospital,abnormal,normal,treatment,action,nextApptDate,nextApptNote,note,files,conditionIds,metrics};
   var recRef;

@@ -10646,6 +10646,44 @@ function hrRecFieldsHtml(r){
   return out+hrMetricChipsHtml(r);
 }
 
+// 상담용 요약 복사: 날짜순으로 병명(분야)별 검진 기록 + 모든 수치 변화 + 다음 예약을 한 덩어리 글로
+function hrChartSummaryText(){
+  var H=S.health||{},recs=(H.records||[]).slice().sort(function(a,b){return a.date.localeCompare(b.date);}),conds=H.conditions||[];
+  var L=[],d8=function(d){return d.replace(/-/g,'.');};
+  L.push('【검진 기록 요약】 '+d8(todStr())+' 기준');
+  var map=hrCollectMetrics(recs),names=Object.keys(map);
+  if(names.length){
+    L.push('','■ 수치 변화');
+    names.forEach(function(n){
+      var pts=map[n],u=pts[pts.length-1].unit||'';
+      var line='- '+n+': '+pts.map(function(p){return d8(p.date)+' '+hrFmtNum(p.value)+(p.unit||'');}).join(' → ');
+      if(pts.length>1){var dd=Math.round((pts[pts.length-1].value-pts[0].value)*100)/100;line+=' ('+(dd<0?'▼':dd>0?'▲':'변화 없음')+(dd?' '+hrFmtNum(Math.abs(dd))+u:'')+')';}
+      L.push(line);
+    });
+  }
+  var groups=conds.map(function(c){return {name:c.name+(c.category?' ('+c.category+')':''),recs:recs.filter(function(r){return r.conditionIds&&r.conditionIds.indexOf(c.id)!==-1;}),id:c.id};}).filter(function(g){return g.recs.length;});
+  var none=recs.filter(function(r){return !r.conditionIds||!r.conditionIds.length;});
+  if(none.length) groups.push({name:'기타 (병명 미지정)',recs:none,id:null});
+  groups.forEach(function(g){
+    L.push('','■ '+g.name);
+    g.recs.forEach(function(r){
+      L.push('['+d8(r.date)+'] '+(r.title||'기록')+(r.hospital?' · '+r.hospital:''));
+      [['abnormal','이상 소견'],['normal','정상 범위'],['treatment','처치/처방'],['action','추후 조치'],['note','진료 내용']].forEach(function(k){
+        if(r[k[0]]) L.push('  '+k[1]+': '+String(r[k[0]]).split('\n').map(function(x){return x.replace(/^[\s•·]+/,'').trim();}).filter(Boolean).join(' / '));
+      });
+      if(r.nextApptDate) L.push('  다음 예약: '+d8(r.nextApptDate)+(r.nextApptNote?' ('+r.nextApptNote+')':''));
+    });
+  });
+  var up=(H.schedules||[]).filter(function(x){return !x.done&&dLeft(x.date)>=0;}).sort(function(a,b){return a.date.localeCompare(b.date);});
+  if(up.length){L.push('','■ 앞으로 예정'); up.forEach(function(x){L.push('- '+d8(x.date)+' '+(x.title||'')+(x.hospital?' · '+x.hospital:''));});}
+  return L.join('\n');
+}
+function hrCopyChartSummary(btn){
+  var t=hrChartSummaryText(),ok=function(){if(btn){var o=btn.textContent;btn.textContent='✓ 복사했어요';setTimeout(function(){btn.textContent=o;},1800);}};
+  function fb(){var ta=document.createElement('textarea');ta.value=t;ta.style.cssText='position:fixed;left:-9999px';document.body.appendChild(ta);ta.select();try{document.execCommand('copy');ok();}catch(e){alert(t);}ta.remove();}
+  if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(ok,fb); else fb();
+}
+
 // ══ 종합 차트: 모든 병원·분야의 검진 결과를 한 화면에 (병명별 상태 + 수치 한눈에 + 추이) ══
 function hrFirstLine(t,n){
   var l=String(t||'').split('\n').map(function(x){return x.replace(/^[\s•·\-]+/,'').trim();}).filter(Boolean)[0]||'';
@@ -10658,6 +10696,7 @@ function hrChartHtml(){
   var hospitals={};recs.forEach(function(r){if(r.hospital)hospitals[r.hospital]=1;});
   var upcoming=(H.schedules||[]).filter(function(x){return !x.done&&dLeft(x.date)>=0;}).sort(function(a,b){return a.date.localeCompare(b.date);});
   var out='<div class="card" style="border:none;box-shadow:none;margin-bottom:12px">';
+  out+='<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn bp bsm" onclick="hrCopyChartSummary(this)" title="상담 때 쓸 수 있게 모든 검진 기록과 수치 변화를 글로 복사해요">📋 요약 복사 (상담용)</button></div>';
   // 요약 줄
   out+='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">'+
     [['검진 기록',recs.length+'건'],['병원',Object.keys(hospitals).length+'곳'],['마지막 검진',recs[0].date],['다음 예약',upcoming.length?upcoming[0].date+' (D-'+dLeft(upcoming[0].date)+')':'없음']].map(function(x){

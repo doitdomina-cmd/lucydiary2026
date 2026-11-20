@@ -10490,21 +10490,25 @@ function openCondReport(id){
       '</div>';
     }
     body+='</div>';
-    // ── 검진 기록 미리보기 (최근 1건) ──
+    // ── 검진 기록 미리보기 (최근 3건 + 수치 추이) ──
     body+='<div style="margin-top:18px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border2)">'+
-      '<div style="font-size:0.8em;font-weight:700;color:var(--t3)">📋 검진 기록</div>'+
+      '<div style="font-size:0.8em;font-weight:700;color:var(--t3)">📋 검진 기록 <span style="font-weight:400">'+(timeline.length>3?'· 최근 3건':'')+'</span></div>'+
+      (timeline.length>3?'<button class="btn bg bsm" style="font-size:0.72em" onclick="setCondReportTab(\'records\')">전체 '+timeline.length+'건 보기</button>':'')+
     '</div>';
     if(!timeline.length){
       body+='<div style="font-size:0.82em;color:var(--t3);padding:4px 0">기록이 없어요</div>';
     } else {
-      var nr=timeline[0].data;
-      body+='<div style="padding:6px 0">'+
-        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'+
-          '<span style="font-size:0.78em;color:var(--t3);flex-shrink:0">'+nr.date+'</span>'+
-          '<span style="font-size:0.88em;font-weight:600;flex:1;min-width:0">'+hrTitleHtml(nr)+'</span>'+
-        '</div>'+
-        hrRecFieldsHtml(nr)+
-      '</div>';
+      body+=hrTrendHtml(timeline.map(function(it){return it.data;}).filter(function(r){return r&&r.metrics&&r.metrics.length;}));
+      timeline.slice(0,3).forEach(function(it,i,arr){
+        var nr=it.data;
+        body+='<div style="padding:8px 0;'+(i<arr.length-1?'border-bottom:1px solid var(--border)':'')+'">'+
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'+
+            '<span style="font-size:0.78em;color:var(--t3);flex-shrink:0">'+nr.date+'</span>'+
+            '<span style="font-size:0.88em;font-weight:600;flex:1;min-width:0">'+hrTitleHtml(nr)+'</span>'+
+          '</div>'+
+          hrRecFieldsHtml(nr)+
+        '</div>';
+      });
     }
     body+='</div>';
   } else if(tab==='sched'){

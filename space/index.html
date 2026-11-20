@@ -7171,6 +7171,7 @@ function pjDelAsk(id){
     '<div style="font-size:0.95em;line-height:1.7"><b>「'+esc(pj.name)+'」</b>을(를) 지울까요?<div style="margin:8px 0;padding:8px 12px;background:var(--s2);border-radius:8px;font-size:0.9em">지금까지의 기록: 루틴 기록 '+nR+'개 · 일지 '+nL+'개'+((pj.tasks||[]).length?' · 할 일 '+(pj.tasks||[]).length+'개':'')+'</div>'+
     '<div style="color:var(--t2);font-size:0.88em">• <b>기록은 남기고 지우기</b>: 프로젝트는 사라지고, 기록은 프로젝트 화면 아래 「지난 프로젝트」에 보관돼요. 저금 내역도 그대로 남아요.<br>• <b>기록까지 모두 지우기</b>: 보관 없이 전부 지워지고 되돌릴 수 없어요.<br>※ 관련 마감일 · 루틴화 일정 · 캘린더 일정은 어느 쪽이든 함께 지워져요.</div></div>',
     '<button class="btn bg" onclick="closeMo()">취소</button>'+
+    (pj.completed?'':'<button class="btn bg" onclick="closeMo();togPjComplete(\''+id+'\')">지우지 않고 완료로 보관</button>')+
     '<button class="btn bp" onclick="closeMo();delPj(\''+id+'\',true,true)">기록은 남기고 지우기</button>'+
     '<button class="btn bg" style="color:var(--red)" onclick="closeMo();delPj(\''+id+'\',true,false)">기록까지 모두 지우기</button>');
 }
@@ -7783,7 +7784,7 @@ function savePj(){
   S.projects.push({id:gid(),name,emoji:'',icon:selPjI,desc:document.getElementById('pj-d').value,dday,lifeAreaId:selPjA,color:selPjC,tasks:[],milestones:[],notes:'',routinized:[],links:[]});
   save();closeMo();render();
 }
-function delPj(id,force,keep){var _pj=S.projects.find(p=>p.id===id);if(!force&&_pj&&!_pj.completed&&confirm('끝난 프로젝트라면 삭제 대신 "완료"로 보관할 수 있어요.\n완료로 보관하면 기록·루틴·사진이 모두 그대로 남아요.\n\n[확인] 완료로 보관   [취소] 삭제 계속')){togPjComplete(id);return;}if(!force){pjDelAsk(id);return;}const pj=S.projects.find(p=>p.id===id);const rzIds=pj&&pj.routinized?pj.routinized.map(r=>r.id):[];S.deadlines=S.deadlines.filter(d=>d.projectId!==id);S.calEvents=S.calEvents.filter(e=>e.projectId!==id);if(rzIds.length>0)S.routines=S.routines.filter(r=>!rzIds.includes(r.id));if(keep!==false){try{pjArchiveAdd(pj);}catch(e){console.error(e);}}else if(S.savings&&S.savings.entries&&rzIds.length>0){rzIds.forEach(function(rid){var prefix='rzsave-'+rid+'-';S.savings.entries.filter(function(e){return e.id&&e.id.indexOf(prefix)===0;}).forEach(function(e){S.savings.current-=e.amount;});S.savings.entries=S.savings.entries.filter(function(e){return !(e.id&&e.id.indexOf(prefix)===0);});});if(S.savings.current<0)S.savings.current=0;}S.projects=S.projects.filter(p=>p.id!==id);if(activePid===id){activePid=null;page='projects';}save();render();}
+function delPj(id,force,keep){var _pj=S.projects.find(p=>p.id===id);if(!force){pjDelAsk(id);return;}const pj=S.projects.find(p=>p.id===id);const rzIds=pj&&pj.routinized?pj.routinized.map(r=>r.id):[];S.deadlines=S.deadlines.filter(d=>d.projectId!==id);S.calEvents=S.calEvents.filter(e=>e.projectId!==id);if(rzIds.length>0)S.routines=S.routines.filter(r=>!rzIds.includes(r.id));if(keep!==false){try{pjArchiveAdd(pj);}catch(e){console.error(e);}}else if(S.savings&&S.savings.entries&&rzIds.length>0){rzIds.forEach(function(rid){var prefix='rzsave-'+rid+'-';S.savings.entries.filter(function(e){return e.id&&e.id.indexOf(prefix)===0;}).forEach(function(e){S.savings.current-=e.amount;});S.savings.entries=S.savings.entries.filter(function(e){return !(e.id&&e.id.indexOf(prefix)===0);});});if(S.savings.current<0)S.savings.current=0;}S.projects=S.projects.filter(p=>p.id!==id);if(activePid===id){activePid=null;page='projects';}save();render();}
 
 function openPjEditModal(pid){
   const p=S.projects.find(x=>x.id===pid);if(!p)return;

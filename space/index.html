@@ -7012,19 +7012,20 @@ function saveArea(eid){
 }
 function delArea(id){
   const projs=S.projects.filter(p=>p.lifeAreaId===id);
-  if(!projs.length){ if(!confirm('이 목표를 삭제할까요?'))return; delAreaDo(id,false); return; }
+  if(!projs.length){ if(!confirm('이 목표를 삭제할까요?'))return; delAreaDo(id,0); return; }
   // 프로젝트가 딸려 있으면: 목표만 지울지, 프로젝트도 같이 지울지 고르게 함
   openMo('목표 삭제',
     '<div style="font-size:0.95em;line-height:1.7">이 목표에 프로젝트 <b>'+projs.length+'개</b>가 들어 있어요.<div style="margin:8px 0;padding:8px 12px;background:var(--s2);border-radius:8px;font-size:0.9em">'+projs.map(function(p){return '· '+p.name;}).join('<br>')+'</div>'+
-    '<div style="color:var(--t2);font-size:0.88em">• <b>목표만 지우기</b>: 프로젝트는 남고, 영역만 비어요.<br>• <b>프로젝트도 같이 지우기</b>: 관련 마감일 · 루틴 · 캘린더 일정까지 함께 지워지고 되돌릴 수 없어요.</div></div>',
+    '<div style="color:var(--t2);font-size:0.88em">• <b>목표만 지우기</b>: 프로젝트는 남고, 영역만 비어요.<br>• <b>프로젝트도 지우기 (기록은 남김)</b>: 프로젝트는 지우고 지금까지의 기록은 「지난 프로젝트」에 보관해요.<br>• <b>프로젝트·기록 모두 지우기</b>: 전부 지워지고 되돌릴 수 없어요.</div></div>',
     '<button class="btn bg" onclick="closeMo()">취소</button>'+
-    '<button class="btn bg" onclick="delAreaDo(\''+id+'\',false)">목표만 지우기</button>'+
-    '<button class="btn bp" style="background:var(--red)" onclick="delAreaDo(\''+id+'\',true)">프로젝트도 같이 지우기</button>');
+    '<button class="btn bg" onclick="delAreaDo(\''+id+'\',0)">목표만 지우기</button>'+
+    '<button class="btn bp" onclick="delAreaDo(\''+id+'\',1)">프로젝트도 지우기 (기록은 남김)</button>'+
+    '<button class="btn bg" style="color:var(--red)" onclick="delAreaDo(\''+id+'\',2)">프로젝트·기록 모두 지우기</button>');
 }
-function delAreaDo(id,withProjects){
-  if(withProjects){
+function delAreaDo(id,mode){
+  if(mode){
     var ids=S.projects.filter(function(p){return p.lifeAreaId===id;}).map(function(p){return p.id;});
-    ids.forEach(function(pid){delPj(pid,true);});
+    ids.forEach(function(pid){delPj(pid,true,mode===1);});
   }
   S.lifeAreas=(S.lifeAreas||[]).filter(a=>a.id!==id);
   S.projects=S.projects.map(p=>p.lifeAreaId===id?Object.assign({},p,{lifeAreaId:''}):p);
@@ -7092,6 +7093,7 @@ function renderProjects(){
     html+='<div class="pjd-done"><div class="pjd-done-h">✿ 완료한 프로젝트 <span>'+doneProjects.length+'</span></div><div class="pjd-done-list">'+
       doneProjects.map(function(p){return '<button type="button" class="pjd-done-it" onclick="go(\'projects\',\''+p.id+'\')"><span>✓</span>'+esc(p.name)+(p.completedAt?'<em>'+esc(p.completedAt.replace(/-/g,'.'))+'</em>':'')+'</button>';}).join('')+'</div></div>';
   }
+  html+=pjArchiveHtml();
   return html;
 }
 
@@ -7159,6 +7161,59 @@ function delPjMetric(pid){var p=S.projects.find(function(x){return x.id===pid;})
 function addPjMetric(pid){var p=S.projects.find(function(x){return x.id===pid;});if(!p||!p.metric)return;var el=document.getElementById('pjm-v-'+pid),v=parseFloat(el&&el.value);if(isNaN(v))return;var t=todStr();p.metric.entries=(p.metric.entries||[]).filter(function(e){return e.date!==t;});p.metric.entries.push({date:t,val:v});save();render();}
 
 // 루틴 기록: Today에서 이 프로젝트의 루틴 카드를 담은 날(시간·메모·사진). 예전 기록·사진 일지(p.logs)는 있으면 같이 보여 준다
+
+// 프로젝트 삭제: 지금까지의 기록을 남길지 같이 지울지 고르기
+function pjDelAsk(id){
+  var pj=S.projects.find(function(p){return p.id===id;}); if(!pj) return;
+  var nR=0;try{nR=pjRtRecords(pj).length;}catch(e){}
+  var nL=(pj.logs||[]).length;
+  openMo('프로젝트 삭제',
+    '<div style="font-size:0.95em;line-height:1.7"><b>「'+esc(pj.name)+'」</b>을(를) 지울까요?<div style="margin:8px 0;padding:8px 12px;background:var(--s2);border-radius:8px;font-size:0.9em">지금까지의 기록: 루틴 기록 '+nR+'개 · 일지 '+nL+'개'+((pj.tasks||[]).length?' · 할 일 '+(pj.tasks||[]).length+'개':'')+'</div>'+
+    '<div style="color:var(--t2);font-size:0.88em">• <b>기록은 남기고 지우기</b>: 프로젝트는 사라지고, 기록은 프로젝트 화면 아래 「지난 프로젝트」에 보관돼요. 저금 내역도 그대로 남아요.<br>• <b>기록까지 모두 지우기</b>: 보관 없이 전부 지워지고 되돌릴 수 없어요.<br>※ 관련 마감일 · 루틴화 일정 · 캘린더 일정은 어느 쪽이든 함께 지워져요.</div></div>',
+    '<button class="btn bg" onclick="closeMo()">취소</button>'+
+    '<button class="btn bp" onclick="closeMo();delPj(\''+id+'\',true,true)">기록은 남기고 지우기</button>'+
+    '<button class="btn bg" style="color:var(--red)" onclick="closeMo();delPj(\''+id+'\',true,false)">기록까지 모두 지우기</button>');
+}
+
+// ── 지난 프로젝트: 프로젝트를 지워도 루틴 기록 · 일지 · 할 일 달성 내역은 여기에 남김 ──
+function pjArchiveAdd(pj){
+  if(!pj) return;
+  if(!S.pjArchive) S.pjArchive=[];
+  var area=(S.lifeAreas||[]).find(function(a){return a.id===pj.lifeAreaId;});
+  var recs=[];
+  try{recs=pjRtRecords(pj).map(function(x){return {ds:x.ds,title:(x.r&&(x.r.task||x.r.title))||'',t:x.t||'',m:x.m||'',ph:x.ph||[]};});}catch(e){}
+  recs.sort(function(a,b){return (b.ds+(b.t||'')).localeCompare(a.ds+(a.t||''));});
+  S.pjArchive.push({id:gid(),pid:pj.id,name:pj.name,color:pj.color||'',area:area?area.name:'',deletedAt:todStr(),
+    tasks:(pj.tasks||[]).map(function(t){return {t:t.text||t.title||t.name||'',done:!!t.done};}),
+    logs:(pj.logs||[]).slice(),records:recs});
+}
+function togPjArch(id){window._pjArchOpen=window._pjArchOpen===id?null:id;render();}
+function delPjArch(id){
+  var a=(S.pjArchive||[]).find(function(x){return x.id===id;}); if(!a) return;
+  if(!confirm('「'+a.name+'」의 보관된 기록을 완전히 지울까요?\n되돌릴 수 없어요.')) return;
+  S.pjArchive=S.pjArchive.filter(function(x){return x.id!==id;}); window._pjArchOpen=null; save(); render();
+}
+function pjArchiveHtml(){
+  var list=(S.pjArchive||[]).slice().sort(function(a,b){return b.deletedAt.localeCompare(a.deletedAt);});
+  if(!list.length) return '';
+  var h='<div style="margin-top:28px;padding-top:14px;border-top:1px dashed var(--border)"><div style="font-size:0.95em;font-weight:700;color:var(--t2);margin-bottom:8px">🗂️ 지난 프로젝트 <span style="color:var(--t3);font-weight:500">'+list.length+'</span> <span style="font-weight:400;font-size:0.85em;color:var(--t3)">· 지운 프로젝트의 기록이 보관돼요</span></div>';
+  list.forEach(function(a){
+    var open=window._pjArchOpen===a.id,nL=(a.logs||[]).length,nR=(a.records||[]).length,done=(a.tasks||[]).filter(function(t){return t.done;}).length;
+    h+='<div style="border:1px solid var(--border);border-left:4px solid '+(a.color||'var(--accent)')+';border-radius:10px;margin-bottom:8px;overflow:hidden">'+
+      '<div onclick="togPjArch(\''+a.id+'\')" style="cursor:pointer;display:flex;align-items:center;gap:8px;padding:10px 12px"><span style="font-weight:700;flex:1;min-width:0">'+esc(a.name)+(a.area?' <span style="font-weight:400;font-size:0.8em;color:var(--t3)">· '+esc(a.area)+'</span>':'')+'</span>'+
+      '<span style="font-size:0.78em;color:var(--t3);white-space:nowrap">루틴 기록 '+nR+' · 일지 '+nL+(a.tasks&&a.tasks.length?' · 할 일 '+done+'/'+a.tasks.length:'')+' · '+a.deletedAt.slice(2).replace(/-/g,'.')+' 삭제</span><span style="color:var(--t3)">'+(open?'▴':'▾')+'</span></div>';
+    if(open){
+      h+='<div style="padding:4px 14px 12px;border-top:1px solid var(--border);font-size:0.88em">';
+      if(a.tasks&&a.tasks.length) h+='<div style="margin:8px 0 4px;font-weight:700;color:var(--t2)">할 일</div>'+a.tasks.map(function(t){return '<div style="color:'+(t.done?'var(--t3)':'var(--text)')+'">'+(t.done?'✓ ':'○ ')+esc(t.t)+'</div>';}).join('');
+      if(nR) h+='<div style="margin:10px 0 4px;font-weight:700;color:var(--t2)">루틴 기록</div>'+a.records.map(function(r){return '<div style="padding:3px 0;border-bottom:1px solid var(--border)"><span style="color:var(--t3)">'+r.ds.slice(2).replace(/-/g,'.')+(r.t?' '+esc(r.t):'')+'</span> '+esc(r.title)+(r.m?'<div style="color:var(--t2);white-space:pre-wrap;font-size:0.92em">'+esc(r.m)+'</div>':'')+'</div>';}).join('');
+      if(nL) h+='<div style="margin:10px 0 4px;font-weight:700;color:var(--t2)">일지</div>'+a.logs.slice().sort(function(x,y){return (y.date||'').localeCompare(x.date||'');}).map(function(l){return '<div style="padding:3px 0;border-bottom:1px solid var(--border)"><span style="color:var(--t3)">'+esc((l.date||'').slice(2).replace(/-/g,'.'))+'</span> '+esc(l.text||l.memo||l.note||'')+(l.photo?' <img src="'+l.photo+'" style="display:block;max-width:120px;border-radius:6px;margin-top:4px">':'')+'</div>';}).join('');
+      if(!a.tasks.length&&!nR&&!nL) h+='<div style="color:var(--t3);padding:8px 0">남은 기록이 없어요</div>';
+      h+='<div style="text-align:right;margin-top:10px"><button class="btn bg bsm" style="color:var(--red)" onclick="delPjArch(\''+a.id+'\')">이 기록 완전히 지우기</button></div></div>';
+    }
+    h+='</div>';
+  });
+  return h+'</div>';
+}
 function pjRtRecords(p){
   var rmap={};(S.routines||[]).forEach(function(r){if(r.isRz&&r.rzProjectId===p.id)rmap[r.id]=r;});
   if(!Object.keys(rmap).length)return [];
@@ -7728,7 +7783,7 @@ function savePj(){
   S.projects.push({id:gid(),name,emoji:'',icon:selPjI,desc:document.getElementById('pj-d').value,dday,lifeAreaId:selPjA,color:selPjC,tasks:[],milestones:[],notes:'',routinized:[],links:[]});
   save();closeMo();render();
 }
-function delPj(id,force){var _pj=S.projects.find(p=>p.id===id);if(!force&&_pj&&!_pj.completed&&confirm('끝난 프로젝트라면 삭제 대신 "완료"로 보관할 수 있어요.\n완료로 보관하면 기록·루틴·사진이 모두 그대로 남아요.\n\n[확인] 완료로 보관   [취소] 삭제 계속')){togPjComplete(id);return;}if(!force&&!confirm('정말 삭제할까요?\n(관련 마감일, 루틴화 일정, 캘린더 이벤트도 함께 삭제되고 되돌릴 수 없어요)'))return;const pj=S.projects.find(p=>p.id===id);const rzIds=pj&&pj.routinized?pj.routinized.map(r=>r.id):[];S.deadlines=S.deadlines.filter(d=>d.projectId!==id);S.calEvents=S.calEvents.filter(e=>e.projectId!==id);if(rzIds.length>0)S.routines=S.routines.filter(r=>!rzIds.includes(r.id));if(S.savings&&S.savings.entries&&rzIds.length>0){rzIds.forEach(function(rid){var prefix='rzsave-'+rid+'-';S.savings.entries.filter(e=>e.id&&e.id.indexOf(prefix)===0).forEach(e=>{S.savings.current-=e.amount;});S.savings.entries=S.savings.entries.filter(e=>!(e.id&&e.id.indexOf(prefix)===0));});if(S.savings.current<0)S.savings.current=0;}S.projects=S.projects.filter(p=>p.id!==id);if(activePid===id){activePid=null;page='projects';}save();render();}
+function delPj(id,force,keep){var _pj=S.projects.find(p=>p.id===id);if(!force&&_pj&&!_pj.completed&&confirm('끝난 프로젝트라면 삭제 대신 "완료"로 보관할 수 있어요.\n완료로 보관하면 기록·루틴·사진이 모두 그대로 남아요.\n\n[확인] 완료로 보관   [취소] 삭제 계속')){togPjComplete(id);return;}if(!force){pjDelAsk(id);return;}const pj=S.projects.find(p=>p.id===id);const rzIds=pj&&pj.routinized?pj.routinized.map(r=>r.id):[];S.deadlines=S.deadlines.filter(d=>d.projectId!==id);S.calEvents=S.calEvents.filter(e=>e.projectId!==id);if(rzIds.length>0)S.routines=S.routines.filter(r=>!rzIds.includes(r.id));if(keep!==false){try{pjArchiveAdd(pj);}catch(e){console.error(e);}}else if(S.savings&&S.savings.entries&&rzIds.length>0){rzIds.forEach(function(rid){var prefix='rzsave-'+rid+'-';S.savings.entries.filter(function(e){return e.id&&e.id.indexOf(prefix)===0;}).forEach(function(e){S.savings.current-=e.amount;});S.savings.entries=S.savings.entries.filter(function(e){return !(e.id&&e.id.indexOf(prefix)===0);});});if(S.savings.current<0)S.savings.current=0;}S.projects=S.projects.filter(p=>p.id!==id);if(activePid===id){activePid=null;page='projects';}save();render();}
 
 function openPjEditModal(pid){
   const p=S.projects.find(x=>x.id===pid);if(!p)return;

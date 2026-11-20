@@ -17209,7 +17209,9 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
         }
         // ── 웹툰 관리 탭 ──────────────────────────────────────────
         // webtoonViewFilter, webtoonSortMode는 스크립트 상단에서 선언됨 (로딩 순서 버그 방지)
-        const WEBTOON_PEN_ORDER = ['후아유99', '도민아', '타락감자', '오렌지말머리', '후아유69'];
+        const WEBTOON_PEN_ORDER = ['후아유99', '도민아', '김도도', '타락감자', '오렌지말머리', '후아유69'];
+        // 필명 순서 찾기 — 띄어쓰기는 무시('오렌지 말머리' = '오렌지말머리')
+        function penOrderIndex(p) { const n = s => String(s || '').replace(/\s+/g, ''); return WEBTOON_PEN_ORDER.findIndex(x => n(x) === n(p)); }
         // 스케줄 관리(taskSchedules)에 등록된 '웹툰 캐릭터 가이드 전달' 일정 중 가장 빠른 날짜를 가져옴 (자동 연동)
         function getWebtoonCharGuideDate(workId) {
             let found = null;
@@ -17276,7 +17278,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                 return [...list].sort((a, b) => {
                     const pa = (webtoonManage[a.id] || {}).penName || '';
                     const pb = (webtoonManage[b.id] || {}).penName || '';
-                    const ia = WEBTOON_PEN_ORDER.indexOf(pa), ib = WEBTOON_PEN_ORDER.indexOf(pb);
+                    const ia = penOrderIndex(pa), ib = penOrderIndex(pb);
                     const oa = ia === -1 ? 999 : ia, ob = ib === -1 ? 999 : ib;
                     if (oa !== ob) return oa - ob;
                     return sortKeyDate(a).localeCompare(sortKeyDate(b));
@@ -17290,7 +17292,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             const groups = {};
             list.forEach(w => { const pen = penOf(w) || '미지정'; (groups[pen] = groups[pen] || []).push(w); });
             const rank = p => {
-                const i = WEBTOON_PEN_ORDER.indexOf(p); if (i !== -1) return i;
+                const i = penOrderIndex(p); if (i !== -1) return i;
                 const j = (Array.isArray(penNames) ? penNames : []).indexOf(p); if (j !== -1) return 100 + j;
                 return p === '미지정' ? 9999 : 5000;
             };
@@ -17499,7 +17501,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                 });
                 Object.keys(groups).forEach(pen => { groups[pen].sort((a, b) => sortKeyDate(a).localeCompare(sortKeyDate(b))); });
                 const penOrder = Object.keys(groups).sort((a, b) => {
-                    const ia = WEBTOON_PEN_ORDER.indexOf(a), ib = WEBTOON_PEN_ORDER.indexOf(b);
+                    const ia = penOrderIndex(a), ib = penOrderIndex(b);
                     if (ia !== -1 && ib !== -1) return ia - ib;
                     if (ia !== -1) return -1;
                     if (ib !== -1) return 1;

@@ -10651,6 +10651,7 @@ function hrExtractMetrics(text){
   var out=[],seen={};
   function add(name,val,unit){
     name=String(name||'').trim(); if(!name||isNaN(val)) return;
+    if(name==='자궁내막'&&unit==='cm'){val=Math.round(val*100)/10;unit='mm';} // 1.2cm → 12mm
     if(seen[name]) return; seen[name]=1;
     out.push({name:name,value:Number(val),unit:unit||''});
   }
@@ -10744,6 +10745,7 @@ function hrParsePaste(text){
   // 제목 줄 "제목 / 날짜: 산부인과 / 2026-11-20" 형태 정리
   var dm=/(20\d\d)\s*[.\-\/년]\s*(\d{1,2})\s*[.\-\/월]\s*(\d{1,2})/.exec(text);
   if(dm) res.date=dm[1]+'-'+('0'+dm[2]).slice(-2)+'-'+('0'+dm[3]).slice(-2);
+  res.hasTitle=!!res.title;
   if(res.title){res.title=res.title.split(/\s*\/\s*/)[0].replace(/\s*(20\d\d)[.\-\/년][^]*$/,'').trim();}
   if(res.nextAppt&&!res.action) { /* 다음 예약 글은 조치 칸으로 */ res.action=res.nextAppt; }
   delete res.nextAppt;
@@ -10756,7 +10758,10 @@ function hrApplyPaste(){
   var ta=document.getElementById('hr-paste'); if(!ta||!ta.value.trim()) return;
   var r=hrParsePaste(ta.value);
   function set(id,v){var el=document.getElementById(id); if(el&&v) el.value=v;}
-  set('hr-t',r.title); set('hr-d',r.date); set('hr-hospital',r.hospital);
+  // 새 기록은 제목을 채우고, 기존 기록 수정 중에는 글에 제목이 따로 적혀 있을 때만 바꿈 (날짜도 같음)
+  if(!window._hrEditId||r.hasTitle) set('hr-t',r.title);
+  if(!window._hrEditId) set('hr-d',r.date);
+  set('hr-hospital',r.hospital);
   set('hr-abnormal',r.abnormal); set('hr-normal',r.normal); set('hr-treatment',r.treatment); set('hr-action',r.action); set('hr-note',r.note);
   set('hr-metrics',hrMetricsToText(r.metrics));
   var msg=document.getElementById('hr-paste-msg'); if(msg) msg.textContent='칸을 채웠어요. 아래에서 확인하고 고친 뒤 저장해 주세요 · 수치 '+r.metrics.length+'개';
@@ -10794,7 +10799,7 @@ function openHealthRecModal(id, presetCondId){
     : '<div style="font-size:0.8em;color:var(--t3)">등록된 병명이 없어요. 건강 요약에서 먼저 추가해보세요.</div>';
   window._hrEditId=id||null;
   openHealthMo((id?'검진 기록 수정':'검진 기록 추가'),
-    (id?'':'<div class="fg" style="background:var(--s2);border-radius:10px;padding:10px"><label class="fl">📋 한 번에 붙여넣기</label><textarea class="ta" id="hr-paste" rows="4" placeholder="진료 내용을 통째로 붙여넣고 [칸 채우기]를 누르세요. ⚠️ 이상 소견 · ✅ 정상 · 처치 · 조치 · 메모 머리말이 있으면 칸마다 나눠 넣고, 수치(3.8mm, Hb 13.9 등)는 따로 뽑아 줘요."></textarea><div style="display:flex;align-items:center;gap:8px;margin-top:6px"><button type="button" class="btn bp bsm" onclick="hrApplyPaste()">칸 채우기</button><span id="hr-paste-msg" style="font-size:0.72em;color:var(--t3)"></span></div></div>')+
+    ('<div class="fg" style="background:var(--s2);border-radius:10px;padding:10px"><label class="fl">📋 한 번에 붙여넣기'+(id?' <span style="font-weight:400;color:var(--t3)">· 붙이면 아래 칸이 이 내용으로 바뀌어요</span>':'')+'</label><textarea class="ta" id="hr-paste" rows="4" placeholder="진료 내용을 통째로 붙여넣고 [칸 채우기]를 누르세요. ⚠️ 이상 소견 · ✅ 정상 · 처치 · 조치 · 메모 머리말이 있으면 칸마다 나눠 넣고, 수치(3.8mm, Hb 13.9 등)는 따로 뽑아 줘요."></textarea><div style="display:flex;align-items:center;gap:8px;margin-top:6px"><button type="button" class="btn bp bsm" onclick="hrApplyPaste()">칸 채우기</button><span id="hr-paste-msg" style="font-size:0.72em;color:var(--t3)"></span></div></div>')+
     '<div class="fg"><label class="fl">이름</label><input class="inp" id="hr-t" placeholder="예: 종합 건강검진, 항문외과 진료" value="'+(r.title||'')+'"></div>'+
     '<div class="fg"><label class="fl">날짜</label><input type="date" class="inp" id="hr-d" value="'+(r.date||todStr())+'"></div>'+
     '<div class="fg"><label class="fl">병원</label><input class="inp" id="hr-hospital" placeholder="예: 웰니스 병원" value="'+(r.hospital||'')+'"></div>'+

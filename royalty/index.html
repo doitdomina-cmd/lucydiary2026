@@ -17284,6 +17284,26 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             }
             return [...list].sort((a, b) => sortKeyDate(a).localeCompare(sortKeyDate(b)));
         }
+        // '필명 정렬'일 때: 필명 제목 → 그 필명 작품들 → 줄바꿈 → 다음 필명 … (list 는 이미 걸러지고 출간일 순으로 정렬된 상태)
+        // 필명 순서: 고정 순서(WEBTOON_PEN_ORDER) → 설정의 필명 목록 순서 → 가나다, '미지정'은 맨 끝
+        function penGroupedCardsHTML(list, penOf, cardFn) {
+            const groups = {};
+            list.forEach(w => { const pen = penOf(w) || '미지정'; (groups[pen] = groups[pen] || []).push(w); });
+            const rank = p => {
+                const i = WEBTOON_PEN_ORDER.indexOf(p); if (i !== -1) return i;
+                const j = (Array.isArray(penNames) ? penNames : []).indexOf(p); if (j !== -1) return 100 + j;
+                return p === '미지정' ? 9999 : 5000;
+            };
+            const order = Object.keys(groups).sort((a, b) => (rank(a) - rank(b)) || a.localeCompare(b, 'ko'));
+            const gridOpen = `<div class="grid gap-4" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">`;
+            return order.map(pen => {
+                const heartColor = (typeof getPenColor === 'function' && getPenColor(pen)) || WEBTOON_PEN_HEART_COLORS[pen] || '#94a3b8';
+                return `<div class="mb-6">
+                    <h4 class="text-base font-bold text-slate-500 mb-2 flex items-center gap-1.5 px-1"><i class="fa-solid fa-heart" style="color:${heartColor}"></i> ${pen} <span class="text-sm font-semibold text-slate-400">(${groups[pen].length})</span></h4>
+                        ${gridOpen}${groups[pen].map(cardFn).join('')}</div>
+                    </div>`;
+            }).join('');
+        }
         function webtoonFieldValueHTML(dateVal, doneFlag, emptyText, forceDash) {
             if (doneFlag) return 'ㅡ';
             if (dateVal) return dateVal;
@@ -17506,6 +17526,10 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             const sortRow = webtoonSortRowHTML();
             if (filtered.length === 0) {
                 container.innerHTML = sortRow + `<div class="text-center py-20 text-slate-400">해당하는 웹툰 작품이 없습니다.</div>`;
+                return;
+            }
+            if (webtoonSortMode === 'pen') {
+                container.innerHTML = sortRow + penGroupedCardsHTML(filtered.sort((a, b) => sortKeyDate(a).localeCompare(sortKeyDate(b))), w => (webtoonManage[w.id] || {}).penName, webtoonCardHTML);
                 return;
             }
             container.innerHTML = sortRow + gridOpen + filtered.map(webtoonCardHTML).join('') + gridClose;
@@ -18191,6 +18215,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             return `<div id="workmanage-sort-row" class="flex items-center gap-2 mb-4 px-1 flex-wrap">
                 <button onclick="setWorkManageSortMode('date')" class="${btnCls(workManageSortMode === 'date')}" style="${btnStyle(workManageSortMode === 'date')}">출간일 정렬</button>
                 <button onclick="setWorkManageSortMode('genre')" class="${btnCls(workManageSortMode === 'genre')}" style="${btnStyle(workManageSortMode === 'genre')}">장르 정렬</button>
+                <button onclick="setWorkManageSortMode('pen')" class="${btnCls(workManageSortMode === 'pen')}" style="${btnStyle(workManageSortMode === 'pen')}">필명 정렬</button>
             </div>`;
         }
         const WORK_GENRE_ORDER = ['BL 장편', '현로 장편', '현로 초단', 'BL 초단'];
@@ -18340,6 +18365,10 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             const sortRow = workManageSortRowHTML();
             if (filtered.length === 0) {
                 container.innerHTML = sortRow + `<div class="text-center py-20 text-slate-400">해당하는 작품이 없습니다.</div>`;
+                return;
+            }
+            if (workManageSortMode === 'pen') {
+                container.innerHTML = sortRow + penGroupedCardsHTML(filtered, w => (workManage[w.id] || {}).penName, workManageCardHTML);
                 return;
             }
             container.innerHTML = sortRow + gridOpen + filtered.map(workManageCardHTML).join('') + gridClose;

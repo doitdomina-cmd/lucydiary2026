@@ -7011,11 +7011,24 @@ function saveArea(eid){
   save();closeMo();render();
 }
 function delArea(id){
-  const pc=S.projects.filter(p=>p.lifeAreaId===id).length;
-  if(pc>0&&!confirm('프로젝트 '+pc+'개의 영역이 해제돼요. 계속할까요?'))return;
+  const projs=S.projects.filter(p=>p.lifeAreaId===id);
+  if(!projs.length){ if(!confirm('이 목표를 삭제할까요?'))return; delAreaDo(id,false); return; }
+  // 프로젝트가 딸려 있으면: 목표만 지울지, 프로젝트도 같이 지울지 고르게 함
+  openMo('목표 삭제',
+    '<div style="font-size:0.95em;line-height:1.7">이 목표에 프로젝트 <b>'+projs.length+'개</b>가 들어 있어요.<div style="margin:8px 0;padding:8px 12px;background:var(--s2);border-radius:8px;font-size:0.9em">'+projs.map(function(p){return '· '+p.name;}).join('<br>')+'</div>'+
+    '<div style="color:var(--t2);font-size:0.88em">• <b>목표만 지우기</b>: 프로젝트는 남고, 영역만 비어요.<br>• <b>프로젝트도 같이 지우기</b>: 관련 마감일 · 루틴 · 캘린더 일정까지 함께 지워지고 되돌릴 수 없어요.</div></div>',
+    '<button class="btn bg" onclick="closeMo()">취소</button>'+
+    '<button class="btn bg" onclick="delAreaDo(\''+id+'\',false)">목표만 지우기</button>'+
+    '<button class="btn bp" style="background:var(--red)" onclick="delAreaDo(\''+id+'\',true)">프로젝트도 같이 지우기</button>');
+}
+function delAreaDo(id,withProjects){
+  if(withProjects){
+    var ids=S.projects.filter(function(p){return p.lifeAreaId===id;}).map(function(p){return p.id;});
+    ids.forEach(function(pid){delPj(pid,true);});
+  }
   S.lifeAreas=(S.lifeAreas||[]).filter(a=>a.id!==id);
   S.projects=S.projects.map(p=>p.lifeAreaId===id?Object.assign({},p,{lifeAreaId:''}):p);
-  save();render();
+  save();closeMo();render();
 }
 
 // ═══════════ PROJECTS ═══════════
@@ -7715,7 +7728,7 @@ function savePj(){
   S.projects.push({id:gid(),name,emoji:'',icon:selPjI,desc:document.getElementById('pj-d').value,dday,lifeAreaId:selPjA,color:selPjC,tasks:[],milestones:[],notes:'',routinized:[],links:[]});
   save();closeMo();render();
 }
-function delPj(id){var _pj=S.projects.find(p=>p.id===id);if(_pj&&!_pj.completed&&confirm('끝난 프로젝트라면 삭제 대신 "완료"로 보관할 수 있어요.\n완료로 보관하면 기록·루틴·사진이 모두 그대로 남아요.\n\n[확인] 완료로 보관   [취소] 삭제 계속')){togPjComplete(id);return;}if(!confirm('정말 삭제할까요?\n(관련 마감일, 루틴화 일정, 캘린더 이벤트도 함께 삭제되고 되돌릴 수 없어요)'))return;const pj=S.projects.find(p=>p.id===id);const rzIds=pj&&pj.routinized?pj.routinized.map(r=>r.id):[];S.deadlines=S.deadlines.filter(d=>d.projectId!==id);S.calEvents=S.calEvents.filter(e=>e.projectId!==id);if(rzIds.length>0)S.routines=S.routines.filter(r=>!rzIds.includes(r.id));if(S.savings&&S.savings.entries&&rzIds.length>0){rzIds.forEach(function(rid){var prefix='rzsave-'+rid+'-';S.savings.entries.filter(e=>e.id&&e.id.indexOf(prefix)===0).forEach(e=>{S.savings.current-=e.amount;});S.savings.entries=S.savings.entries.filter(e=>!(e.id&&e.id.indexOf(prefix)===0));});if(S.savings.current<0)S.savings.current=0;}S.projects=S.projects.filter(p=>p.id!==id);if(activePid===id){activePid=null;page='projects';}save();render();}
+function delPj(id,force){var _pj=S.projects.find(p=>p.id===id);if(!force&&_pj&&!_pj.completed&&confirm('끝난 프로젝트라면 삭제 대신 "완료"로 보관할 수 있어요.\n완료로 보관하면 기록·루틴·사진이 모두 그대로 남아요.\n\n[확인] 완료로 보관   [취소] 삭제 계속')){togPjComplete(id);return;}if(!force&&!confirm('정말 삭제할까요?\n(관련 마감일, 루틴화 일정, 캘린더 이벤트도 함께 삭제되고 되돌릴 수 없어요)'))return;const pj=S.projects.find(p=>p.id===id);const rzIds=pj&&pj.routinized?pj.routinized.map(r=>r.id):[];S.deadlines=S.deadlines.filter(d=>d.projectId!==id);S.calEvents=S.calEvents.filter(e=>e.projectId!==id);if(rzIds.length>0)S.routines=S.routines.filter(r=>!rzIds.includes(r.id));if(S.savings&&S.savings.entries&&rzIds.length>0){rzIds.forEach(function(rid){var prefix='rzsave-'+rid+'-';S.savings.entries.filter(e=>e.id&&e.id.indexOf(prefix)===0).forEach(e=>{S.savings.current-=e.amount;});S.savings.entries=S.savings.entries.filter(e=>!(e.id&&e.id.indexOf(prefix)===0));});if(S.savings.current<0)S.savings.current=0;}S.projects=S.projects.filter(p=>p.id!==id);if(activePid===id){activePid=null;page='projects';}save();render();}
 
 function openPjEditModal(pid){
   const p=S.projects.find(x=>x.id===pid);if(!p)return;

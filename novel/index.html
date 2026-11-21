@@ -1531,6 +1531,10 @@ body .home .wgrid .wcard.icard:not(.pol):not([style*="--gc:#"]) { --lb: #f5f4f1;
 .gdot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 .wgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
 .wcard { background: var(--panel); border: 1px solid var(--line); border-top: 4px solid var(--gc); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; cursor: pointer; transition: transform .12s, box-shadow .12s; min-height: 150px; }
+.wb-fe { position: fixed; inset: 0; z-index: 9998; display: flex; flex-direction: column; background: #fffdf4; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+.wfe-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1.5px dashed var(--line); background: var(--panel); }
+.wfe-x { font-size: 15px; padding: 7px 14px; border-radius: 999px; border: 1.5px dashed var(--line); background: #fff; color: var(--text); }
+.wfe-ta { flex: 1; width: 100%; border: 0; outline: 0; resize: none; padding: 16px 18px 40px; font: 17px/1.75 var(--ui-font, 'Pretendard', sans-serif); background: transparent; color: var(--text); box-sizing: border-box; }
 .wcard.wdone { opacity: .8; }
 .wcard.wdone:hover { opacity: 1; }
 .wcard.drag-src { opacity: .35; }
@@ -4739,6 +4743,21 @@ function wbUndo(redo) {
 /* 그리기 */
 function wbTilt(id) { let h = 0; for (const c of String(id)) h = (h * 33 + c.charCodeAt(0)) >>> 0; return ((h % 9) - 4) * 0.45; }
 function wbTape(id) { let h = 0; for (const c of String(id)) h = (h * 17 + c.charCodeAt(0)) >>> 0; return { r: ((h % 7) - 3) * 1.5, x: 38 + (h % 25), k: Math.floor(h / 7) % 6 }; }
+// 폰에서 메모(포스트잇)를 누르면 화면 가득 채워서 열기 — 글은 그 메모에 그대로 저장
+const WB_PHONE = () => window.matchMedia('(max-width: 700px)').matches;
+function wbFullEdit(n) {
+    if (!n || $('.wb-fe')) return;
+    wbPush();
+    const tag = (n.tag || '').trim();
+    const el = document.createElement('div'); el.className = 'wb-fe';
+    el.innerHTML = `<div class="wfe-head"><span class="pi-tag" style="--tc:${tag ? wbTagColor(tag) : 'var(--muted)'}">${tag ? wbTagHtml(tag) : '주제 없음'}</span><span style="flex:1"></span><button class="wfe-x" data-fe="close">닫기 ✕</button></div>
+        <textarea class="wfe-ta" data-id="${n.id}" data-field="body" placeholder="메모" style="${n.fs ? `font-size:${Math.max(16, n.fs)}px;` : ''}${wbFontOf(n) ? `font-family:${wbFontOf(n)[2]};` : ''}">${esc(n.body || '')}</textarea>`;
+    document.body.appendChild(el);
+    const ta = $('.wfe-ta', el);
+    const close = () => { el.remove(); wbHistSave(); try { renderNotes(); } catch (_) {} };
+    el.addEventListener('click', e => { if (e.target.closest('[data-fe="close"]')) close(); });
+    ta.focus({ preventScroll: true }); const L = ta.value.length; try { ta.setSelectionRange(L, L); } catch (_) {}
+}
 function piHtml(n, mode) {
     const tag = (n.tag || '').trim(), sel = wbSel[mode] === n.id;
     const al = n.al || 'left', tp = wbTape(n.id);
@@ -5553,6 +5572,7 @@ function wbBind(view, mode) {
             // 한 번 누르기: 주제 칩이면 주제 고르기, 아니면 고르고 바로 글쓰기
             const tagEl = o.start?.closest?.('.pi-tag');
             if (tagEl) { wbPlaceBar(mode); wbTagPop(tagEl, n, mode); return; }
+            if (WB_PHONE() && !o.start?.closest?.('.pi-grip, .pi-resize, .pi-link')) { wbPlaceBar(mode); wbFullEdit(n); return; } // 폰: 메모를 누르면 화면 가득 열어서 쓰기
             if (o.ta || o.kind === 'move') { const ta = o.ta || $('textarea', o.el); if (ta && !o.start?.closest?.('.pi-grip')) { ta.focus({ preventScroll: true }); const L = ta.value.length; try { ta.setSelectionRange(L, L); } catch (_) {} } }
             wbPlaceBar(mode);
             return;

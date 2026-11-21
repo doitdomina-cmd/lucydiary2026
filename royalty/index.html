@@ -30825,7 +30825,14 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                 // 구간마다 쓴 글자로 무게를 준다 (지운 구간이 섞여 있으면 시간 길이로)
                 const byChars = segs.every(g => (Number(g.c) || 0) >= 0) && segs.some(g => (Number(g.c) || 0) > 0);
                 const buckets = new Map();
-                segs.forEach(g => {
+                // 작업실이 1분 단위로 쓴 글자(m: {세션 시작부터 몇 분째: 글자})를 남겼으면 그걸로 정확히 나눈다
+                const mins = ss.m ? Object.entries(ss.m).filter(([, c]) => Number(c) > 0) : [];
+                if (mins.length) mins.forEach(([k, c]) => {
+                    const d = new Date(Number(ss.s) + Number(k) * 6e4 + 3e4);
+                    const key = novelDayKey(d) + '|' + d.getHours();
+                    buckets.set(key, (buckets.get(key) || 0) + Number(c));
+                });
+                else segs.forEach(g => {
                     const a = Number(g.a), b = Math.max(Number(g.b) || a, a + 1000);
                     if (!a) return;
                     let t = a;

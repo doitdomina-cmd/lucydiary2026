@@ -3216,7 +3216,7 @@ function applyWidths() {
    원고 입력
    ===================================================================== */
 try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch (e) {}
-const lastCount = new Map();
+const lastCount = new Map(), lastCountA = new Map();   // 문서별 마지막 글자 수 (공백 제외 / 공백 포함)
 
 document.addEventListener('input', e => {
     const t = e.target;
@@ -3265,16 +3265,17 @@ function onEditorInput(ed) {
     it.body = serializeEditor(ed);
     touch(it);
     // 오늘 작성량: 원고(자료 폴더 제외)에서 늘어난 글자 수만 더함
-    const now = countChars(editorText(ed)).noSpace;
+    const cc = countChars(editorText(ed)), now = cc.noSpace, nowA = cc.all;
     const before = lastCount.has(it.id) ? lastCount.get(it.id) : docCountBefore(it, now);
-    lastCount.set(it.id, now);
-    if (now !== before && !isRefDoc(it)) {
-        const gain = netGain(it, now - before);
-        if (gain > 0) {
+    const beforeA = lastCountA.has(it.id) ? lastCountA.get(it.id) : docCountBefore(it, nowA, 'all');
+    lastCount.set(it.id, now); lastCountA.set(it.id, nowA);
+    if ((now !== before || nowA !== beforeA) && !isRefDoc(it)) {
+        const gain = now !== before ? netGain(it, now - before) : 0;
+        const gainA = nowA !== beforeA ? netGain(it, nowA - beforeA, true) : 0;   // 공백 포함 (정산 앱으로 넘길 때 씀)
+        if (gain > 0 || gainA > 0) {
             const S = stats(); const k = todayKey();
-            S.days[k] = (S.days[k] || 0) + gain;
-            pruneStats(S); touch(S);
-            try { sessRecord(it, gain); } catch (e) { console.error(e); }
+            if (gain > 0) { S.days[k] = (S.days[k] || 0) + gain; pruneStats(S); touch(S); }
+            try { sessRecord(it, gain, gainA); } catch (e) { console.error(e); }
             renderToday();
         }
     }
@@ -3290,23 +3291,25 @@ function onEditorInput(ed) {
 }
 /* 오늘 늘어난 글자 = 작품마다 오늘 글자 변화(늘면 +, 지우면 −)를 더한 값이 '오늘 최고점'을 넘은 만큼만.
    예전엔 늘어난 것만 더해서, 지웠다가 다시 붙여 넣거나 잘라서 다른 회차로 옮기면 그만큼이 또 '쓴 글자'로 잡혔음 (2026-11-21) */
-function netGain(doc, d) {
+function netGain(doc, d, all) {   // all = 공백 포함 쪽을 따로 셈
     const S = stats(), k = todayKey();
     if (!S.net || S.net.day !== k) S.net = { day: k, w: {} };
     const o = (S.net.w[doc.workId || '_'] ??= { n: 0, p: 0 });
-    o.n += d;
-    const g = Math.max(0, o.n - o.p);
-    if (o.n > o.p) o.p = o.n;
+    const N = all ? 'na' : 'n', P = all ? 'pa' : 'p';
+    o[N] = (o[N] || 0) + d; o[P] ??= 0;
+    const g = Math.max(0, o[N] - o[P]);
+    if (o[N] > o[P]) o[P] = o[N];
     if (g <= 0) touch(S);
     return g;
 }
-function docCountBefore(it, fallback) { const c = countCache.get(it.id); return c ? c.v.noSpace : fallback; }
+function docCountBefore(it, fallback, field) { const c = countCache.get(it.id); return c ? c.v[field || 'noSpace'] : fallback; }
 
 /* =====================================================================
    집필 기록 (자동): 원고를 쓰면 '세션'이 알아서 기록됨. 5분 동안 안 쓰면 세션 끝. (2026-11-21 15분 → 5분)
    - 하루 하나의 항목 'sess_YYYY-MM-DD' = { list: [세션…] }, 세션 = { s, e, c, segs:[{a,b,d,c}], w:{작품id:{c, e:{회차id:c}}}, m:{분:글자} }
    - d = 'ph'(폰) / 'pc'(PC). 기기를 바꿔 5분 안에 이어 쓰면 같은 세션, 구간(segs)만 나뉨
    - m = 세션 시작부터 몇 분째에 몇 자를 썼는지 (1분 단위). 실제로 쓴 시간·시간표 진하기에 씀. 예전 기록엔 없음
+   - c 는 공백 제외, a 는 공백 포함 (세션·작품별 w[id].a). 정산 앱은 공백 포함으로 받음 (a 가 없는 예전 기록은 0.765 로 나눠 어림) (2026-11-21)
    - 정산 앱(royalty)의 '작업실에서 가져오기'가 이 구조를 읽는다 — 바꾸면 그쪽 novelSessionsToSlots 도 같이 볼 것
    ===================================================================== */
 const SESS_GAP = 5 * 60 * 1000;
@@ -3320,7 +3323,7 @@ function sessHost(k, make) {
     if (h) h.list ??= [];
     return h;
 }
-function sessRecord(doc, delta) {
+function sessRecord(doc, delta, deltaA) {   // delta = 공백 제외, deltaA = 공백 포함
     const t = Date.now(), dev = sessDev(), k = dayKeyOfMs(t);
     let last = null, host = null;
     [sessHost(k, false), sessHost(dayKeyOfMs(t - 864e5), false)].filter(Boolean).forEach(h => {
@@ -3329,12 +3332,13 @@ function sessRecord(doc, delta) {
     let ss;
     if (last && t - last.e <= SESS_GAP) { ss = last; ss.e = Math.max(ss.e, t); }
     else { host = sessHost(k, true); ss = { s: t, e: t, c: 0, segs: [], w: {} }; host.list.push(ss); }
+    delta = Math.max(0, delta || 0); deltaA = Math.max(0, deltaA || 0);
     const sg = ss.segs[ss.segs.length - 1];
     if (sg && sg.d === dev) { sg.b = t; sg.c += delta; } else ss.segs.push({ a: t, b: t, d: dev, c: delta });
-    ss.c += delta;
-    const mi = Math.floor((t - ss.s) / 6e4); (ss.m ??= {})[mi] = (ss.m[mi] || 0) + delta;   // 1분 단위로 쓴 글자
+    ss.c += delta; ss.a = (ss.a || 0) + deltaA;
+    const mi = Math.floor((t - ss.s) / 6e4); if (delta > 0) (ss.m ??= {})[mi] = (ss.m[mi] || 0) + delta;   // 1분 단위로 쓴 글자
     const wk = doc.workId || '_', W = (ss.w[wk] ??= { c: 0, e: {} });
-    W.c += delta; W.e[doc.id] = (W.e[doc.id] || 0) + delta;
+    W.c += delta; W.a = (W.a || 0) + deltaA; if (delta > 0) W.e[doc.id] = (W.e[doc.id] || 0) + delta;
     touch(host);
     try { sessBreakCheck(ss); } catch (e) { console.error(e); }
 }
@@ -3430,7 +3434,9 @@ function sessTake(obj, cut) { Object.keys(obj).sort((a, b) => obj[b] - obj[a]).f
 // 세션 x 에서 cut 자를 뺌 (mi = 그 글자를 쓴 분, 모르면 null) — 분·구간·작품·회차 숫자를 함께 맞춤
 function sessCut(x, mi, cut) {
     cut = Math.min(Math.round(cut), Math.max(0, x.c || 0)); if (cut <= 0) return 0;
-    x.c -= cut;
+    const ra = x.a != null && x.c > 0 ? x.a / x.c : null, wra = {};
+    Object.entries(x.w || {}).forEach(([k, W]) => { wra[k] = W.a != null && W.c > 0 ? W.a / W.c : null; });
+    x.c -= cut; if (ra != null) x.a = Math.max(0, Math.round(x.a - cut * ra));
     if (x.m) {
         let rest = cut;
         if (mi != null && x.m[mi]) { const t = Math.min(rest, x.m[mi]); x.m[mi] -= t; rest -= t; }
@@ -3441,14 +3447,14 @@ function sessCut(x, mi, cut) {
     if (mi != null) { const ms = x.s + Number(mi) * 6e4, g = segs.find(g => ms >= g.a - 6e4 && ms <= g.b + 6e4); if (g) { const t = Math.min(rest, Math.max(0, g.c)); g.c -= t; rest -= t; } }
     if (rest) { const o = {}; segs.forEach((g, i) => { o[i] = g.c; }); sessTake(o, rest); segs.forEach((g, i) => { g.c = o[i]; }); }
     const W = x.w || {}, wo = {}; Object.keys(W).forEach(k => { wo[k] = W[k].c; }); sessTake(wo, cut);
-    Object.keys(W).forEach(k => { const d = W[k].c - wo[k]; W[k].c = wo[k]; if (d > 0 && W[k].e) sessTake(W[k].e, d); });
+    Object.keys(W).forEach(k => { const d = W[k].c - wo[k]; W[k].c = wo[k]; if (d > 0 && wra[k] != null) W[k].a = Math.max(0, Math.round(W[k].a - d * wra[k])); if (d > 0 && W[k].e) sessTake(W[k].e, d); });
     return cut;
 }
 function sessScaleUp(x, r) {
     const sc = c => Math.round((Number(c) || 0) * r);
-    x.c = sc(x.c); (x.segs || []).forEach(g => { g.c = sc(g.c); });
+    x.c = sc(x.c); if (x.a != null) x.a = sc(x.a); (x.segs || []).forEach(g => { g.c = sc(g.c); });
     if (x.m) Object.keys(x.m).forEach(i => { x.m[i] = sc(x.m[i]); });
-    Object.values(x.w || {}).forEach(W => { W.c = sc(W.c); Object.keys(W.e || {}).forEach(e => { W.e[e] = sc(W.e[e]); }); });
+    Object.values(x.w || {}).forEach(W => { W.c = sc(W.c); if (W.a != null) W.a = sc(W.a); Object.keys(W.e || {}).forEach(e => { W.e[e] = sc(W.e[e]); }); });
 }
 // 세션들(list)에서 ex 자를 뺌: 튀는 분부터, 그다음 비율대로. 실제로 뺀 글자 수를 돌려줌
 function sessCutExcess(list, ex) {
@@ -4119,7 +4125,7 @@ function scheduleTreeRefresh() {
 let lastEditor = null;
 document.addEventListener('focusin', e => {
     const ed = e.target.closest && e.target.closest('.manuscript[data-id]');
-    if (ed) { lastEditor = ed; lastCount.set(ed.dataset.id, countChars(editorText(ed)).noSpace); }
+    if (ed) { lastEditor = ed; const c = countChars(editorText(ed)); lastCount.set(ed.dataset.id, c.noSpace); lastCountA.set(ed.dataset.id, c.all); }
     const p = e.target.closest && e.target.closest('.pane[data-pane], .epane[data-pane]');
     if (!p) return;
     const i = +p.dataset.pane, W = WL();

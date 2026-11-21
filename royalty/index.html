@@ -8988,6 +8988,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                             <div>
                                 <div class="flex items-center gap-3 mb-2">
                                     <span class="text-sm font-bold text-slate-600 shrink-0">작품 선택</span>
+                                    <button id="novel-import-btn" onclick="openNovelImportModal()" class="shrink-0 order-last px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-500 shadow-sm hover:text-[var(--primary)] transition-all flex items-center gap-1.5" title="루시의 작업실에서 쓴 기록(자동 세션)을 시간대별로 가져와요"><i class="fa-solid fa-feather-pointed"></i> 작업실에서 가져오기</button>
                                     <select id="w-dailyWorkSelector" onchange="writerRenderDailyTable()" class="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[var(--primary)] font-medium text-slate-700"></select>
                                 </div>
                                 <div id="w-dailyTableContainer" class="rounded-lg overflow-hidden border border-slate-100"></div>
@@ -9101,6 +9102,23 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                 </div>
                 <button onclick="confirmWriteCounterReset()" class="w-full py-2.5 rounded-xl text-sm font-bold text-white bg-rose-500 hover:bg-rose-600 transition-all">이 날짜부터 0자로 리셋</button>
             </div>
+        </div>
+    </div>
+
+    <!-- 작업실(루시의 작업실) 자동 집필 기록 가져오기 -->
+    <div id="novel-import-modal" class="modal-overlay">
+        <div class="modal-content max-w-lg w-full">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-base font-bold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-feather-pointed" style="color:var(--primary)"></i> 작업실에서 가져오기</h3>
+                <button onclick="closeNovelImportModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <p class="text-xs text-slate-500 leading-relaxed mb-3">루시의 작업실에서 쓴 기록(자동 세션)을 시간대별 집필량으로 채워요.<br>· 직접 적은 칸은 그대로 두고, 전에 가져온 칸만 새 값으로 바꿔요.<br>· 새벽 0~5시에 쓴 건 전날 '0시' 칸에 합쳐요.</p>
+            <div class="flex gap-2 mb-3">
+                <button data-nrange="day" onclick="novelImportLoad('day')" class="novel-range-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold border border-slate-200 transition-all">보고 있는 날</button>
+                <button data-nrange="month" onclick="novelImportLoad('month')" class="novel-range-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold border border-slate-200 transition-all">이번 달 전체</button>
+            </div>
+            <div id="novel-import-body" class="text-sm"></div>
+            <button id="novel-import-go" onclick="novelImportApply()" class="w-full mt-4 py-2.5 rounded-xl text-sm font-bold text-white transition-all" style="background:var(--primary)">가져오기</button>
         </div>
     </div>
 
@@ -11898,6 +11916,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
         let workManageSortMode = 'date'; // 'date' | 'genre'
         let refSchedWorks = []; // 참고일정(연재 일정 계산기) 저장 작품
         let refSchedHidden = []; // 연재 일정 보기에서 끈 작품 id
+        let novelWorkMap = {};   // 작업실 작품 id → 정산 글자수 기록 작품 키 ('' = 가져오지 않음)
         let publisherViewMode = { publishers: 'list', studios: 'list' }; // [NEW] 출판사/스튜디오 줄로 보기 · 카드로 보기
         let publisherCardSortOrder = []; // [NEW] 카드 보기 전용 순서 (줄 보기 순서와 별도 저장)
         let taxViewYear = new Date().getFullYear();
@@ -12335,7 +12354,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                         masterWorks: _worksForSave, monthlyData, years, publisherData, analysisData, 
                         publisherSortOrder, publisherCardSortOrder, publisherViewMode, genreList, genreBadgeOpacity, tableFontSettings, crosshairSettings,
                         writeSchedules, writeSpans, timelineScenarios, writeVolumes, writeMergedVolumeWorks, taskSchedules, contacts, penNames, widgetSettingsData, dashMemos, pubCards, workIdeas, ddayCardDesigns, ddayCardFonts, modalDesign, calCardDesigns, calCardFonts, calCardSizes, writeCardSettings, taskCardSettings, taskColors: TASK_COLORS, taskCategoryList, writeColors: WRITE_COLORS, writeCategoryList,
-                        writerWorks, writerDailyData, writerGlobalDailyGoal, writeCounterBase, writeCounterResetDate, submissions, webtoonSubs, webtoonSubOrder, incomeGoals, taxSettings, taxGoalMemos, charGoals, writerLastWorkKey, taxGoalItems, contactSortMode, webtoonManage, webtoonCardSettings, penNameColorOverrides, webtoonViewFilter, webtoonSortMode, workManage, workManageCardSettings, workManageViewFilter, workManageSortMode, refSchedWorks, refSchedHidden
+                        writerWorks, writerDailyData, writerGlobalDailyGoal, writeCounterBase, writeCounterResetDate, submissions, webtoonSubs, webtoonSubOrder, incomeGoals, taxSettings, taxGoalMemos, charGoals, writerLastWorkKey, taxGoalItems, contactSortMode, webtoonManage, webtoonCardSettings, penNameColorOverrides, webtoonViewFilter, webtoonSortMode, workManage, workManageCardSettings, workManageViewFilter, workManageSortMode, refSchedWorks, refSchedHidden, novelWorkMap
                     };
                     const jsonStr = JSON.stringify(dataToSave);
 
@@ -12447,6 +12466,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             if (parsed.workManageViewFilter) workManageViewFilter = parsed.workManageViewFilter;
             if (parsed.workManageSortMode) workManageSortMode = parsed.workManageSortMode;
             if (Array.isArray(parsed.refSchedHidden)) { refSchedHidden.length = 0; refSchedHidden.push(...parsed.refSchedHidden); }
+            if (parsed.novelWorkMap && typeof parsed.novelWorkMap === 'object') novelWorkMap = parsed.novelWorkMap;
             if (Array.isArray(parsed.refSchedWorks)) { refSchedWorks.length = 0; refSchedWorks.push(...parsed.refSchedWorks); try { if (window.rsRefresh) window.rsRefresh(); } catch (e) {} }
             if (parsed.widgetSettingsData) widgetSettingsData = parsed.widgetSettingsData;
             if (parsed.calCardDesigns) Object.assign(calCardDesigns, parsed.calCardDesigns);
@@ -13581,7 +13601,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                 contacts, penNames, widgetSettingsData, dashMemos, pubCards, workIdeas, ddayCardDesigns, ddayCardFonts, modalDesign, calCardDesigns, calCardFonts, calCardSizes, submissions, webtoonSubs, webtoonSubOrder, contactSortMode, webtoonViewFilter, webtoonSortMode,
                 // [FIX] 글자수 관리 탭 데이터가 백업에서 빠져있던 문제 수정 — 아래 항목들이 누락되어 있었음
                 writerWorks, writerDailyData, writerGlobalDailyGoal, writeCounterBase, writeCounterResetDate, writerLastWorkKey,
-                incomeGoals, taxSettings, taxGoalMemos, taxGoalItems, charGoals, webtoonManage, webtoonCardSettings, penNameColorOverrides, workManage, workManageCardSettings, workManageViewFilter, workManageSortMode, refSchedWorks, refSchedHidden
+                incomeGoals, taxSettings, taxGoalMemos, taxGoalItems, charGoals, webtoonManage, webtoonCardSettings, penNameColorOverrides, workManage, workManageCardSettings, workManageViewFilter, workManageSortMode, refSchedWorks, refSchedHidden, novelWorkMap
             }; 
             const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'}); 
             const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `royalty_backup_${getYYYYMMDD(new Date())}.json`; a.click(); 
@@ -30358,6 +30378,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             const hData = writerDailyData[ds].works[storageKey].hours[h] || { prev:'', now:'', diff:0 };
             hData[field] = val === '' ? '' : parseInt(val);
             hData.diff = Math.max((parseInt(hData.now)||0) - (parseInt(hData.prev)||0), 0);
+            delete hData.src;   // 작업실에서 가져온 칸도 손으로 고치면 '직접 적은 칸' (다시 가져와도 안 덮어씀)
             writerDailyData[ds].works[storageKey].hours[h] = hData;
             syncWriteCompletionFromDaily(ds, storageKey);
             const diffCell = document.getElementById(`w-diff_${h}`); if (diffCell) diffCell.textContent = hData.diff;
@@ -30734,7 +30755,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                 const inputStyle = `"w-full px-2 py-1 text-center border border-slate-200 rounded text-[12px] font-semibold outline-none focus:ring-1 focus:ring-[var(--primary)] focus:border-transparent bg-white transition-all"`;
                 const noSpinner = `style="-moz-appearance:textfield;" onwheel="this.blur()"`;
                 return `<tr class="border-b border-slate-50 hover:bg-slate-50/50">
-                    <td class="py-0.5 px-2 text-[12px] text-slate-500 font-medium w-12 text-center">${h}시</td>
+                    <td class="py-0.5 px-2 text-[12px] text-slate-500 font-medium w-12 text-center whitespace-nowrap">${h}시${hData.src === 'novel' ? ' <i class="novel-src-mark fa-solid fa-feather-pointed text-[9px]" style="color:var(--primary);opacity:.7" title="작업실에서 가져온 기록"></i>' : ''}</td>
                     <td class="py-0.5 px-1.5"><input type="number" inputmode="decimal" value="${hData.prev}" ${noSpinner} onfocus="writerLastFocusedHour=${h}; writerLastFocusedField='prev'" oninput="writerUpdateH(${h},'prev',this.value)" class=${inputStyle}></td>
                     <td class="py-0.5 px-1.5"><input type="number" inputmode="decimal" value="${hData.now}" ${noSpinner} onfocus="writerLastFocusedHour=${h}; writerLastFocusedField='now'" oninput="writerUpdateH(${h},'now',this.value)" onchange="writerAutoCarryNow(${h},${idx},this.value)" class=${inputStyle}></td>
                     <td id="w-diff_${h}" class="py-0.5 px-2 text-center text-[12px] font-bold w-16" style="color:var(--primary)">${hData.diff||0}</td>
@@ -30760,6 +30781,221 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             if (ti2) ti2.value = timeVal;
             writerUpdateDailyStats(true);
             requestAnimationFrame(writerFitDailyTable); setTimeout(writerFitDailyTable, 60);
+        }
+
+        // ══ 작업실(루시의 작업실) 자동 집필 기록 → 상세 기록 입력 ══════════
+        // 작업실은 원고를 쓰면 '세션'을 자동으로 남긴다: 하루 'sess_YYYY-MM-DD' = { list:[{ s, e, c, segs:[{a,b,d,c}], w:{작품id:{c}} }] }
+        // 세션의 시간 구간(segs)에 쓴 글자를 시간대(1시간)별로 나누고, 작품별 글자(w[id].c)를 그 비율로 나눠 칸을 채운다.
+        // 가져온 칸은 src:'novel' 로 표시 — 다시 가져올 때 이 칸만 지우고 새로 채운다(직접 적은 칸은 건드리지 않음).
+        const NOVEL_SRC = 'novel';
+        let novelImportState = null;   // { range, from, to, slots, works, totals }
+        function novelDayKey(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+        function novelShiftDay(ds, n) { const d = new Date(ds + 'T00:00:00'); d.setDate(d.getDate() + n); return novelDayKey(d); }
+        function novelNormTitle(t) { return String(t || '').replace(/\s+/g, '').replace(/[\[\]()（）<>《》『』「」]/g, '').toLowerCase(); }
+        function novelEsc(t) { return String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+        // 클라우드에서 작업실 하루 기록 + 작품 이름 읽기 (PC 는 main.js 가 대신 읽음)
+        async function novelFetchSessions(from, to) {
+            if (ipcRenderer) return await ipcRenderer.invoke('novel-sessions-fetch', from, to);
+            if (typeof firebase === 'undefined' || !firebase.apps?.length || !firebase.auth().currentUser) return { ok: false, error: '구글 로그인 후에 가져올 수 있어요' };
+            const col = firebase.firestore().collection('users').doc(firebase.auth().currentUser.uid).collection('novel');
+            const snap = await col.orderBy(firebase.firestore.FieldPath.documentId()).startAt('sess_' + from).endAt('sess_' + to).get();
+            const days = [], wids = new Set();
+            snap.forEach(d => {
+                try {
+                    const r = JSON.parse(d.data().json);
+                    if (!r || r.deleted || r.kind !== 'sessday') return;
+                    days.push({ day: r.day, list: r.list || [] });
+                    (r.list || []).forEach(x => Object.keys(x.w || {}).forEach(k => { if (k && k !== '_') wids.add(k); }));
+                } catch (e) {}
+            });
+            const works = {};
+            const docs = await Promise.all([...wids].map(id => col.doc(id).get().catch(() => null)));
+            docs.forEach(d => { if (!d || !d.exists) return; try { const r = JSON.parse(d.data().json); works[d.id] = (r && r.title) || ''; } catch (e) {} });
+            return { ok: true, days, works };
+        }
+
+        // 세션들 → { 정산 날짜: { 작업실 작품id: { 칸(시): 글자수 } } }
+        function novelSessionsToSlots(days) {
+            const out = {};
+            days.forEach(day => (day.list || []).forEach(ss => {
+                const segs = (ss.segs && ss.segs.length) ? ss.segs : [{ a: ss.s, b: ss.e, c: ss.c }];
+                // 구간마다 쓴 글자로 무게를 준다 (지운 구간이 섞여 있으면 시간 길이로)
+                const byChars = segs.every(g => (Number(g.c) || 0) >= 0) && segs.some(g => (Number(g.c) || 0) > 0);
+                const buckets = new Map();
+                segs.forEach(g => {
+                    const a = Number(g.a), b = Math.max(Number(g.b) || a, a + 1000);
+                    if (!a) return;
+                    let t = a;
+                    while (t < b) {
+                        const d = new Date(t);
+                        const e = Math.min(b, new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours() + 1).getTime());
+                        const key = novelDayKey(d) + '|' + d.getHours();
+                        buckets.set(key, (buckets.get(key) || 0) + (byChars ? (Number(g.c) || 0) * (e - t) / (b - a) : (e - t)));
+                        t = e;
+                    }
+                });
+                const entries = [...buckets.entries()].filter(([, w]) => w > 0);
+                const totalW = entries.reduce((x, [, w]) => x + w, 0);
+                if (totalW <= 0) return;
+                Object.entries(ss.w || {}).forEach(([wid, W]) => {
+                    const c = Math.round(Number(W && W.c) || 0);
+                    if (!wid || wid === '_' || c <= 0) return;
+                    const raw = entries.map(([k, w]) => [k, c * w / totalW]);
+                    const parts = raw.map(([k, v]) => [k, Math.floor(v)]);
+                    let rest = c - parts.reduce((x, [, v]) => x + v, 0);
+                    raw.map(([, v], i) => [i, v - Math.floor(v)]).sort((x, y) => y[1] - x[1]).forEach(([i]) => { if (rest > 0) { parts[i][1]++; rest--; } });
+                    parts.forEach(([k, n]) => {
+                        if (n <= 0) return;
+                        const [cd, hh] = k.split('|'); const h = Number(hh);
+                        const ds = h >= 6 ? cd : novelShiftDay(cd, -1);   // 새벽 0~5시 → 전날 '0시' 칸
+                        const slot = h >= 6 ? h : 0;
+                        const o = ((out[ds] ??= {})[wid] ??= {});
+                        o[slot] = (o[slot] || 0) + n;
+                    });
+                });
+            }));
+            return out;
+        }
+
+        function novelTargetItems() {
+            const items = getActiveWorkItems(false, true);
+            const gp = g => g === 'BL 장편' ? 0 : g === '현로 장편' ? 1 : g === '현로 초단' ? 2 : g === 'BL 초단' ? 3 : 99;
+            return items.sort((a, b) => (gp(a.genre) - gp(b.genre)) || a.displayTitle.localeCompare(b.displayTitle, 'ko'));
+        }
+        function novelAutoKey(title, items) {
+            const n = novelNormTitle(title); if (!n) return '';
+            const hit = items.find(it => novelNormTitle(it.displayTitle) === n)
+                || items.find(it => novelNormTitle((masterWorks.find(w => w.id === it.id) || {}).title) === n);
+            return hit ? hit.id : '';
+        }
+
+        function openNovelImportModal() {
+            document.getElementById('novel-import-modal').classList.add('open');
+            novelImportLoad('day');
+        }
+        function closeNovelImportModal() { document.getElementById('novel-import-modal').classList.remove('open'); novelImportState = null; }
+
+        async function novelImportLoad(range) {
+            const body = document.getElementById('novel-import-body');
+            const go = document.getElementById('novel-import-go');
+            document.querySelectorAll('#novel-import-modal .novel-range-btn').forEach(b => {
+                const on = b.dataset.nrange === range;
+                b.style.background = on ? 'var(--primary)' : ''; b.style.color = on ? '#fff' : ''; b.classList.toggle('vt-off', !on);
+            });
+            const base = writerViewDate;
+            let from, to;
+            if (range === 'month') { from = novelDayKey(new Date(base.getFullYear(), base.getMonth(), 1)); to = novelDayKey(new Date(base.getFullYear(), base.getMonth() + 1, 0)); }
+            else { from = to = writerGetYYYYMMDD(base); }
+            const label = range === 'month' ? `${base.getFullYear()}년 ${base.getMonth() + 1}월` : writerGetKoreanDate(base);
+            novelImportState = null;
+            go.disabled = true; go.style.opacity = '.5';
+            body.innerHTML = `<div class="py-6 text-center text-slate-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-1"></i> ${label} 작업실 기록을 불러오는 중…</div>`;
+            let res;
+            try { res = await novelFetchSessions(novelShiftDay(from, -1), novelShiftDay(to, 1)); }
+            catch (e) { res = { ok: false, error: e.message || String(e) }; }
+            if (!document.getElementById('novel-import-modal').classList.contains('open')) return;
+            if (!res || !res.ok) {
+                body.innerHTML = `<div class="py-5 text-center text-rose-500 text-xs">작업실 기록을 못 불러왔어요.<br><span class="text-slate-400">${novelEsc(res && res.error || '알 수 없는 오류')}</span></div>`;
+                return;
+            }
+            const all = novelSessionsToSlots(res.days || []);
+            const slots = {};
+            Object.keys(all).forEach(ds => { if (ds >= from && ds <= to) slots[ds] = all[ds]; });
+            const totals = {};
+            Object.values(slots).forEach(byW => Object.entries(byW).forEach(([wid, hours]) => { totals[wid] = (totals[wid] || 0) + Object.values(hours).reduce((a, b) => a + b, 0); }));
+            novelImportState = { range, from, to, slots, works: res.works || {}, totals };
+            const wids = Object.keys(totals).filter(w => totals[w] > 0).sort((a, b) => totals[b] - totals[a]);
+            if (!wids.length) {
+                body.innerHTML = `<div class="py-6 text-center text-slate-400 text-xs">${label}에는 작업실에서 쓴 기록이 없어요.</div>`;
+                go.disabled = false; go.style.opacity = '';   // 비어 있어도 '가져오기'로 전에 가져온 칸을 비울 수 있게
+                return;
+            }
+            const items = novelTargetItems();
+            const sum = wids.reduce((a, w) => a + totals[w], 0);
+            const nDays = Object.keys(slots).length;
+            const rows = wids.map(wid => {
+                const title = (res.works || {})[wid] || '(이름 없는 작품)';
+                const auto = novelAutoKey(title, items);
+                const saved = Object.prototype.hasOwnProperty.call(novelWorkMap, wid) ? novelWorkMap[wid] : null;
+                const cur = (saved === '' || (saved && items.some(it => it.id === saved))) ? saved : auto;
+                const opts = `<option value="">가져오지 않음</option>` + items.map(it => `<option value="${novelEsc(it.id)}" ${it.id === cur ? 'selected' : ''}>[${novelEsc(it.genre)}] ${novelEsc(it.displayTitle)}</option>`).join('');
+                return `<div class="novel-map-row flex items-center gap-2 py-2 border-b border-slate-100">
+                    <div class="min-w-0 flex-1"><div class="font-bold text-slate-700 truncate" title="${novelEsc(title)}">${novelEsc(title)}</div><div class="text-[11px] text-slate-400">${totals[wid].toLocaleString()}자${!cur ? ' · <span style="color:#e11d48">연결할 작품을 골라 주세요</span>' : ''}</div></div>
+                    <i class="fa-solid fa-arrow-right text-slate-300 text-xs shrink-0"></i>
+                    <select data-nwid="${novelEsc(wid)}" data-auto="${novelEsc(auto)}" class="w-[52%] shrink-0 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none">${opts}</select>
+                </div>`;
+            }).join('');
+            body.innerHTML = `<div class="text-xs text-slate-500 mb-1">${label} · ${nDays}일 · 작업실 기록 <b class="text-slate-700">${sum.toLocaleString()}자</b></div>
+                <div class="text-[11px] text-slate-400 mb-1">작업실 작품 → 정산의 글자수 기록 작품 (고른 연결은 기억해요)</div>${rows}`;
+            go.disabled = false; go.style.opacity = '';
+        }
+
+        // 원고 위치(이전/현재)를 이 날 앞 기록에 이어 붙여 다시 계산 — 진행률이 '마지막 현재 값'으로 계산되기 때문
+        function novelRechain(ds, key) {
+            const wd = writerDailyData[ds]?.works?.[key]; if (!wd?.hours) return;
+            let pos = writerGetWorkPosition(key, ds);
+            try {
+                if ((writeVolumes[key] || []).length) {
+                    const marks = buildVolumeTimeline(key);
+                    const prevDay = Object.keys(writerDailyData).filter(d => d < ds && writerGetPositionOnDate(key, d) !== null).sort().pop();
+                    if (prevDay && activeVolumeOn(marks, prevDay) !== activeVolumeOn(marks, ds)) pos = 0;   // 새 권은 0자부터
+                }
+            } catch (e) {}
+            WRITER_HOURS_SCAN.forEach(h => {
+                const c = wd.hours[h]; if (!c) return;
+                if (c.src === NOVEL_SRC) { c.prev = pos; c.now = pos + (Number(c.diff) || 0); }
+                const nv = parseFloat(c.now);
+                if (c.now !== '' && !isNaN(nv)) pos = nv;
+            });
+        }
+
+        function novelImportApply() {
+            const st = novelImportState; if (!st) return;
+            const map = {};
+            document.querySelectorAll('#novel-import-body select[data-nwid]').forEach(sel => {
+                const wid = sel.dataset.nwid, val = sel.value, auto = sel.dataset.auto;
+                map[wid] = val;
+                if (val || auto || Object.prototype.hasOwnProperty.call(novelWorkMap, wid)) novelWorkMap[wid] = val;
+            });
+            const dates = [];
+            for (let d = st.from; d <= st.to; d = novelShiftDay(d, 1)) dates.push(d);
+            let filled = 0, skipped = 0;
+            const touched = new Set();
+            dates.forEach(ds => {
+                const keys = new Set();
+                // 1) 전에 가져온 칸은 지운다 (작업실에서 지웠거나 연결을 바꾼 경우까지 맞추려고)
+                Object.entries(writerDailyData[ds]?.works || {}).forEach(([key, wd]) => {
+                    Object.keys(wd?.hours || {}).forEach(h => { if (wd.hours[h]?.src === NOVEL_SRC) { delete wd.hours[h]; keys.add(key); } });
+                });
+                // 2) 새로 채운다 — 직접 적은 칸은 건너뜀
+                Object.entries(st.slots[ds] || {}).forEach(([wid, hours]) => {
+                    const key = map[wid]; if (!key) return;
+                    if (!writerDailyData[ds]) writerDailyData[ds] = { works: {} };
+                    if (!writerDailyData[ds].works) writerDailyData[ds].works = {};
+                    const wd = (writerDailyData[ds].works[key] ??= { hours: {} });
+                    if (!wd.hours) wd.hours = {};
+                    Object.entries(hours).forEach(([slot, n]) => {
+                        const cur = wd.hours[slot];
+                        const manual = cur && cur.src !== NOVEL_SRC && ((cur.now !== '' && cur.now != null) || (cur.prev !== '' && cur.prev != null));
+                        if (manual) { skipped += n; return; }
+                        wd.hours[slot] = { prev: 0, now: n, diff: n, src: NOVEL_SRC };
+                        filled += n;
+                    });
+                    keys.add(key);
+                });
+                // 3) 이 날 원고 위치 다시 잇기 (날짜 순서대로라 다음 날도 맞게 이어짐)
+                keys.forEach(key => { novelRechain(ds, key); touched.add(ds + '\n' + key); });
+            });
+            writerPositionCache = {};
+            touched.forEach(t => { const [ds, key] = t.split('\n'); try { syncWriteCompletionFromDaily(ds, key); } catch (e) {} });
+            save();
+            closeNovelImportModal();
+            try { writerRenderDaily(); } catch (e) {}
+            try { writerRenderCalendar(); } catch (e) {}
+            try { if (document.getElementById('tab-write')?.classList.contains('active')) renderWriteCalendar(); } catch (e) {}
+            const msg = `작업실 기록 ${filled.toLocaleString()}자를 채웠어요.` + (skipped ? ` (직접 적은 칸과 겹친 ${skipped.toLocaleString()}자는 건너뛰었어요)` : '');
+            try { meShowToast(msg); } catch (e) { alert(msg); }
         }
 
         function writerUpdateDailyStats(updateChart = true) {

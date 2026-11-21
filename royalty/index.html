@@ -8394,7 +8394,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                                         <div>
                                             <div class="flex items-center justify-between ml-1 mb-1">
                                                 <label class="text-sm font-bold text-slate-600 block">출판사</label>
-                                                <label class="flex items-center gap-1 text-xs font-bold text-slate-500 cursor-pointer select-none" title="직계: 플랫폼 수수료를 떼지 않고 전체 매출에서 바로 정산 비율만큼 받는 계약"><input type="checkbox" id="new-work-direct" class="w-3.5 h-3.5 accent-emerald-500 cursor-pointer"> 직계</label>
+                                                <label class="flex items-center gap-1 text-xs font-bold text-slate-500 cursor-pointer select-none" title="직계: 플랫폼 수수료를 떼지 않고 전체 매출에서 바로 정산 비율만큼 받는 계약"><input type="checkbox" id="new-work-direct" class="w-3.5 h-3.5 accent-emerald-500 cursor-pointer" onchange="this.dataset.auto=''"> 직계</label>
                                             </div>
                                             <input list="publisher-list" type="text" id="new-work-publisher" placeholder="출판사" oninput="syncSettlementPublisher(this.value)" class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100 transition-all">
                                             <datalist id="publisher-list"></datalist>
@@ -14215,7 +14215,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
         function updateTitleDatalist() { const datalist = document.getElementById('existing-titles-list'); if(!datalist) return; const titles = [...new Set(masterWorks.map(w => w.title))].sort(); datalist.innerHTML = titles.map(t => `<option value="${t}">`).join(''); }
         function updatePublisherDatalist() { const datalist = document.getElementById('publisher-list'); if(!datalist) return; const allPublishers = [...new Set([...masterWorks.map(w => w.publisher), ...masterWorks.map(w => w.settlementPublisher), ...Object.keys(publisherData)])].filter(p => p && p !== '-').sort(); datalist.innerHTML = allPublishers.map(pub => `<option value="${pub}">`).join(''); }
         function updateStudioDatalist() { const datalist = document.getElementById('studio-list'); if(!datalist) return; const allStudios = [...new Set(masterWorks.map(w => w.studio))].filter(s => s && s !== '-' && s !== 'undefined' && s !== 'null').sort(); datalist.innerHTML = allStudios.map(s => `<option value="${s}">`).join(''); }
-        function autoFillPublisher(val) { const work = masterWorks.find(w => w.title === val); if(work) { document.getElementById('new-work-publisher').value = work.publisher; } }
+        function autoFillPublisher(val) { const work = masterWorks.find(w => w.title === val); if(work) { document.getElementById('new-work-publisher').value = work.publisher; try { syncDirectFromPublisher(work.publisher); } catch (e) {} } }
         function setupCustomAutocomplete() {
             const input = document.getElementById('new-work-title'); const dropdown = document.getElementById('custom-title-dropdown'); if (!input || !dropdown) return;
             input.addEventListener('focus', () => { renderCustomDropdown(input.value); });
@@ -16105,9 +16105,18 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
         // 더 이상 출판사 필드 변경에 자동으로 따라가지 않고 수동 지정값을 유지한다.
         let settlementPublisherTouched = false;
         function syncSettlementPublisher(val) {
+            syncDirectFromPublisher(val);
             if (settlementPublisherTouched) return;
             const el = document.getElementById('new-work-settlement-publisher');
             if (el) el.value = val;
+        }
+        // 출판사 관리에서 '직계'로 표시한 출판사를 고르면 직계 체크를 자동으로 켠다.
+        // 자동으로 켠 것만 다른 출판사로 바꿀 때 다시 끈다 (손으로 켠 체크는 그대로 둔다).
+        function syncDirectFromPublisher(val) {
+            const cb = document.getElementById('new-work-direct'); if (!cb) return;
+            const info = publisherData[String(val || '').trim()];
+            if (info && info.direct) { cb.checked = true; cb.dataset.auto = '1'; }
+            else if (cb.dataset.auto === '1') { cb.checked = false; cb.dataset.auto = ''; }
         }
         function toggleStudioInput() { 
             const genre = document.getElementById('new-work-genre').value; 
@@ -16404,7 +16413,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             if (extrasSec) extrasSec.classList.add('hidden');
             document.getElementById('new-work-title').value = ''; try { updateNewWorkPriorHint(); } catch (e) {}
             document.getElementById('new-work-publisher').value = '';
-            { const dr = document.getElementById('new-work-direct'); if (dr) dr.checked = false; }
+            { const dr = document.getElementById('new-work-direct'); if (dr) { dr.checked = false; dr.dataset.auto = ''; } }
             document.getElementById('new-work-studio').value = '';
             const spReset = document.getElementById('new-work-settlement-publisher'); if (spReset) spReset.value = '';
             settlementPublisherTouched = false;
@@ -16504,7 +16513,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             document.getElementById('new-work-genre').value = w.genre;
             document.getElementById('new-work-title').value = w.title; try { updateNewWorkPriorHint(); } catch (e) {}
             document.getElementById('new-work-publisher').value = w.publisher !== '-' ? w.publisher : '';
-            { const dr = document.getElementById('new-work-direct'); if (dr) dr.checked = !!w.direct; }
+            { const dr = document.getElementById('new-work-direct'); if (dr) { dr.checked = !!w.direct; dr.dataset.auto = ''; } }
             document.getElementById('new-work-studio').value = (w.studio && w.studio !== '-' && w.studio !== 'undefined') ? w.studio : '';
             const spFill = document.getElementById('new-work-settlement-publisher');
             if (spFill) spFill.value = (w.settlementPublisher && w.settlementPublisher !== w.publisher) ? w.settlementPublisher : '';
@@ -18829,7 +18838,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             let html = `<div class="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm"><table class="w-full text-sm text-left whitespace-nowrap"><thead class="bg-slate-50 text-slate-500 font-bold border-b border-slate-200 text-sm"><tr><th class="py-2 px-3 w-12 text-center">No.</th><th class="py-2 px-2 w-[180px]">${currentPublisherTab === 'publishers' ? '출판사' : '스튜디오'}</th>`;
             if (currentPublisherTab === 'publishers') { html += `<th class="py-2 px-2">현로 레이블</th><th class="py-2 px-2">BL 레이블</th><th class="py-2 px-2 w-28 text-center">정산일</th><th class="py-2 px-2 w-28 text-center">정산 기준</th><th class="py-2 px-2 w-28 text-center">정산 사이트</th><th class="py-2 px-2 w-20 text-center">업데이트</th><th class="py-2 px-3 min-w-[150px]">비고</th><th class="py-2 px-2 w-16 text-center">ID</th>`; } else { html += `<th class="py-2 px-2 text-center">정산일</th><th class="py-2 px-2 text-center">정산 기준</th><th class="py-2 px-2 text-center">해외</th><th class="py-2 px-3">기타</th>`; }
             html += `</tr></thead><tbody id="publisher-tbody">`;
-            targetList.forEach((pub, i) => { const info = publisherData[pub] || { labelHyun: '', labelBL: '', standard: '', site: '', updateDay: '', paymentDay: '', memo: '', advance: '', overseas: '', etc: '' }; html += `<tr class="hover:bg-slate-50/50 draggable-row" draggable="true" data-publisher="${pub}"><td class="py-2 px-3 text-center text-slate-400 font-bold cursor-grab active:cursor-grabbing">${i + 1}</td><td class="py-2 px-2 font-bold text-slate-700 w-[180px]"><div class="truncate w-[180px] cursor-pointer hover:text-emerald-600 hover:underline" title="${pub}" onclick="openPublisherCard('${pub}')">${pub}</div></td>`;
+            targetList.forEach((pub, i) => { const info = publisherData[pub] || { labelHyun: '', labelBL: '', standard: '', site: '', updateDay: '', paymentDay: '', memo: '', advance: '', overseas: '', etc: '' }; html += `<tr class="hover:bg-slate-50/50 draggable-row" draggable="true" data-publisher="${pub}"><td class="py-2 px-3 text-center text-slate-400 font-bold cursor-grab active:cursor-grabbing">${i + 1}</td><td class="py-2 px-2 font-bold text-slate-700 w-[180px]"><div class="flex items-center gap-1.5 w-[180px]"><div class="truncate min-w-0 cursor-pointer hover:text-emerald-600 hover:underline" title="${pub}" onclick="openPublisherCard('${pub}')">${pub}</div>${currentPublisherTab === 'publishers' && info.direct ? `<span class="pub-direct-tag shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 align-middle">직계</span>` : ''}</div></td>`;
                 if (currentPublisherTab === 'publishers') html += `<td class="py-2 px-1"><input type="text" value="${info.labelHyun || ''}" class="w-full bg-transparent rounded-lg px-2 py-1 text-sm text-slate-700 focus:bg-white focus:ring-2 focus:ring-emerald-100 outline-none transition-all border border-transparent focus:border-slate-100" data-lbl="hyun" placeholder=" " style="--tilt:${lblTilt(pub, 'h')}deg" onchange="savePublisherDetail('${pub}', 'labelHyun', this.value)"></td><td class="py-2 px-1"><input type="text" value="${info.labelBL || ''}" class="w-full bg-transparent rounded-lg px-2 py-1 text-sm text-slate-700 focus:bg-white focus:ring-2 focus:ring-emerald-100 outline-none transition-all border border-transparent focus:border-slate-100" data-lbl="bl" placeholder=" " style="--tilt:${lblTilt(pub, 'b')}deg" onchange="savePublisherDetail('${pub}', 'labelBL', this.value)"></td><td class="py-2 px-2 text-center">${mkPubSelect(pub, 'paymentDay', [1,7,10,12,15,20,25,'말일'].map(d => ({ value: d, label: `${d}${typeof d==='number'?'일':''}` })))}</td><td class="py-2 px-2 text-center">${mkPubSelect(pub, 'standard', ['익월','익익월','익익익월'].map(v => ({ value: v, label: v })))}</td><td class="py-2 px-2 text-center"><div class="flex items-center gap-1">${mkPubSelect(pub, 'site', ['실시간','자체','웹하드','이메일','이카운트'].map(v => ({ value: v, label: v })))}<button onclick="event.stopPropagation(); openPublisherSite('${pub}')" class="shrink-0 transition-opacity hover:opacity-100" style="color:var(--primary); opacity:0.55;" title="정산 사이트 열기"><i class="fa-solid fa-heart text-xs"></i></button></div></td><td class="py-2 px-2 text-center">${mkPubSelect(pub, 'updateDay', [...Array.from({length: 30}, (_, i) => i + 1), '말일'].map(d => ({ value: d, label: `${d}${typeof d==='number'?'일':''}` })), false, true)}</td><td class="py-2 px-3"><input type="text" value="${info.memo || ''}" class="bg-transparent w-full text-sm outline-none" onchange="savePublisherDetail('${pub}', 'memo', this.value)"></td><td class="py-2 px-2 text-center"><button onclick="openCredentialsModal('${pub}')" class="text-slate-400 hover:text-emerald-500 transition-colors"><i class="fa-solid fa-key"></i></button></td>`;
                 else html += `<td class="py-2 px-2"><input type="text" value="${info.paymentDay || ''}" class="w-full bg-transparent rounded-lg px-2 py-1 text-sm text-center text-slate-700 outline-none focus:bg-white focus:ring-2 focus:ring-emerald-100 transition-all border border-transparent focus:border-slate-100" onchange="savePublisherDetail('${pub}', 'paymentDay', this.value)"></td><td class="py-2 px-2"><input type="text" value="${info.standard || ''}" class="w-full bg-transparent rounded-lg px-2 py-1 text-sm text-center text-slate-700 outline-none focus:bg-white focus:ring-2 focus:ring-emerald-100 transition-all border border-transparent focus:border-slate-100" onchange="savePublisherDetail('${pub}', 'standard', this.value)"></td><td class="py-2 px-2 text-center"><button onclick="openOverseasModal('${pub}')" class="text-slate-400 hover:text-emerald-500 transition-colors flex items-center justify-center w-full h-full"><i class="fa-solid fa-globe mr-1"></i> <span class="text-xs">기록</span></button></td><td class="py-2 px-3"><input type="text" value="${info.etc || ''}" class="w-full bg-transparent rounded-lg px-2 py-1 text-sm text-slate-700 outline-none focus:bg-white focus:ring-2 focus:ring-emerald-100 transition-all border border-transparent focus:border-slate-100" onchange="savePublisherDetail('${pub}', 'etc', this.value)"></td>`;
                 html += `</tr>`; }); html += `</tbody></table></div>`; listContainer.innerHTML = html; addDragEvents();
@@ -18855,6 +18864,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                         onclick="openPublisherCard('${pub}')">
                     <div class="flex items-start justify-between mb-2">
                         <h4 class="font-bold text-slate-700 text-base flex-1 min-w-0 truncate" title="${pub}">${pub}</h4>
+                        ${isPub && info.direct ? `<span class="pub-direct-tag shrink-0 ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 align-middle">직계</span>` : ''}
                         ${isPub ? `<button onclick="event.stopPropagation(); openPublisherSite('${pub}')" class="shrink-0 ml-2" style="color:var(--primary); opacity:0.55;" title="정산 사이트 열기"><i class="fa-solid fa-heart text-xs"></i></button>` : ''}
                     </div>
                     ${labelText ? `<div class="text-[11px] text-slate-400 mb-2 truncate">${labelText}</div>` : ''}
@@ -18918,7 +18928,13 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                     <option value="same" ${_ps === 'same' ? 'selected' : ''}>그날 그대로 입금</option>
                 </select></div>`;
             if (currentPubCardTab === 'publishers') {
-                body.innerHTML = `<div class="grid grid-cols-2 gap-3">
+                const pubWorkCount = masterWorks.filter(w => w.publisher === pub).length;
+                body.innerHTML = `<label class="pub-direct-row flex items-center gap-2 mb-3 p-2.5 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer select-none">
+                    <input type="checkbox" class="w-4 h-4 accent-emerald-500 cursor-pointer" ${info.direct ? 'checked' : ''} onchange="setPublisherDirect(currentPubCardName, this.checked)">
+                    <span class="text-sm font-bold text-slate-600">직계 출판사</span>
+                    <span class="text-[11px] text-slate-400">플랫폼 수수료 없이 총매출에서 바로 정산 · 이 출판사 작품 ${pubWorkCount}개에 같이 적용</span>
+                </label>
+                <div class="grid grid-cols-2 gap-3">
                     ${textField('현로 레이블', 'labelHyun', info.labelHyun)}
                     ${textField('BL 레이블', 'labelBL', info.labelBL)}
                 </div>
@@ -18968,6 +18984,18 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                     <input type="text" value="${info.etc || ''}" class="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100" onchange="pubCardFieldChanged('etc', this.value)">
                 </div>`;
             }
+        }
+        // 출판사를 직계로 표시/해제하면 그 출판사의 모든 작품도 같이 바꾼다 (작품별로 나중에 다시 바꿀 수 있음)
+        function setPublisherDirect(pub, on) {
+            if (!pub) return;
+            on = !!on;
+            savePublisherDetail(pub, 'direct', on);
+            const list = masterWorks.filter(w => w.publisher === pub);
+            list.forEach(w => { w.direct = on; });
+            save(true);
+            renderPublisherTab();
+            try { renderMasterWorksList(); } catch (e) {}
+            try { if (typeof meShowToast === 'function') meShowToast(`${pub}: 작품 ${list.length}개를 ${on ? '직계로' : '직계 아님으로'} 바꿨어요`); } catch (e) {}
         }
         function savePublisherDetail(pub, f, v) { if(!publisherData[pub]) publisherData[pub] = { labelHyun: '', labelBL: '', standard: '', site: '', updateDay: '', paymentDay: '', memo: '' }; publisherData[pub][f] = v; save(true); }
         // [NEW] 정산 사이트 클릭 시 저장된 URL로 바로 이동 (없으면 입력 요청)

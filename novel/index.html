@@ -1568,7 +1568,7 @@ body .home .wgrid .wcard.icard:not(.pol):not([style*="--gc:#"]) { --lb: #f5f4f1;
 .wl-vb { position: absolute; left: 6px; width: 62%; border-radius: 8px; padding: 3px 8px; color: #fff; font-size: 11px; line-height: 1.3; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.15); box-sizing: border-box; }
 .wl-vb b { display: block; font-size: 12px; } .wl-vb span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wl-wk { display: flex; gap: 6px; padding-left: 34px; position: relative; } .wl-wa { position: absolute; left: 0; top: 0; width: 32px; } .wl-wa span { position: absolute; right: 2px; font-size: 10px; color: var(--muted); transform: translateY(-50%); }
-.wl-wc { flex: 1; min-width: 0; text-align: center; cursor: pointer; font-size: 11px; } .wl-wc > b { display: block; font-size: 11px; margin-bottom: 4px; height: 14px; }
+.wl-wc { flex: 1; min-width: 0; text-align: center; cursor: pointer; font-size: 11px; } .wl-wc > b { display: block; font-size: 11px; margin-bottom: 4px; min-height: 28px; line-height: 1.25; }
 .wl-wcb { position: relative; background: var(--panel2); border-radius: 8px; overflow: hidden; } .wl-wcb u { position: absolute; left: 0; right: 0; height: 1px; background: var(--line); } .wl-wcb em { position: absolute; left: 12%; right: 12%; border-radius: 4px; opacity: .92; }
 .wl-wc > span { display: block; margin-top: 4px; color: var(--muted); font-size: 10px; line-height: 1.35; }
 .wl-tb, .wl-tb2 { position: relative; height: 24px; background: var(--panel2); border-radius: 6px; overflow: hidden; }
@@ -3342,15 +3342,18 @@ function wlHeat(days) {
         }));
     }
     const WD = ['일', '월', '화', '수', '목', '금', '토'], lv = v => v <= 0 ? 0 : v < 400 ? 1 : v < 1200 ? 2 : v < 2400 ? 3 : 4;
-    return `<div class="wl-hm"><div class="wl-hl">${WD.map(n => `<span>${n}</span>`).join('')}</div><div><div class="wl-hh">${Array.from({ length: 24 }, (_, h) => `<span>${h % 3 === 0 ? h + '시' : ''}</span>`).join('')}</div>${cell.map(r => `<div class="wl-hr">${r.map(c => `<i style="background:${sessCell(lv(c.ph + c.pc), c.ph >= 1, c.pc >= 1)}"></i>`).join('')}</div>`).join('')}</div></div>`;
+    let lo = 8; cell.forEach(r => r.forEach((c, h) => { if (c.ph + c.pc > 0) lo = Math.min(lo, h); })); // 새벽(0~8시)은 쓴 기록이 있을 때만 보임
+    const hrs = Array.from({ length: 24 - lo }, (_, i) => lo + i);
+    return `<div class="wl-hm"><div class="wl-hl">${WD.map(n => `<span>${n}</span>`).join('')}</div><div><div class="wl-hh">${hrs.map(h => `<span>${h % 3 === 0 ? h + '시' : ''}</span>`).join('')}</div>${cell.map(r => `<div class="wl-hr">${hrs.map(h => { const c = r[h]; return `<i style="background:${sessCell(lv(c.ph + c.pc), c.ph >= 1, c.pc >= 1)}"></i>`; }).join('')}</div>`).join('')}</div></div>`;
 }
 function wlWeek() {
-    const today = new Date(), WD = ['일', '월', '화', '수', '목', '금', '토'], RH = 14; let cols = '';
-    for (let i = 6; i >= 0; i--) {
-        const D = new Date(today); D.setDate(D.getDate() - i); const k = dayKeyOfMs(D.getTime()), list = sessOfDay(k);
-        cols += `<div class="wl-wc" data-wlday="${k}"><b>${D.getMonth() + 1}/${D.getDate()} (${WD[D.getDay()]})</b><div class="wl-wcb" style="height:${24 * RH}px">${[3, 6, 9, 12, 15, 18, 21].map(x => `<u style="top:${x * RH}px"></u>`).join('')}${list.map(x => { const a = msHour(x.s), b = Math.max(msHour(x.e), a + 0.15); return `<em style="top:${a * RH}px;height:${Math.max(4, (b - a) * RH)}px;background:${sessBg(x.segs).replace('90deg', '180deg')}"></em>`; }).join('')}</div><span>${list.length ? `${list.length}세션<br>+${fmt(list.reduce((a, x) => a + x.c, 0))}자` : (stats().days[k] ? `+${fmt(stats().days[k])}자` : '쉼')}</span></div>`;
-    }
-    return `<div class="wl-wk"><div class="wl-wa">${[0, 3, 6, 9, 12, 15, 18, 21, 24].map(x => `<span style="top:${x * RH + 18}px">${x}시</span>`).join('')}</div>${cols}</div>`;
+    const today = new Date(), WD = ['일', '월', '화', '수', '목', '금', '토'], RH = 20; let cols = '', days = [], lo = 8;
+    for (let i = 6; i >= 0; i--) { const D = new Date(today); D.setDate(D.getDate() - i); const k = dayKeyOfMs(D.getTime()), list = sessOfDay(k); days.push({ D, k, list }); list.forEach(x => { lo = Math.min(lo, Math.floor(msHour(x.s))); }); } // 새벽(0~8시)은 쓴 날만 펼침
+    const H = 24 - lo;
+    days.forEach(({ D, k, list }) => {
+        cols += `<div class="wl-wc" data-wlday="${k}"><b>${D.getMonth() + 1}/${D.getDate()} (${WD[D.getDay()]})</b><div class="wl-wcb" style="height:${H * RH}px">${Array.from({ length: H }, (_, j) => j).filter(j => (lo + j) % 3 === 0).map(j => `<u style="top:${j * RH}px"></u>`).join('')}${list.map(x => { const a = msHour(x.s) - lo, b = Math.max(msHour(x.e) - lo, a + 0.15); return `<em style="top:${a * RH}px;height:${Math.max(4, (b - a) * RH)}px;background:${sessBg(x.segs).replace('90deg', '180deg')}"></em>`; }).join('')}</div><span>${list.length ? `${list.length}세션<br>+${fmt(list.reduce((a, x) => a + x.c, 0))}자` : (stats().days[k] ? `+${fmt(stats().days[k])}자` : '쉼')}</span></div>`;
+    });
+    return `<div class="wl-wk"><div class="wl-wa">${Array.from({ length: H + 1 }, (_, j) => j).filter(j => (lo + j) % 3 === 0).map(j => `<span style="top:${j * RH + 18}px">${lo + j}시</span>`).join('')}</div>${cols}</div>`;
 }
 function wlDist(days) {
     const cnt = [0, 0, 0, 0, 0], today = new Date();

@@ -9024,6 +9024,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                                             <div id="w-dailyGoalPerCenter" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 font-black text-lg text-slate-700">0%</div>
                                         </div>
                                         <p id="w-dailyGoalText" class="font-bold mt-2 text-xs" style="color:var(--primary)">0 / 0자</p>
+                                        <div id="w-dailyGoalWorks" class="mt-2 flex flex-col gap-1 text-[11px] text-left"></div>
                                     </div>
                                 </div>
 
@@ -29606,6 +29607,15 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
         function writerGetDayWorkData(dateStr, storageKey) {
             return writerDailyData[dateStr]?.works?.[storageKey] || null;
         }
+        const WRITER_DAY_PARTS = ['#7ED3B2', '#7FC4E0', '#A5D67E', '#B6A6E0', '#F2B880', '#F2A4B6'];
+        function writerGetDayWorkParts(dateStr) {   // [{ key, title, chars, color }] 많이 쓴 순
+            const worksObj = writerDailyData[dateStr]?.works || {};
+            let items = []; try { items = getActiveWorkItems(false, true); } catch (e) {}
+            const nameOf = k => (items.find(it => it.id === k) || {}).displayTitle || (masterWorks.find(w => w.id === k) || {}).title || k;
+            return Object.entries(worksObj).map(([k, wd]) => ({ key: k, chars: Object.values(wd?.hours || {}).reduce((a, b) => a + (Number(b.diff) || 0), 0) }))
+                .filter(p => p.chars > 0).sort((a, b) => b.chars - a.chars)
+                .map((p, i) => ({ ...p, title: nameOf(p.key), color: WRITER_DAY_PARTS[i % WRITER_DAY_PARTS.length] }));
+        }
         function writerGetDayTotal(dateStr) {
             let sum = 0;
             const worksObj = writerDailyData[dateStr]?.works;
@@ -30969,7 +30979,9 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                 const totalW = entries.reduce((x, [, w]) => x + w, 0);
                 if (totalW <= 0) return;
                 Object.entries(ss.w || {}).forEach(([wid, W]) => {
-                    const c = Math.round(Number(W && W.c) || 0);
+                    // 정산 기록은 공백 포함(원고 위치)이라 공백 포함 글자(a)를 쓴다. a 가 없는 예전 기록은 공백 제외(c)를 0.765 로 나눠 어림
+                    const cNo = Number(W && W.c) || 0, cAll = Number(W && W.a);
+                    const c = Math.round(cAll >= cNo && cAll > 0 ? cAll : cNo / NOSPACE_TO_WITHSPACE_RATIO);
                     if (!wid || wid === '_' || c <= 0) return;
                     const raw = entries.map(([k, w]) => [k, c * w / totalW]);
                     const parts = raw.map(([k, v]) => [k, Math.floor(v)]);
@@ -31323,14 +31335,18 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             }
             const dayTotal = writerGetDayTotal(ds);
             const dayGoalToday = writerGetDayGoal(ds);
+            // 작품별로 오늘 쓴 글자 (도넛 조각 + 아래 목록) — 민트 계열 색을 작품마다
+            const dayParts = writerGetDayWorkParts(ds);
+            { const box = document.getElementById('w-dailyGoalWorks');
+              if (box) box.innerHTML = dayParts.length > 0 ? dayParts.map(p => `<div class="flex items-center gap-1.5 min-w-0"><i style="width:8px;height:8px;border-radius:50%;background:${p.color};flex:none"></i><span class="truncate flex-1 text-slate-500" title="${novelEsc(p.title)}">${novelEsc(p.title)}</span><b class="text-slate-600 shrink-0">+${p.chars.toLocaleString()}</b></div>`).join('') : ''; }
             if (dayGoalToday > 0) {
                 document.getElementById('w-dailyGoalText').textContent = `${dayTotal.toLocaleString()} / ${dayGoalToday.toLocaleString()}자`;
                 document.getElementById('w-dailyGoalPerCenter').textContent = `${((dayTotal/dayGoalToday)*100).toFixed(0)}%`;
-                if (updateChart) writerCreateDoughnut('w-dailyGoalChart', dayTotal, dayGoalToday, WRITER_DAY_MINT, undefined, true);   // 오늘 하루 = 민트
+                if (updateChart) writerCreateDoughnut('w-dailyGoalChart', dayTotal, dayGoalToday, WRITER_DAY_MINT, dayParts.length > 1 ? dayParts : undefined, true);   // 오늘 하루 = 민트
             } else {
                 document.getElementById('w-dailyGoalText').textContent = `${dayTotal.toLocaleString()}자`;
                 document.getElementById('w-dailyGoalPerCenter').textContent = '';
-                if (updateChart) writerCreateDoughnut('w-dailyGoalChart', dayTotal, Math.max(dayTotal,1), WRITER_DAY_MINT, undefined, true);
+                if (updateChart) writerCreateDoughnut('w-dailyGoalChart', dayTotal, Math.max(dayTotal,1), WRITER_DAY_MINT, dayParts.length > 1 ? dayParts : undefined, true);
             }
         }
 

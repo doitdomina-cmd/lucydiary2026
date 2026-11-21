@@ -26553,7 +26553,64 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
         // 🟢 [NEW] 집필 관리의 모든 기록을 연도 구분 없이 한 텍스트 파일로 내보내기
         //   (챗GPT 등에 붙여넣어 집필 루틴을 상담하기 좋게, 이미지 대신 글자로 내보낸다)
         // ════════════════════════════════════════════════════════
-        function exportAllWritingRecords() {
+        // 집필 기록 내보내기에 붙이는 '작업실 자동 집필 기록' (세션: s 시작 · e 끝 · c 글자 · segs 기기 구간 · w 작품별 · m 1분 단위 글자)
+        async function novelExportSection(lines) {
+            lines.push('=== 작업실 자동 집필 기록 (루시의 작업실에서 원고를 쓰면 자동으로 남는 세션 — 5분 넘게 쉬면 새 세션) ===');
+            const res = await novelFetchSessions('2000-01-01', '2999-12-31');
+            if (!res || !res.ok) { lines.push(`(작업실 기록을 못 불러왔어요: ${(res && res.error) || '알 수 없는 오류'})`); lines.push(''); return; }
+            const titles = res.works || {};
+            const sess = [];
+            (res.days || []).forEach(d => (d.list || []).forEach(x => { if (x && x.s) sess.push(x); }));
+            sess.sort((a, b) => a.s - b.s);
+            if (!sess.length) { lines.push('(아직 작업실 기록이 없어요)'); lines.push(''); return; }
+            const pad = n => String(n).padStart(2, '0');
+            const hm = ms => { const d = new Date(ms); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+            const dayOf = ms => novelDayKey(new Date(ms));
+            const span = x => Math.max(1, Math.round((x.e - x.s) / 6e4));
+            const act = x => x.m ? Math.max(1, Object.keys(x.m).length) : span(x);
+            const minTxt = m => `${Math.floor(m / 60) ? Math.floor(m / 60) + '시간 ' : ''}${m % 60}분`;
+            const title = id => id === '_' ? '(작품 없음)' : (titles[id] || '(이름 없는 작품)');
+            // 시간대(0~23시)별 글자 — 1분 기록이 있으면 그걸로, 없으면 세션 시간에 고르게
+            const addHours = (x, hb) => {
+                if (x.m) { Object.entries(x.m).forEach(([k, c]) => { hb[new Date(x.s + Number(k) * 6e4 + 3e4).getHours()] += Number(c) || 0; }); return; }
+                const a = x.s, b = Math.max(x.e, x.s + 6e4);
+                for (let t = a; t < b;) { const d = new Date(t); const e = Math.min(b, new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours() + 1).getTime()); hb[d.getHours()] += (x.c || 0) * (e - t) / (b - a); t = e; }
+            };
+            const peakTxt = hb => { const top = hb.map((v, h) => [h, v]).filter(([, v]) => v > 0).sort((p, q) => q[1] - p[1]).slice(0, 2).map(([h]) => h).sort((p, q) => p - q); return top.length ? top.map(h => `${h}시대`).join('·') : '-'; };
+            const devTxt = x => { const ds = new Set((x.segs || []).map(g => g.d === 'ph' ? '폰' : 'PC')); return [...ds].join('+') || '-'; };
+            const hasOld = sess.some(x => !x.m);
+            if (hasOld) lines.push("(1분 단위 기록이 생기기 전(2026-11-21 이전)의 세션은 '실제로 쓴 시간'을 세션 전체 시간으로 셌어요)");
+            const first = dayOf(sess[0].s), last = dayOf(sess[sess.length - 1].s);
+            const totC = sess.reduce((a, x) => a + (x.c || 0), 0), totA = sess.reduce((a, x) => a + act(x), 0);
+            lines.push(`기간: ${first} ~ ${last} · 세션 ${sess.length}번 · 실제로 쓴 시간 ${minTxt(totA)} · +${totC.toLocaleString()}자 · 시간당 ${Math.round(totC / Math.max(1, totA) * 60).toLocaleString()}자`);
+            // 월별 요약
+            lines.push('');
+            lines.push('[월별 요약]');
+            const byMonth = {};
+            sess.forEach(x => { const k = dayOf(x.s).slice(0, 7); (byMonth[k] ??= []).push(x); });
+            Object.keys(byMonth).sort().forEach(k => {
+                const L = byMonth[k], c = L.reduce((a, x) => a + (x.c || 0), 0), am = L.reduce((a, x) => a + act(x), 0);
+                const days = new Set(L.map(x => dayOf(x.s))).size, hb = Array(24).fill(0), byW = {};
+                L.forEach(x => { addHours(x, hb); Object.entries(x.w || {}).forEach(([id, W]) => { byW[id] = (byW[id] || 0) + (Number(W && W.c) || 0); }); });
+                lines.push(`- ${k.slice(0, 4)}년 ${Number(k.slice(5))}월: 세션 ${L.length}번 · 집필한 날 ${days}일 · 실제로 쓴 시간 ${minTxt(am)} · +${c.toLocaleString()}자 · 시간당 ${Math.round(c / Math.max(1, am) * 60).toLocaleString()}자 · 많이 쓴 시간대 ${peakTxt(hb)}`);
+                const ws = Object.entries(byW).filter(([, v]) => v > 0).sort((p, q) => q[1] - p[1]);
+                if (ws.length) lines.push(`    작품: ${ws.map(([id, v]) => `${title(id)} +${v.toLocaleString()}자`).join(', ')}`);
+            });
+            // 날짜별
+            lines.push('');
+            lines.push('[날짜별]');
+            const WD = ['일', '월', '화', '수', '목', '금', '토'];
+            const byDay = {};
+            sess.forEach(x => { (byDay[dayOf(x.s)] ??= []).push(x); });
+            Object.keys(byDay).sort().forEach(k => {
+                const L = byDay[k], c = L.reduce((a, x) => a + (x.c || 0), 0), am = L.reduce((a, x) => a + act(x), 0), sm = L.reduce((a, x) => a + span(x), 0), byW = {};
+                L.forEach(x => Object.entries(x.w || {}).forEach(([id, W]) => { byW[id] = (byW[id] || 0) + (Number(W && W.c) || 0); }));
+                const D = new Date(k + 'T00:00:00');
+                lines.push(`- ${k} (${WD[D.getDay()]}) · 세션 ${L.length}번 (${L.map(x => `${hm(x.s)}~${hm(x.e)}`).join(', ')}) · 실제로 쓴 시간 ${minTxt(am)}${sm > am ? ` (세션 ${minTxt(sm)} 중)` : ''} · +${c.toLocaleString()}자 · ${Object.entries(byW).filter(([, v]) => v > 0).map(([id, v]) => `${title(id)} +${v.toLocaleString()}자`).join(', ') || '-'} · ${[...new Set(L.map(devTxt))].join('/')}`);
+            });
+            lines.push('');
+        }
+        async function exportAllWritingRecords() {
             const lines = [];
             const today = getYYYYMMDD(new Date());
             const fmtDateTime = (dm) => {
@@ -27012,6 +27069,11 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                 });
                 lines.push('');
             });
+
+            // 작업실(루시의 작업실) 자동 집필 기록 — 클라우드에서 전체를 읽어 월별 요약 + 날짜별로 붙인다
+            try { meShowToast('작업실 기록을 불러오는 중…'); } catch (e) {}
+            try { await novelExportSection(lines); }
+            catch (e) { lines.push('=== 작업실 자동 집필 기록 ==='); lines.push(`(작업실 기록을 못 불러왔어요: ${e.message || e})`); lines.push(''); }
 
             const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
             const url = URL.createObjectURL(blob);

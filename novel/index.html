@@ -1602,7 +1602,7 @@ button.wl-sc { background: none; border: 1px dashed transparent; border-radius: 
 .wl-vl { position: absolute; left: 0; right: 0; border-top: 1px solid var(--line); height: 0; } .wl-vl span { position: absolute; left: -40px; top: -7px; width: 34px; text-align: right; font-size: 10px; color: var(--muted); }
 .wl-vh { position: absolute; right: 0; height: 20px; border-radius: 4px 0 0 4px; opacity: .45; }
 .wl-vb { position: absolute; left: 6px; width: 62%; border-radius: 8px; padding: 3px 8px; color: #fff; font-size: 11px; line-height: 1.3; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.15); box-sizing: border-box; }
-.wl-vb b { display: block; font-size: 12px; } .wl-vb span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wl-vb b { display: block; font-size: 12px; } .wl-vb .wl-vc { font-style: normal; font-weight: 700; color: #2f8a55; margin-left: 4px; } .wl-vb span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* 1분 기록이 있는 세션: 세션 전체는 옅게, 실제로 쓴 구간(wl-run)만 진하게 */
 .wl-vbm { background: color-mix(in srgb, #5fb77a 12%, var(--panel, #fff)); border: 1px dashed color-mix(in srgb, #5fb77a 60%, transparent); color: var(--text, #3b3a36); box-shadow: none; }
 .wl-vbm .wl-run { position: absolute; left: 0; right: 0; opacity: .78; }
@@ -2441,7 +2441,12 @@ const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const fmt = n => n.toLocaleString('ko-KR');
-const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+/* 집필 하루는 새벽 2시에 넘어간다 — 새벽 0~1시에 쓴 글자는 전날 기록 (2026-11-22). 정산 앱도 같은 기준 */
+const WDAY_CUT = 2 * 36e5;
+const wdKey = ms => { const d = new Date(ms - WDAY_CUT); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const wdNow = () => new Date(Date.now() - WDAY_CUT);   // '오늘'을 고를 때 쓰는 날짜 (시각은 쓰지 말 것)
+const wdHour = (ms, k) => (ms - new Date(k + 'T00:00:00').getTime()) / 36e5;   // 그 집필 날 0시부터 몇 시간째 (새벽 1시 = 25)
+const todayKey = () => wdKey(Date.now());
 const isPhone = () => matchMedia('(max-width: 760px)').matches;
 
 let clientId = null;
@@ -3325,10 +3330,34 @@ const dayKeyOfMs = ms => { const d = new Date(ms); return `${d.getFullYear()}-${
 function sessHost(k, make) {
     const id = 'sess_' + k;
     let h = items[id];
-    if (!h && make) h = create('sessday', { id, day: k, list: [], u: 1 });
-    if (h && h.deleted) { if (!make) return null; h.deleted = false; h.list = []; h.u = 1; }
-    if (h) { h.list ??= []; if (!h.u) sessUnitFix(h); }
+    if (!h && make) h = create('sessday', { id, day: k, list: [], u: 1, dc: 1 });
+    if (h && h.deleted) { if (!make) return null; h.deleted = false; h.list = []; h.u = 1; h.dc = 1; }
+    if (h) { h.list ??= []; if (!h.u) sessUnitFix(h); if (!h.dc) sessCutFix(h); }
+    // 다음 날짜 항목에 이 날 새벽(0~1시) 세션이 남아 있으면 먼저 옮겨 옴
+    const nk = dayKeyOfMs(new Date(k + 'T12:00:00').getTime() + 864e5), nx = items['sess_' + nk];
+    if (nx && !nx.dc && !nx.deleted) { sessCutFix(nx); if (!h && items[id] && !items[id].deleted) h = items[id]; }
     return h;
+}
+/* 예전(자정에 날이 바뀌던 때) 기록 중 새벽 0~1시 세션을 전날 항목으로 옮김. 옮긴 항목엔 dc:1 표시.
+   하루 글자(stats.days)도 그만큼 옮김. 같은 시작 시각 세션이 이미 있으면 두 번 넣지 않음 */
+function sessCutFix(h) {
+    if (!h || h.dc) return;
+    h.dc = 1;
+    const day = h.day || String(h.id).slice(5), stay = [], S = stats(); let moved = 0;
+    (h.list || []).forEach(x => {
+        const k = x && x.s ? wdKey(x.s) : day;
+        if (k === day) { stay.push(x); return; }
+        const t = sessHost(k, true);
+        if (!t.list.some(y => y && y.s === x.s)) {
+            t.list.push(x); t.list.sort((a, b) => a.s - b.s); touch(t);
+            const c = Math.max(0, x.c || 0);
+            S.days[day] = Math.max(0, (S.days[day] || 0) - c); if (!S.days[day]) delete S.days[day];
+            S.days[k] = (S.days[k] || 0) + c;
+        }
+        moved++;
+    });
+    if (moved) { h.list = stay; touch(S); }
+    touch(h);
 }
 /* 예전(공백 제외) 기록을 공포로 한 번 바꿈 — 바꾼 항목엔 u:1 표시가 붙어 다른 기기에도 그대로 동기화됨.
    공포 기록(a)이 있는 세션은 그 비율로 정확히, 없으면 내 원고의 공미 비율(noSpaceRatio)로 어림 */
@@ -3350,9 +3379,9 @@ function sessUnitFix(h) {
     h.u = 1; touch(h);
 }
 function sessRecord(doc, delta) {   // delta = 늘어난 공포(공백 포함) 글자
-    const t = Date.now(), dev = sessDev(), k = dayKeyOfMs(t);
+    const t = Date.now(), dev = sessDev(), k = wdKey(t);
     let last = null, host = null;
-    [sessHost(k, false), sessHost(dayKeyOfMs(t - 864e5), false)].filter(Boolean).forEach(h => {
+    [sessHost(k, false), sessHost(wdKey(t - 864e5), false)].filter(Boolean).forEach(h => {
         const x = h.list[h.list.length - 1]; if (x && (!last || x.e > last.e)) { last = x; host = h; }
     });
     let ss;
@@ -3429,15 +3458,15 @@ function wlDayCard(k) {
     if (!list.length) return h + `<div class="wl-empty">${dayTot ? `이 날은 ${fmt(dayTot)}자를 썼어요. (시간 기록은 이 기능을 켠 뒤부터 남아요)` : '이 날은 쓴 기록이 없어요.'}</div></div>`;
     h += `<div class="wl-kr"><div><small>세션</small><b>${list.length}번</b></div><div><small>실제로 쓴 시간</small><b>${minTxt(mins)}</b>${spanMins > mins ? `<small>세션 ${minTxt(spanMins)} 중</small>` : ''}</div><div><small>늘어난 글자 (공포)</small><b>+${fmt(tot)}자</b></div><div><small>시간당</small><b>${mins ? fmt(Math.round(tot / (mins / 60))) : 0}자</b></div><div><small>첫 시작~마지막</small><b>${hm(list[0].s)}~${hm(list[list.length - 1].e)}</b></div></div>`;
     // 세로 시간표: 위에서 아래로 0시~24시. 왼쪽 시각, 가운데 세션 막대, 오른쪽 시간별 글자 막대
-    const hb = Array.from({ length: 24 }, () => ({ ph: 0, pc: 0 }));
-    list.forEach(x => sessAddHours(x, (D, d, c) => { hb[D.getHours()][d] += c; }));
+    const hb = Array.from({ length: 26 }, () => ({ ph: 0, pc: 0 }));
+    list.forEach(x => sessAddHours(x, (D, d, c) => { hb[Math.min(25, Math.max(0, Math.floor(wdHour(D.getTime(), k))))][d] += c; }));
     const hmx = Math.max(1, ...hb.map(x => x.ph + x.pc)), RH = list.some(x => x.m) ? 72 : 30;   // 1분 기록이 있으면 시간표를 길게 (쉰 틈이 보이게)
     // 쓴 시간 앞뒤 1시간만 보여 줌 (빈 새벽·낮이 길게 늘어나지 않게)
-    const lo = Math.max(0, Math.floor(Math.min(...list.map(x => msHour(x.s)))) - 1), hi = Math.min(24, Math.ceil(Math.max(...list.map(x => Math.max(msHour(x.e), msHour(x.s) + 0.15)))) + 1);
+    const lo = Math.max(0, Math.floor(Math.min(...list.map(x => wdHour(x.s, k)))) - 1), hi = Math.min(26, Math.ceil(Math.max(...list.map(x => Math.max(wdHour(x.e, k), wdHour(x.s, k) + 0.15)))) + 1);
     h += `<div class="wl-sub">하루 시간표 <span style="opacity:.7">· 막대 = 세션 (진한 곳 = 실제로 쓴 때), 오른쪽 = 시간별로 쓴 글자</span></div><div class="wl-vt" style="height:${(hi - lo) * RH}px">
-        ${Array.from({ length: hi - lo + 1 }, (_, i) => `<div class="wl-vl" style="top:${i * RH}px"><span>${lo + i}시</span></div>`).join('')}
+        ${Array.from({ length: hi - lo + 1 }, (_, i) => `<div class="wl-vl" style="top:${i * RH}px"><span>${(lo + i) % 24}시</span></div>`).join('')}
         ${hb.map((x, i) => (x.ph + x.pc) ? `<div class="wl-vh" style="top:${(i - lo) * RH + 5}px;width:${(x.ph + x.pc) / hmx * 100}%;max-width:22%;background:${x.ph > x.pc ? SESS_PH : SESS_PC}"></div>` : '').join('')}
-        ${list.map(x => { const a = msHour(x.s), b = Math.max(msHour(x.e), a + 0.15), lab = `<b>${hm(x.s)}~${hm(x.e)}</b>${Object.entries(x.w).map(([wk, W]) => `<span>${wkTitle(wk)} +${fmt(W.c)}</span>`).join('')}`;
+        ${list.map(x => { const a = wdHour(x.s, k), b = Math.max(wdHour(x.e, k), a + 0.15), lab = `<b>${hm(x.s)}~${hm(x.e)} <em class="wl-vc">+${fmt(Math.max(0, x.c || 0))}자</em></b>${Object.entries(x.w).map(([wk, W]) => `<span>${wkTitle(wk)} +${fmt(W.c)}</span>`).join('')}`;
             if (!x.m) return `<div class="wl-vb" style="top:${(a - lo) * RH}px;height:${Math.max(18, (b - a) * RH)}px;background:${sessBg(x.segs).replace('90deg', '180deg')}">${lab}</div>`;
             // 1분 기록이 있으면: 세션 전체는 옅게, 실제로 쓴 구간만 진하게
             const runs = sessRuns(x).map(([ra, rb, d]) => `<i class="wl-run" style="top:${(ra - x.s) / 36e5 * RH}px;height:${Math.max(1.5, (rb - ra) / 36e5 * RH)}px;background:${d === 'ph' ? SESS_PH : SESS_PC}"></i>`).join('');
@@ -3514,7 +3543,7 @@ function sessFixOne(k, idx, n) {
     const S = stats(); S.days[k] = Math.max(0, (S.days[k] || 0) + (x.c - old)); touch(S); renderToday();
 }
 function wlGrass(weeks) {
-    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const today = wdNow(); today.setHours(0, 0, 0, 0);
     const start = new Date(today); start.setDate(start.getDate() - today.getDay() - (weeks - 1) * 7);
     const cols = []; let mon = '';
     for (let w = 0; w < weeks; w++) {
@@ -3533,7 +3562,7 @@ function wlGrass(weeks) {
 }
 function wlHeat(days) {
     const cell = Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => ({ ph: 0, pc: 0 })));
-    const today = new Date();
+    const today = wdNow();
     for (let i = 0; i < days; i++) {
         const D = new Date(today); D.setDate(D.getDate() - i);
         sessOfDay(dayKeyOfMs(D.getTime())).forEach(x => sessAddHours(x, (T, d, c) => { cell[T.getDay()][T.getHours()][d] += c; }));
@@ -3544,22 +3573,22 @@ function wlHeat(days) {
     return `<div class="wl-hm"><div class="wl-hl">${WD.map(n => `<span>${n}</span>`).join('')}</div><div><div class="wl-hh">${hrs.map(h => `<span>${h % 3 === 0 ? h + '시' : ''}</span>`).join('')}</div>${cell.map(r => `<div class="wl-hr">${hrs.map(h => { const c = r[h]; return `<i style="background:${sessCell(lv(c.ph + c.pc), c.ph >= 1, c.pc >= 1)}"></i>`; }).join('')}</div>`).join('')}</div></div>`;
 }
 function wlWeek() {
-    const today = new Date(), WD = ['일', '월', '화', '수', '목', '금', '토'], RH = 20; let cols = '', days = [], lo = 8;
-    for (let i = 6; i >= 0; i--) { const D = new Date(today); D.setDate(D.getDate() - i); const k = dayKeyOfMs(D.getTime()), list = sessOfDay(k); days.push({ D, k, list }); list.forEach(x => { lo = Math.min(lo, Math.floor(msHour(x.s))); }); } // 새벽(0~8시)은 쓴 날만 펼침
-    const H = 24 - lo;
+    const today = wdNow(), WD = ['일', '월', '화', '수', '목', '금', '토'], RH = 20; let cols = '', days = [], lo = 8, hi = 24;
+    for (let i = 6; i >= 0; i--) { const D = new Date(today); D.setDate(D.getDate() - i); const k = dayKeyOfMs(D.getTime()), list = sessOfDay(k); days.push({ D, k, list }); list.forEach(x => { lo = Math.min(lo, Math.floor(wdHour(x.s, k))); hi = Math.max(hi, Math.min(26, Math.ceil(wdHour(x.e, k)))); }); } // 새벽(0~8시)은 쓴 날만 펼침, 자정 넘어 쓴 날은 새벽 2시까지
+    const H = hi - lo;
     days.forEach(({ D, k, list }) => {
-        cols += `<div class="wl-wc" data-wlday="${k}"><b>${D.getMonth() + 1}/${D.getDate()} (${WD[D.getDay()]})</b><div class="wl-wcb" style="height:${H * RH}px">${Array.from({ length: H }, (_, j) => j).filter(j => (lo + j) % 3 === 0).map(j => `<u style="top:${j * RH}px"></u>`).join('')}${list.map(x => { const a = msHour(x.s) - lo, b = Math.max(msHour(x.e) - lo, a + 0.15); if (!x.m) return `<em style="top:${a * RH}px;height:${Math.max(4, (b - a) * RH)}px;background:${sessBg(x.segs).replace('90deg', '180deg')}"></em>`; return `<em class="wl-emm" style="top:${a * RH}px;height:${Math.max(4, (b - a) * RH)}px">${sessRuns(x).map(([ra, rb, d]) => `<i style="top:${(ra - x.s) / 36e5 * RH}px;height:${Math.max(1, (rb - ra) / 36e5 * RH)}px;background:${d === 'ph' ? SESS_PH : SESS_PC}"></i>`).join('')}</em>`; }).join('')}</div><span>${list.length ? `${list.length}세션<br>+${fmt(list.reduce((a, x) => a + x.c, 0))}자` : (stats().days[k] ? `+${fmt(stats().days[k])}자` : '쉼')}</span></div>`;
+        cols += `<div class="wl-wc" data-wlday="${k}"><b>${D.getMonth() + 1}/${D.getDate()} (${WD[D.getDay()]})</b><div class="wl-wcb" style="height:${H * RH}px">${Array.from({ length: H }, (_, j) => j).filter(j => (lo + j) % 3 === 0).map(j => `<u style="top:${j * RH}px"></u>`).join('')}${list.map(x => { const a = wdHour(x.s, k) - lo, b = Math.max(wdHour(x.e, k) - lo, a + 0.15); if (!x.m) return `<em style="top:${a * RH}px;height:${Math.max(4, (b - a) * RH)}px;background:${sessBg(x.segs).replace('90deg', '180deg')}"></em>`; return `<em class="wl-emm" style="top:${a * RH}px;height:${Math.max(4, (b - a) * RH)}px">${sessRuns(x).map(([ra, rb, d]) => `<i style="top:${(ra - x.s) / 36e5 * RH}px;height:${Math.max(1, (rb - ra) / 36e5 * RH)}px;background:${d === 'ph' ? SESS_PH : SESS_PC}"></i>`).join('')}</em>`; }).join('')}</div><span>${list.length ? `${list.length}세션<br>+${fmt(list.reduce((a, x) => a + x.c, 0))}자` : (stats().days[k] ? `+${fmt(stats().days[k])}자` : '쉼')}</span></div>`;
     });
     return `<div class="wl-wk"><div class="wl-wa">${Array.from({ length: H + 1 }, (_, j) => j).filter(j => (lo + j) % 3 === 0).map(j => `<span style="top:${j * RH + 18}px">${lo + j}시</span>`).join('')}</div>${cols}</div>`;
 }
 function wlDist(days) {
-    const cnt = [0, 0, 0, 0, 0], today = new Date();
+    const cnt = [0, 0, 0, 0, 0], today = wdNow();
     for (let i = 0; i < days; i++) { const D = new Date(today); D.setDate(D.getDate() - i); const n = sessOfDay(dayKeyOfMs(D.getTime())).length; cnt[Math.min(4, n)]++; }
     const mx = Math.max(1, ...cnt);
     return `<div class="wl-ds">${cnt.map((n, k) => `<div class="wl-dc"><div class="wl-db" style="height:${n / mx * 70 + 4}px"></div><b>${n}일</b><span>${k === 0 ? '쉼' : k === 4 ? '4+세션' : k + '세션'}</span></div>`).join('')}</div>`;
 }
 function wlTop() {
-    const today = new Date(); let sess = 0, act = 0; const byHour = Array(24).fill(0);
+    const today = wdNow(); let sess = 0, act = 0; const byHour = Array(24).fill(0);
     for (let i = 0; i < 91; i++) { const D = new Date(today); D.setDate(D.getDate() - i); const L = sessOfDay(dayKeyOfMs(D.getTime())); if (i < 7) { sess += L.length; if (L.length) act++; } L.forEach(x => x.segs.forEach(g => { byHour[new Date(g.a).getHours()] += g.c; })); }
     const todayL = sessOfDay(todayKey()), tc = todayL.reduce((a, x) => a + x.c, 0), mx = Math.max(...byHour), bh = mx > 0 ? byHour.indexOf(mx) : -1;
     return `<div class="wl-top"><div><small>오늘</small><b>${todayL.length} 세션 · +${fmt(tc)}자</b></div><div><small>이번 주 평균</small><b>${act ? '하루 ' + (sess / act).toFixed(1) + ' 세션' : '—'}</b></div><div><small>가장 많이 쓰는 시간</small><b>${bh < 0 ? '—' : `${bh}~${bh + 1}시`}</b></div></div>`;
@@ -3571,7 +3600,8 @@ const rpMin = m => `${Math.floor(m / 60) ? Math.floor(m / 60) + '시간 ' : ''}$
 const rpDayKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 function rpAllSessions() {
     const out = [];
-    Object.values(items).forEach(h => { if (h && h.kind === 'sessday' && live(h)) { if (!h.u) sessUnitFix(h); (h.list || []).forEach(x => { if (x && x.s) out.push(x); }); } });
+    Object.values(items).filter(h => h && h.kind === 'sessday' && live(h)).forEach(h => { if (!h.u) sessUnitFix(h); if (!h.dc) sessCutFix(h); });
+    Object.values(items).forEach(h => { if (h && h.kind === 'sessday' && live(h)) (h.list || []).forEach(x => { if (x && x.s) out.push(x); }); });
     return out.sort((a, b) => a.s - b.s);
 }
 function rpWorkInfo() {
@@ -3583,7 +3613,7 @@ function rpWorkInfo() {
 }
 // 기록 전체를 한 번에 모은 숫자들 (txt 와 분석이 같이 씀)
 function rpCollect() {
-    const S = stats().days || {}, sess = rpAllSessions(), today = new Date(); today.setHours(0, 0, 0, 0);
+    const S = stats().days || {}, sess = rpAllSessions(), today = wdNow(); today.setHours(0, 0, 0, 0);
     const dayKeys = Object.keys(S).filter(k => (S[k] || 0) > 0).sort();
     const at = n => { const d = new Date(today); d.setDate(d.getDate() - n); return S[rpDayKey(d)] || 0; };
     let streak = 0; for (let i = at(0) > 0 ? 0 : 1; i < 400 && at(i) > 0; i++) streak++;
@@ -3600,7 +3630,7 @@ function rpCollect() {
     // 요일별은 하루 글자 기록(더 오래 쌓임)도 같이 본다
     const wdDays = Array(7).fill(0), wdChars = Array(7).fill(0);
     dayKeys.forEach(k => { const g = new Date(k + 'T00:00:00').getDay(); wdDays[g]++; wdChars[g] += S[k]; });
-    const sessDays = new Set(sess.map(x => rpDayKey(new Date(x.s)))).size;
+    const sessDays = new Set(sess.map(x => wdKey(x.s))).size;
     const totAct = sess.reduce((a, x) => a + act(x), 0), totSessC = sess.reduce((a, x) => a + (x.c || 0), 0);
     const recentWorks = {};
     const cut = Date.now() - 30 * 864e5;
@@ -3647,7 +3677,7 @@ function rpExportAll() {
     if (!R.sess.length) L.push('(없음)');
     if (R.sess.some(x => !x.m)) L.push("(1분 단위 기록이 생기기 전 세션은 '실제로 쓴 시간'을 세션 전체 시간으로 셌어요)");
     const byDay = {};
-    R.sess.forEach(x => { (byDay[rpDayKey(new Date(x.s))] ??= []).push(x); });
+    R.sess.forEach(x => { (byDay[wdKey(x.s)] ??= []).push(x); });
     Object.keys(byDay).sort().forEach(k => {
         const list = byDay[k], c = list.reduce((a, x) => a + (x.c || 0), 0), am = list.reduce((a, x) => a + R.act(x), 0);
         L.push(`- ${k} (${RP_WD[new Date(k + 'T00:00:00').getDay()]}) · 세션 ${list.length}번 · 실제로 쓴 시간 ${rpMin(am)} · +${fmt(c)}자`);
@@ -3709,7 +3739,7 @@ function rpGoalStats(keys) {
         inAvgPerDay: wroteKeys.length ? wroteKeys.reduce((a, k) => a + (inDay[k] || 0), 0) / wroteKeys.length : 0,
     };
 }
-const rpLastKeys = n => { const t = new Date(); t.setHours(0, 0, 0, 0); return Array.from({ length: n }, (_, i) => { const d = new Date(t); d.setDate(d.getDate() - n + i); return rpDayKey(d); }); };   // 오늘 빼고 최근 n일
+const rpLastKeys = n => { const t = wdNow(); t.setHours(0, 0, 0, 0); return Array.from({ length: n }, (_, i) => { const d = new Date(t); d.setDate(d.getDate() - n + i); return rpDayKey(d); }); };   // 오늘 빼고 최근 n일
 // 목표 기준 조언
 function rpGoalTips(Q) {
     const G = Q.G, T = [];
@@ -3898,7 +3928,7 @@ function wkTips(D, P) {
 }
 function wkHTML(mon, back) {
     const D = wkData(mon), pm = new Date(mon); pm.setDate(pm.getDate() - 7);
-    const P = wkData(pm), cur = wkMonday(new Date()), last = new Date(cur); last.setDate(last.getDate() - 7);
+    const P = wkData(pm), cur = wkMonday(wdNow()), last = new Date(cur); last.setDate(last.getDate() - 7);
     const end = new Date(mon); end.setDate(end.getDate() + 6);
     const md = d => `${d.getMonth() + 1}/${d.getDate()}`;
     const name = +mon === +cur ? '이번 주 (진행 중)' : +mon === +last ? '지난주' : `${mon.getMonth() + 1}월 ${mon.getDate()}일 주`;
@@ -3921,7 +3951,7 @@ function wkHTML(mon, back) {
         <p class="modal-note" style="margin:0">한 주를 처음 열 때 지난주 요약이 자동으로 떠요. 설정 › 기타에서 끌 수 있어요.</p></div>`;
 }
 function openWeekSummary(mon, back) {   // back: 집필 기록 창에서 왔으면 '← 집필 기록' 버튼
-    let m = mon || (() => { const x = wkMonday(new Date()); x.setDate(x.getDate() - 7); return x; })();
+    let m = mon || (() => { const x = wkMonday(wdNow()); x.setDate(x.getDate() - 7); return x; })();
     const bg = document.createElement('div'); bg.className = 'modal-bg';
     const draw = () => { bg.innerHTML = wkHTML(m, back); };
     draw(); document.body.appendChild(bg);
@@ -3935,7 +3965,7 @@ function openWeekSummary(mon, back) {   // back: 집필 기록 창에서 왔으�
 let wkTried = 0;
 function weekSummaryMaybe() {
     if (settings().weekSummary === false) return;
-    const cur = wkMonday(new Date()), key = rpDayKey(cur);
+    const cur = wkMonday(wdNow()), key = rpDayKey(cur);
     if (pref.weekShown === key) return;
     // 클라우드에서 기록을 받는 중이거나 다른 창이 떠 있으면 조금 뒤에
     if ((cloud.col && cloud.state === 'loading') || $('.modal-bg')) { if (++wkTried < 12) setTimeout(weekSummaryMaybe, 5000); return; }
@@ -11422,11 +11452,11 @@ const HH_SCENES = {
 // 지금 테마에 맞는 일러스트 (없으면 기본 창가 책상)
 const hhScene = () => { const c = document.body.classList; return c.contains('th-label') ? HH_SCENES.label : (c.contains('th-polaroid') || c.contains('cozy')) ? HH_SCENES.polaroid : c.contains('th-airmail') ? HH_SCENES.airmail : c.contains('th-fountain') ? HH_SCENES.fountain : HH_SCENE; };
 function homeHero(list) {
-    const days = stats().days || {}, d0 = new Date(), key = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const days = stats().days || {}, d0 = wdNow(), key = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const at = n => { const d = new Date(d0); d.setDate(d.getDate() - n); return days[key(d)] || 0; };
     const today = at(0); let week = 0; for (let i = 0; i < 7; i++) week += Math.max(0, at(i));
     let streak = 0; for (let i = today > 0 ? 0 : 1; i < 400 && at(i) > 0; i++) streak++;
-    const h = d0.getHours(), hi = h < 5 ? '아직 깨어 있네요' : h < 12 ? '좋은 아침이에요' : h < 18 ? '좋은 오후예요' : '오늘도 수고했어요';
+    const h = new Date().getHours(), hi = h < 5 ? '아직 깨어 있네요' : h < 12 ? '좋은 아침이에요' : h < 18 ? '좋은 오후예요' : '오늘도 수고했어요';
     // 이어서 쓰기: 홈 카드 끌어서 정한 순서와 상관없이, 가장 최근에 원고를 고친 (완고 아닌) 작품
     const lastEp = wid => Object.values(items).reduce((m, it) => (it.kind === 'episode' && it.workId === wid && live(it) && !inTrash(it) && !isRefDoc(it) && it.rev > m) ? it.rev : m, 0);
     const pool = list.filter(x => !x.w.done), last = (pool.length ? pool : list).map(x => [x, lastEp(x.w.id)]).sort((a, b) => b[1] - a[1])[0]?.[0] || list[0];

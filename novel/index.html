@@ -1588,7 +1588,7 @@ body .home .wgrid .wcard.icard:not(.pol):not([style*="--gc:#"]) { --lb: #f5f4f1;
 .wl-card h3 { margin: 0 0 4px; font-size: 15px; }
 .wl-dh { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; } .wl-dh h3 { margin: 0; }
 .wl-tag { background: #ffe9a8; color: #7a5e16; font-size: 11px; padding: 2px 9px; border-radius: 99px; font-weight: 700; }
-.wl-nv { width: 28px; height: 28px; border-radius: 50%; background: var(--panel2); font-size: 17px; line-height: 1; } .wl-nv:disabled { opacity: .35; }
+.wl-nv { width: 28px; height: 28px; border-radius: 50%; background: var(--panel2); font-size: 17px; line-height: 1; } .wl-fix { font-size: 12px; padding: 4px 10px; white-space: nowrap; } .wl-nv:disabled { opacity: .35; }
 .wl-sub { color: var(--muted); font-size: 12px; margin: 6px 0 4px; }
 .wl-empty { color: var(--muted); font-size: 13px; padding: 12px 2px; }
 .wl-kr { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; } .wl-kr > div { min-width: 90px; }
@@ -3259,11 +3259,14 @@ function onEditorInput(ed) {
     const now = countChars(editorText(ed)).noSpace;
     const before = lastCount.has(it.id) ? lastCount.get(it.id) : docCountBefore(it, now);
     lastCount.set(it.id, now);
-    if (now > before && !isRefDoc(it)) {
-        const S = stats(); const k = todayKey();
-        S.days[k] = (S.days[k] || 0) + (now - before);
-        pruneStats(S); touch(S); renderToday();
-        try { sessRecord(it, now - before); } catch (e) { console.error(e); }
+    if (now !== before && !isRefDoc(it)) {
+        const gain = netGain(it, now - before);
+        if (gain > 0) {
+            const S = stats(); const k = todayKey();
+            S.days[k] = (S.days[k] || 0) + gain;
+            pruneStats(S); touch(S); renderToday();
+            try { sessRecord(it, gain); } catch (e) { console.error(e); }
+        }
     }
     // 같은 문서가 다른 분할 창/참고창에도 열려 있으면 함께 갱신
     $$(`.manuscript[data-id="${it.id}"]`).forEach(o => { if (o !== ed) { o.innerHTML = it.body; fillImages(o); decorateFolds(o); } });
@@ -3274,6 +3277,18 @@ function onEditorInput(ed) {
     schedulePageViews(it.id);
     scheduleLiveSpell();
     scheduleAiAuto();
+}
+/* 오늘 늘어난 글자 = 작품마다 오늘 글자 변화(늘면 +, 지우면 −)를 더한 값이 '오늘 최고점'을 넘은 만큼만.
+   예전엔 늘어난 것만 더해서, 지웠다가 다시 붙여 넣거나 잘라서 다른 회차로 옮기면 그만큼이 또 '쓴 글자'로 잡혔음 (2026-11-21) */
+function netGain(doc, d) {
+    const S = stats(), k = todayKey();
+    if (!S.net || S.net.day !== k) S.net = { day: k, w: {} };
+    const o = (S.net.w[doc.workId || '_'] ??= { n: 0, p: 0 });
+    o.n += d;
+    const g = Math.max(0, o.n - o.p);
+    if (o.n > o.p) o.p = o.n;
+    if (g <= 0) touch(S);
+    return g;
 }
 function docCountBefore(it, fallback) { const c = countCache.get(it.id); return c ? c.v.noSpace : fallback; }
 
@@ -3369,7 +3384,7 @@ function wlDayCard(k) {
     const list = sessOfDay(k), D = new Date(k + 'T00:00:00'), WD = ['일', '월', '화', '수', '목', '금', '토'];
     const isToday = k === todayKey();
     const tot = list.reduce((a, x) => a + x.c, 0), mins = list.reduce((a, x) => a + sessActMin(x), 0), spanMins = list.reduce((a, x) => a + sessSpanMin(x), 0);
-    let h = `<div class="wl-card"><div class="wl-dh"><h3>${isToday ? '오늘의 하루' : '하루 보기'}</h3><span class="wl-tag">${D.getMonth() + 1}월 ${D.getDate()}일 (${WD[D.getDay()]})</span><span style="flex:1"></span><button class="wl-nv" data-wl="prev">‹</button><button class="wl-nv" data-wl="next" ${isToday ? 'disabled' : ''}>›</button></div>`;
+    let h = `<div class="wl-card"><div class="wl-dh"><h3>${isToday ? '오늘의 하루' : '하루 보기'}</h3><span class="wl-tag">${D.getMonth() + 1}월 ${D.getDate()}일 (${WD[D.getDay()]})</span><span style="flex:1"></span><button class="btn wl-fix" data-wl="fix" title="붙여 넣기 등으로 부풀려진 이 날의 글자 수를 실제 숫자로 고쳐요">숫자 바로잡기</button><button class="wl-nv" data-wl="prev">‹</button><button class="wl-nv" data-wl="next" ${isToday ? 'disabled' : ''}>›</button></div>`;
     const dayTot = stats().days[k] || 0;
     if (!list.length) return h + `<div class="wl-empty">${dayTot ? `이 날은 ${fmt(dayTot)}자를 썼어요. (시간 기록은 이 기능을 켠 뒤부터 남아요)` : '이 날은 쓴 기록이 없어요.'}</div></div>`;
     h += `<div class="wl-kr"><div><small>세션</small><b>${list.length}번</b></div><div><small>실제로 쓴 시간</small><b>${minTxt(mins)}</b>${spanMins > mins ? `<small>세션 ${minTxt(spanMins)} 중</small>` : ''}</div><div><small>늘어난 글자</small><b>+${fmt(tot)}자</b></div><div><small>시간당</small><b>${mins ? fmt(Math.round(tot / (mins / 60))) : 0}자</b></div><div><small>첫 시작~마지막</small><b>${hm(list[0].s)}~${hm(list[list.length - 1].e)}</b></div></div>`;
@@ -3395,6 +3410,24 @@ function wlDayCard(k) {
     const byW = {}; list.forEach(x => Object.entries(x.w).forEach(([wk, W]) => { const o = (byW[wk] ??= { c: 0, n: 0 }); o.c += W.c; o.n++; }));
     h += `<div class="wl-sub" style="margin-top:14px">작품별로 쓴 글자</div><div class="wl-ep">${Object.entries(byW).sort((a, b) => b[1].c - a[1].c).map(([wk, o]) => `<span>${wkTitle(wk)} <small>세션 ${o.n}번</small> <b>+${fmt(o.c)}자</b></span>`).join('')}</div>`;
     return h + '</div>';
+}
+// 하루 기록 바로잡기: 그날 세션 글자들을 비율대로 줄이고(또는 늘리고) 하루 글자도 그 숫자로
+function sessFixDay(k, v) {
+    const host = sessHost(k, false), list = host ? host.list : [];
+    const tot = list.reduce((a, x) => a + Math.max(0, x.c || 0), 0);
+    if (tot > 0) {
+        const r = v / tot, sc = c => Math.round((Number(c) || 0) * r);
+        list.forEach(x => {
+            x.c = sc(x.c);
+            (x.segs || []).forEach(g => { g.c = sc(g.c); });
+            if (x.m) Object.keys(x.m).forEach(i => { x.m[i] = sc(x.m[i]); if (!x.m[i]) delete x.m[i]; });
+            Object.values(x.w || {}).forEach(W => { W.c = sc(W.c); Object.keys(W.e || {}).forEach(e => { W.e[e] = sc(W.e[e]); }); });
+        });
+        const diff = v - list.reduce((a, x) => a + x.c, 0);   // 반올림 차이는 가장 큰 세션에
+        if (diff && list.length) { const big = list.reduce((m, x) => x.c > m.c ? x : m, list[0]); big.c += diff; const W = Object.values(big.w || {})[0]; if (W) W.c += diff; }
+        touch(host);
+    }
+    const S = stats(); S.days[k] = v; touch(S); renderToday();
 }
 function wlGrass(weeks) {
     const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -3858,6 +3891,16 @@ function openWriteLog(k) {
         if (e.target.closest('[data-wl="antxt"]')) { rpAnalysisText(); return; }
         if (e.target.closest('[data-wl="an"]')) { mode = 'an'; draw(); $('.wl-modal', bg).scrollTop = 0; return; }
         if (e.target.closest('[data-wl="back"]')) { mode = 'log'; draw(); $('.wl-modal', bg).scrollTop = 0; return; }
+        if (e.target.closest('[data-wl="fix"]')) {
+            const k = wlDay || todayKey(), cur = sessOfDay(k).reduce((a, x) => a + Math.max(0, x.c || 0), 0) || stats().days[k] || 0;
+            ask(`${k} 실제로 늘어난 글자 수 (공백 제외) — 지금 ${fmt(cur)}자로 잡혀 있어요. 시간대별 글자는 비율대로 줄여요.`, String(cur), 'number').then(v => {
+                if (v == null || v === '') return;
+                const n = Math.round(Number(String(v).replace(/[,\s]/g, '')));
+                if (!(n >= 0)) { toast('숫자로 적어 주세요.'); return; }
+                sessFixDay(k, n); draw(); toast(`${k} 기록을 ${fmt(n)}자로 고쳤어요.`);
+            });
+            return;
+        }
         const nv = e.target.closest('[data-wl="prev"],[data-wl="next"]');
         if (nv && !nv.disabled) { const D = new Date(wlDay + 'T00:00:00'); D.setDate(D.getDate() + (nv.dataset.wl === 'prev' ? -1 : 1)); wlDay = dayKeyOfMs(D.getTime()); draw(); $('.wl-modal', bg).scrollTop = 0; return; }
         const tb = e.target.closest('[data-wltab]'); if (tb) { wlTab = tb.dataset.wltab; draw(); $('.wl-modal', bg).scrollTop = 0; return; }

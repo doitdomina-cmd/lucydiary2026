@@ -9118,6 +9118,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                 <button data-nrange="month" onclick="novelImportLoad('month')" class="novel-range-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold border border-slate-200 transition-all">이번 달 전체</button>
             </div>
             <div id="novel-import-body" class="text-sm"></div>
+            <label class="flex items-start gap-2 mt-3 text-xs text-slate-500 cursor-pointer select-none"><input type="checkbox" id="novel-import-overwrite" onchange="if (novelImportState && novelImportState.done) novelImportLoad(novelImportState.range)" class="mt-0.5 w-3.5 h-3.5 cursor-pointer" style="accent-color:var(--primary)"> <span><b class="text-slate-600">이미 적힌 칸도 바꾸기</b> — 작업실 기록이 있는 시간에 직접 적은 숫자가 있으면 작업실 기록으로 바꿔요 (원래 숫자는 지워져요)</span></label>
             <button id="novel-import-go" onclick="novelImportApply()" class="w-full mt-4 py-2.5 rounded-xl text-sm font-bold text-white transition-all" style="background:var(--primary)">가져오기</button>
         </div>
     </div>
@@ -30604,6 +30605,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             if (!writerDailyData[ds].works[storageKey].hours[h]) writerDailyData[ds].works[storageKey].hours[h] = { prev:'', now:'', diff:0 };
             const hData = writerDailyData[ds].works[storageKey].hours[h];
             hData[field] = val;
+            delete hData.src;   // 미니창에서 고쳐도 '직접 적은 칸'
             const prev = parseFloat(hData.prev) || 0, now = parseFloat(hData.now) || 0;
             hData.diff = (hData.prev !== '' && hData.now !== '') ? Math.max(0, now - prev) : 0;
             syncWriteCompletionFromDaily(ds, storageKey);
@@ -30871,6 +30873,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
         }
 
         function openNovelImportModal() {
+            const ow = document.getElementById('novel-import-overwrite'); if (ow) ow.checked = false;
             document.getElementById('novel-import-modal').classList.add('open');
             novelImportLoad('day');
         }
@@ -30889,6 +30892,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             else { from = to = writerGetYYYYMMDD(base); }
             const label = range === 'month' ? `${base.getFullYear()}년 ${base.getMonth() + 1}월` : writerGetKoreanDate(base);
             novelImportState = null;
+            go.textContent = '가져오기';
             go.disabled = true; go.style.opacity = '.5';
             body.innerHTML = `<div class="py-6 text-center text-slate-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-1"></i> ${label} 작업실 기록을 불러오는 중…</div>`;
             let res;
@@ -30942,8 +30946,12 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                     if (prevDay && activeVolumeOn(marks, prevDay) !== activeVolumeOn(marks, ds)) pos = 0;   // 새 권은 0자부터
                 }
             } catch (e) {}
+            let first = true;
             WRITER_HOURS_SCAN.forEach(h => {
                 const c = wd.hours[h]; if (!c) return;
+                // 그날 맨 앞 칸이 가져온 칸이고, 바꾸기 전에 직접 적어 둔 시작 위치가 있으면 거기서부터
+                if (first && c.src === NOVEL_SRC && typeof wd.novelBase === 'number') pos = wd.novelBase;
+                first = false;
                 if (c.src === NOVEL_SRC) { c.prev = pos; c.now = pos + (Number(c.diff) || 0); }
                 const nv = parseFloat(c.now);
                 if (c.now !== '' && !isNaN(nv)) pos = nv;
@@ -30952,6 +30960,8 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
 
         function novelImportApply() {
             const st = novelImportState; if (!st) return;
+            if (st.done) { closeNovelImportModal(); return; }   // 결과를 본 뒤 '닫기'
+            const overwrite = !!document.getElementById('novel-import-overwrite')?.checked;
             const map = {};
             document.querySelectorAll('#novel-import-body select[data-nwid]').forEach(sel => {
                 const wid = sel.dataset.nwid, val = sel.value, auto = sel.dataset.auto;
@@ -30962,6 +30972,8 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             for (let d = st.from; d <= st.to; d = novelShiftDay(d, 1)) dates.push(d);
             let filled = 0, skipped = 0;
             const touched = new Set();
+            const report = {};   // 정산 작품 키 → { fill:[[날짜,시,글자]], skip:[[날짜,시,글자]] }
+            const rep = key => (report[key] ??= { fill: [], skip: [] });
             dates.forEach(ds => {
                 const keys = new Set();
                 // 1) 전에 가져온 칸은 지운다 (작업실에서 지웠거나 연결을 바꾼 경우까지 맞추려고)
@@ -30978,9 +30990,15 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                     Object.entries(hours).forEach(([slot, n]) => {
                         const cur = wd.hours[slot];
                         const manual = cur && cur.src !== NOVEL_SRC && ((cur.now !== '' && cur.now != null) || (cur.prev !== '' && cur.prev != null));
-                        if (manual) { skipped += n; return; }
+                        if (manual && !overwrite) { skipped += n; rep(key).skip.push([ds, slot, n]); return; }
+                        // 직접 적은 칸을 바꿀 때: 그날 시작 원고 위치(맨 앞 칸의 '이전')는 잃지 않게 따로 기억
+                        if (manual) {
+                            const firstH = WRITER_HOURS_SCAN.find(x => wd.hours[x] && (wd.hours[x].prev !== '' || wd.hours[x].now !== ''));
+                            const fp = parseFloat(wd.hours[firstH]?.prev);
+                            if (String(firstH) === String(slot) && !isNaN(fp) && wd.novelBase == null) wd.novelBase = fp;
+                        }
                         wd.hours[slot] = { prev: 0, now: n, diff: n, src: NOVEL_SRC };
-                        filled += n;
+                        filled += n; rep(key).fill.push([ds, slot, n]);
                     });
                     keys.add(key);
                 });
@@ -30990,12 +31008,31 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             writerPositionCache = {};
             touched.forEach(t => { const [ds, key] = t.split('\n'); try { syncWriteCompletionFromDaily(ds, key); } catch (e) {} });
             save();
-            closeNovelImportModal();
+            // 가져온 작품을 표에 바로 보여 준다 (다른 작품이 선택돼 있으면 바뀐 게 안 보이므로)
+            const firstKey = Object.keys(report).find(k => report[k].fill.length) || Object.keys(report)[0];
+            if (firstKey) writerJumpToWorkKey = firstKey;
             try { writerRenderDaily(); } catch (e) {}
             try { writerRenderCalendar(); } catch (e) {}
             try { if (document.getElementById('tab-write')?.classList.contains('active')) renderWriteCalendar(); } catch (e) {}
-            const msg = `작업실 기록 ${filled.toLocaleString()}자를 채웠어요.` + (skipped ? ` (직접 적은 칸과 겹친 ${skipped.toLocaleString()}자는 건너뛰었어요)` : '');
-            try { meShowToast(msg); } catch (e) { alert(msg); }
+            // 결과를 창에 남긴다 (금방 사라지는 알림만으로는 무엇이 됐는지 알기 어려움)
+            const items = novelTargetItems();
+            const nameOf = k => (items.find(it => it.id === k) || {}).displayTitle || (masterWorks.find(w => w.id === k) || {}).title || k;
+            const multiDay = st.from !== st.to;
+            const cellTxt = ([ds, h, n]) => `${multiDay ? ds.slice(5).replace('-', '/') + ' ' : ''}${h}시 +${Number(n).toLocaleString()}`;
+            const lines = Object.entries(report).map(([k, r]) => {
+                const f = r.fill.reduce((a, x) => a + x[2], 0), sk = r.skip.reduce((a, x) => a + x[2], 0);
+                return `<div class="py-2 border-b border-slate-100">
+                    <div class="font-bold text-slate-700">${novelEsc(nameOf(k))} <span class="font-normal text-slate-500">· ${f.toLocaleString()}자 채움</span></div>
+                    ${r.fill.length ? `<div class="text-[11px] text-slate-500 mt-0.5">${r.fill.map(cellTxt).join(' · ')}</div>` : ''}
+                    ${r.skip.length ? `<div class="text-[11px] mt-0.5" style="color:#e11d48">이미 숫자가 적힌 칸이라 건너뜀: ${r.skip.map(cellTxt).join(' · ')} (${sk.toLocaleString()}자)</div>` : ''}
+                </div>`;
+            }).join('');
+            st.done = true;
+            const body = document.getElementById('novel-import-body');
+            if (body) body.innerHTML = `<div class="text-sm font-bold text-slate-700 mb-1"><i class="fa-solid fa-check" style="color:var(--primary)"></i> 작업실 기록 ${filled.toLocaleString()}자를 채웠어요</div>
+                ${skipped ? `<div class="text-[11px] text-slate-500 mb-1">직접 적은 칸과 겹친 ${skipped.toLocaleString()}자는 건너뛰었어요. 그 칸도 바꾸려면 아래 '이미 적힌 칸도 바꾸기'를 켜고 다시 가져오세요.</div>` : ''}
+                ${lines || '<div class="py-3 text-xs text-slate-400">연결한 작품이 없어서 채운 칸이 없어요.</div>'}`;
+            const go = document.getElementById('novel-import-go'); if (go) go.textContent = '닫기';
         }
 
         function writerUpdateDailyStats(updateChart = true) {

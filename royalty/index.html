@@ -29269,12 +29269,56 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                     if (old.workId !== workId) { delete taskSchedules[dateStr][idx].isAutoManuscript; delete taskSchedules[dateStr][idx].extraId; }
                 }
             } else {
+                // 같은 작품의 '완고 입고'가 이미 다른 날에 있으면: 그걸 이 날로 옮길지 묻는다 (작품 정보의 완고 입고일도 같이 바뀜)
+                const olds = category === '완고 입고' && workId ? Object.entries(taskSchedules).flatMap(([d, list]) => d === dateStr ? [] : (list || []).filter(t => t.workId === workId && t.category === '완고 입고').map(t => ({ d, t }))) : [];
+                if (olds.length) {
+                    if (!taskSchedules[dateStr].length) delete taskSchedules[dateStr];
+                    askManuscriptMoveChoice(workId, olds, dateStr).then(ch => {
+                        if (ch == null) return;   // 취소: 창은 그대로
+                        if (!taskSchedules[dateStr]) taskSchedules[dateStr] = [];
+                        if (ch === 'both') taskSchedules[dateStr].push({ id: 'ts_' + Date.now() + Math.floor(Math.random()*1000), date: dateStr, workId, category, memo, isCompleted });
+                        else {
+                            const o = olds[ch]; const list = taskSchedules[o.d] || [];
+                            const i = list.indexOf(o.t); if (i > -1) list.splice(i, 1);
+                            if (!list.length) delete taskSchedules[o.d];
+                            o.t.date = dateStr; if (memo.trim()) o.t.memo = memo; o.t.isCompleted = isCompleted;
+                            taskSchedules[dateStr].push(o.t);
+                            syncManuscriptDateFromTask(o.t);
+                        }
+                        save(); closeTaskModal(); renderTaskCalendar();
+                    });
+                    return;
+                }
                 taskSchedules[dateStr].push({
                     id: 'ts_' + Date.now() + Math.floor(Math.random()*1000), date: dateStr, workId, category, memo, isCompleted
                 });
             }
 
             save(); closeTaskModal(); renderTaskCalendar();
+        }
+        // 완고 입고가 이미 있을 때 선택창: 옮길 카드의 번호(olds 안 순서) / 'both'(둘 다 두기) / null(취소)
+        function askManuscriptMoveChoice(workId, olds, newDate) {
+            return new Promise(resolve => {
+                const w = masterWorks.find(x => x.id === workId) || {};
+                const md = d => { const [, m, dd] = String(d).split('-'); return `${Number(m)}월 ${Number(dd)}일`; };
+                const esc = t => String(t ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+                const exName = t => { if (!t.extraId) return ''; const ex = (w.extras || []).find(e => e.id === t.extraId); return ex ? ` (${esc(ex.title || '외전')})` : ' (외전)'; };
+                const ov = document.createElement('div');
+                ov.style.cssText = 'position:fixed;inset:0;background:rgba(30,25,20,.45);z-index:100000;display:flex;align-items:center;justify-content:center;padding:16px;';
+                const box = document.createElement('div');
+                box.style.cssText = 'background:#fffdf7;border-radius:14px;max-width:380px;width:100%;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.25);font-family:inherit;color:#3b342c;';
+                box.innerHTML = `<div style="font-weight:800;font-size:15px;margin-bottom:6px;">'${esc(w.title || '작품')}' 완고 입고</div>
+                    <div style="font-size:13px;color:#6b6258;margin-bottom:14px;">원래 <b>${olds.map(o => md(o.d) + exName(o.t)).join(', ')}</b>에 완고 입고가 있어요. <b>${md(newDate)}</b>로 옮기시겠어요?</div>
+                    ${olds.map((o, i) => `<button data-c="${i}" style="display:block;width:100%;text-align:left;padding:11px 13px;margin-bottom:8px;border-radius:10px;border:1.5px solid #d9cfb8;background:#fff8e1;cursor:pointer;font-size:13px;line-height:1.45;"><b>${md(o.d)}${exName(o.t)} → ${md(newDate)}로 옮기기</b><br><span style="color:#8a7f70;font-size:12px;">${o.t.isAutoManuscript ? '작품 정보의 완고 입고일도 같이 바뀌어요.' : '원래 날짜의 카드는 없어져요.'}</span></button>`).join('')}
+                    <button data-c="both" style="display:block;width:100%;text-align:left;padding:11px 13px;margin-bottom:8px;border-radius:10px;border:1.5px solid #ddd6c8;background:#fff;cursor:pointer;font-size:13px;line-height:1.45;"><b>옮기지 않고 하나 더 만들기</b><br><span style="color:#8a7f70;font-size:12px;">두 날짜에 모두 완고 입고가 있어요.</span></button>
+                    <button data-c="cancel" style="display:block;width:100%;padding:10px;border-radius:10px;border:1.5px solid #ddd6c8;background:#fff;cursor:pointer;font-size:13px;font-weight:700;">취소</button>`;
+                const done = v => { document.removeEventListener('keydown', onKey, true); ov.remove(); resolve(v); };
+                const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); done(null); } };
+                box.querySelectorAll('button').forEach(b => b.onclick = () => done(b.dataset.c === 'cancel' ? null : b.dataset.c === 'both' ? 'both' : Number(b.dataset.c)));
+                ov.addEventListener('click', e => { if (e.target === ov) done(null); });
+                document.addEventListener('keydown', onKey, true);
+                ov.appendChild(box); document.body.appendChild(ov);
+            });
         }
 
         function deleteTaskSchedule() {

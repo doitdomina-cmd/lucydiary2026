@@ -9116,6 +9116,13 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             <div class="flex gap-2 mb-3">
                 <button data-nrange="day" onclick="novelImportLoad('day')" class="novel-range-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold border border-slate-200 transition-all">보고 있는 날</button>
                 <button data-nrange="month" onclick="novelImportLoad('month')" class="novel-range-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold border border-slate-200 transition-all">이번 달 전체</button>
+                <button data-nrange="range" onclick="novelImportPickRange()" class="novel-range-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold border border-slate-200 transition-all">기간 선택</button>
+            </div>
+            <div id="novel-range-row" class="hidden flex items-center gap-2 mb-3 flex-wrap">
+                <input type="date" id="novel-range-from" class="flex-1 min-w-[130px] px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none">
+                <span class="text-xs text-slate-400">~</span>
+                <input type="date" id="novel-range-to" class="flex-1 min-w-[130px] px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none">
+                <button onclick="novelImportLoad('range')" class="shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold text-white" style="background:var(--primary)">불러오기</button>
             </div>
             <div id="novel-import-body" class="text-sm"></div>
             <label class="flex items-start gap-2 mt-3 text-xs text-slate-500 cursor-pointer select-none"><input type="checkbox" id="novel-import-overwrite" onchange="if (novelImportState && novelImportState.done) novelImportLoad(novelImportState.range)" class="mt-0.5 w-3.5 h-3.5 cursor-pointer" style="accent-color:var(--primary)"> <span><b class="text-slate-600">이미 적힌 칸도 바꾸기</b> — 작업실 기록이 있는 시간에 직접 적은 숫자가 있으면 작업실 기록으로 바꿔요 (원래 숫자는 지워져요)</span></label>
@@ -30886,18 +30893,40 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
         }
         function closeNovelImportModal() { document.getElementById('novel-import-modal').classList.remove('open'); novelImportState = null; }
 
-        async function novelImportLoad(range) {
-            const body = document.getElementById('novel-import-body');
-            const go = document.getElementById('novel-import-go');
+        function novelMarkRangeBtn(range) {
             document.querySelectorAll('#novel-import-modal .novel-range-btn').forEach(b => {
                 const on = b.dataset.nrange === range;
                 b.style.background = on ? 'var(--primary)' : ''; b.style.color = on ? '#fff' : ''; b.classList.toggle('vt-off', !on);
             });
+            document.getElementById('novel-range-row')?.classList.toggle('hidden', range !== 'range');
+        }
+        // '기간 선택': 시작·끝 날짜를 고르고 '불러오기' (처음엔 이번 달 1일 ~ 보고 있는 날)
+        function novelImportPickRange() {
+            novelMarkRangeBtn('range');
+            const f = document.getElementById('novel-range-from'), t = document.getElementById('novel-range-to'), base = writerViewDate;
+            if (!f.value) f.value = novelDayKey(new Date(base.getFullYear(), base.getMonth(), 1));
+            if (!t.value) t.value = writerGetYYYYMMDD(base);
+            novelImportState = null;
+            const go = document.getElementById('novel-import-go');
+            go.textContent = '가져오기'; go.disabled = true; go.style.opacity = '.5';
+            document.getElementById('novel-import-body').innerHTML = `<div class="py-5 text-center text-slate-400 text-xs">날짜를 고르고 '불러오기'를 눌러 주세요.</div>`;
+        }
+        async function novelImportLoad(range) {
+            const body = document.getElementById('novel-import-body');
+            const go = document.getElementById('novel-import-go');
+            novelMarkRangeBtn(range);
             const base = writerViewDate;
-            let from, to;
-            if (range === 'month') { from = novelDayKey(new Date(base.getFullYear(), base.getMonth(), 1)); to = novelDayKey(new Date(base.getFullYear(), base.getMonth() + 1, 0)); }
-            else { from = to = writerGetYYYYMMDD(base); }
-            const label = range === 'month' ? `${base.getFullYear()}년 ${base.getMonth() + 1}월` : writerGetKoreanDate(base);
+            let from, to, label;
+            if (range === 'month') { from = novelDayKey(new Date(base.getFullYear(), base.getMonth(), 1)); to = novelDayKey(new Date(base.getFullYear(), base.getMonth() + 1, 0)); label = `${base.getFullYear()}년 ${base.getMonth() + 1}월`; }
+            else if (range === 'range') {
+                from = document.getElementById('novel-range-from').value; to = document.getElementById('novel-range-to').value;
+                if (!from || !to) { body.innerHTML = `<div class="py-5 text-center text-rose-500 text-xs">시작 날짜와 끝 날짜를 모두 골라 주세요.</div>`; return; }
+                if (from > to) [from, to] = [to, from];
+                if ((new Date(to + 'T00:00:00') - new Date(from + 'T00:00:00')) / 864e5 > 366) { body.innerHTML = `<div class="py-5 text-center text-rose-500 text-xs">기간은 1년까지만 고를 수 있어요.</div>`; return; }
+                const md = ds => `${Number(ds.slice(5, 7))}/${Number(ds.slice(8))}`;
+                label = from === to ? md(from) : `${from.slice(0, 4) !== to.slice(0, 4) ? from.slice(0, 4) + '년 ' : ''}${md(from)} ~ ${md(to)}`;
+            }
+            else { from = to = writerGetYYYYMMDD(base); label = writerGetKoreanDate(base); }
             novelImportState = null;
             go.textContent = '가져오기';
             go.disabled = true; go.style.opacity = '.5';

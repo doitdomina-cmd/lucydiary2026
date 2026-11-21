@@ -1563,7 +1563,14 @@ body .home .wgrid .wcard.icard:not(.pol):not([style*="--gc:#"]) { --lb: #f5f4f1;
 .wk-bar { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; min-width: 0; }
 .wk-bar i { width: 100%; max-width: 36px; border-radius: 6px 6px 0 0; background: var(--accent); opacity: .55; }
 .wk-bar.best i { opacity: 1; } .wk-bar b { font-size: 10px; color: var(--muted); white-space: nowrap; margin-bottom: 2px; } .wk-bar span { font-size: 12px; margin-top: 3px; position: relative; top: 18px; height: 0; }
-.wk-modal .wk-bars { margin-bottom: 20px; } @media (max-width: 700px) { .wk-modal .wl-kr > div { flex: 1 1 calc(50% - 3px); } }
+.wk-modal .wk-bars { margin-bottom: 20px; position: relative; }
+.wk-goal { position: absolute; left: 0; right: 0; height: 0; border-top: 1.5px dashed #d0705a; text-decoration: none; pointer-events: none; z-index: 1; } .wk-goal span { position: absolute; right: 0; top: -16px; font-size: 10px; color: #d0705a; }
+.wk-bar.hit i { background: #2f8a54; opacity: .8; } .wk-bar.hit.best i { opacity: 1; }
+.rp-band .wl-hbc.in { background: color-mix(in srgb, var(--accent) 10%, transparent); border-radius: 4px 4px 0 0; }
+.rp-band .wl-hbv { background: #cbb98a; } .rp-band .wl-hbc.in .wl-hbv { background: var(--accent); }
+.goal-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 4px 0 6px; font-size: 13px; } .goal-row > span { min-width: 92px; }
+.modal .goal-row input { border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; background: var(--panel2); color: var(--text); font: inherit; margin: 0; } .modal .goal-row input[type=number] { width: 90px; } .modal .goal-row input[type=text] { width: 140px; }
+.goal-row small { color: var(--muted); font-size: 11px; } @media (max-width: 700px) { .wk-modal .wl-kr > div { flex: 1 1 calc(50% - 3px); } }
 /* 쉬는 시간 알림 */
 .brk-card { position: fixed; top: 70px; left: 50%; transform: translateX(-50%); z-index: 9000; display: flex; align-items: center; gap: 12px; background: var(--panel); color: var(--text); border: 2px solid var(--accent); border-radius: 16px; padding: 12px 14px 12px 16px; box-shadow: 0 10px 30px rgba(0,0,0,.18); width: max-content; max-width: calc(100vw - 24px); animation: brkIn .35s ease; }
 .brk-card .brk-emo { font-size: 28px; } .brk-card .brk-t { min-width: 0; } .brk-card b { display: block; font-size: 16px; } .brk-card span { font-size: 12px; color: var(--muted); } .brk-card .btn { white-space: nowrap; }
@@ -3538,6 +3545,90 @@ function rpExportAll() {
 }
 
 // ② 나의 집필 분석 — 숫자로 유형을 정하고, 그에 맞는 조언을 고른다
+/* ---------- 내 목표 기준: 하루 최소 글자 · 지향 집필 시간 (설정 › 기타, 기본 8,000자 · 9-12, 14-16) ---------- */
+function rpParseBands(t) {
+    const out = [];
+    String(t || '').split(/[,，、/]/).forEach(p => { const m = p.replace(/\s|시/g, '').match(/^(\d{1,2})(?::\d\d)?[-~](\d{1,2})(?::\d\d)?$/); if (m) { const a = +m[1], b = +m[2]; if (a >= 0 && b <= 24 && b > a) out.push([a, b]); } });
+    return out.length ? out.sort((x, y) => x[0] - y[0]) : [[9, 12], [14, 16]];
+}
+function rpGoalCfg() {
+    const S = settings(), goal = Number(S.dayGoal) > 0 ? Math.round(Number(S.dayGoal)) : 8000, bands = rpParseBands(S.workHours ?? '9-12, 14-16');
+    const hrs = bands.reduce((a, [x, y]) => a + (y - x), 0);
+    return { goal, bands, hrs, start: bands[0][0], end: bands[bands.length - 1][1], inb: h => bands.some(([a, b]) => h >= a && h < b), txt: bands.map(([a, b]) => `${a}~${b}시`).join(', ') };
+}
+const rpHM = m => `${Math.floor(m / 60)}시${m % 60 ? ' ' + Math.round(m % 60) + '분' : ''}`;
+// 지향 시간 밖 글자를 어디에 썼나: 이른 시간 / 사이(점심) / 저녁 / 밤·새벽
+function rpOutBucket(G, h) { return (h >= 22 || h < 5) ? 'night' : h < G.start ? 'early' : h < G.end ? 'gap' : 'eve'; }
+const RP_OUT_NAME = G => ({ early: `이른 시간(${G.start}시 전)`, gap: '지향 시간 사이(점심 등)', eve: `저녁(${G.end}~22시)`, night: '밤·새벽(22시~)' });
+// keys: 볼 날짜들 (YYYY-MM-DD)
+function rpGoalStats(keys) {
+    const G = rpGoalCfg(), S = stats().days || {};
+    const vals = keys.map(k => S[k] || sessOfDay(k).reduce((a, x) => a + Math.max(0, x.c || 0), 0));
+    const wrote = vals.filter(v => v > 0), hit = vals.filter(v => v >= G.goal).length;
+    const avgOn = wrote.length ? wrote.reduce((a, b) => a + b, 0) / wrote.length : 0;
+    let inC = 0, outC = 0, inMinM = 0, inCM = 0, outMinM = 0, outCM = 0; const out = { early: 0, gap: 0, eve: 0, night: 0 }, firsts = [], inDay = {}, hours = Array(24).fill(0);
+    keys.forEach(k => {
+        const L = sessOfDay(k);
+        const st = L.map(x => x.s).filter(t => new Date(t).getHours() >= 5);
+        if (st.length) { const D = new Date(Math.min(...st)); firsts.push(D.getHours() * 60 + D.getMinutes()); }
+        const add = (h, c, minute) => {
+            hours[h] += c;
+            if (G.inb(h)) { inC += c; inDay[k] = (inDay[k] || 0) + c; if (minute) { inMinM++; inCM += c; } }
+            else { outC += c; out[rpOutBucket(G, h)] += c; if (minute) { outMinM++; outCM += c; } }
+        };
+        L.forEach(x => {
+            if (x.m) Object.entries(x.m).forEach(([mi, c]) => add(new Date(x.s + Number(mi) * 6e4 + 3e4).getHours(), Number(c) || 0, true));
+            else sessAddHours(x, (D, d, c) => add(D.getHours(), c, false));
+        });
+    });
+    const tot = inC + outC, wroteKeys = keys.filter((k, i) => vals[i] > 0);
+    return {
+        G, keys, vals, wroteDays: wrote.length, hit, avgOn, inC, outC, tot, out, hours,
+        inShare: tot ? inC / tot : null,
+        avgFirst: firsts.length ? firsts.reduce((a, b) => a + b, 0) / firsts.length : null, firstDays: firsts.length,
+        lateDays: firsts.filter(m => m > G.start * 60 + 30).length,
+        speedIn: inMinM >= 30 ? inCM / inMinM * 60 : null, speedOut: outMinM >= 30 ? outCM / outMinM * 60 : null,
+        inMinPerDay: wroteKeys.length ? inMinM / wroteKeys.length : 0,
+        inAvgPerDay: wroteKeys.length ? wroteKeys.reduce((a, k) => a + (inDay[k] || 0), 0) / wroteKeys.length : 0,
+    };
+}
+const rpLastKeys = n => { const t = new Date(); t.setHours(0, 0, 0, 0); return Array.from({ length: n }, (_, i) => { const d = new Date(t); d.setDate(d.getDate() - n + i); return rpDayKey(d); }); };   // 오늘 빼고 최근 n일
+// 목표 기준 조언
+function rpGoalTips(Q) {
+    const G = Q.G, T = [];
+    if (!Q.wroteDays) return T;
+    const pct = Math.round(Q.avgOn / G.goal * 100);
+    if (Q.avgOn < G.goal) T.push(`하루 ${fmt(G.goal)}자를 넘긴 날은 ${Q.hit}일이에요 (쓴 날 ${Q.wroteDays}일 중). 쓴 날 평균은 ${fmt(Math.round(Q.avgOn))}자로 목표의 ${pct}%라, 하루 ${fmt(Math.round(G.goal - Q.avgOn))}자가 더 필요해요 — 지향 시간 ${G.hrs}시간에 나누면 1시간에 ${fmt(Math.ceil((G.goal - Q.avgOn) / G.hrs / 10) * 10)}자씩 더 쓰면 돼요.`);
+    else T.push(`쓴 날 평균 ${fmt(Math.round(Q.avgOn))}자로 하루 목표 ${fmt(G.goal)}자를 넘기고 있어요 (${Q.hit}일 달성). 이제는 쓰지 않은 날을 줄이는 게 다음 단계예요.`);
+    if (Q.avgFirst != null) {
+        const late = Q.avgFirst - G.start * 60;
+        if (late > 30) T.push(`첫 글자를 평균 ${rpHM(Math.round(Q.avgFirst))}에 써요. 지향하는 ${G.start}시보다 ${rpMin(late)} 늦어요 (${Q.firstDays}일 중 ${Q.lateDays}일 늦게 시작). ${G.start}시 정각에 바로 원고를 열고, 어제 마지막 문단을 이어 쓰는 것으로 시작해 보세요.`);
+        else if (late < -30) T.push(`평균 ${rpHM(Math.round(Q.avgFirst))}에 시작해서 ${G.start}시보다 일찍 써요. 일찍 쓴 분량도 좋지만, 지향 시간(${G.txt})에 힘을 모아 두면 리듬이 더 안정돼요.`);
+        else T.push(`평균 ${rpHM(Math.round(Q.avgFirst))}에 시작해요. ${G.start}시 시작 리듬을 잘 지키고 있어요.`);
+    }
+    if (Q.inShare != null) {
+        const outP = Math.round((1 - Q.inShare) * 100), N = RP_OUT_NAME(G);
+        const big = Object.entries(Q.out).sort((a, b) => b[1] - a[1])[0];
+        if (outP >= 30 && big && big[1] > 0) {
+            const bp = Math.round(big[1] / Q.tot * 100);
+            const why = big[0] === 'night' ? '밤에 쓰면 다음 날 9시 시작이 늦어지기 쉬워요.' : big[0] === 'gap' ? '사이 시간은 쉬어 줘야 오후 집중이 살아나요.' : big[0] === 'eve' ? '저녁 분량을 지향 시간 안으로 끌어오면 하루가 일찍 끝나요.' : `${G.start}시 전에 쓴 분량은 좋지만, 지향 시간에 몰아 쓰면 계획이 쉬워져요.`;
+            T.push(`지향 시간(${G.txt}) 밖에서 쓴 글자가 ${outP}%예요 — 특히 ${N[big[0]]}에 ${bp}%. ${why}`);
+        } else T.push(`쓴 글자의 ${Math.round(Q.inShare * 100)}%를 지향 시간(${G.txt}) 안에서 썼어요. 계획대로 잘 가고 있어요.`);
+    }
+    const need = Math.ceil(G.goal / G.hrs / 10) * 10;
+    if (Q.speedIn) {
+        if (Q.speedIn >= need) T.push(`지향 시간 안에서 실제로 쓸 때 속도는 1시간에 ${fmt(Math.round(Q.speedIn))}자예요. ${G.hrs}시간을 꽉 채우면 ${fmt(Math.round(Q.speedIn * G.hrs))}자라 목표를 넘길 수 있어요 — 관건은 그 시간에 '이어서 앉아 있는 것'이에요. (지금은 쓴 날 지향 시간 중 평균 ${rpMin(Math.round(Q.inMinPerDay))} 실제로 썼어요)`);
+        else T.push(`${G.hrs}시간 안에 ${fmt(G.goal)}자를 쓰려면 1시간에 ${fmt(need)}자가 필요한데, 지금 속도는 1시간에 ${fmt(Math.round(Q.speedIn))}자예요. 이 속도로는 약 ${(G.goal / Q.speedIn).toFixed(1)}시간이 필요해요 — 쓰기 전에 장면 메모를 정해 두고, 지향 시간 안의 멈춤을 줄여 보세요.`);
+    }
+    return T;
+}
+// 시간대 막대: 지향 시간은 진하게, 칸 배경도 칠함
+function rpBandBars(Q) {
+    const G = Q.G, hs = Q.hours.map((c, h) => [h, c]).filter(([, c]) => c > 0);
+    const lo = Math.min(G.start, ...hs.map(x => x[0]).filter(h => h >= 5)), hi = Math.max(G.end - 1, ...hs.map(x => x[0]));
+    const mx = Math.max(1, ...Q.hours);
+    return `<div class="wl-hb rp-band" style="margin-bottom:18px">${Array.from({ length: hi - lo + 1 }, (_, i) => lo + i).map(h => `<div class="wl-hbc ${G.inb(h) ? 'in' : ''}"><div class="wl-hbv" style="height:${Q.hours[h] / mx * 100}%"></div><span>${(h - lo) % 2 === 0 ? h : ''}</span></div>`).join('')}</div>`;
+}
 function rpAnalyze() {
     const R = rpCollect(), A = { R, types: [], facts: [], tips: [], warn: '' };
     const hoursTot = R.hours.reduce((a, b) => a + b, 0);
@@ -3585,15 +3676,21 @@ function rpAnalyze() {
     if (R.dayKeys.length >= 7) A.facts.push(['잘 써지는 요일', `${RP_WD[bestWd]}요일`, `쓴 날 평균 ${fmt(Math.round(wdAvg[bestWd]))}자`]);
     // 작품별
     A.works = ws.slice().sort((p, q) => (p.done - q.done) || (q.all - p.all));
-    // 조언
-    const goal = Math.max(1000, Math.round((R.median || 3000) / 500) * 500);
-    if (A.timeType) A.tips.push(`가장 잘 써지는 때는 ${A.timeType.t}${peakH >= 0 ? `, 특히 ${peakH}시대` : ''}예요. 이 시간을 '집필 시간'으로 정해 두고 다른 일은 미뤄 보세요.`);
+    // 내 목표 기준 (최근 30일, 오늘 빼고)
+    A.Q = rpGoalStats(rpLastKeys(30));
+    // 조언 — 목표 기준을 먼저
+    rpGoalTips(A.Q).forEach(t => A.tips.push(t));
+    const goal = A.Q.G.goal;
+    if (A.timeType && peakH >= 0) {
+        const G = A.Q.G;
+        if (G.inb(peakH)) A.tips.push(`가장 잘 써지는 때(${peakH}시대)가 지향 시간(${G.txt}) 안이에요. 계획과 몸의 리듬이 맞으니 그 시간만 지키면 돼요.`);
+        else A.tips.push(`기록상 가장 잘 써지는 때는 ${A.timeType.t}, 특히 ${peakH}시대예요. 지향 시간(${G.txt})에도 이만큼 몰입하려면 그때의 조건(알림 끄기·조용한 곳·'오늘 쓸 장면' 미리 정하기)을 ${G.start}시에 만들어 두세요.`);
+    }
     if (A.sessType === '짧게 자주형') A.tips.push(`짧게 여러 번 앉는 편이에요. 하루 한 번은 25분 이상 이어 쓰는 '긴 세션'을 잡으면 몰입 구간이 늘어나요.`);
     else if (A.sessType === '몰입형') A.tips.push(`한 번 앉으면 오래 쓰는 몰입형이에요. 60~90분마다 5분씩 쉬면 뒤쪽 속도가 덜 떨어져요.`);
     else if (A.sessType === '짧은 집중형') A.tips.push(`한 번에 짧게 쓰고 끝나는 날이 많아요. 시작 전에 '오늘 쓸 장면'을 한 줄로 정해 두면 더 길게 이어져요.`);
     if (A.habit === '몰아쓰기형' || A.habit === '쉬엄쉬엄형') A.tips.push(`쓰는 날과 안 쓰는 날의 차이가 커요. 안 쓰는 날도 '최소 ${fmt(Math.max(500, Math.round(goal / 3 / 100) * 100))}자'만 쓰면 감이 안 끊겨요.`);
     else if (A.habit === '꾸준형') A.tips.push(`꾸준함이 가장 큰 강점이에요. 지금 리듬을 지키되, 일주일에 하루는 완전히 쉬는 날로 정해 두면 오래 갈 수 있어요.`);
-    A.tips.push(`하루 목표는 쓴 날 기준 중간값인 ${fmt(goal)}자 정도가 무리 없어요. 이걸 넘긴 날은 '보너스'로 생각하세요.`);
     if ((A.parallel || 0) >= 3) A.tips.push(`최근 ${A.parallel}개 작품을 오가며 썼어요. 마감이 가장 가까운 작품 하나를 '오늘의 첫 세션'으로 정하면 진도가 덜 흩어져요.`);
     if (R.dayKeys.length >= 14 && wdAvg[lowWd] < wdAvg[bestWd] * 0.4) A.tips.push(`${RP_WD[lowWd]}요일엔 유독 적게 써요. 그날은 목표를 낮추거나 퇴고·기획하는 날로 정해 보세요.`);
     if (R.streak === 0 && R.dayKeys.length) A.tips.push(`오늘 아직 안 썼어요. 딱 한 문단만 써도 연속 기록이 다시 시작돼요.`);
@@ -3606,6 +3703,10 @@ function rpAnalysisHTML() {
     if (A.warn) h += `<div class="wl-sub" style="color:var(--accent)">${esc(A.warn)}</div>`;
     h += A.label ? `<div class="rp-type">${esc(A.label)} 작가</div>` : `<div class="wl-empty">아직 분석할 기록이 없어요. 원고를 쓰면 자동으로 쌓여요.</div>`;
     h += `<div class="rp-types">${A.types.map(t => `<div><b>${esc(t.k)}</b><span>${esc(t.d)}</span></div>`).join('')}</div></div>`;
+    const Q = A.Q, G = Q.G;
+    if (Q.wroteDays) h += `<div class="wl-card"><div class="wl-dh"><h3>내 목표 기준</h3><span class="wl-tag">하루 ${fmt(G.goal)}자 · ${G.txt} · 최근 30일</span></div>
+        <div class="wl-kr"><div><small>목표 달성</small><b>${Q.hit}일</b><small>쓴 날 ${Q.wroteDays}일 중</small></div><div><small>쓴 날 평균</small><b>${fmt(Math.round(Q.avgOn))}자</b><small>목표의 ${Math.round(Q.avgOn / G.goal * 100)}%</small></div>${Q.inShare != null ? `<div><small>지향 시간 안 글자</small><b>${Math.round(Q.inShare * 100)}%</b><small>쓴 날 평균 ${fmt(Math.round(Q.inAvgPerDay))}자</small></div>` : ''}${Q.avgFirst != null ? `<div><small>첫 글자 평균</small><b>${rpHM(Math.round(Q.avgFirst))}</b><small>${G.start}시 목표 · 늦은 날 ${Q.lateDays}일</small></div>` : ''}${Q.speedIn ? `<div><small>지향 시간 속도</small><b>시간당 ${fmt(Math.round(Q.speedIn))}자</b><small>필요 ${fmt(Math.ceil(G.goal / G.hrs / 10) * 10)}자</small></div>` : ''}</div>
+        ${Q.tot ? `<div class="wl-sub" style="margin-top:10px">시간대별로 쓴 글자 <span style="opacity:.7">· 진한 칸 = 지향 시간</span></div>${rpBandBars(Q)}` : ''}</div>`;
     h += `<div class="wl-card"><h3>숫자로 보는 나</h3><div class="wl-kr">${A.facts.map(([a, b, c]) => `<div><small>${esc(a)}</small><b>${esc(b)}</b><small>${esc(c)}</small></div>`).join('')}</div></div>`;
     if (A.works.length) h += `<div class="wl-card"><h3>작품별</h3><div class="rp-works">${A.works.map(x => `<div class="${x.done ? 'done' : ''}"><b>${esc(x.title)}</b><span>${esc(x.genre)} · ${x.done ? '완고' : '미완고'} · 원고 ${x.docs}개</span><i>${fmt(x.all)}자</i></div>`).join('')}</div></div>`;
     if (A.tips.length) h += `<div class="wl-card"><h3>앞으로 이렇게 해 보면 좋아요</h3><ol class="rp-tips">${A.tips.map(t => `<li>${esc(t)}</li>`).join('')}</ol></div>`;
@@ -3619,6 +3720,17 @@ function rpAnalysisText() {
     if (A.label) L.push(`[유형] ${A.label} 작가`);
     A.types.forEach(t => L.push(`  · ${t.k}: ${t.d}`));
     L.push('');
+    const Q = A.Q, G = Q.G;
+    if (Q.wroteDays) {
+        L.push(`[내 목표 기준] 하루 ${fmt(G.goal)}자 · 지향 시간 ${G.txt} · 최근 30일`);
+        L.push(`  · 목표 달성: ${Q.hit}일 (쓴 날 ${Q.wroteDays}일 중)`);
+        L.push(`  · 쓴 날 평균: ${fmt(Math.round(Q.avgOn))}자 (목표의 ${Math.round(Q.avgOn / G.goal * 100)}%)`);
+        if (Q.inShare != null) L.push(`  · 지향 시간 안에서 쓴 글자: ${Math.round(Q.inShare * 100)}% (쓴 날 평균 ${fmt(Math.round(Q.inAvgPerDay))}자)`);
+        if (Q.inShare != null) { const N = RP_OUT_NAME(G); Object.entries(Q.out).filter(([, c]) => c > 0).forEach(([k, c]) => L.push(`      - ${N[k]}: ${Math.round(c / Q.tot * 100)}%`)); }
+        if (Q.avgFirst != null) L.push(`  · 첫 글자 평균: ${rpHM(Math.round(Q.avgFirst))} (${G.start}시보다 늦은 날 ${Q.lateDays}일 / ${Q.firstDays}일)`);
+        if (Q.speedIn) L.push(`  · 지향 시간 실제 속도: 1시간에 ${fmt(Math.round(Q.speedIn))}자 (목표에 필요한 속도 ${fmt(Math.ceil(G.goal / G.hrs / 10) * 10)}자)`);
+        L.push('');
+    }
     L.push('[숫자로 보는 나]');
     A.facts.forEach(([a, b, c]) => L.push(`  · ${a}: ${b} (${c})`));
     L.push('');
@@ -3641,13 +3753,16 @@ function wkData(mon) {
         mon, days, sess, hours, byW, dev: sessDevSplit(sess),
         total: days.reduce((a, x) => a + x.c, 0), wrote: days.filter(x => x.c > 0).length,
         act: sess.reduce((a, x) => a + sessActMin(x), 0), span: sess.reduce((a, x) => a + sessSpanMin(x), 0),
-        best: days.reduce((m, x) => (!m || x.c > m.c) ? x : m, null),
+        best: days.reduce((m, x) => (!m || x.c > m.c) ? x : m, null), Q: rpGoalStats(days.map(x => x.k)),
         longest: sess.reduce((m, x) => (!m || (x.e - x.s) > (m.e - m.s)) ? x : m, null),
     };
 }
 function wkTips(D, P) {
-    const T = [], WD = RP_WD;
+    const T = [], WD = RP_WD, G = D.Q.G;
     if (!D.total) { T.push('이 주는 쉬어 갔어요. 이번 주엔 하루 10분이라도 원고를 열어 봐요.'); return T; }
+    // 내 목표 기준 (하루 최소 글자 · 지향 시간)
+    T.push(D.Q.hit ? `하루 ${fmt(G.goal)}자를 넘긴 날이 ${D.Q.hit}일이에요.${D.Q.hit >= 5 ? ' 훌륭해요!' : ''}` : `하루 ${fmt(G.goal)}자를 넘긴 날은 없었어요.`);
+    rpGoalTips(D.Q).slice(1).forEach(t => T.push(t));
     if (P.total > 0) {
         const pct = Math.round((D.total - P.total) / P.total * 100);
         if (pct >= 10) T.push(`그 전 주보다 ${pct}% 더 썼어요! 👏 이 흐름 그대로 가요.`);
@@ -3658,44 +3773,44 @@ function wkTips(D, P) {
     else if (D.wrote >= 5) T.push(`${D.wrote}일이나 썼어요. 리듬이 잘 잡혀 있어요.`);
     else if (D.wrote <= 2) T.push(`쓴 날이 ${D.wrote}일이에요. 길게 한 번보다 짧게 자주 여는 게 이어 쓰기에 좋아요.`);
     const mx = Math.max(...D.hours);
-    if (mx > 0) { const h = D.hours.indexOf(mx); T.push(`가장 잘 써진 시간은 ${h}~${h + 1}시예요. 이번 주에도 이 시간을 집필 시간으로 잡아 보세요.`); }
-    if (D.act > 0) T.push(`실제로 쓴 1시간에 평균 ${fmt(Math.round(D.total / D.act * 60))}자를 썼어요.`);
+    if (mx > 0) { const h = D.hours.indexOf(mx); if (!G.inb(h)) T.push(`가장 많이 쓴 시간은 ${h}~${h + 1}시였어요 (지향 시간 밖).`); }
     if (D.span > 60 && D.act / D.span < 0.6) T.push(`세션 시간 중 실제로 쓴 시간은 ${Math.round(D.act / D.span * 100)}%였어요. 쓰기 전에 장면 메모를 짧게 정해 두면 멈추는 시간이 줄어요.`);
     if (D.longest && (D.longest.e - D.longest.s) / 6e4 >= 90) T.push(`가장 길게 이어 쓴 세션은 ${minTxt(sessSpanMin(D.longest))}이었어요. 50분마다 잠깐 쉬어 가요.`);
-    if (D.wrote) { const per = Math.ceil(D.total / D.wrote / 100) * 100; T.push(`이번 주 목표 제안: 하루 ${fmt(per)}자 × ${Math.max(D.wrote, 3)}일 = ${fmt(per * Math.max(D.wrote, 3))}자`); }
+    T.push(`이번 주 목표: 매일 ${fmt(G.goal)}자 — ${G.txt} (${G.hrs}시간) 동안 1시간에 ${fmt(Math.ceil(G.goal / G.hrs / 10) * 10)}자씩`);
     return T;
 }
-function wkHTML(mon) {
+function wkHTML(mon, back) {
     const D = wkData(mon), pm = new Date(mon); pm.setDate(pm.getDate() - 7);
     const P = wkData(pm), cur = wkMonday(new Date()), last = new Date(cur); last.setDate(last.getDate() - 7);
     const end = new Date(mon); end.setDate(end.getDate() + 6);
     const md = d => `${d.getMonth() + 1}/${d.getDate()}`;
     const name = +mon === +cur ? '이번 주 (진행 중)' : +mon === +last ? '지난주' : `${mon.getMonth() + 1}월 ${mon.getDate()}일 주`;
     const diff = P.total > 0 ? Math.round((D.total - P.total) / P.total * 100) : null;
-    const dmx = Math.max(1, ...D.days.map(x => x.c));
-    const bars = D.days.map(x => `<div class="wk-bar ${D.best && x === D.best && x.c ? 'best' : ''}"><b>${x.c ? fmt(x.c) : ''}</b><i style="height:${x.c ? Math.max(4, x.c / dmx * 90) : 2}px"></i><span>${RP_WD[x.D.getDay()]}</span></div>`).join('');
+    const G = D.Q.G, dmx = Math.max(1, G.goal, ...D.days.map(x => x.c));
+    const bars = `<u class="wk-goal" style="bottom:${2 + G.goal / dmx * 90}px"><span>목표 ${fmt(G.goal)}</span></u>` + D.days.map(x => `<div class="wk-bar ${x.c >= G.goal ? 'hit' : ''} ${D.best && x === D.best && x.c ? 'best' : ''}"><b>${x.c ? fmt(x.c) : ''}</b><i style="height:${x.c ? Math.max(4, x.c / dmx * 90) : 2}px"></i><span>${RP_WD[x.D.getDay()]}</span></div>`).join('');
     const ws = Object.entries(D.byW).sort((a, b) => b[1] - a[1]);
     const hs = D.hours.map((c, h) => [h, c]).filter(([, c]) => c > 0);
     const hmx = Math.max(1, ...D.hours);
     const lo = hs.length ? Math.min(...hs.map(x => x[0])) : 9, hi = hs.length ? Math.max(...hs.map(x => x[0])) : 18;
     const hourBars = Array.from({ length: hi - lo + 1 }, (_, i) => lo + i).map(h => `<div class="wl-hbc"><div class="wl-hbv" style="height:${D.hours[h] / hmx * 100}%;background:var(--accent)"></div><span>${(h - lo) % 2 === 0 ? h : ''}</span></div>`).join('');
     const devT = D.dev.ph + D.dev.pc;
-    return `<div class="modal wl-modal wk-modal"><div class="wl-head"><h3 style="margin:0;flex:1"><i class="ic ic-history"></i> 주간 요약</h3><button class="wl-nv" data-wk="prev">‹</button><span class="wl-tag">${name} · ${md(mon)}~${md(end)}</span><button class="wl-nv" data-wk="next" ${+mon >= +cur ? 'disabled' : ''}>›</button><button class="btn" data-wk="close">닫기</button></div>
+    return `<div class="modal wl-modal wk-modal"><div class="wl-head"><h3 style="margin:0;flex:1"><i class="ic ic-history"></i> 주간 요약</h3>${back ? '<button class="btn" data-wk="back">← 집필 기록</button>' : ''}<button class="wl-nv" data-wk="prev">‹</button><span class="wl-tag">${name} · ${md(mon)}~${md(end)}</span><button class="wl-nv" data-wk="next" ${+mon >= +cur ? 'disabled' : ''}>›</button><button class="btn" data-wk="close">닫기</button></div>
         <div class="wl-card"><div class="wk-hero"><small>쓴 글자 (공백 제외)</small><b>${fmt(D.total)}자</b>${diff == null ? '' : `<span class="wk-diff ${diff > 0 ? 'up' : diff < 0 ? 'down' : ''}">${diff > 0 ? '▲' : diff < 0 ? '▼' : '='} ${Math.abs(diff)}% <small>(그 전 주 ${fmt(P.total)}자)</small></span>`}</div>
-        <div class="wl-kr"><div><small>쓴 날</small><b>${D.wrote} / 7일</b></div><div><small>실제로 쓴 시간</small><b>${D.act ? minTxt(D.act) : '—'}</b></div><div><small>세션</small><b>${D.sess.length}번</b></div><div><small>가장 많이 쓴 날</small><b>${D.best && D.best.c ? `${RP_WD[D.best.D.getDay()]}요일 ${fmt(D.best.c)}자` : '—'}</b></div></div>
+        <div class="wl-kr"><div><small>쓴 날</small><b>${D.wrote} / 7일</b></div><div><small>실제로 쓴 시간</small><b>${D.act ? minTxt(D.act) : '—'}</b></div><div><small>목표 ${fmt(G.goal)}자 달성</small><b>${D.Q.hit} / 7일</b></div>${D.Q.inShare != null ? `<div><small>지향 시간 안 글자</small><b>${Math.round(D.Q.inShare * 100)}%</b></div>` : ''}${D.Q.avgFirst != null ? `<div><small>첫 글자 평균</small><b>${rpHM(Math.round(D.Q.avgFirst))}</b></div>` : ''}<div><small>세션</small><b>${D.sess.length}번</b></div><div><small>가장 많이 쓴 날</small><b>${D.best && D.best.c ? `${RP_WD[D.best.D.getDay()]}요일 ${fmt(D.best.c)}자` : '—'}</b></div></div>
         <div class="wl-sub" style="margin-top:12px">요일별</div><div class="wk-bars">${bars}</div></div>
         ${ws.length ? `<div class="wl-card"><h3>작품별로 쓴 글자</h3><div class="rp-works">${ws.map(([id, c]) => `<div><b>${wkTitle(id)}</b><span></span><i>+${fmt(c)}자</i></div>`).join('')}</div></div>` : ''}
-        ${hs.length ? `<div class="wl-card"><h3>시간대별</h3><div class="wl-hb" style="margin-bottom:18px">${hourBars}</div>${devT ? `<div class="wl-sub">📱 폰 ${Math.round(D.dev.ph / devT * 100)}% · 🖥 PC ${Math.round(D.dev.pc / devT * 100)}%</div>` : ''}</div>` : ''}
+        ${hs.length ? `<div class="wl-card"><h3>시간대별 <small style="font-weight:400;color:var(--muted);font-size:12px">· 진한 칸 = 지향 시간 ${G.txt}</small></h3>${rpBandBars(D.Q)}${devT ? `<div class="wl-sub">📱 폰 ${Math.round(D.dev.ph / devT * 100)}% · 🖥 PC ${Math.round(D.dev.pc / devT * 100)}%</div>` : ''}</div>` : ''}
         <div class="wl-card"><h3>한마디</h3><ul class="rp-tips">${wkTips(D, P).map(t => `<li>${esc(t)}</li>`).join('')}</ul></div>
         <p class="modal-note" style="margin:0">한 주를 처음 열 때 지난주 요약이 자동으로 떠요. 설정 › 기타에서 끌 수 있어요.</p></div>`;
 }
-function openWeekSummary(mon) {
+function openWeekSummary(mon, back) {   // back: 집필 기록 창에서 왔으면 '← 집필 기록' 버튼
     let m = mon || (() => { const x = wkMonday(new Date()); x.setDate(x.getDate() - 7); return x; })();
     const bg = document.createElement('div'); bg.className = 'modal-bg';
-    const draw = () => { bg.innerHTML = wkHTML(m); };
+    const draw = () => { bg.innerHTML = wkHTML(m, back); };
     draw(); document.body.appendChild(bg);
     bg.addEventListener('click', e => {
         if (e.target === bg || e.target.closest('[data-wk="close"]')) { bg.remove(); return; }
+        if (e.target.closest('[data-wk="back"]')) { bg.remove(); openWriteLog(); return; }
         const b = e.target.closest('[data-wk]'); if (!b || b.disabled) return;
         m = new Date(m); m.setDate(m.getDate() + (b.dataset.wk === 'prev' ? -7 : 7)); draw();
     });
@@ -3739,7 +3854,7 @@ function openWriteLog(k) {
     bg.addEventListener('click', e => {
         if (e.target === bg || e.target.closest('[data-wl="close"]')) { bg.remove(); return; }
         if (e.target.closest('[data-wl="txt"]')) { rpExportAll(); return; }
-        if (e.target.closest('[data-wl="wk"]')) { bg.remove(); openWeekSummary(); return; }
+        if (e.target.closest('[data-wl="wk"]')) { bg.remove(); openWeekSummary(null, true); return; }
         if (e.target.closest('[data-wl="antxt"]')) { rpAnalysisText(); return; }
         if (e.target.closest('[data-wl="an"]')) { mode = 'an'; draw(); $('.wl-modal', bg).scrollTop = 0; return; }
         if (e.target.closest('[data-wl="back"]')) { mode = 'log'; draw(); $('.wl-modal', bg).scrollTop = 0; return; }
@@ -11550,6 +11665,8 @@ function openSettings(focus) {
             <label class="check"><input type="checkbox" data-opt="aiAuto" ${S.aiAuto === true ? 'checked' : ''}> AI 맞춤법 자동 검사 <small style="color:var(--muted)">(연 회차를 뒤에서 한 번씩 읽고, 새로 쓴 문단도 몇 초 뒤 검사)</small> ${aiReady() ? '' : '<small style="color:var(--danger)">— 아래에 AI 키를 넣어야 돌아가요</small>'}</label>
             <label class="check"><input type="checkbox" data-opt="crisp" ${S.crisp !== false ? 'checked' : ''}> 원고 글자 진하게 <small style="color:var(--muted)">(명조체 가로획이 흐리거나 끊겨 보일 때)</small></label>
             </div><div data-sp="etc"><label>집필 기록</label>
+            <div class="goal-row"><span>하루 최소 목표</span><input type="number" data-sset="dayGoal" value="${esc(String(S.dayGoal ?? 8000))}" min="0" step="500">자 <small>(분석·주간 요약의 기준)</small></div>
+            <div class="goal-row"><span>지향 집필 시간</span><input type="text" data-sset="workHours" value="${esc(S.workHours ?? '9-12, 14-16')}" placeholder="9-12, 14-16"><small>예: 9-12, 14-16 (쉼표로 여러 개)</small></div>
             <label class="check"><input type="checkbox" data-opt="royaltySync" ${S.royaltySync === true ? 'checked' : ''}> 정산 앱 상세 기록으로 자동 넘기기 <small style="color:var(--muted)">(정산 앱을 열거나 집필 탭을 볼 때 최근 7일 작업실 기록을 시간대별로 채워요 · 직접 적은 칸은 그대로)</small></label>
             <label class="check"><input type="checkbox" data-opt="breakAlert" ${S.breakAlert !== false ? 'checked' : ''}> ${BREAK_MIN}분 넘게 이어서 쓰면 ‘쉬었다 해요’ 알림</label>
             <label class="check"><input type="checkbox" data-opt="weekSummary" ${S.weekSummary !== false ? 'checked' : ''}> 한 주를 처음 열 때(월요일) 지난주 요약 보여 주기 <button class="mini" data-x="wkopen" style="margin-left:4px">지금 보기</button></label>
@@ -11566,6 +11683,12 @@ function openSettings(focus) {
     if (focus === 'ai') setTimeout(() => { $('#set-ai', bg)?.scrollIntoView({ block: 'center' }); $('[data-aikey]', bg)?.focus(); }, 0);
     bg.addEventListener('input', e => { if (e.target.dataset && 'aikey' in e.target.dataset) { pref.aiKey = e.target.value.trim(); delete pref.aiExhausted; savePref(); } });
     bg.addEventListener('change', e => { if (e.target.dataset && 'aipaid' in e.target.dataset) { pref.aiPaid = e.target.checked; if (pref.aiPaid) delete pref.aiExhausted; savePref(); } });
+    bg.addEventListener('change', e => {
+        const k = e.target.dataset && e.target.dataset.sset; if (!k) return;
+        if (k === 'dayGoal') { const v = Math.round(Number(e.target.value)); S.dayGoal = v > 0 ? v : 8000; e.target.value = S.dayGoal; }
+        else { S.workHours = e.target.value.trim() || '9-12, 14-16'; e.target.value = rpParseBands(S.workHours).map(([a, b]) => `${a}-${b}`).join(', '); S.workHours = e.target.value; }
+        touch(S);
+    });
     bg.addEventListener('change', e => {
         const o = e.target.dataset && e.target.dataset.opt; if (!o) return;
         S[o] = e.target.checked; touch(S); applyPref(); refreshLiveSpell(); refreshRepeat();

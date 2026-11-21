@@ -14197,7 +14197,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
         })();
 
-        function switchTab(tabName) { try { galaxySeals(); } catch (e) {} try { candyStripe(); } catch (e) {} 
+        function switchTab(tabName) { try { galaxySeals(); } catch (e) {} try { candyStripe(); } catch (e) {} if (tabName === 'daily' || tabName === 'write') setTimeout(() => { try { novelAutoSync(30000); } catch (e) {} }, 400);
             document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active')); 
             document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active')); 
             document.getElementById(`nav-${tabName}`).classList.add('active'); 
@@ -30886,7 +30886,10 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             const works = {};
             const docs = await Promise.all([...wids].map(id => col.doc(id).get().catch(() => null)));
             docs.forEach(d => { if (!d || !d.exists) return; try { const r = JSON.parse(d.data().json); works[d.id] = (r && r.title) || ''; } catch (e) {} });
-            return { ok: true, days, works };
+            // 작업실 설정의 '정산 앱으로 자동 넘기기' 켜짐 여부
+            let sync = false;
+            try { const sd = await col.doc('settings').get(); if (sd.exists) { const r = JSON.parse(sd.data().json); sync = !!(r && r.royaltySync); } } catch (e) {}
+            return { ok: true, days, works, sync };
         }
 
         // 세션들 → { 정산 날짜: { 작업실 작품id: { 칸(시): 글자수 } } }
@@ -31059,6 +31062,62 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             });
         }
 
+        // ── 작업실 → 상세 기록 자동 넘기기 ──
+        // 작업실 설정(기타 탭)의 '정산 앱 상세 기록으로 자동 넘기기'가 켜져 있으면, 정산 앱을 열 때·돌아올 때·집필 탭을 볼 때
+        // 최근 7일 작업실 기록을 알아서 채운다. 직접 적은 칸은 건드리지 않고, 연결은 '작업실에서 가져오기'에서 고른 것(없으면 같은 제목)을 쓴다.
+        let _novelAutoAt = 0, _novelAutoBusy = false, _novelAutoWarned = '';
+        async function novelAutoSync(minGap = 120000) {
+            if (_novelAutoBusy || Date.now() - _novelAutoAt < minGap) return;
+            if (!ipcRenderer) {
+                if (!window.__novelCloudReady || typeof firebase === 'undefined' || !firebase.apps?.length || !firebase.auth().currentUser) return;
+            }
+            if (document.getElementById('novel-import-modal')?.classList.contains('open')) return;   // 손으로 가져오는 중
+            _novelAutoBusy = true; _novelAutoAt = Date.now();
+            try {
+                const to = novelDayKey(new Date()), from = novelShiftDay(to, -6);
+                const res = await novelFetchSessions(novelShiftDay(from, -1), novelShiftDay(to, 1));
+                if (!res || !res.ok || !res.sync) return;
+                // 입력하는 중이면 표를 다시 그리지 않게 다음 기회로
+                const ae = document.activeElement;
+                if (ae && (ae.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName))) { _novelAutoAt = Date.now() - minGap + 20000; return; }
+                const all = novelSessionsToSlots(res.days || []), slots = {};
+                Object.keys(all).forEach(ds => { if (ds >= from && ds <= to) slots[ds] = all[ds]; });
+                const items = novelTargetItems(), map = {}, missing = [];
+                const wids = new Set(); Object.values(slots).forEach(byW => Object.keys(byW).forEach(w => wids.add(w)));
+                wids.forEach(wid => {
+                    const title = (res.works || {})[wid] || '';
+                    const has = Object.prototype.hasOwnProperty.call(novelWorkMap, wid), saved = has ? novelWorkMap[wid] : null;
+                    const key = (saved === '' || (saved && items.some(it => it.id === saved))) ? saved : novelAutoKey(title, items);
+                    map[wid] = key;
+                    if (!key && saved !== '') missing.push(title || '이름 없는 작품');
+                });
+                const dates = []; for (let d = from; d <= to; d = novelShiftDay(d, 1)) dates.push(d);
+                const snap = () => JSON.stringify(dates.map(d => writerDailyData[d] || null));
+                const before = snap();
+                const r = novelApplySlots({ from, to, slots }, map, false);
+                if (snap() !== before) {
+                    save();
+                    novelRedrawWriter();
+                    try { meShowToast(`작업실 기록을 상세 기록에 넘겼어요 (최근 7일 ${r.filled.toLocaleString()}자)`); } catch (e) {}
+                }
+                const mk = missing.sort().join('|');
+                if (mk && mk !== _novelAutoWarned) {
+                    _novelAutoWarned = mk;
+                    try { meShowToast(`연결할 작품을 못 찾았어요: ${missing.slice(0, 2).join(', ')}${missing.length > 2 ? ' 외' : ''} — '작업실에서 가져오기'에서 골라 주세요`); } catch (e) {}
+                }
+            } catch (e) { console.error('[작업실 자동 넘기기]', e); }
+            finally { _novelAutoBusy = false; }
+        }
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') setTimeout(() => novelAutoSync(), 1500); });
+        window.addEventListener('focus', () => setTimeout(() => novelAutoSync(), 1500));
+        // 상세 기록·집필 탭을 보고 있으면 몇 분마다 한 번씩
+        setInterval(() => {
+            if (document.visibilityState !== 'visible') return;
+            if (!document.getElementById('tab-daily')?.classList.contains('active') && !document.getElementById('tab-write')?.classList.contains('active')) return;
+            novelAutoSync(180000);
+        }, 60000);
+        if (ipcRenderer) setTimeout(() => novelAutoSync(0), 8000);   // PC: 켜지고 조금 뒤 (데이터 파일은 이미 읽음)
+
         function novelImportApply() {
             const st = novelImportState; if (!st) return;
             if (st.done) { closeNovelImportModal(); return; }   // 결과를 본 뒤 '닫기'
@@ -31069,6 +31128,13 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                 map[wid] = val;
                 if (val || auto || Object.prototype.hasOwnProperty.call(novelWorkMap, wid)) novelWorkMap[wid] = val;
             });
+            const { filled, skipped, report } = novelApplySlots(st, map, overwrite);
+            novelAfterApply(report);
+            novelImportReport(st, report, filled, skipped);
+        }
+
+        // 작업실 칸 채우기 (st = { from, to, slots }) — 전에 가져온 칸은 지우고 새로 채움, 직접 적은 칸은 overwrite 일 때만 바꿈
+        function novelApplySlots(st, map, overwrite) {
             const dates = [];
             for (let d = st.from; d <= st.to; d = novelShiftDay(d, 1)) dates.push(d);
             let filled = 0, skipped = 0;
@@ -31108,13 +31174,21 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             });
             writerPositionCache = {};
             touched.forEach(t => { const [ds, key] = t.split('\n'); try { syncWriteCompletionFromDaily(ds, key); } catch (e) {} });
+            return { filled, skipped, report };
+        }
+        function novelRedrawWriter() {
+            try { writerRenderDaily(); } catch (e) {}
+            try { writerRenderCalendar(); } catch (e) {}
+            try { if (document.getElementById('tab-write')?.classList.contains('active')) renderWriteCalendar(); } catch (e) {}
+        }
+        function novelAfterApply(report) {
             save();
             // 가져온 작품을 표에 바로 보여 준다 (다른 작품이 선택돼 있으면 바뀐 게 안 보이므로)
             const firstKey = Object.keys(report).find(k => report[k].fill.length) || Object.keys(report)[0];
             if (firstKey) writerJumpToWorkKey = firstKey;
-            try { writerRenderDaily(); } catch (e) {}
-            try { writerRenderCalendar(); } catch (e) {}
-            try { if (document.getElementById('tab-write')?.classList.contains('active')) renderWriteCalendar(); } catch (e) {}
+            novelRedrawWriter();
+        }
+        function novelImportReport(st, report, filled, skipped) {
             // 결과를 창에 남긴다 (금방 사라지는 알림만으로는 무엇이 됐는지 알기 어려움)
             const items = novelTargetItems();
             const nameOf = k => (items.find(it => it.id === k) || {}).displayTitle || (masterWorks.find(w => w.id === k) || {}).title || k;
@@ -31618,6 +31692,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                         applyAndRender(parsed);
                         try { initRemoteCovers(); } catch (e) {}
                         try { _dgbSig = ''; _dmbSig = ''; renderDashGoalBoard(true); renderDashMemoBoard(true); } catch (e) {}
+                        setTimeout(() => { try { novelAutoSync(0); } catch (e) {} }, 1000);
                     }).catch(e => console.error('[Cloud] 최신 데이터 받기 실패', e));
                 } catch (e) {}
             }
@@ -31684,6 +31759,8 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                         cloudReady = true;
                         markCloudActive();
                         closeOverlay();
+                        window.__novelCloudReady = true;
+                        setTimeout(() => { try { novelAutoSync(0); } catch (e) {} }, 2000);   // 작업실 기록 자동 넘기기 (켜 둔 경우)
                     } else {
                         document.getElementById('cloudLoginBtn').style.display = 'none';
                         document.getElementById('cloudImport').style.display = 'block';

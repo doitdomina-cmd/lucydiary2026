@@ -1589,7 +1589,8 @@ body .home .wgrid .wcard.icard:not(.pol):not([style*="--gc:#"]) { --lb: #f5f4f1;
 .wl-card h3 { margin: 0 0 4px; font-size: 15px; }
 .wl-dh { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; } .wl-dh h3 { margin: 0; }
 .wl-tag { background: #ffe9a8; color: #7a5e16; font-size: 11px; padding: 2px 9px; border-radius: 99px; font-weight: 700; }
-.wl-nv { width: 28px; height: 28px; border-radius: 50%; background: var(--panel2); font-size: 17px; line-height: 1; } .wl-fix { font-size: 12px; padding: 4px 10px; white-space: nowrap; } .wl-nv:disabled { opacity: .35; }
+.wl-nv { width: 28px; height: 28px; border-radius: 50%; background: var(--panel2); font-size: 17px; line-height: 1; } .wl-fix { font-size: 12px; padding: 4px 10px; white-space: nowrap; }
+button.wl-sc { background: none; border: 1px dashed transparent; border-radius: 8px; padding: 2px 6px; cursor: pointer; font-family: inherit; font-size: inherit; } button.wl-sc:hover { border-color: var(--line); background: var(--panel2); } button.wl-sc small { opacity: .45; font-weight: 400; } .wl-nv:disabled { opacity: .35; }
 .wl-sub { color: var(--muted); font-size: 12px; margin: 6px 0 4px; }
 .wl-empty { color: var(--muted); font-size: 13px; padding: 12px 2px; }
 .wl-kr { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; } .wl-kr > div { min-width: 90px; }
@@ -3414,29 +3415,70 @@ function wlDayCard(k) {
     const gaps = list.slice(1).map((x, i) => { const g = Math.round((x.s - list[i].e) / 6e4); return `☕ ${hm(list[i].e)}~${hm(x.s)} 쉼 ${Math.floor(g / 60) ? Math.floor(g / 60) + '시간 ' : ''}${g % 60}분`; });
     if (gaps.length) h += `<div class="wl-gp">${gaps.map(g => `<span>${g}</span>`).join('')}</div>`;
     // 세션 목록 (한 세션 안에서 작품이 여러 개면 작품별로 따로 적음)
-    h += `<div class="wl-sub" style="margin-top:14px">세션 목록</div><div class="wl-sl">${list.map((x, i) => `<div class="wl-si"><span class="wl-sn" style="background:${sessBg(x.segs)}">${i + 1}</span><div class="wl-sm"><b>${hm(x.s)} ~ ${hm(x.e)}</b> <span class="wl-sd">${sessSpanMin(x)}분${x.m && sessActMin(x) < sessSpanMin(x) ? ` · 실제로 쓴 시간 ${minTxt(sessActMin(x))}` : ''}</span> <span class="wl-dv">${devTxt(x.segs)}</span><div class="wl-sw">${Object.entries(x.w).map(([wk, W]) => `<span><b>${wkTitle(wk)}</b> <small>${Object.keys(W.e).map(e => esc(get(e)?.title || '')).filter(Boolean).join(', ')}</small> <i>+${fmt(W.c)}자</i></span>`).join('')}</div></div><span class="wl-sc">+${fmt(x.c)}자</span></div>`).join('')}</div>`;
+    h += `<div class="wl-sub" style="margin-top:14px">세션 목록</div><div class="wl-sl">${list.map((x, i) => `<div class="wl-si"><span class="wl-sn" style="background:${sessBg(x.segs)}">${i + 1}</span><div class="wl-sm"><b>${hm(x.s)} ~ ${hm(x.e)}</b> <span class="wl-sd">${sessSpanMin(x)}분${x.m && sessActMin(x) < sessSpanMin(x) ? ` · 실제로 쓴 시간 ${minTxt(sessActMin(x))}` : ''}</span> <span class="wl-dv">${devTxt(x.segs)}</span><div class="wl-sw">${Object.entries(x.w).map(([wk, W]) => `<span><b>${wkTitle(wk)}</b> <small>${Object.keys(W.e).map(e => esc(get(e)?.title || '')).filter(Boolean).join(', ')}</small> <i>+${fmt(W.c)}자</i></span>`).join('')}</div></div><button class="wl-sc" data-wlsess="${i}" title="눌러서 이 세션 글자 수 고치기">+${fmt(x.c)}자 <small>✎</small></button></div>`).join('')}</div>`;
     // 작품별 합계
     const byW = {}; list.forEach(x => Object.entries(x.w).forEach(([wk, W]) => { const o = (byW[wk] ??= { c: 0, n: 0 }); o.c += W.c; o.n++; }));
     h += `<div class="wl-sub" style="margin-top:14px">작품별로 쓴 글자</div><div class="wl-ep">${Object.entries(byW).sort((a, b) => b[1].c - a[1].c).map(([wk, o]) => `<span>${wkTitle(wk)} <small>세션 ${o.n}번</small> <b>+${fmt(o.c)}자</b></span>`).join('')}</div>`;
     return h + '</div>';
 }
-// 하루 기록 바로잡기: 그날 세션 글자들을 비율대로 줄이고(또는 늘리고) 하루 글자도 그 숫자로
+/* 기록 바로잡기 (붙여 넣기 등으로 부풀려진 숫자)
+   - 줄일 때: 1분에 SESS_SPIKE자 넘게 늘어난 '튀는 분'(붙여 넣기)부터 깎고, 그래도 넘치면 남은 세션에서 비율대로
+   - 세션 하나만 고칠 수도 있음 (세션 목록의 숫자를 누름) */
+const SESS_SPIKE = 200;
+// obj 의 숫자 칸들을 큰 것부터 cut 만큼 줄임
+function sessTake(obj, cut) { Object.keys(obj).sort((a, b) => obj[b] - obj[a]).forEach(k => { if (cut <= 0) return; const t = Math.min(cut, Math.max(0, obj[k] || 0)); obj[k] -= t; cut -= t; }); }
+// 세션 x 에서 cut 자를 뺌 (mi = 그 글자를 쓴 분, 모르면 null) — 분·구간·작품·회차 숫자를 함께 맞춤
+function sessCut(x, mi, cut) {
+    cut = Math.min(Math.round(cut), Math.max(0, x.c || 0)); if (cut <= 0) return 0;
+    x.c -= cut;
+    if (x.m) {
+        let rest = cut;
+        if (mi != null && x.m[mi]) { const t = Math.min(rest, x.m[mi]); x.m[mi] -= t; rest -= t; }
+        if (rest) sessTake(x.m, rest);
+        Object.keys(x.m).forEach(i => { if (x.m[i] <= 0) delete x.m[i]; });
+    }
+    const segs = x.segs || []; let rest = cut;
+    if (mi != null) { const ms = x.s + Number(mi) * 6e4, g = segs.find(g => ms >= g.a - 6e4 && ms <= g.b + 6e4); if (g) { const t = Math.min(rest, Math.max(0, g.c)); g.c -= t; rest -= t; } }
+    if (rest) { const o = {}; segs.forEach((g, i) => { o[i] = g.c; }); sessTake(o, rest); segs.forEach((g, i) => { g.c = o[i]; }); }
+    const W = x.w || {}, wo = {}; Object.keys(W).forEach(k => { wo[k] = W[k].c; }); sessTake(wo, cut);
+    Object.keys(W).forEach(k => { const d = W[k].c - wo[k]; W[k].c = wo[k]; if (d > 0 && W[k].e) sessTake(W[k].e, d); });
+    return cut;
+}
+function sessScaleUp(x, r) {
+    const sc = c => Math.round((Number(c) || 0) * r);
+    x.c = sc(x.c); (x.segs || []).forEach(g => { g.c = sc(g.c); });
+    if (x.m) Object.keys(x.m).forEach(i => { x.m[i] = sc(x.m[i]); });
+    Object.values(x.w || {}).forEach(W => { W.c = sc(W.c); Object.keys(W.e || {}).forEach(e => { W.e[e] = sc(W.e[e]); }); });
+}
+// 세션들(list)에서 ex 자를 뺌: 튀는 분부터, 그다음 비율대로. 실제로 뺀 글자 수를 돌려줌
+function sessCutExcess(list, ex) {
+    const ex0 = ex, spikes = [];
+    list.forEach(x => x.m && Object.entries(x.m).forEach(([i, c]) => { if (c > SESS_SPIKE) spikes.push([x, i, c]); }));
+    spikes.sort((a, b) => b[2] - a[2]).forEach(([x, i, c]) => { if (ex > 0) ex -= sessCut(x, i, Math.min(ex, c - SESS_SPIKE)); });
+    if (ex > 0) {
+        const t = list.reduce((a, x) => a + Math.max(0, x.c), 0);
+        if (t > 0) { const want = ex; list.forEach(x => { if (ex > 0) ex -= sessCut(x, null, Math.min(ex, Math.round(want * Math.max(0, x.c) / t))); }); }
+        list.slice().sort((a, b) => b.c - a.c).forEach(x => { if (ex > 0) ex -= sessCut(x, null, ex); });   // 반올림 남은 것
+    }
+    return ex0 - ex;
+}
+// 하루 기록 바로잡기: 그날 세션 글자 합을 v 로, 하루 글자도 v 로
 function sessFixDay(k, v) {
     const host = sessHost(k, false), list = host ? host.list : [];
     const tot = list.reduce((a, x) => a + Math.max(0, x.c || 0), 0);
-    if (tot > 0) {
-        const r = v / tot, sc = c => Math.round((Number(c) || 0) * r);
-        list.forEach(x => {
-            x.c = sc(x.c);
-            (x.segs || []).forEach(g => { g.c = sc(g.c); });
-            if (x.m) Object.keys(x.m).forEach(i => { x.m[i] = sc(x.m[i]); if (!x.m[i]) delete x.m[i]; });
-            Object.values(x.w || {}).forEach(W => { W.c = sc(W.c); Object.keys(W.e || {}).forEach(e => { W.e[e] = sc(W.e[e]); }); });
-        });
-        const diff = v - list.reduce((a, x) => a + x.c, 0);   // 반올림 차이는 가장 큰 세션에
-        if (diff && list.length) { const big = list.reduce((m, x) => x.c > m.c ? x : m, list[0]); big.c += diff; const W = Object.values(big.w || {})[0]; if (W) W.c += diff; }
-        touch(host);
-    }
+    if (tot > v) sessCutExcess(list, tot - v);
+    else if (v > tot && tot > 0) { list.forEach(x => sessScaleUp(x, v / tot)); const big = list.reduce((m, x) => x.c > m.c ? x : m, list[0]); const d = v - list.reduce((a, x) => a + x.c, 0); if (d) { big.c += d; const W = Object.values(big.w || {})[0]; if (W) W.c += d; } }
+    if (host) touch(host);
     const S = stats(); S.days[k] = v; touch(S); renderToday();
+}
+// 세션 하나만 고치기 — 하루 글자도 그만큼 같이 바뀜
+function sessFixOne(k, idx, n) {
+    const host = sessHost(k, false), x = host && host.list[idx]; if (!x) return;
+    const old = Math.max(0, x.c || 0);
+    if (n < old) sessCutExcess([x], old - n);
+    else if (n > old) { if (old > 0) sessScaleUp(x, n / old); x.c = n; const W = Object.values(x.w || {}).sort((a, b) => b.c - a.c)[0]; if (W) W.c += n - Object.values(x.w).reduce((a, w) => a + w.c, 0); }
+    touch(host);
+    const S = stats(); S.days[k] = Math.max(0, (S.days[k] || 0) + (x.c - old)); touch(S); renderToday();
 }
 function wlGrass(weeks) {
     const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -3902,11 +3944,22 @@ function openWriteLog(k) {
         if (e.target.closest('[data-wl="back"]')) { mode = 'log'; draw(); $('.wl-modal', bg).scrollTop = 0; return; }
         if (e.target.closest('[data-wl="fix"]')) {
             const k = wlDay || todayKey(), cur = sessOfDay(k).reduce((a, x) => a + Math.max(0, x.c || 0), 0) || stats().days[k] || 0;
-            ask(`${k} 실제로 늘어난 글자 수 (공백 제외) — 지금 ${fmt(cur)}자로 잡혀 있어요. 시간대별 글자는 비율대로 줄여요.`, String(cur), 'number').then(v => {
+            ask(`${k} 실제로 늘어난 글자 수 (공백 제외) — 지금 ${fmt(cur)}자로 잡혀 있어요. 1분에 ${SESS_SPIKE}자 넘게 튄 때(붙여 넣기)부터 빼요. 세션 하나만 고치려면 세션 목록의 숫자를 누르세요.`, String(cur), 'number').then(v => {
                 if (v == null || v === '') return;
                 const n = Math.round(Number(String(v).replace(/[,\s]/g, '')));
                 if (!(n >= 0)) { toast('숫자로 적어 주세요.'); return; }
                 sessFixDay(k, n); draw(); toast(`${k} 기록을 ${fmt(n)}자로 고쳤어요.`);
+            });
+            return;
+        }
+        const sb = e.target.closest('[data-wlsess]');
+        if (sb) {
+            const k = wlDay || todayKey(), i = +sb.dataset.wlsess, x = sessOfDay(k)[i]; if (!x) return;
+            ask(`${hm(x.s)}~${hm(x.e)} 세션에서 실제로 쓴 글자 수 (공백 제외) — 지금 ${fmt(x.c)}자. 하루 글자도 그만큼 같이 바뀌어요.`, String(x.c), 'number').then(v => {
+                if (v == null || v === '') return;
+                const n = Math.round(Number(String(v).replace(/[,\s]/g, '')));
+                if (!(n >= 0)) { toast('숫자로 적어 주세요.'); return; }
+                sessFixOne(k, i, n); draw(); toast(`세션 기록을 ${fmt(n)}자로 고쳤어요.`);
             });
             return;
         }

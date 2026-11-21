@@ -11520,8 +11520,9 @@ function navStart() {
     curNav = navState();
     try {
         // 작품 화면으로 바로 켜졌어도 뒤로가기는 메인(작품 목록)으로 가도록 아래에 메인 칸을 깔아 둠
-        if (!curNav.home) { history.replaceState({ nav: { home: true } }, ''); history.pushState({ nav: curNav }, ''); navOverHome = true; }
-        else history.replaceState({ nav: curNav }, '');
+        // 메인(작품 목록)은 '바닥 칸 + 덮개 칸' 두 겹: 메인에서 뒤로 가기를 눌러도 사이트를 빠져나가지 않음
+        history.replaceState({ nav: { home: true }, base: true }, ''); history.pushState({ nav: { home: true } }, '');
+        if (!curNav.home) { history.pushState({ nav: curNav }, ''); navOverHome = true; }
     } catch (e) {}
     navReady = true;
 }
@@ -11543,7 +11544,9 @@ function closeTopOverlay() {
 window.addEventListener('popstate', e => {
     if (!navReady) return;
     if (closeTopOverlay()) { try { history.pushState({ nav: curNav }, ''); } catch (_) {} return; }
-    const st = e.state && e.state.nav; if (!st) return;
+    const st = e.state && e.state.nav;
+    if (e.state && e.state.base && curNav && curNav.home && !navApplying) { try { history.pushState({ nav: { home: true } }, ''); } catch (_) {} return; } // 메인에서 또 뒤로 가기: 덮개 칸을 다시 얹어 그대로 머무름
+    if (!st) { try { history.pushState({ nav: { home: true } }, ''); } catch (_) {} return; }
     navApplying = true;
     // 작품에서 뒤로 갔는데 도착한 칸이 (예전에 쓰던) 다른 작품 칸이면, 그 작품으로 가지 말고 메인으로 — 칸도 메인으로 고쳐 둠
     if (!st.home && curNav && !curNav.home) {

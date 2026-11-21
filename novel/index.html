@@ -1562,6 +1562,15 @@ body .home .wgrid .wcard.icard:not(.pol):not([style*="--gc:#"]) { --lb: #f5f4f1;
 .wl-hb { display: flex; gap: 2px; align-items: flex-end; height: 88px; border-bottom: 1.5px solid var(--line); }
 .wl-hbc { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; font-size: 10px; color: var(--muted); position: relative; }
 .wl-hbv { width: 100%; border-radius: 3px 3px 0 0; } .wl-hbc span { position: absolute; bottom: -15px; }
+.wl-vt { position: relative; margin: 6px 0 4px 40px; border-left: 1.5px solid var(--line); }
+.wl-vl { position: absolute; left: 0; right: 0; border-top: 1px solid var(--line); height: 0; } .wl-vl span { position: absolute; left: -40px; top: -7px; width: 34px; text-align: right; font-size: 10px; color: var(--muted); }
+.wl-vh { position: absolute; right: 0; height: 20px; border-radius: 4px 0 0 4px; opacity: .45; }
+.wl-vb { position: absolute; left: 6px; width: 62%; border-radius: 8px; padding: 3px 8px; color: #fff; font-size: 11px; line-height: 1.3; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.15); box-sizing: border-box; }
+.wl-vb b { display: block; font-size: 12px; } .wl-vb span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wl-wk { display: flex; gap: 6px; padding-left: 34px; position: relative; } .wl-wa { position: absolute; left: 0; top: 0; width: 32px; } .wl-wa span { position: absolute; right: 2px; font-size: 10px; color: var(--muted); transform: translateY(-50%); }
+.wl-wc { flex: 1; min-width: 0; text-align: center; cursor: pointer; font-size: 11px; } .wl-wc > b { display: block; font-size: 11px; margin-bottom: 4px; height: 14px; }
+.wl-wcb { position: relative; background: var(--panel2); border-radius: 8px; overflow: hidden; } .wl-wcb u { position: absolute; left: 0; right: 0; height: 1px; background: var(--line); } .wl-wcb em { position: absolute; left: 12%; right: 12%; border-radius: 4px; opacity: .92; }
+.wl-wc > span { display: block; margin-top: 4px; color: var(--muted); font-size: 10px; line-height: 1.35; }
 .wl-tb, .wl-tb2 { position: relative; height: 24px; background: var(--panel2); border-radius: 6px; overflow: hidden; }
 .wl-tb u, .wl-tb2 u { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--line); }
 .wl-tb em, .wl-tb2 em { position: absolute; top: 3px; bottom: 3px; border-radius: 5px; opacity: .92; }
@@ -3285,13 +3294,16 @@ function wlDayCard(k) {
     const dayTot = stats().days[k] || 0;
     if (!list.length) return h + `<div class="wl-empty">${dayTot ? `이 날은 ${fmt(dayTot)}자를 썼어요. (시간 기록은 이 기능을 켠 뒤부터 남아요)` : '이 날은 쓴 기록이 없어요.'}</div></div>`;
     h += `<div class="wl-kr"><div><small>세션</small><b>${list.length}번</b></div><div><small>집필 시간</small><b>${Math.floor(mins / 60) ? Math.floor(mins / 60) + '시간 ' : ''}${mins % 60}분</b></div><div><small>늘어난 글자</small><b>+${fmt(tot)}자</b></div><div><small>시간당</small><b>${mins ? fmt(Math.round(tot / (mins / 60))) : 0}자</b></div><div><small>첫 시작~마지막</small><b>${hm(list[0].s)}~${hm(list[list.length - 1].e)}</b></div></div>`;
-    // 시간별 글자 막대
+    // 세로 시간표: 위에서 아래로 0시~24시. 왼쪽 시각, 가운데 세션 막대, 오른쪽 시간별 글자 막대
     const hb = Array.from({ length: 24 }, () => ({ ph: 0, pc: 0 }));
     list.forEach(x => x.segs.forEach(g => { const a = msHour(g.a), b = Math.max(msHour(g.b), a + 0.0001), span = b - a; for (let hr = Math.floor(a); hr <= Math.min(23, Math.floor(b)); hr++) { const ov = Math.max(0, Math.min(b, hr + 1) - Math.max(a, hr)); hb[hr][g.d] += g.c * (ov / span); } }));
-    const hmx = Math.max(1, ...hb.map(x => x.ph + x.pc));
-    h += `<div class="wl-sub">시간별로 쓴 글자</div><div class="wl-hb">${hb.map((x, i) => `<div class="wl-hbc"><div class="wl-hbv" style="height:${(x.ph + x.pc) ? (x.ph + x.pc) / hmx * 70 + 3 : 0}px;background:${x.ph > x.pc ? SESS_PH : SESS_PC}"></div><span>${i % 3 === 0 ? i : ''}</span></div>`).join('')}</div>`;
-    // 하루 흐름 + 쉬는 시간
-    h += `<div class="wl-sub" style="margin-top:18px">하루 흐름</div><div class="wl-tb">${[3, 6, 9, 12, 15, 18, 21].map(x => `<u style="left:${x / 24 * 100}%"></u>`).join('')}${list.map(x => `<em style="left:${msHour(x.s) / 24 * 100}%;width:${Math.max(0.6, (x.e - x.s) / 36e5 / 24 * 100)}%;background:${sessBg(x.segs)}"></em>`).join('')}</div>`;
+    const hmx = Math.max(1, ...hb.map(x => x.ph + x.pc)), RH = 30;
+    // 쓴 시간 앞뒤 1시간만 보여 줌 (빈 새벽·낮이 길게 늘어나지 않게)
+    const lo = Math.max(0, Math.floor(Math.min(...list.map(x => msHour(x.s)))) - 1), hi = Math.min(24, Math.ceil(Math.max(...list.map(x => Math.max(msHour(x.e), msHour(x.s) + 0.15)))) + 1);
+    h += `<div class="wl-sub">하루 시간표 <span style="opacity:.7">· 막대 = 세션, 오른쪽 = 시간별로 쓴 글자</span></div><div class="wl-vt" style="height:${(hi - lo) * RH}px">
+        ${Array.from({ length: hi - lo + 1 }, (_, i) => `<div class="wl-vl" style="top:${i * RH}px"><span>${lo + i}시</span></div>`).join('')}
+        ${hb.map((x, i) => (x.ph + x.pc) ? `<div class="wl-vh" style="top:${(i - lo) * RH + 5}px;width:${(x.ph + x.pc) / hmx * 100}%;max-width:22%;background:${x.ph > x.pc ? SESS_PH : SESS_PC}"></div>` : '').join('')}
+        ${list.map(x => { const a = msHour(x.s), b = Math.max(msHour(x.e), a + 0.15); return `<div class="wl-vb" style="top:${(a - lo) * RH}px;height:${Math.max(18, (b - a) * RH)}px;background:${sessBg(x.segs).replace('90deg', '180deg')}"><b>${hm(x.s)}~${hm(x.e)}</b>${Object.entries(x.w).map(([wk, W]) => `<span>${wkTitle(wk)} +${fmt(W.c)}</span>`).join('')}</div>`; }).join('')}</div>`;
     const gaps = list.slice(1).map((x, i) => { const g = Math.round((x.s - list[i].e) / 6e4); return `☕ ${hm(list[i].e)}~${hm(x.s)} 쉼 ${Math.floor(g / 60) ? Math.floor(g / 60) + '시간 ' : ''}${g % 60}분`; });
     if (gaps.length) h += `<div class="wl-gp">${gaps.map(g => `<span>${g}</span>`).join('')}</div>`;
     // 세션 목록 (한 세션 안에서 작품이 여러 개면 작품별로 따로 적음)
@@ -3333,12 +3345,12 @@ function wlHeat(days) {
     return `<div class="wl-hm"><div class="wl-hl">${WD.map(n => `<span>${n}</span>`).join('')}</div><div><div class="wl-hh">${Array.from({ length: 24 }, (_, h) => `<span>${h % 3 === 0 ? h + '시' : ''}</span>`).join('')}</div>${cell.map(r => `<div class="wl-hr">${r.map(c => `<i style="background:${sessCell(lv(c.ph + c.pc), c.ph >= 1, c.pc >= 1)}"></i>`).join('')}</div>`).join('')}</div></div>`;
 }
 function wlWeek() {
-    const today = new Date(); let h = `<div class="wl-tl"><div class="wl-ta">${[0, 3, 6, 9, 12, 15, 18, 21, 24].map(x => `<span style="left:${x / 24 * 100}%">${x}</span>`).join('')}</div>`;
+    const today = new Date(), WD = ['일', '월', '화', '수', '목', '금', '토'], RH = 14; let cols = '';
     for (let i = 6; i >= 0; i--) {
-        const D = new Date(today); D.setDate(D.getDate() - i); const k = dayKeyOfMs(D.getTime()), list = sessOfDay(k), WD = ['일', '월', '화', '수', '목', '금', '토'];
-        h += `<div class="wl-tr" data-wlday="${k}"><b>${D.getMonth() + 1}/${D.getDate()} (${WD[D.getDay()]})</b><div class="wl-tb2">${[3, 6, 9, 12, 15, 18, 21].map(x => `<u style="left:${x / 24 * 100}%"></u>`).join('')}${list.map(x => `<em style="left:${msHour(x.s) / 24 * 100}%;width:${Math.max(0.6, (x.e - x.s) / 36e5 / 24 * 100)}%;background:${sessBg(x.segs)}"></em>`).join('')}</div><span class="wl-ts">${list.length ? `${list.length}세션 · +${fmt(list.reduce((a, x) => a + x.c, 0))}자` : (stats().days[k] ? `+${fmt(stats().days[k])}자` : '쉬는 날')}</span></div>`;
+        const D = new Date(today); D.setDate(D.getDate() - i); const k = dayKeyOfMs(D.getTime()), list = sessOfDay(k);
+        cols += `<div class="wl-wc" data-wlday="${k}"><b>${D.getMonth() + 1}/${D.getDate()} (${WD[D.getDay()]})</b><div class="wl-wcb" style="height:${24 * RH}px">${[3, 6, 9, 12, 15, 18, 21].map(x => `<u style="top:${x * RH}px"></u>`).join('')}${list.map(x => { const a = msHour(x.s), b = Math.max(msHour(x.e), a + 0.15); return `<em style="top:${a * RH}px;height:${Math.max(4, (b - a) * RH)}px;background:${sessBg(x.segs).replace('90deg', '180deg')}"></em>`; }).join('')}</div><span>${list.length ? `${list.length}세션<br>+${fmt(list.reduce((a, x) => a + x.c, 0))}자` : (stats().days[k] ? `+${fmt(stats().days[k])}자` : '쉼')}</span></div>`;
     }
-    return h + '</div>';
+    return `<div class="wl-wk"><div class="wl-wa">${[0, 3, 6, 9, 12, 15, 18, 21, 24].map(x => `<span style="top:${x * RH + 18}px">${x}시</span>`).join('')}</div>${cols}</div>`;
 }
 function wlDist(days) {
     const cnt = [0, 0, 0, 0, 0], today = new Date();

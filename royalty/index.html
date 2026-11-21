@@ -29886,7 +29886,8 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             }
             return tip;
         }
-        function writerCreateDoughnut(canvasId, current, goal, color, breakdown) {
+        const WRITER_DAY_MINT = '#7ED3B2';
+        function writerCreateDoughnut(canvasId, current, goal, color, breakdown, keepColor) {   // keepColor: 견출지에서도 테이프 순서 색 대신 받은 색(장르·민트)을 줄무늬로
             const canvas = document.getElementById(canvasId); if (!canvas) return;
             const existing = Chart.getChart(canvas); if (existing) try { existing.destroy(); } catch(e) {}
             let data, bg;
@@ -29908,6 +29909,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                 bg = bg.map(cc => {
                     if (typeof cc !== 'string' || cc.toLowerCase() === _tr) return cc;
                     if (cc.toLowerCase() === '#cbd5e0') return '#E6DCC4';
+                    if (keepColor) return chartLabelTape(chartPastelFill(cc));
                     return chartLabelTape(LABEL_TAPES[_k++ % LABEL_TAPES.length]);
                 });
             } }
@@ -31246,11 +31248,11 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                     const per = Math.min((total/goal)*100, 100).toFixed(0);
                     document.getElementById('w-workTotalText').textContent = `${total.toLocaleString()} / ${goal.toLocaleString()}자`;
                     document.getElementById('w-workTotalPerCenter').textContent = `${per}%`;
-                    if (updateChart) writerCreateDoughnut('w-workTotalChart', total, goal, getGenreColor(work.genre) || primary);
+                    if (updateChart) writerCreateDoughnut('w-workTotalChart', total, goal, getGenreColor(work.genre) || primary, undefined, true);   // 진행률 = 장르 색
                 } else {
                     document.getElementById('w-workTotalText').textContent = `누적 ${total.toLocaleString()}자`;
                     document.getElementById('w-workTotalPerCenter').textContent = total.toLocaleString();
-                    if (updateChart) writerCreateDoughnut('w-workTotalChart', Math.min(total,200000), Math.max(total,200000)||1, getGenreColor(work.genre) || primary);
+                    if (updateChart) writerCreateDoughnut('w-workTotalChart', Math.min(total,200000), Math.max(total,200000)||1, getGenreColor(work.genre) || primary, undefined, true);
                 }
 
                 const deadlineLabel = (extra ? extra.manuscriptDate : work.manuscriptDate) ? '완고 입고' : '출간일';
@@ -31280,11 +31282,11 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             if (dayGoalToday > 0) {
                 document.getElementById('w-dailyGoalText').textContent = `${dayTotal.toLocaleString()} / ${dayGoalToday.toLocaleString()}자`;
                 document.getElementById('w-dailyGoalPerCenter').textContent = `${((dayTotal/dayGoalToday)*100).toFixed(0)}%`;
-                if (updateChart) writerCreateDoughnut('w-dailyGoalChart', dayTotal, dayGoalToday, '#f2a4b6');
+                if (updateChart) writerCreateDoughnut('w-dailyGoalChart', dayTotal, dayGoalToday, WRITER_DAY_MINT, undefined, true);   // 오늘 하루 = 민트
             } else {
                 document.getElementById('w-dailyGoalText').textContent = `${dayTotal.toLocaleString()}자`;
                 document.getElementById('w-dailyGoalPerCenter').textContent = '';
-                if (updateChart) writerCreateDoughnut('w-dailyGoalChart', dayTotal, Math.max(dayTotal,1), '#f2a4b6');
+                if (updateChart) writerCreateDoughnut('w-dailyGoalChart', dayTotal, Math.max(dayTotal,1), WRITER_DAY_MINT, undefined, true);
             }
         }
 

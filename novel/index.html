@@ -1533,8 +1533,13 @@ body .home .wgrid .wcard.icard:not(.pol):not([style*="--gc:#"]) { --lb: #f5f4f1;
 .wcard { background: var(--panel); border: 1px solid var(--line); border-top: 4px solid var(--gc); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; cursor: pointer; transition: transform .12s, box-shadow .12s; min-height: 150px; }
 .wb-fe { position: fixed; inset: 0; z-index: 9998; display: flex; flex-direction: column; background: #fffdf4; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
 .wfe-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1.5px dashed var(--line); background: var(--panel); }
-.wfe-x { font-size: 15px; padding: 7px 14px; border-radius: 999px; border: 1.5px dashed var(--line); background: #fff; color: var(--text); }
-.wfe-ta { flex: 1; width: 100%; border: 0; outline: 0; resize: none; padding: 16px 18px 40px; font: 17px/1.75 var(--ui-font, 'Pretendard', sans-serif); background: transparent; color: var(--text); box-sizing: border-box; }
+@media (max-width: 700px) { html body .pomo-dock, html body .pomo-top { display: none !important; } } /* 폰에서는 뽀모(뽀모도로) 카드를 숨김 */
+.wfe-dock { display: flex; justify-content: flex-end; gap: 8px; padding: 8px 12px; border-top: 1.5px dashed var(--line); background: var(--panel); }
+.wfe-b { box-sizing: border-box; width: 44px; height: 38px; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; background: #fff1b8; color: #6b5414; border: 1px solid #ecd78c; box-shadow: 0 1px 3px rgba(150,120,30,.18); }
+.wfe-b:active { background: #ffe68a; }
+.wfe-b.wfe-close { background: #e2736d; border-color: #cf5b55; color: #fff; }
+.wfe-b .ic { width: 19px; height: 19px; }
+.wfe-ta { flex: 1; width: 100%; border: 0; outline: 0; resize: none; padding: 16px 18px 24px; font: 17px/1.75 var(--ui-font, 'Pretendard', sans-serif); background: transparent; color: var(--text); box-sizing: border-box; }
 .wcard.wdone { opacity: .8; }
 .wcard.wdone:hover { opacity: 1; }
 .wcard.drag-src { opacity: .35; }
@@ -4750,12 +4755,18 @@ function wbFullEdit(n) {
     wbPush();
     const tag = (n.tag || '').trim();
     const el = document.createElement('div'); el.className = 'wb-fe';
-    el.innerHTML = `<div class="wfe-head"><span class="pi-tag" style="--tc:${tag ? wbTagColor(tag) : 'var(--muted)'}">${tag ? wbTagHtml(tag) : '주제 없음'}</span><span style="flex:1"></span><button class="wfe-x" data-fe="close">닫기 ✕</button></div>
-        <textarea class="wfe-ta" data-id="${n.id}" data-field="body" placeholder="메모" style="${n.fs ? `font-size:${Math.max(16, n.fs)}px;` : ''}${wbFontOf(n) ? `font-family:${wbFontOf(n)[2]};` : ''}">${esc(n.body || '')}</textarea>`;
+    el.innerHTML = `<div class="wfe-head"><span class="pi-tag" style="--tc:${tag ? wbTagColor(tag) : 'var(--muted)'}">${tag ? wbTagHtml(tag) : '주제 없음'}</span></div>
+        <textarea class="wfe-ta" data-id="${n.id}" data-field="body" placeholder="메모" style="${n.fs ? `font-size:${Math.max(16, n.fs)}px;` : ''}${wbFontOf(n) ? `font-family:${wbFontOf(n)[2]};` : ''}">${esc(n.body || '')}</textarea>
+        <div class="wfe-dock"><button class="wfe-b" data-fe="copy" title="이 메모 복사"><i class="ic ic-copy"></i></button><button class="wfe-b wfe-close" data-fe="close" title="닫기"><i class="ic ic-x"></i></button></div>`;
     document.body.appendChild(el);
     const ta = $('.wfe-ta', el);
-    const close = () => { el.remove(); wbHistSave(); try { renderNotes(); } catch (_) {} };
-    el.addEventListener('click', e => { if (e.target.closest('[data-fe="close"]')) close(); });
+    const vv = window.visualViewport, fit = () => { if (vv) { el.style.height = vv.height + 'px'; el.style.top = vv.offsetTop + 'px'; } };
+    const close = () => { vv && vv.removeEventListener('resize', fit); vv && vv.removeEventListener('scroll', fit); el.remove(); wbHistSave(); try { renderNotes(); } catch (_) {} };
+    if (vv) { vv.addEventListener('resize', fit); vv.addEventListener('scroll', fit); fit(); } // 키보드가 올라와도 아래 버튼이 가려지지 않게
+    el.addEventListener('click', e => {
+        if (e.target.closest('[data-fe="close"]')) close();
+        if (e.target.closest('[data-fe="copy"]')) { const t = ta.value; (navigator.clipboard?.writeText(t) || Promise.reject()).then(() => toast('복사했어요.'), () => { ta.select(); try { document.execCommand('copy'); toast('복사했어요.'); } catch (_) {} }); }
+    });
     ta.focus({ preventScroll: true }); const L = ta.value.length; try { ta.setSelectionRange(L, L); } catch (_) {}
 }
 function piHtml(n, mode) {

@@ -11518,17 +11518,18 @@ function navSync() {
 }
 function navStart() {
     curNav = navState();
-    try { history.replaceState({ nav: curNav }, ''); } catch (e) {}
-    navReady = true;
-}
-// 메인 아래 '바닥 칸 + 덮개 칸'은 첫 터치·키 입력 뒤에 깖: 폰 브라우저(크롬)는 사용자가 만지기 전에 스크립트가 쌓은 기록 칸을 뒤로 가기 때 건너뛰어서, 켜자마자 깔면 뒤로 가기가 사이트를 빠져나가 버림
-let navArmed = false;
-function navArm() {
-    if (navArmed || !navReady) return; navArmed = true;
     try {
+        // 메인은 '바닥 칸 + 덮개 칸' 두 겹, 작품이면 그 위에 작품 칸: 켜자마자 바로 뒤로 가기를 눌러도 메인으로 감
         history.replaceState({ nav: { home: true }, base: true }, ''); history.pushState({ nav: { home: true } }, '');
         if (!curNav.home) { history.pushState({ nav: curNav }, ''); navOverHome = true; }
     } catch (e) {}
+    navReady = true;
+}
+// 폰 크롬은 사용자가 만지기 전에 스크립트가 쌓은 칸을 뒤로 가기 때 건너뛸 수 있어서, 첫 터치·키 입력 때 같은 칸을 한 번 더 얹어 둠
+let navArmed = false;
+function navArm() {
+    if (navArmed || !navReady) return; navArmed = true;
+    try { history.pushState({ nav: curNav, armed: true }, ''); } catch (e) {}
 }
 ['pointerdown', 'touchstart', 'keydown'].forEach(ev => window.addEventListener(ev, navArm, { capture: true, passive: true }));
 function closeTopOverlay() {

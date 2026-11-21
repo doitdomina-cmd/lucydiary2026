@@ -8392,7 +8392,10 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                                             <select id="new-work-genre" class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100 transition-all cursor-pointer" onchange="toggleStudioInput()"></select>
                                         </div>
                                         <div>
-                                            <label class="text-sm font-bold text-slate-600 ml-1 mb-1 block">출판사</label>
+                                            <div class="flex items-center justify-between ml-1 mb-1">
+                                                <label class="text-sm font-bold text-slate-600 block">출판사</label>
+                                                <label class="flex items-center gap-1 text-xs font-bold text-slate-500 cursor-pointer select-none" title="직계: 플랫폼 수수료를 떼지 않고 전체 매출에서 바로 정산 비율만큼 받는 계약"><input type="checkbox" id="new-work-direct" class="w-3.5 h-3.5 accent-emerald-500 cursor-pointer"> 직계</label>
+                                            </div>
                                             <input list="publisher-list" type="text" id="new-work-publisher" placeholder="출판사" oninput="syncSettlementPublisher(this.value)" class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100 transition-all">
                                             <datalist id="publisher-list"></datalist>
                                         </div>
@@ -12896,12 +12899,13 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
         // 추정 총매출 공식: 총매출 × 0.7(플랫폼 30% 차감) × (rate/100) = 순수익
         // 역산: 총매출 = 순수익 ÷ (rate/100) ÷ 0.7
         // 예) 순수익 2000만, rate=70% → 2000만 / 0.7 / 0.7 ≈ 4082만 ✓
-        function calculateGrossSales(netProfit, rate) { 
+        // 직계(w.direct) 작품은 플랫폼 수수료 없이 총매출에서 바로 비율만큼 받으므로 / 0.7 을 하지 않는다
+        function calculateGrossSales(netProfit, rate, work) { 
             const r = Number(rate);
             if (!netProfit || !r || r <= 0) return 0; 
-            return Math.round(netProfit / (r / 100) / 0.7); 
+            return Math.round(netProfit / (r / 100) / (work && work.direct ? 1 : 0.7)); 
         }
-        function getCumulativeWorkData(workId) { let totalProfit = 0; Object.values(monthlyData).forEach(monthSet => { if (monthSet[workId]) totalProfit += monthSet[workId]; }); const work = masterWorks.find(w => w.id === workId); const totalSales = work ? calculateGrossSales(totalProfit, work.rate) : 0; return { totalProfit, totalSales }; }
+        function getCumulativeWorkData(workId) { let totalProfit = 0; Object.values(monthlyData).forEach(monthSet => { if (monthSet[workId]) totalProfit += monthSet[workId]; }); const work = masterWorks.find(w => w.id === workId); const totalSales = work ? calculateGrossSales(totalProfit, work.rate, work) : 0; return { totalProfit, totalSales }; }
 
         // ── 출간 일정 캘린더 ──────────────────────────────────────
         let publishCalDate = new Date();
@@ -14451,7 +14455,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                 else rateText = '-';
                 document.getElementById('memo-rate-display').innerText = rateText;
             } else {
-                document.getElementById('memo-rate-display').innerText = work.rate ? work.rate + '%' : '-';
+                document.getElementById('memo-rate-display').innerText = work.rate ? work.rate + '%' + (work.direct ? ' · 직계' : '') : '-';
             }
             const _pendingLabel = getPendingLabel(work);
             const _dateEl = document.getElementById('memo-date-display');
@@ -16400,6 +16404,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             if (extrasSec) extrasSec.classList.add('hidden');
             document.getElementById('new-work-title').value = ''; try { updateNewWorkPriorHint(); } catch (e) {}
             document.getElementById('new-work-publisher').value = '';
+            { const dr = document.getElementById('new-work-direct'); if (dr) dr.checked = false; }
             document.getElementById('new-work-studio').value = '';
             const spReset = document.getElementById('new-work-settlement-publisher'); if (spReset) spReset.value = '';
             settlementPublisherTouched = false;
@@ -16499,6 +16504,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             document.getElementById('new-work-genre').value = w.genre;
             document.getElementById('new-work-title').value = w.title; try { updateNewWorkPriorHint(); } catch (e) {}
             document.getElementById('new-work-publisher').value = w.publisher !== '-' ? w.publisher : '';
+            { const dr = document.getElementById('new-work-direct'); if (dr) dr.checked = !!w.direct; }
             document.getElementById('new-work-studio').value = (w.studio && w.studio !== '-' && w.studio !== 'undefined') ? w.studio : '';
             const spFill = document.getElementById('new-work-settlement-publisher');
             if (spFill) spFill.value = (w.settlementPublisher && w.settlementPublisher !== w.publisher) ? w.settlementPublisher : '';
@@ -16601,6 +16607,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             const isPending = document.getElementById('new-work-pending').checked || !date;   // 날짜를 안 적으면 저절로 출간 예정
             const pendingMonth = isPending ? (document.getElementById('new-work-pending-month')?.value || '') : '';
             const publisher = document.getElementById('new-work-publisher').value.trim() || '-';
+            const direct = !!document.getElementById('new-work-direct')?.checked;   // 직계: 플랫폼 수수료 없이 총매출 기준
             const studio = document.getElementById('new-work-studio').value.trim();
             const settlementPublisherRaw = document.getElementById('new-work-settlement-publisher')?.value.trim() || '';
             // 정산 출판사가 출판사와 같으면(=수동 지정 안 했으면) 굳이 저장하지 않고 출판사를 계속 따라가게 비워둔다
@@ -16642,7 +16649,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                 const w = masterWorks.find(x => x.id === editId); if (!w) return;
                 const oldManuscriptDate = w.manuscriptDate;
                 w.title = title; w.genre = genre; w.publisher = publisher || '-'; w.studio = studio || '-'; w.settlementPublisher = settlementPublisher;
-                w.rate = rate; w.rs = rs; w.webtoonRate = webtoonRate;
+                w.rate = rate; w.rs = rs; w.webtoonRate = webtoonRate; w.direct = direct;
                 w.goalNoSpace = goalNoSpace; w.goalWithSpace = goalWithSpace;
                 w.manuscriptDate = manuscriptDate;
                 w.isPending = isPending; w.pendingMonth = isPending ? pendingMonth : ''; w.publishDate = isPending ? '' : date;
@@ -16659,7 +16666,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                     const originalWork = masterWorks.find(w => w.title === title && !w.genre.includes('웹툰'));
                     if (originalWork) originalWork.hasWebtoon = true;
                 }
-                const newWork = { id: Date.now().toString(), genre, title, publisher: publisher || '-', studio: studio || '-', settlementPublisher, rate, rs, webtoonRate, goalNoSpace, goalWithSpace, manuscriptDate, publishDate: date, isPending, pendingMonth, volumes, advanceAmount: advanceAmount ? Number(advanceAmount) : '', advanceDate, contractDate };
+                const newWork = { id: Date.now().toString(), genre, title, publisher: publisher || '-', studio: studio || '-', settlementPublisher, rate, rs, webtoonRate, direct, goalNoSpace, goalWithSpace, manuscriptDate, publishDate: date, isPending, pendingMonth, volumes, advanceAmount: advanceAmount ? Number(advanceAmount) : '', advanceDate, contractDate };
                 masterWorks.push(newWork);
                 savedWorkId = newWork.id;
                 // 신규 등록 시 완고 입고일이 있으면 자동 스케줄 생성
@@ -16731,7 +16738,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                     genreList.forEach(gObj => {
                         const isWebtoonG = gObj.name && gObj.name.includes('웹툰');
                         let gCumulative = 0, gSales = 0, gYearly = {}; years.forEach(y => gYearly[y] = 0);
-                        masterWorks.filter(w => w.genre === gObj.name).forEach(w => { let wCum = 0; years.forEach(y => { for(let m=1; m<=12; m++) { const val = (monthlyData[`${y}-${String(m).padStart(2,'0')}`] || {})[w.id] || 0; gYearly[y] += val; gCumulative += val; wCum += val; } }); gSales += calculateGrossSales(wCum, w.rate); });
+                        masterWorks.filter(w => w.genre === gObj.name).forEach(w => { let wCum = 0; years.forEach(y => { for(let m=1; m<=12; m++) { const val = (monthlyData[`${y}-${String(m).padStart(2,'0')}`] || {})[w.id] || 0; gYearly[y] += val; gCumulative += val; wCum += val; } }); gSales += calculateGrossSales(wCum, w.rate, w); });
                         grandTotal += gCumulative; grandSales += gSales; years.forEach(y => yearTotals[y] += gYearly[y]);
                         const salesCellG = `<td class="text-right pr-2 text-slate-500 text-sm" style="background:#fafafa;">${currencySymbol}${formatCurrency(gSales)}</td>`;
                         html += `<tr><td class="sticky-col pl-6 font-bold text-slate-700">${gObj.name}</td><td class="text-center font-bold text-[0.85rem] grand-total-cell cum-col" style="background:#f1f5f9; border-color:#e2e8f0;">${currencySymbol}${formatCurrency(gCumulative)}</td>${salesCellG}` + years.map(y => `<td class="yr-col text-right pr-2 text-slate-500 text-sm">${currencySymbol}${formatCurrency(gYearly[y])}</td>`).join('') + `</tr>`;
@@ -16753,8 +16760,8 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                         const dateDisplay = getDateDisplay(w);
                         const advAmt = w.advanceAmount ? Number(w.advanceAmount).toLocaleString()+'만원' : '';
                         const advHtml = advAmt ? `<span class="sheet-adv-badge" style="color:#16a34a;font-size:12px;font-weight:400;margin-left:auto;padding-left:6px;white-space:nowrap;flex-shrink:0;">선인세 ${advAmt}</span>` : '';
-                        const rateTxt = (currentGenreTab !== '웹툰' && w.rate) ? ` | ${w.rate}%` : '';
-                        const wSales = calculateGrossSales(wCumulative, w.rate); totalSalesAll += wSales;
+                        const rateTxt = (currentGenreTab !== '웹툰' && w.rate) ? ` | ${w.rate}%${w.direct ? ' 직계' : ''}` : '';
+                        const wSales = calculateGrossSales(wCumulative, w.rate, w); totalSalesAll += wSales;
                         const salesCell = showSalesCol ? `<td class="text-right pr-2 text-slate-500 text-sm" style="background:#fafafa;">${currencySymbol}${formatCurrency(wSales)}</td>` : '';
                         html += `<tr><td class="sticky-col pl-6" style="min-width:156px;overflow:hidden;"><div class="font-bold text-slate-700 text-sm truncate w-full mb-1" title="${w.title}">${w.title}</div><div class="text-[11px] text-slate-400 flex items-center"><span class="sheet-pub-name">${(currentGenreTab === '웹툰' ? (w.studio || '-') : w.publisher)}${rateTxt} | </span>${dateDisplay}${advHtml}</div></td><td class="text-center font-bold text-[0.85rem] grand-total-cell cum-col" style="background:#f1f5f9; border-color:#e2e8f0;">${currencySymbol}${formatCurrency(wCumulative)}</td>${salesCell}` + years.map(y => `<td class="yr-col text-right pr-2 text-slate-600 text-sm">${currencySymbol}${formatCurrency(wYearly[y])}</td>`).join('') + `</tr>`;
                     });
@@ -16762,7 +16769,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                     masterWorks.filter(w => w.genre === genre && w.contractBroken).forEach(w => {
                         let wCum = 0;
                         years.forEach(y => { for (let m = 1; m <= 12; m++) { const val = (monthlyData[`${y}-${String(m).padStart(2,'0')}`] || {})[w.id] || 0; totalYearly[y] += val; wCum += val; } });
-                        totalCumulative += wCum; totalSalesAll += calculateGrossSales(wCum, w.rate);
+                        totalCumulative += wCum; totalSalesAll += calculateGrossSales(wCum, w.rate, w);
                     });
                     const salesFootTotal = showSalesCol ? `<td class="text-right pr-2 font-bold grand-total-cell">${currencySymbol}${formatCurrency(totalSalesAll)}</td>` : '';
                     html += `</tbody></table></div></div><div class="sheet-footer-outer"><div class="sheet-footer-inner"><table class="sheet-table"><tbody><tr class="bg-slate-100/50"><td class="sticky-col text-center font-bold text-slate-600 text-sm" style="width:156px;min-width:156px;">총합</td><td class="text-center font-bold grand-total-cell cum-col">${currencySymbol}${formatCurrency(totalCumulative)}</td>${salesFootTotal}` + years.map(y => `<td class="yr-col text-right pr-2 font-bold grand-total-cell">${currencySymbol}${formatCurrency(totalYearly[y])}</td>`).join('') + `</tr></tbody></table></div></div>`;
@@ -16793,7 +16800,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                         const dateDisplay = getDateDisplay(w);
                         const advAmt2 = w.advanceAmount ? Number(w.advanceAmount).toLocaleString()+'만원' : '';
                         const advHtml2 = advAmt2 ? `<span class="sheet-adv-badge" style="color:#16a34a;font-size:12px;font-weight:400;margin-left:auto;padding-left:6px;white-space:nowrap;flex-shrink:0;">선인세 ${advAmt2}</span>` : '';
-                        const rateTxt2 = (currentGenreTab !== '웹툰' && w.rate) ? ` | ${w.rate}%` : '';
+                        const rateTxt2 = (currentGenreTab !== '웹툰' && w.rate) ? ` | ${w.rate}%${w.direct ? ' 직계' : ''}` : '';
                         html += `<tr><td class="sticky-col pl-6"><div class="font-bold text-slate-700 text-sm truncate w-[240px] mb-1">${w.title}</div><div class="text-[11px] text-slate-400 flex items-center"><span class="sheet-pub-name">${(currentGenreTab === '웹툰' ? (w.studio || '-') : w.publisher)}${rateTxt2} | </span>${dateDisplay}${advHtml2}</div></td>`;
                         const advSums = advanceMonthSums(getWorkAdvances(w));
                         months.forEach(m => {
@@ -16945,7 +16952,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                     else if (w.webtoonRate) rateLabel = webtoonRsLabel(w);
                     else rateLabel = '';
                 } else {
-                    rateLabel = `${w.rate}%`;
+                    rateLabel = `${w.rate}%${w.direct ? '·직계' : ''}`;
                 }
                 const dateDisplay = getDateDisplay(w);
                 const studioVal = w.studio && w.studio !== '-' && w.studio !== 'undefined' ? w.studio : '';
@@ -16964,7 +16971,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                     <div class="flex items-start justify-between">
                         <span class="inline-block px-1.5 py-0.5 rounded text-[10px]" style="background-color:${badgeBg}; color:#334155">${w.genre}</span>
                         <div class="flex items-center gap-1">
-                            ${rateLabel ? `<span class="text-[10px] font-bold ${rateBadgeClass} px-1.5 py-0.5 rounded">${rateLabel}</span>` : ''}
+                            ${rateLabel ? `<span class="text-[10px] font-bold ${rateBadgeClass} px-1.5 py-0.5 rounded whitespace-nowrap">${rateLabel}</span>` : ''}
                         </div>
                     </div>
                     <h4 class="text-slate-800 text-sm font-medium truncate" title="${w.title}">${w.title}</h4>
@@ -18297,7 +18304,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                     <div class="space-y-1.5 text-[13px]">
                         <div class="flex gap-2"><span class="min-w-[86px] shrink-0 whitespace-nowrap" style="color:${workManageCardSettings.labelColor1}">출판사</span><span style="color:${workManageCardSettings.valueColors.studio}">${(w.publisher && w.publisher !== '-') ? w.publisher : ''}</span></div>
                         <div class="flex gap-2"><span class="min-w-[86px] shrink-0 whitespace-nowrap" style="color:${workManageCardSettings.labelColor1}">계약일</span><span style="color:${workManageCardSettings.valueColors.contract}">${w.contractDate || ''}</span></div>
-                        <div class="flex gap-2"><span class="min-w-[86px] shrink-0 whitespace-nowrap" style="color:${workManageCardSettings.labelColor1}">비율</span><span style="color:${workManageCardSettings.valueColors.rate}">${w.rate ? w.rate + '%' : ''}</span></div>
+                        <div class="flex gap-2"><span class="min-w-[86px] shrink-0 whitespace-nowrap" style="color:${workManageCardSettings.labelColor1}">비율</span><span style="color:${workManageCardSettings.valueColors.rate}">${w.rate ? w.rate + '%' : ''}${w.direct ? ' <span style="font-size:11.5px;opacity:.75">(직계 · 수수료 없이 총매출 기준)</span>' : ''}</span></div>
                         <div class="flex gap-2"><span class="min-w-[86px] shrink-0 whitespace-nowrap" style="color:${workManageCardSettings.labelColor1}">선인세</span><span style="color:${workManageCardSettings.valueColors.mg}">${w.advanceAmount ? Number(w.advanceAmount).toLocaleString() + '만원' : ''}</span></div>
                         <div class="wm-fit flex gap-2"><span class="min-w-[86px] shrink-0 whitespace-nowrap" style="color:${workManageCardSettings.labelColor1}">글자수</span><span style="color:${workManageCardSettings.valueColors.charcount}">${charCountText}</span></div>
                     </div>
@@ -22917,7 +22924,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             const prevMonthKey = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2,'0')}`;
             const prevMonth2Date = new Date(targetMonthDate.getFullYear(), targetMonthDate.getMonth() - 2, 1);
             const prevMonth2Key = `${prevMonth2Date.getFullYear()}-${String(prevMonth2Date.getMonth() + 1).padStart(2,'0')}`;
-            Object.entries(monthlyData).forEach(([mKey, data]) => { const parts = mKey.split('-'); if (parts.length !== 2) return; const y = parseInt(parts[0]), m = parseInt(parts[1]); Object.entries(data).forEach(([wId, val]) => { const w = masterWorks.find(x => x.id === wId); if (w) { const sales = calculateGrossSales(val, w.rate); totalProfit += val; totalSales += sales; genreStats[w.genre] = (genreStats[w.genre] || 0) + val; workStats[wId] = (workStats[wId] || 0) + (Number(val)||0); if (!workStatsByYear[y]) workStatsByYear[y] = {}; workStatsByYear[y][wId] = (workStatsByYear[y][wId] || 0) + (Number(val)||0); if (yearTotals[y]) yearTotals[y][w.genre] = (yearTotals[y][w.genre] || 0) + val; if (y === targetDashYear) { monthlyStats[m-1][w.genre] = (monthlyStats[m-1][w.genre] || 0) + val; yearProfit += val; yearSales += sales; } if (y === prevDashYear) { prevYearProfit += val; } if (mKey === targetDashMonthKey) { thisMonthProfit += val; thisMonthSales += sales; } if (mKey === prevMonthKey) { prevMonthProfit += val; } if (mKey === prevMonth2Key) { prevMonth2Profit += val; } } }); });
+            Object.entries(monthlyData).forEach(([mKey, data]) => { const parts = mKey.split('-'); if (parts.length !== 2) return; const y = parseInt(parts[0]), m = parseInt(parts[1]); Object.entries(data).forEach(([wId, val]) => { const w = masterWorks.find(x => x.id === wId); if (w) { const sales = calculateGrossSales(val, w.rate, w); totalProfit += val; totalSales += sales; genreStats[w.genre] = (genreStats[w.genre] || 0) + val; workStats[wId] = (workStats[wId] || 0) + (Number(val)||0); if (!workStatsByYear[y]) workStatsByYear[y] = {}; workStatsByYear[y][wId] = (workStatsByYear[y][wId] || 0) + (Number(val)||0); if (yearTotals[y]) yearTotals[y][w.genre] = (yearTotals[y][w.genre] || 0) + val; if (y === targetDashYear) { monthlyStats[m-1][w.genre] = (monthlyStats[m-1][w.genre] || 0) + val; yearProfit += val; yearSales += sales; } if (y === prevDashYear) { prevYearProfit += val; } if (mKey === targetDashMonthKey) { thisMonthProfit += val; thisMonthSales += sales; } if (mKey === prevMonthKey) { prevMonthProfit += val; } if (mKey === prevMonth2Key) { prevMonth2Profit += val; } } }); });
             document.getElementById('stat-total').innerText = `₩ ${formatCurrency(totalProfit)}`; const _sts=document.getElementById('stat-total-sales'); if(_sts) _sts.innerText = `₩ ${formatCurrency(totalSales)}`; document.getElementById('stat-year-profit').innerText = `₩ ${formatCurrency(yearProfit)}`; const _sys=document.getElementById('stat-year-sales'); if(_sys) _sys.innerText = `₩ ${formatCurrency(yearSales)}`; document.getElementById('dashboard-year-label').innerText = targetDashYear; document.getElementById('dashboard-month-label').innerText = dashMonthOffset === 0 ? "이번 달" : `${targetMonthDate.getFullYear()}년 ${targetMonthDate.getMonth() + 1}월`; document.getElementById('stat-month-profit').innerText = `₩ ${formatCurrency(thisMonthProfit)}`; const _sms=document.getElementById('stat-month-sales'); if(_sms) _sms.innerText = `₩ ${formatCurrency(thisMonthSales)}`; const _liveWorks = masterWorks.filter(w => !w.contractBroken); /* 계약 파기 작품은 작품 수에서 뺀다 */ document.getElementById('stat-works-count').innerText = _liveWorks.length; const _nonWt=_liveWorks.filter(w=>!(w.genre&&w.genre.includes('웹툰')));
             const _totalVols=_nonWt.reduce((s,w)=>s+(parseInt(w.volumes)||1)+(w.extras||[]).length,0);
             const _pubNonWt=_nonWt.filter(w=>isWebtoonPublished(w));
@@ -26990,7 +26997,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                 const advTxt = w.advanceAmount ? `${Number(w.advanceAmount).toLocaleString()}만원${w.advanceDate ? ` (${w.advanceDate})` : ''}` : '없음';
                 lines.push(`\n- [${w.genre || '장르 미상'}] ${w.title}  (work_id: ${w.id})`);
                 lines.push(`  출판사: ${w.publisher || '-'}${w.settlementPublisher ? ` (정산처: ${w.settlementPublisher})` : ''} · 플랫폼: ${(workManage[w.id] || {}).launchPlatform || '-'} · 프로모션: ${(workManage[w.id] || {}).promotion || '-'}`);
-                lines.push(`  정산 비율: ${w.rate || 0}% · 선인세: ${advTxt}`);
+                lines.push(`  정산 비율: ${w.rate || 0}%${w.direct ? ' (직계·총매출 기준)' : ''} · 선인세: ${advTxt}`);
                 lines.push(`  출간: ${getPendingLabel(w)}`);
                 lines.push(`  누적 순수익: ₩${formatCurrency(totalProfit)} · 추정 총매출: ₩${formatCurrency(totalSales)}`);
             });

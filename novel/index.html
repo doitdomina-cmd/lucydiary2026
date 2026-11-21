@@ -627,6 +627,10 @@ body.tw-ov .manuscript[contenteditable="true"] { caret-color: transparent; }
 #col-notes.no-board .free-note textarea { flex: 1; height: auto; max-height: none; resize: none; }
 .fn-head, .board-head { display: flex; align-items: center; gap: 4px; padding: 4px 8px; font-size: 11px; color: var(--muted); min-height: 30px; }
 .fn-head b, .board-head b { color: var(--text); }
+.fn-head[data-fn] { cursor: pointer; user-select: none; }
+.fn-caret { width: 14px; text-align: center; color: var(--muted); font-size: 12px; }
+.free-note.fn-closed textarea { display: none; }
+#col-notes.no-board .free-note.fn-closed { flex: none; }
 .free-note textarea { height: 150px; min-height: 60px; max-height: 70vh; resize: vertical; border: 0; outline: none; background: var(--panel); padding: 4px 12px 10px; font-size: 12px; line-height: 1.7; }
 .board-head { border-bottom: 1px solid var(--line); background: var(--panel2); flex: none; }
 /* 화이트보드 */
@@ -2299,7 +2303,7 @@ nav.mtabs { display: none; }
     <section class="col" id="col-notes">
         <div class="pomo-dock" id="pomo-dock"></div>
         <div class="free-note">
-            <div class="fn-head"><i class="ic ic-pin"></i> <b>프리 노트</b><span style="flex:1"></span><span>회차를 옮겨도 그대로</span></div>
+            <div class="fn-head" data-fn="toggle" title="눌러서 접기 · 펴기"><span class="fn-caret">▾</span><i class="ic ic-pin"></i> <b>프리 노트</b><span style="flex:1"></span><span>회차를 옮겨도 그대로</span></div>
             <textarea id="free-note" data-field="body" placeholder="연재 메모, 금지어, 떠오른 아이디어를 적어 두세요"></textarea>
         </div>
         <div class="board-head" id="board-head"></div>
@@ -4515,7 +4519,12 @@ function freeNote() {
     const id = 'free_' + curWorkId();
     return get(id) || create('freenote', { id, workId: curWorkId(), body: '' });
 }
+// 프리 노트 접기·펴기: 기기마다 따로 기억. 처음(기억 없음)에는 폰에서만 접혀 있어서 화이트보드가 넓게 보임
+const fnOpen = () => pref.fnOpen != null ? !!pref.fnOpen : !WB_PHONE();
+function fnApply() { const box = $('.free-note'); if (!box) return; const o = fnOpen(); box.classList.toggle('fn-closed', !o); const c = $('.fn-caret', box); if (c) c.textContent = o ? '▾' : '▸'; }
+document.addEventListener('click', e => { if (e.target.closest('.fn-head[data-fn="toggle"]')) { pref.fnOpen = !fnOpen(); savePref(); fnApply(); } });
 function renderFreeNote() {
+    fnApply();
     const fn = freeNote(), ta = $('#free-note');
     ta.dataset.id = fn.id;
     if (document.activeElement !== ta && ta.value !== fn.body) ta.value = fn.body || '';

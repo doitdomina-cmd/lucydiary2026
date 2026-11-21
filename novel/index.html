@@ -1555,6 +1555,19 @@ body .home .wgrid .wcard.icard:not(.pol):not([style*="--gc:#"]) { --lb: #f5f4f1;
 .wl-tabs button { padding: 6px 14px; border-radius: 999px; background: var(--panel2); border: 1px solid var(--line); font-size: 13px; color: var(--muted); }
 .wl-tabs button.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
 .wl-card { border: 1.5px dashed var(--line); border-radius: 16px; padding: 14px 16px; margin-bottom: 14px; background: var(--panel); }
+/* 주간 요약 */
+.wk-hero { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; } .wk-hero small { color: var(--muted); font-size: 12px; flex-basis: 100%; }
+.wk-hero b { font-size: 28px; color: var(--accent); } .wk-diff { font-size: 13px; font-weight: 700; color: var(--muted); } .wk-diff small { font-weight: 400; }
+.wk-diff.up { color: #2f8a54; } .wk-diff.down { color: #c4553a; }
+.wk-bars { display: flex; gap: 6px; align-items: flex-end; height: 130px; border-bottom: 1.5px solid var(--line); padding-bottom: 2px; }
+.wk-bar { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; min-width: 0; }
+.wk-bar i { width: 100%; max-width: 36px; border-radius: 6px 6px 0 0; background: var(--accent); opacity: .55; }
+.wk-bar.best i { opacity: 1; } .wk-bar b { font-size: 10px; color: var(--muted); white-space: nowrap; margin-bottom: 2px; } .wk-bar span { font-size: 12px; margin-top: 3px; position: relative; top: 18px; height: 0; }
+.wk-modal .wk-bars { margin-bottom: 20px; } @media (max-width: 700px) { .wk-modal .wl-kr > div { flex: 1 1 calc(50% - 3px); } }
+/* 쉬는 시간 알림 */
+.brk-card { position: fixed; top: 70px; left: 50%; transform: translateX(-50%); z-index: 9000; display: flex; align-items: center; gap: 12px; background: var(--panel); color: var(--text); border: 2px solid var(--accent); border-radius: 16px; padding: 12px 14px 12px 16px; box-shadow: 0 10px 30px rgba(0,0,0,.18); width: max-content; max-width: calc(100vw - 24px); animation: brkIn .35s ease; }
+.brk-card .brk-emo { font-size: 28px; } .brk-card .brk-t { min-width: 0; } .brk-card b { display: block; font-size: 16px; } .brk-card span { font-size: 12px; color: var(--muted); } .brk-card .btn { white-space: nowrap; }
+@keyframes brkIn { from { opacity: 0; transform: translate(-50%, -12px); } to { opacity: 1; transform: translate(-50%, 0); } }
 .wl-head { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; } .wl-head .btn { white-space: nowrap; }
 .wl-head h3 { white-space: nowrap; } @media (max-width: 700px) { .wl-head h3 { flex-basis: 100% !important; } }
 /* 나의 집필 분석 */
@@ -2158,7 +2171,7 @@ nav.mtabs { display: none; }
     header .today-chip, header .cur-chip, header .sel-chip { font-size: 11px; padding: 0 6px; gap: 3px; }
     header .cur-chip b, header .sel-chip b { font-size: 12px; }
     header .cur-chip .cc-t, header .cur-chip small { display: none; }
-    header:has(.cur-chip:not(.hidden)) .today-chip { display: none; }
+    header .cur-chip { display: none !important; }   /* 폰: 회차 글자 수는 원고 아래 바에 있으니, 위쪽엔 '오늘 N자'(누르면 집필 기록) */
     header .sync-badge { font-size: 10px; padding: 3px 6px; }
     header .focus-ph { padding: 0 6px; }
     main { height: calc(100% - 82px - 54px - env(safe-area-inset-bottom)); }
@@ -3291,6 +3304,24 @@ function sessRecord(doc, delta) {
     const wk = doc.workId || '_', W = (ss.w[wk] ??= { c: 0, e: {} });
     W.c += delta; W.e[doc.id] = (W.e[doc.id] || 0) + delta;
     touch(host);
+    try { sessBreakCheck(ss); } catch (e) { console.error(e); }
+}
+/* 쉬는 시간 알림: 한 세션(5분 넘게 안 쉬고 이어 쓴 것)이 50분·100분…이 되면 한 번씩 '쉬었다 해요' (설정 › 기타에서 끌 수 있음) */
+const BREAK_MIN = 50;
+function sessBreakCheck(ss) {
+    if (settings().breakAlert === false) return;
+    const n = Math.floor((ss.e - ss.s) / (BREAK_MIN * 6e4));
+    if (n < 1 || (ss.brk || 0) >= n) return;
+    ss.brk = n;
+    showBreakCard(n * BREAK_MIN);
+}
+function showBreakCard(min) {
+    $('.brk-card')?.remove();
+    const c = document.createElement('div'); c.className = 'brk-card';
+    c.innerHTML = `<div class="brk-emo">☕</div><div class="brk-t"><b>${min}분 되었어요! 쉬었다 해요!</b><span>스트레칭하고 물 한 잔 · 5분 넘게 쉬면 새 세션으로 기록돼요</span></div><button class="btn">알겠어요</button>`;
+    c.querySelector('button').onclick = () => c.remove();
+    document.body.appendChild(c);
+    setTimeout(() => c.remove(), 90000);
 }
 const SESS_PC = '#5fb77a', SESS_PH = '#a07fd6';
 const SESS_COL = ['#efe9d8', '#cfe6c9', '#9fd29c', '#5fb77a', '#2f8a54'], SESS_PCOL = ['#efe9d8', '#e3d8f2', '#c9b4e8', '#a07fd6', '#7a4fbd'], SESS_NCOL = ['#efe9d8', '#ece3cc', '#ddd0ae', '#cbb98a', '#b39f6c'];
@@ -3598,6 +3629,90 @@ function rpAnalysisText() {
     A.tips.forEach((t, i) => L.push(`  ${i + 1}. ${t}`));
     download(`작업실_나의집필분석_${todayKey()}.txt`, L.join('\n'), 'text/plain');
 }
+/* ---------- 주간 요약: 한 주를 처음 열 때(보통 월요일) 지난주(월~일)를 한 장으로 ---------- */
+const wkMonday = d => { const x = new Date(d); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() - (x.getDay() + 6) % 7); return x; };
+function wkData(mon) {
+    const S = stats().days || {};
+    const days = Array.from({ length: 7 }, (_, i) => { const D = new Date(mon); D.setDate(D.getDate() + i); const k = rpDayKey(D), list = sessOfDay(k); return { D, k, c: S[k] || list.reduce((a, x) => a + Math.max(0, x.c || 0), 0), list }; });
+    const sess = days.flatMap(x => x.list);
+    const hours = Array(24).fill(0); sess.forEach(x => sessAddHours(x, (D, d, c) => { hours[D.getHours()] += c; }));
+    const byW = {}; sess.forEach(x => Object.entries(x.w || {}).forEach(([id, W]) => { if (id !== '_' && W.c > 0) byW[id] = (byW[id] || 0) + W.c; }));
+    return {
+        mon, days, sess, hours, byW, dev: sessDevSplit(sess),
+        total: days.reduce((a, x) => a + x.c, 0), wrote: days.filter(x => x.c > 0).length,
+        act: sess.reduce((a, x) => a + sessActMin(x), 0), span: sess.reduce((a, x) => a + sessSpanMin(x), 0),
+        best: days.reduce((m, x) => (!m || x.c > m.c) ? x : m, null),
+        longest: sess.reduce((m, x) => (!m || (x.e - x.s) > (m.e - m.s)) ? x : m, null),
+    };
+}
+function wkTips(D, P) {
+    const T = [], WD = RP_WD;
+    if (!D.total) { T.push('이 주는 쉬어 갔어요. 이번 주엔 하루 10분이라도 원고를 열어 봐요.'); return T; }
+    if (P.total > 0) {
+        const pct = Math.round((D.total - P.total) / P.total * 100);
+        if (pct >= 10) T.push(`그 전 주보다 ${pct}% 더 썼어요! 👏 이 흐름 그대로 가요.`);
+        else if (pct <= -10) T.push(`그 전 주보다 ${-pct}% 줄었어요. 바쁜 주였다면 괜찮아요 — 이번 주엔 잘 써지던 시간을 먼저 비워 두세요.`);
+        else T.push('그 전 주와 비슷하게 꾸준히 썼어요. 꾸준함이 제일 강해요.');
+    }
+    if (D.wrote >= 7) T.push('7일 내내 썼어요! 대단해요. 지치지 않게 하루는 가볍게 쉬어도 좋아요.');
+    else if (D.wrote >= 5) T.push(`${D.wrote}일이나 썼어요. 리듬이 잘 잡혀 있어요.`);
+    else if (D.wrote <= 2) T.push(`쓴 날이 ${D.wrote}일이에요. 길게 한 번보다 짧게 자주 여는 게 이어 쓰기에 좋아요.`);
+    const mx = Math.max(...D.hours);
+    if (mx > 0) { const h = D.hours.indexOf(mx); T.push(`가장 잘 써진 시간은 ${h}~${h + 1}시예요. 이번 주에도 이 시간을 집필 시간으로 잡아 보세요.`); }
+    if (D.act > 0) T.push(`실제로 쓴 1시간에 평균 ${fmt(Math.round(D.total / D.act * 60))}자를 썼어요.`);
+    if (D.span > 60 && D.act / D.span < 0.6) T.push(`세션 시간 중 실제로 쓴 시간은 ${Math.round(D.act / D.span * 100)}%였어요. 쓰기 전에 장면 메모를 짧게 정해 두면 멈추는 시간이 줄어요.`);
+    if (D.longest && (D.longest.e - D.longest.s) / 6e4 >= 90) T.push(`가장 길게 이어 쓴 세션은 ${minTxt(sessSpanMin(D.longest))}이었어요. 50분마다 잠깐 쉬어 가요.`);
+    if (D.wrote) { const per = Math.ceil(D.total / D.wrote / 100) * 100; T.push(`이번 주 목표 제안: 하루 ${fmt(per)}자 × ${Math.max(D.wrote, 3)}일 = ${fmt(per * Math.max(D.wrote, 3))}자`); }
+    return T;
+}
+function wkHTML(mon) {
+    const D = wkData(mon), pm = new Date(mon); pm.setDate(pm.getDate() - 7);
+    const P = wkData(pm), cur = wkMonday(new Date()), last = new Date(cur); last.setDate(last.getDate() - 7);
+    const end = new Date(mon); end.setDate(end.getDate() + 6);
+    const md = d => `${d.getMonth() + 1}/${d.getDate()}`;
+    const name = +mon === +cur ? '이번 주 (진행 중)' : +mon === +last ? '지난주' : `${mon.getMonth() + 1}월 ${mon.getDate()}일 주`;
+    const diff = P.total > 0 ? Math.round((D.total - P.total) / P.total * 100) : null;
+    const dmx = Math.max(1, ...D.days.map(x => x.c));
+    const bars = D.days.map(x => `<div class="wk-bar ${D.best && x === D.best && x.c ? 'best' : ''}"><b>${x.c ? fmt(x.c) : ''}</b><i style="height:${x.c ? Math.max(4, x.c / dmx * 90) : 2}px"></i><span>${RP_WD[x.D.getDay()]}</span></div>`).join('');
+    const ws = Object.entries(D.byW).sort((a, b) => b[1] - a[1]);
+    const hs = D.hours.map((c, h) => [h, c]).filter(([, c]) => c > 0);
+    const hmx = Math.max(1, ...D.hours);
+    const lo = hs.length ? Math.min(...hs.map(x => x[0])) : 9, hi = hs.length ? Math.max(...hs.map(x => x[0])) : 18;
+    const hourBars = Array.from({ length: hi - lo + 1 }, (_, i) => lo + i).map(h => `<div class="wl-hbc"><div class="wl-hbv" style="height:${D.hours[h] / hmx * 100}%;background:var(--accent)"></div><span>${(h - lo) % 2 === 0 ? h : ''}</span></div>`).join('');
+    const devT = D.dev.ph + D.dev.pc;
+    return `<div class="modal wl-modal wk-modal"><div class="wl-head"><h3 style="margin:0;flex:1"><i class="ic ic-history"></i> 주간 요약</h3><button class="wl-nv" data-wk="prev">‹</button><span class="wl-tag">${name} · ${md(mon)}~${md(end)}</span><button class="wl-nv" data-wk="next" ${+mon >= +cur ? 'disabled' : ''}>›</button><button class="btn" data-wk="close">닫기</button></div>
+        <div class="wl-card"><div class="wk-hero"><small>쓴 글자 (공백 제외)</small><b>${fmt(D.total)}자</b>${diff == null ? '' : `<span class="wk-diff ${diff > 0 ? 'up' : diff < 0 ? 'down' : ''}">${diff > 0 ? '▲' : diff < 0 ? '▼' : '='} ${Math.abs(diff)}% <small>(그 전 주 ${fmt(P.total)}자)</small></span>`}</div>
+        <div class="wl-kr"><div><small>쓴 날</small><b>${D.wrote} / 7일</b></div><div><small>실제로 쓴 시간</small><b>${D.act ? minTxt(D.act) : '—'}</b></div><div><small>세션</small><b>${D.sess.length}번</b></div><div><small>가장 많이 쓴 날</small><b>${D.best && D.best.c ? `${RP_WD[D.best.D.getDay()]}요일 ${fmt(D.best.c)}자` : '—'}</b></div></div>
+        <div class="wl-sub" style="margin-top:12px">요일별</div><div class="wk-bars">${bars}</div></div>
+        ${ws.length ? `<div class="wl-card"><h3>작품별로 쓴 글자</h3><div class="rp-works">${ws.map(([id, c]) => `<div><b>${wkTitle(id)}</b><span></span><i>+${fmt(c)}자</i></div>`).join('')}</div></div>` : ''}
+        ${hs.length ? `<div class="wl-card"><h3>시간대별</h3><div class="wl-hb" style="margin-bottom:18px">${hourBars}</div>${devT ? `<div class="wl-sub">📱 폰 ${Math.round(D.dev.ph / devT * 100)}% · 🖥 PC ${Math.round(D.dev.pc / devT * 100)}%</div>` : ''}</div>` : ''}
+        <div class="wl-card"><h3>한마디</h3><ul class="rp-tips">${wkTips(D, P).map(t => `<li>${esc(t)}</li>`).join('')}</ul></div>
+        <p class="modal-note" style="margin:0">한 주를 처음 열 때 지난주 요약이 자동으로 떠요. 설정 › 기타에서 끌 수 있어요.</p></div>`;
+}
+function openWeekSummary(mon) {
+    let m = mon || (() => { const x = wkMonday(new Date()); x.setDate(x.getDate() - 7); return x; })();
+    const bg = document.createElement('div'); bg.className = 'modal-bg';
+    const draw = () => { bg.innerHTML = wkHTML(m); };
+    draw(); document.body.appendChild(bg);
+    bg.addEventListener('click', e => {
+        if (e.target === bg || e.target.closest('[data-wk="close"]')) { bg.remove(); return; }
+        const b = e.target.closest('[data-wk]'); if (!b || b.disabled) return;
+        m = new Date(m); m.setDate(m.getDate() + (b.dataset.wk === 'prev' ? -7 : 7)); draw();
+    });
+}
+let wkTried = 0;
+function weekSummaryMaybe() {
+    if (settings().weekSummary === false) return;
+    const cur = wkMonday(new Date()), key = rpDayKey(cur);
+    if (pref.weekShown === key) return;
+    // 클라우드에서 기록을 받는 중이거나 다른 창이 떠 있으면 조금 뒤에
+    if ((cloud.col && cloud.state === 'loading') || $('.modal-bg')) { if (++wkTried < 12) setTimeout(weekSummaryMaybe, 5000); return; }
+    const prev = new Date(cur); prev.setDate(prev.getDate() - 7);
+    pref.weekShown = key; savePref();
+    const D = wkData(prev);
+    if (!D.total && !D.sess.length) return;   // 지난주 기록이 없으면 조용히 넘어감
+    openWeekSummary(prev);
+}
 function openWriteLog(k) {
     wlDay = k || todayKey(); wlTab = 'day';
     let bg = $('.wl-bg'); if (bg) bg.remove();
@@ -3614,7 +3729,7 @@ function openWriteLog(k) {
             : `${wlDayCard(wlDay)}
         <div class="wl-card"><h3>집필 잔디</h3><div class="wl-sub">하루에 쓴 글자 수 (최근 13주) · 진할수록 많이 쓴 날 · 칸을 누르면 그날 상세</div>${wlGrass(13)}</div>
         <div class="wl-card"><h3>하루에 몇 세션으로 일하나요?</h3><div class="wl-sub">최근 13주 · 하루 세션 수별 날짜</div>${wlDist(91)}</div>`;
-        bg.innerHTML = `<div class="modal wl-modal"><div class="wl-head"><h3 style="margin:0;flex:1"><i class="ic ic-history"></i> 집필 기록</h3><button class="btn" data-wl="an" title="내 집필 습관을 숫자로 분석하고 유형·조언을 보여 줘요">나의 집필 분석</button><button class="btn" data-wl="txt" title="작품·하루 글자·세션 기록 전체를 텍스트 파일로 저장">기록 전체 (txt)</button><button class="btn" data-wl="close">닫기</button></div>
+        bg.innerHTML = `<div class="modal wl-modal"><div class="wl-head"><h3 style="margin:0;flex:1"><i class="ic ic-history"></i> 집필 기록</h3><button class="btn" data-wl="wk" title="한 주(월~일)를 한 장으로 요약">주간 요약</button><button class="btn" data-wl="an" title="내 집필 습관을 숫자로 분석하고 유형·조언을 보여 줘요">나의 집필 분석</button><button class="btn" data-wl="txt" title="작품·하루 글자·세션 기록 전체를 텍스트 파일로 저장">기록 전체 (txt)</button><button class="btn" data-wl="close">닫기</button></div>
         ${wlTop()}
         <div class="wl-tabs">${tabs.map(([k, l]) => `<button class="${wlTab === k ? 'on' : ''}" data-wltab="${k}">${l}</button>`).join('')}</div>
         <div class="wl-leg"><span><i style="background:${SESS_PC}"></i>PC</span><span><i style="background:${SESS_PH}"></i>폰</span><span><i style="background:linear-gradient(135deg,${SESS_PH} 50%,${SESS_PC} 50%)"></i>둘 다 (같은 세션으로 이어 씀)</span></div>
@@ -3624,6 +3739,7 @@ function openWriteLog(k) {
     bg.addEventListener('click', e => {
         if (e.target === bg || e.target.closest('[data-wl="close"]')) { bg.remove(); return; }
         if (e.target.closest('[data-wl="txt"]')) { rpExportAll(); return; }
+        if (e.target.closest('[data-wl="wk"]')) { bg.remove(); openWeekSummary(); return; }
         if (e.target.closest('[data-wl="antxt"]')) { rpAnalysisText(); return; }
         if (e.target.closest('[data-wl="an"]')) { mode = 'an'; draw(); $('.wl-modal', bg).scrollTop = 0; return; }
         if (e.target.closest('[data-wl="back"]')) { mode = 'log'; draw(); $('.wl-modal', bg).scrollTop = 0; return; }
@@ -11433,7 +11549,11 @@ function openSettings(focus) {
  <label class="check"><input type="checkbox" data-opt="nativeSpell" ${S.nativeSpell === true ? 'checked' : ''}> 윈도우(브라우저) 맞춤법 검사도 같이 쓰기 <small style="color:var(--muted)">(인물 이름·맞는 말에도 줄이 생길 수 있어요)</small></label>
             <label class="check"><input type="checkbox" data-opt="aiAuto" ${S.aiAuto === true ? 'checked' : ''}> AI 맞춤법 자동 검사 <small style="color:var(--muted)">(연 회차를 뒤에서 한 번씩 읽고, 새로 쓴 문단도 몇 초 뒤 검사)</small> ${aiReady() ? '' : '<small style="color:var(--danger)">— 아래에 AI 키를 넣어야 돌아가요</small>'}</label>
             <label class="check"><input type="checkbox" data-opt="crisp" ${S.crisp !== false ? 'checked' : ''}> 원고 글자 진하게 <small style="color:var(--muted)">(명조체 가로획이 흐리거나 끊겨 보일 때)</small></label>
-            </div><div data-sp="etc"><label id="set-ai">AI 표현 추천 <small>(비슷한 표현에서 ‘AI 추천’을 쓸 때)</small></label>
+            </div><div data-sp="etc"><label>집필 기록</label>
+            <label class="check"><input type="checkbox" data-opt="royaltySync" ${S.royaltySync === true ? 'checked' : ''}> 정산 앱 상세 기록으로 자동 넘기기 <small style="color:var(--muted)">(정산 앱을 열거나 집필 탭을 볼 때 최근 7일 작업실 기록을 시간대별로 채워요 · 직접 적은 칸은 그대로)</small></label>
+            <label class="check"><input type="checkbox" data-opt="breakAlert" ${S.breakAlert !== false ? 'checked' : ''}> ${BREAK_MIN}분 넘게 이어서 쓰면 ‘쉬었다 해요’ 알림</label>
+            <label class="check"><input type="checkbox" data-opt="weekSummary" ${S.weekSummary !== false ? 'checked' : ''}> 한 주를 처음 열 때(월요일) 지난주 요약 보여 주기 <button class="mini" data-x="wkopen" style="margin-left:4px">지금 보기</button></label>
+            <label id="set-ai">AI 표현 추천 <small>(비슷한 표현에서 ‘AI 추천’을 쓸 때)</small></label>
             <div class="ai-key"><input type="password" data-aikey placeholder="여기에 키를 붙여 넣으세요" value="${esc(pref.aiKey || '')}" autocomplete="off" spellcheck="false"><button class="btn" data-x="aitest">연결 확인</button></div>
             <p class="modal-note" style="margin:4px 0 0">${AI_PROVIDERS.gemini.hint} <a href="${AI_PROVIDERS.gemini.keyUrl}" target="_blank" rel="noopener">키 만들러 가기 ↗</a><br>키는 이 기기에만 저장돼요. (동기화·백업 파일에는 안 들어가요)</p>
             <label class="check" style="margin-top:4px"><input type="checkbox" data-aipaid ${pref.aiPaid ? 'checked' : ''}> 결제를 켠(유료) 키예요 <small style="color:var(--muted)">— 자동 검사도 좋은 모델로 해요. 무료 키는 하루 횟수가 적어서 자동 검사는 가벼운 모델로 해요.</small></label>
@@ -11455,6 +11575,7 @@ function openSettings(focus) {
         const t = e.target.closest('button'); if (e.target === bg || t?.dataset.x === 'close') { bg.remove(); return; }
         if (!t) return;
         if (t.dataset.x === 'typo') { bg.remove(); typoModal(); return; }
+        if (t.dataset.x === 'wkopen') { e.preventDefault(); bg.remove(); openWeekSummary(); return; }
         if (t.dataset.stab) { tab = t.dataset.stab; render(); return; }
         if (t.dataset.mfont != null) { pref.menuFont = t.dataset.mfont; savePref(); applyPref(); render(); return; }
         if (t.dataset.hfont != null) { pref.homeFont = t.dataset.hfont; savePref(); applyPref(); render(); return; }
@@ -12145,6 +12266,7 @@ async function copyPomoReport(box) {
     if (localDirty.size) saveLocal();
     renderCloudBadge();
     cloudInit();
+    setTimeout(weekSummaryMaybe, 6000);   // 한 주를 처음 열면 지난주 요약
     loadBackupDir().then(() => setTimeout(maybeFolderBackup, 15000));
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
         navigator.serviceWorker.register('novel-sw.js').then(reg => { try { reg.update(); } catch (_) {} }).catch(() => {});

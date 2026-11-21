@@ -2180,7 +2180,8 @@ nav.mtabs { display: none; }
     header .today-chip, header .cur-chip, header .sel-chip { font-size: 11px; padding: 0 6px; gap: 3px; }
     header .cur-chip b, header .sel-chip b { font-size: 12px; }
     header .cur-chip .cc-t, header .cur-chip small { display: none; }
-    header .cur-chip { display: none !important; }   /* 폰: 회차 글자 수는 원고 아래 바에 있으니, 위쪽엔 '오늘 N자'(누르면 집필 기록) */
+    header .cur-chip { display: none !important; }
+    header .today-chip :is(.tc-ja, .tc-i) { display: none; }   /* 폰: '오늘 공포 7,093 · 작품 +5,656' 으로 줄임 */   /* 폰: 회차 글자 수는 원고 아래 바에 있으니, 위쪽엔 '오늘 N자'(누르면 집필 기록) */
     header .sync-badge { font-size: 10px; padding: 3px 6px; }
     header .focus-ph { padding: 0 6px; }
     main { height: calc(100% - 82px - 54px - env(safe-area-inset-bottom)); }
@@ -2299,7 +2300,7 @@ nav.mtabs { display: none; }
 <header>
     <button class="brand" id="btn-home" title="작품 목록 (메인 화면)"><i class="ic ic-feather"></i> 루시의 작업실</button>
     <select class="work-select" id="work-select" title="작품 선택"></select>
-    <span class="today-chip" id="today-chip" title="오늘 늘어난 원고 글자 수 (공백 제외) · 이 작품 = 지금 연 작품이 오늘 늘어난 글자 · 눌러서 집필 기록 보기" style="cursor:pointer">오늘 <b>0</b>자</span>
+    <span class="today-chip" id="today-chip" title="오늘 늘어난 원고 글자 수 (공포 = 공백 포함) · 이 작품 = 지금 연 작품이 오늘 늘어난 글자 · 눌러서 집필 기록 보기" style="cursor:pointer">오늘 공포 <b>0</b><span class="tc-ja">자</span></span>
     <span class="cur-chip hidden" id="cur-chip" title="지금 쓰는 회차의 글자 수 (공포 = 공백 포함, 공미 = 공백 제외)"></span>
     <span class="sel-chip hidden" id="sel-chip" title="드래그해서 고른 부분의 글자 수"></span>
     <span class="spacer"></span>
@@ -2767,9 +2768,14 @@ function para() {
     return { align: S.align || 'justify', indentPt: n(S.indentPt, 10), lh: n(S.lhPct, 180) / 100, beforePt: n(S.beforePt, 10), afterPt: n(S.afterPt, 10), leftPt: n(S.leftPt, 0), rightPt: n(S.rightPt, 0) };
 }
 function stats() {
-    if (!items.stats) items.stats = { id: 'stats', kind: 'stats', rev: 0, days: {} };
-    items.stats.days ??= {};
-    return items.stats;
+    if (!items.stats) items.stats = { id: 'stats', kind: 'stats', rev: 0, days: {}, du: 1 };
+    const S = items.stats; S.days ??= {};
+    if (!S.du) {   // 예전(공백 제외) 하루 글자를 공포로 한 번 바꿈
+        const keys = Object.keys(S.days);
+        S.du = 1;
+        if (keys.length) { const r0 = noSpaceRatio() || 0.77; keys.forEach(k => { S.days[k] = Math.round((Number(S.days[k]) || 0) / r0); }); touch(S); }
+    }
+    return S;
 }
 
 /* ---------- 첫 실행 기본 데이터 ---------- */
@@ -2863,7 +2869,7 @@ function renderToday() {
     const wid = $('.home') ? null : curWorkId();
     let wc = 0; if (wid) sessOfDay(todayKey()).forEach(x => { wc += Math.max(0, (x.w && x.w[wid] && x.w[wid].c) || 0); });
     let el = chip.querySelector('.tc-w'); if (!el) { el = document.createElement('span'); el.className = 'tc-w'; chip.appendChild(el); }
-    el.hidden = !wid; el.innerHTML = wid ? `<i>·</i> 이 작품 <b>+${fmt(wc)}</b>` : '';
+    el.hidden = !wid; el.innerHTML = wid ? `<i>·</i> <span class="tc-i">이 </span>작품 <b>+${fmt(wc)}</b>` : '';
 }
 
 function openDocIds() {
@@ -3269,13 +3275,13 @@ function onEditorInput(ed) {
     const before = lastCount.has(it.id) ? lastCount.get(it.id) : docCountBefore(it, now);
     const beforeA = lastCountA.has(it.id) ? lastCountA.get(it.id) : docCountBefore(it, nowA, 'all');
     lastCount.set(it.id, now); lastCountA.set(it.id, nowA);
-    if ((now !== before || nowA !== beforeA) && !isRefDoc(it)) {
-        const gain = now !== before ? netGain(it, now - before) : 0;
-        const gainA = nowA !== beforeA ? netGain(it, nowA - beforeA, true) : 0;   // 공백 포함 (정산 앱으로 넘길 때 씀)
-        if (gain > 0 || gainA > 0) {
+    if (nowA !== beforeA && !isRefDoc(it)) {
+        // 집필 기록은 공포(공백 포함)로 센다 — 정산 앱·원고 글자 수와 같은 기준 (2026-11-21, 그전엔 공백 제외)
+        const gainA = netGain(it, nowA - beforeA, true);
+        if (gainA > 0) {
             const S = stats(); const k = todayKey();
-            if (gain > 0) { S.days[k] = (S.days[k] || 0) + gain; pruneStats(S); touch(S); }
-            try { sessRecord(it, gain, gainA); } catch (e) { console.error(e); }
+            S.days[k] = (S.days[k] || 0) + gainA; pruneStats(S); touch(S);
+            try { sessRecord(it, gainA); } catch (e) { console.error(e); }
             renderToday();
         }
     }
@@ -3309,7 +3315,7 @@ function docCountBefore(it, fallback, field) { const c = countCache.get(it.id); 
    - 하루 하나의 항목 'sess_YYYY-MM-DD' = { list: [세션…] }, 세션 = { s, e, c, segs:[{a,b,d,c}], w:{작품id:{c, e:{회차id:c}}}, m:{분:글자} }
    - d = 'ph'(폰) / 'pc'(PC). 기기를 바꿔 5분 안에 이어 쓰면 같은 세션, 구간(segs)만 나뉨
    - m = 세션 시작부터 몇 분째에 몇 자를 썼는지 (1분 단위). 실제로 쓴 시간·시간표 진하기에 씀. 예전 기록엔 없음
-   - c 는 공백 제외, a 는 공백 포함 (세션·작품별 w[id].a). 정산 앱은 공백 포함으로 받음 (a 가 없는 예전 기록은 0.765 로 나눠 어림) (2026-11-21)
+   - 글자는 공포(공백 포함). c 와 a 가 같음 (a 는 정산 앱이 읽는 칸). 예전 공백 제외 기록은 sessUnitFix 가 한 번 공포로 바꾸고 u:1 표시 (2026-11-21)
    - 정산 앱(royalty)의 '작업실에서 가져오기'가 이 구조를 읽는다 — 바꾸면 그쪽 novelSessionsToSlots 도 같이 볼 것
    ===================================================================== */
 const SESS_GAP = 5 * 60 * 1000;
@@ -3318,12 +3324,31 @@ const dayKeyOfMs = ms => { const d = new Date(ms); return `${d.getFullYear()}-${
 function sessHost(k, make) {
     const id = 'sess_' + k;
     let h = items[id];
-    if (!h && make) h = create('sessday', { id, day: k, list: [] });
-    if (h && h.deleted) { if (!make) return null; h.deleted = false; h.list = []; }
-    if (h) h.list ??= [];
+    if (!h && make) h = create('sessday', { id, day: k, list: [], u: 1 });
+    if (h && h.deleted) { if (!make) return null; h.deleted = false; h.list = []; h.u = 1; }
+    if (h) { h.list ??= []; if (!h.u) sessUnitFix(h); }
     return h;
 }
-function sessRecord(doc, delta, deltaA) {   // delta = 공백 제외, deltaA = 공백 포함
+/* 예전(공백 제외) 기록을 공포로 한 번 바꿈 — 바꾼 항목엔 u:1 표시가 붙어 다른 기기에도 그대로 동기화됨.
+   공포 기록(a)이 있는 세션은 그 비율로 정확히, 없으면 내 원고의 공미 비율(noSpaceRatio)로 어림 */
+function sessUnitFix(h) {
+    if (!h || h.u) return;
+    const r0 = noSpaceRatio() || 0.77;
+    (h.list || []).forEach(x => {
+        if (!x) return;
+        const f = (x.a != null && x.c > 0 && x.a >= x.c) ? x.a / x.c : 1 / r0, sc = (v, g) => Math.round((Number(v) || 0) * (g || f));
+        x.c = sc(x.c); x.a = x.c;
+        (x.segs || []).forEach(g => { g.c = sc(g.c); });
+        if (x.m) Object.keys(x.m).forEach(i => { x.m[i] = sc(x.m[i]); });
+        Object.values(x.w || {}).forEach(W => {
+            const fw = (W.a != null && W.c > 0 && W.a >= W.c) ? W.a / W.c : f;
+            Object.keys(W.e || {}).forEach(e => { W.e[e] = sc(W.e[e], fw); });
+            W.c = sc(W.c, fw); W.a = W.c;
+        });
+    });
+    h.u = 1; touch(h);
+}
+function sessRecord(doc, delta) {   // delta = 늘어난 공포(공백 포함) 글자
     const t = Date.now(), dev = sessDev(), k = dayKeyOfMs(t);
     let last = null, host = null;
     [sessHost(k, false), sessHost(dayKeyOfMs(t - 864e5), false)].filter(Boolean).forEach(h => {
@@ -3332,7 +3357,7 @@ function sessRecord(doc, delta, deltaA) {   // delta = 공백 제외, deltaA = �
     let ss;
     if (last && t - last.e <= SESS_GAP) { ss = last; ss.e = Math.max(ss.e, t); }
     else { host = sessHost(k, true); ss = { s: t, e: t, c: 0, segs: [], w: {} }; host.list.push(ss); }
-    delta = Math.max(0, delta || 0); deltaA = Math.max(0, deltaA || 0);
+    delta = Math.max(0, delta || 0); const deltaA = delta;   // a 는 정산 앱이 읽는 공포 칸 (c 와 같음)
     const sg = ss.segs[ss.segs.length - 1];
     if (sg && sg.d === dev) { sg.b = t; sg.c += delta; } else ss.segs.push({ a: t, b: t, d: dev, c: delta });
     ss.c += delta; ss.a = (ss.a || 0) + deltaA;
@@ -3401,7 +3426,7 @@ function wlDayCard(k) {
     let h = `<div class="wl-card"><div class="wl-dh"><h3>${isToday ? '오늘의 하루' : '하루 보기'}</h3><span class="wl-tag">${D.getMonth() + 1}월 ${D.getDate()}일 (${WD[D.getDay()]})</span><span style="flex:1"></span><button class="btn wl-fix" data-wl="fix" title="붙여 넣기 등으로 부풀려진 이 날의 글자 수를 실제 숫자로 고쳐요">숫자 바로잡기</button><button class="wl-nv" data-wl="prev">‹</button><button class="wl-nv" data-wl="next" ${isToday ? 'disabled' : ''}>›</button></div>`;
     const dayTot = stats().days[k] || 0;
     if (!list.length) return h + `<div class="wl-empty">${dayTot ? `이 날은 ${fmt(dayTot)}자를 썼어요. (시간 기록은 이 기능을 켠 뒤부터 남아요)` : '이 날은 쓴 기록이 없어요.'}</div></div>`;
-    h += `<div class="wl-kr"><div><small>세션</small><b>${list.length}번</b></div><div><small>실제로 쓴 시간</small><b>${minTxt(mins)}</b>${spanMins > mins ? `<small>세션 ${minTxt(spanMins)} 중</small>` : ''}</div><div><small>늘어난 글자</small><b>+${fmt(tot)}자</b></div><div><small>시간당</small><b>${mins ? fmt(Math.round(tot / (mins / 60))) : 0}자</b></div><div><small>첫 시작~마지막</small><b>${hm(list[0].s)}~${hm(list[list.length - 1].e)}</b></div></div>`;
+    h += `<div class="wl-kr"><div><small>세션</small><b>${list.length}번</b></div><div><small>실제로 쓴 시간</small><b>${minTxt(mins)}</b>${spanMins > mins ? `<small>세션 ${minTxt(spanMins)} 중</small>` : ''}</div><div><small>늘어난 글자 (공포)</small><b>+${fmt(tot)}자</b></div><div><small>시간당</small><b>${mins ? fmt(Math.round(tot / (mins / 60))) : 0}자</b></div><div><small>첫 시작~마지막</small><b>${hm(list[0].s)}~${hm(list[list.length - 1].e)}</b></div></div>`;
     // 세로 시간표: 위에서 아래로 0시~24시. 왼쪽 시각, 가운데 세션 막대, 오른쪽 시간별 글자 막대
     const hb = Array.from({ length: 24 }, () => ({ ph: 0, pc: 0 }));
     list.forEach(x => sessAddHours(x, (D, d, c) => { hb[D.getHours()][d] += c; }));
@@ -3428,7 +3453,7 @@ function wlDayCard(k) {
 /* 기록 바로잡기 (붙여 넣기 등으로 부풀려진 숫자)
    - 줄일 때: 1분에 SESS_SPIKE자 넘게 늘어난 '튀는 분'(붙여 넣기)부터 깎고, 그래도 넘치면 남은 세션에서 비율대로
    - 세션 하나만 고칠 수도 있음 (세션 목록의 숫자를 누름) */
-const SESS_SPIKE = 200;
+const SESS_SPIKE = 260;   // 1분에 공포 260자 넘게 늘면 붙여 넣기로 봄
 // obj 의 숫자 칸들을 큰 것부터 cut 만큼 줄임
 function sessTake(obj, cut) { Object.keys(obj).sort((a, b) => obj[b] - obj[a]).forEach(k => { if (cut <= 0) return; const t = Math.min(cut, Math.max(0, obj[k] || 0)); obj[k] -= t; cut -= t; }); }
 // 세션 x 에서 cut 자를 뺌 (mi = 그 글자를 쓴 분, 모르면 null) — 분·구간·작품·회차 숫자를 함께 맞춤
@@ -3544,7 +3569,7 @@ const rpMin = m => `${Math.floor(m / 60) ? Math.floor(m / 60) + '시간 ' : ''}$
 const rpDayKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 function rpAllSessions() {
     const out = [];
-    Object.values(items).forEach(h => { if (h && h.kind === 'sessday' && live(h)) (h.list || []).forEach(x => { if (x && x.s) out.push(x); }); });
+    Object.values(items).forEach(h => { if (h && h.kind === 'sessday' && live(h)) { if (!h.u) sessUnitFix(h); (h.list || []).forEach(x => { if (x && x.s) out.push(x); }); } });
     return out.sort((a, b) => a.s - b.s);
 }
 function rpWorkInfo() {
@@ -3595,7 +3620,7 @@ function rpExportAll() {
     const ws = R.works, doneN = ws.filter(x => x.done).length;
     L.push(`작품 ${ws.length}개 (미완고 ${ws.length - doneN} · 완고 ${doneN})`);
     L.push(`원고 전체 글자: ${fmt(ws.reduce((a, x) => a + x.all, 0))}자 (공백 포함) · ${fmt(ws.reduce((a, x) => a + x.ns, 0))}자 (공백 제외)`);
-    L.push(`하루 글자 기록: ${R.dayKeys.length ? `${R.dayKeys[0]} ~ ${R.dayKeys[R.dayKeys.length - 1]} · 집필한 날 ${R.dayKeys.length}일 · 늘어난 글자 ${fmt(R.total)}자 (공백 제외)` : '없음'}`);
+    L.push(`하루 글자 기록: ${R.dayKeys.length ? `${R.dayKeys[0]} ~ ${R.dayKeys[R.dayKeys.length - 1]} · 집필한 날 ${R.dayKeys.length}일 · 늘어난 글자 ${fmt(R.total)}자 (공포)` : '없음'}`);
     L.push(`연속 집필: 지금 ${R.streak}일 · 가장 길게 ${R.best}일`);
     L.push(`최근 7일 ${fmt(R.l7.c)}자 (${R.l7.days}일) · 최근 30일 ${fmt(R.l30.c)}자 (${R.l30.days}일) · 최근 90일 ${fmt(R.l90.c)}자 (${R.l90.days}일)`);
     if (R.sess.length) L.push(`세션 기록: 세션 ${R.sess.length}번 · 실제로 쓴 시간 ${rpMin(R.totAct)} · 시간당 ${fmt(Math.round(R.totSessC / Math.max(1, R.totAct) * 60))}자`);
@@ -3606,7 +3631,7 @@ function rpExportAll() {
         L.push(`- ${x.title} [${x.genre} · ${x.done ? '완고' : '미완고'}] 원고 ${x.docs}개 · ${fmt(x.all)}자 (공백 제외 ${fmt(x.ns)}자)${sc ? ` · 세션으로 늘어난 글자 +${fmt(sc)}자` : ''}`);
     });
     L.push('');
-    L.push('=== 하루 글자 기록 (공백 제외, 늘어난 글자만) ===');
+    L.push('=== 하루 글자 기록 (공포, 늘어난 글자만) ===');
     const byMonth = {};
     R.dayKeys.forEach(k => { (byMonth[k.slice(0, 7)] ??= []).push(k); });
     Object.keys(byMonth).sort().forEach(m => {
@@ -3885,7 +3910,7 @@ function wkHTML(mon, back) {
     const hourBars = Array.from({ length: hi - lo + 1 }, (_, i) => lo + i).map(h => `<div class="wl-hbc"><div class="wl-hbv" style="height:${D.hours[h] / hmx * 100}%;background:var(--accent)"></div><span>${(h - lo) % 2 === 0 ? h : ''}</span></div>`).join('');
     const devT = D.dev.ph + D.dev.pc;
     return `<div class="modal wl-modal wk-modal"><div class="wl-head"><h3 style="margin:0;flex:1"><i class="ic ic-history"></i> 주간 요약</h3>${back ? '<button class="btn" data-wk="back">← 집필 기록</button>' : ''}<button class="wl-nv" data-wk="prev">‹</button><span class="wl-tag">${name} · ${md(mon)}~${md(end)}</span><button class="wl-nv" data-wk="next" ${+mon >= +cur ? 'disabled' : ''}>›</button><button class="btn" data-wk="close">닫기</button></div>
-        <div class="wl-card"><div class="wk-hero"><small>쓴 글자 (공백 제외)</small><b>${fmt(D.total)}자</b>${diff == null ? '' : `<span class="wk-diff ${diff > 0 ? 'up' : diff < 0 ? 'down' : ''}">${diff > 0 ? '▲' : diff < 0 ? '▼' : '='} ${Math.abs(diff)}% <small>(그 전 주 ${fmt(P.total)}자)</small></span>`}</div>
+        <div class="wl-card"><div class="wk-hero"><small>쓴 글자 (공포)</small><b>${fmt(D.total)}자</b>${diff == null ? '' : `<span class="wk-diff ${diff > 0 ? 'up' : diff < 0 ? 'down' : ''}">${diff > 0 ? '▲' : diff < 0 ? '▼' : '='} ${Math.abs(diff)}% <small>(그 전 주 ${fmt(P.total)}자)</small></span>`}</div>
         <div class="wl-kr"><div><small>쓴 날</small><b>${D.wrote} / 7일</b></div><div><small>실제로 쓴 시간</small><b>${D.act ? minTxt(D.act) : '—'}</b></div><div><small>목표 ${fmt(G.goal)}자 달성</small><b>${D.Q.hit} / 7일</b></div>${D.Q.inShare != null ? `<div><small>지향 시간 안 글자</small><b>${Math.round(D.Q.inShare * 100)}%</b></div>` : ''}${D.Q.avgFirst != null ? `<div><small>첫 글자 평균</small><b>${rpHM(Math.round(D.Q.avgFirst))}</b></div>` : ''}<div><small>세션</small><b>${D.sess.length}번</b></div><div><small>가장 많이 쓴 날</small><b>${D.best && D.best.c ? `${RP_WD[D.best.D.getDay()]}요일 ${fmt(D.best.c)}자` : '—'}</b></div></div>
         <div class="wl-sub" style="margin-top:12px">요일별</div><div class="wk-bars">${bars}</div></div>
         ${ws.length ? `<div class="wl-card"><h3>작품별로 쓴 글자</h3><div class="rp-works">${ws.map(([id, c]) => `<div><b>${wkTitle(id)}</b><span></span><i>+${fmt(c)}자</i></div>`).join('')}</div></div>` : ''}
@@ -3950,7 +3975,7 @@ function openWriteLog(k) {
         if (e.target.closest('[data-wl="back"]')) { mode = 'log'; draw(); $('.wl-modal', bg).scrollTop = 0; return; }
         if (e.target.closest('[data-wl="fix"]')) {
             const k = wlDay || todayKey(), cur = sessOfDay(k).reduce((a, x) => a + Math.max(0, x.c || 0), 0) || stats().days[k] || 0;
-            ask(`${k} 실제로 늘어난 글자 수 (공백 제외) — 지금 ${fmt(cur)}자로 잡혀 있어요. 1분에 ${SESS_SPIKE}자 넘게 튄 때(붙여 넣기)부터 빼요. 세션 하나만 고치려면 세션 목록의 숫자를 누르세요.`, String(cur), 'number').then(v => {
+            ask(`${k} 실제로 늘어난 글자 수 (공포) — 지금 ${fmt(cur)}자로 잡혀 있어요. 1분에 ${SESS_SPIKE}자 넘게 튄 때(붙여 넣기)부터 빼요. 세션 하나만 고치려면 세션 목록의 숫자를 누르세요.`, String(cur), 'number').then(v => {
                 if (v == null || v === '') return;
                 const n = Math.round(Number(String(v).replace(/[,\s]/g, '')));
                 if (!(n >= 0)) { toast('숫자로 적어 주세요.'); return; }
@@ -3961,7 +3986,7 @@ function openWriteLog(k) {
         const sb = e.target.closest('[data-wlsess]');
         if (sb) {
             const k = wlDay || todayKey(), i = +sb.dataset.wlsess, x = sessOfDay(k)[i]; if (!x) return;
-            ask(`${hm(x.s)}~${hm(x.e)} 세션에서 실제로 쓴 글자 수 (공백 제외) — 지금 ${fmt(x.c)}자. 하루 글자도 그만큼 같이 바뀌어요.`, String(x.c), 'number').then(v => {
+            ask(`${hm(x.s)}~${hm(x.e)} 세션에서 실제로 쓴 글자 수 (공포) — 지금 ${fmt(x.c)}자. 하루 글자도 그만큼 같이 바뀌어요.`, String(x.c), 'number').then(v => {
                 if (v == null || v === '') return;
                 const n = Math.round(Number(String(v).replace(/[,\s]/g, '')));
                 if (!(n >= 0)) { toast('숫자로 적어 주세요.'); return; }

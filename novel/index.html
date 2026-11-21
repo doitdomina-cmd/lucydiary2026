@@ -47,6 +47,7 @@ header .work-select { font-weight: 700; max-width: 220px; height: 28px; padding:
 header .spacer { flex: 1; }
 .today-chip { font-size: 12px; color: var(--muted); white-space: nowrap; height: 28px; display: inline-flex; align-items: center; gap: 3px; padding: 0 10px; border-radius: 8px; background: var(--panel2); border: 1px solid var(--line); }
 .today-chip b { color: var(--accent); }
+.today-chip .tc-w { margin-left: 3px; } .today-chip .tc-w i { font-style: normal; opacity: .5; margin-right: 3px; } .today-chip .tc-w[hidden] { display: none; }
 .cur-chip { font-size: 13px; color: var(--text); white-space: nowrap; height: 28px; display: inline-flex; align-items: center; gap: 5px; padding: 0 12px; border-radius: 8px; background: var(--panel2); border: 1px solid var(--line); font-variant-numeric: tabular-nums; max-width: 46vw; overflow: hidden; }
 .cur-chip.hidden { display: none; }
 .sel-chip { font-size: 13px; color: var(--text); white-space: nowrap; height: 28px; display: inline-flex; align-items: center; gap: 5px; padding: 0 12px; border-radius: 8px; background: color-mix(in srgb, #8fb8e8 30%, var(--panel)); border: 1px solid color-mix(in srgb, #8fb8e8 55%, var(--line)); font-variant-numeric: tabular-nums; }
@@ -2297,7 +2298,7 @@ nav.mtabs { display: none; }
 <header>
     <button class="brand" id="btn-home" title="작품 목록 (메인 화면)"><i class="ic ic-feather"></i> 루시의 작업실</button>
     <select class="work-select" id="work-select" title="작품 선택"></select>
-    <span class="today-chip" id="today-chip" title="오늘 늘어난 원고 글자 수 (공백 제외) · 눌러서 집필 기록 보기" style="cursor:pointer">오늘 <b>0</b>자</span>
+    <span class="today-chip" id="today-chip" title="오늘 늘어난 원고 글자 수 (공백 제외) · 이 작품 = 지금 연 작품이 오늘 늘어난 글자 · 눌러서 집필 기록 보기" style="cursor:pointer">오늘 <b>0</b>자</span>
     <span class="cur-chip hidden" id="cur-chip" title="지금 쓰는 회차의 글자 수 (공포 = 공백 포함, 공미 = 공백 제외)"></span>
     <span class="sel-chip hidden" id="sel-chip" title="드래그해서 고른 부분의 글자 수"></span>
     <span class="spacer"></span>
@@ -2855,7 +2856,14 @@ function renderHeader() {
     $$('#mtabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === pref.mtab));
     renderToday();
 }
-function renderToday() { $('#today-chip b').textContent = fmt(stats().days[todayKey()] || 0); }
+// 위쪽 '오늘 N자' + 지금 연 작품이 오늘 늘어난 글자 (세션 기록의 작품별 글자)
+function renderToday() {
+    const chip = $('#today-chip'); chip.querySelector('b').textContent = fmt(stats().days[todayKey()] || 0);
+    const wid = $('.home') ? null : curWorkId();
+    let wc = 0; if (wid) sessOfDay(todayKey()).forEach(x => { wc += Math.max(0, (x.w && x.w[wid] && x.w[wid].c) || 0); });
+    let el = chip.querySelector('.tc-w'); if (!el) { el = document.createElement('span'); el.className = 'tc-w'; chip.appendChild(el); }
+    el.hidden = !wid; el.innerHTML = wid ? `<i>·</i> 이 작품 <b>+${fmt(wc)}</b>` : '';
+}
 
 function openDocIds() {
     const W = WL(), s = new Set();
@@ -3264,8 +3272,9 @@ function onEditorInput(ed) {
         if (gain > 0) {
             const S = stats(); const k = todayKey();
             S.days[k] = (S.days[k] || 0) + gain;
-            pruneStats(S); touch(S); renderToday();
+            pruneStats(S); touch(S);
             try { sessRecord(it, gain); } catch (e) { console.error(e); }
+            renderToday();
         }
     }
     // 같은 문서가 다른 분할 창/참고창에도 열려 있으면 함께 갱신
@@ -11217,8 +11226,9 @@ function openHome() {
     if (!leadTimer) leadTimer = setInterval(() => { if (!$('.home')) return; try { if (refreshLeads()) renderHome(); } catch (e) {} }, 1500);
     document.title = '루시의 작업실';
     navSync();
+    try { renderToday(); } catch (e) {}   // 메인에선 '이 작품' 숨김
 }
-function closeHome() { $('.home')?.remove(); navSync(); }
+function closeHome() { $('.home')?.remove(); navSync(); try { renderToday(); } catch (e) {} }
 // 홈 맨 위 일러스트: 창가 책상 (따뜻한 파스텔 · 코드로 그린 그림이라 저작권 걱정 없음)
 const HH_SCENE = `<svg viewBox="0 0 1100 170" preserveAspectRatio="xMidYMid slice" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
 <defs>

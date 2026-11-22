@@ -1590,7 +1590,9 @@ body .home .wgrid .wcard.icard:not(.pol):not([style*="--gc:#"]) { --lb: #f5f4f1;
 .wl-card h3 { margin: 0 0 4px; font-size: 15px; }
 .wl-dh { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; } .wl-dh h3 { margin: 0; }
 .wl-tag { background: #ffe9a8; color: #7a5e16; font-size: 11px; padding: 2px 9px; border-radius: 99px; font-weight: 700; }
-.wl-nv { width: 28px; height: 28px; border-radius: 50%; background: var(--panel2); font-size: 17px; line-height: 1; } .wl-fix { font-size: 12px; padding: 4px 10px; white-space: nowrap; }
+.wl-nv { width: 28px; height: 28px; border-radius: 50%; background: var(--panel2); font-size: 17px; line-height: 1; } .wl-fix.on { background: #2f8a54; border-color: #2f8a54; color: #fff; }
+.wl-fix.on { background: #2f8a54; border-color: #2f8a54; color: #fff; }
+.wl-fix { font-size: 12px; padding: 4px 10px; white-space: nowrap; }
 .wl-ep .wl-ep-tot { background: color-mix(in srgb, var(--accent) 14%, var(--panel2)); border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--line)); font-weight: 700; }
 button.wl-sc { background: none; border: 1px dashed transparent; border-radius: 8px; padding: 2px 6px; cursor: pointer; font-family: inherit; font-size: inherit; } button.wl-sc:hover { border-color: var(--line); background: var(--panel2); } button.wl-sc small { opacity: .45; font-weight: 400; } .wl-nv:disabled { opacity: .35; }
 .wl-sub { color: var(--muted); font-size: 12px; margin: 6px 0 4px; }
@@ -3310,6 +3312,7 @@ function netGain(doc, d, all) {   // all = 공백 포함 쪽을 따로 셈
     const o = (S.net.w[doc.workId || '_'] ??= { n: 0, p: 0 });
     const N = all ? 'na' : 'n', P = all ? 'pa' : 'p';
     o[N] = (o[N] || 0) + d; o[P] ??= 0;
+    if (S.net.free === k) { const g = Math.max(0, d); o[P] = Math.max(o[P], o[N]); return g; } // '지금부터 그냥 세기'를 켠 날: 늘어난 글자는 무조건 더함 (내일은 저절로 원래 규칙)
     const g = Math.max(0, o[N] - o[P]);
     if (o[N] > o[P]) o[P] = o[N];
     if (g <= 0) touch(S);
@@ -3454,7 +3457,7 @@ function wlDayCard(k) {
     const list = sessOfDay(k), D = new Date(k + 'T00:00:00'), WD = ['일', '월', '화', '수', '목', '금', '토'];
     const isToday = k === todayKey();
     const tot = list.reduce((a, x) => a + x.c, 0), mins = list.reduce((a, x) => a + sessActMin(x), 0), spanMins = list.reduce((a, x) => a + sessSpanMin(x), 0);
-    let h = `<div class="wl-card"><div class="wl-dh"><h3>${isToday ? '오늘의 하루' : '하루 보기'}</h3><span class="wl-tag">${D.getMonth() + 1}월 ${D.getDate()}일 (${WD[D.getDay()]})</span><span style="flex:1"></span><button class="btn wl-fix" data-wl="fix" title="붙여 넣기 등으로 부풀려진 이 날의 글자 수를 실제 숫자로 고쳐요">숫자 바로잡기</button><button class="wl-nv" data-wl="prev">‹</button><button class="wl-nv" data-wl="next" ${isToday ? 'disabled' : ''}>›</button></div>`;
+    let h = `<div class="wl-card"><div class="wl-dh"><h3>${isToday ? '오늘의 하루' : '하루 보기'}</h3><span class="wl-tag">${D.getMonth() + 1}월 ${D.getDate()}일 (${WD[D.getDay()]})</span><span style="flex:1"></span>${isToday ? `<button class="btn wl-fix${stats().net && stats().net.free === k ? ' on' : ''}" data-wl="free" title="플롯 등을 지워서 글자 수가 안 맞아도, 지금부터 늘어나는 글자는 그냥 다 세요. 내일은 저절로 원래대로 돌아가요.">${stats().net && stats().net.free === k ? '✓ 지금부터 세는 중' : '지금부터 세기'}</button>` : ''}<button class="btn wl-fix" data-wl="fix" title="붙여 넣기 등으로 부풀려진 이 날의 글자 수를 실제 숫자로 고쳐요">숫자 바로잡기</button><button class="wl-nv" data-wl="prev">‹</button><button class="wl-nv" data-wl="next" ${isToday ? 'disabled' : ''}>›</button></div>`;
     const dayTot = stats().days[k] || 0;
     if (!list.length) return h + `<div class="wl-empty">${dayTot ? `이 날은 ${fmt(dayTot)}자를 썼어요. (시간 기록은 이 기능을 켠 뒤부터 남아요)` : '이 날은 쓴 기록이 없어요.'}</div></div>`;
     h += `<div class="wl-kr"><div><small>세션</small><b>${list.length}번</b></div><div><small>실제로 쓴 시간</small><b>${minTxt(mins)}</b>${spanMins > mins ? `<small>세션 ${minTxt(spanMins)} 중</small>` : ''}</div><div><small>늘어난 글자 (공포)</small><b>+${fmt(tot)}자</b></div><div><small>시간당</small><b>${mins ? fmt(Math.round(tot / (mins / 60))) : 0}자</b></div><div><small>첫 시작~마지막</small><b>${hm(list[0].s)}~${hm(list[list.length - 1].e)}</b></div></div>`;
@@ -4016,6 +4019,12 @@ function openWriteLog(k, tab) {
         if (e.target.closest('[data-wl="antxt"]')) { rpAnalysisText(); return; }
         // 숫자를 고친 뒤 다시 그릴 때 보고 있던 자리 그대로 (맨 위로 튀지 않게)
         const redrawKeep = () => { const st = $('.wl-modal', bg)?.scrollTop || 0; draw(); const m = $('.wl-modal', bg); if (m) m.scrollTop = st; };
+        if (e.target.closest('[data-wl="free"]')) {
+            const S = stats(), k = todayKey(); if (!S.net || S.net.day !== k) S.net = { day: k, w: {} };
+            if (S.net.free === k) { delete S.net.free; toast('원래 규칙으로 돌아갔어요.'); }
+            else { S.net.free = k; Object.values(S.net.w).forEach(o => { o.p = o.n || 0; o.pa = o.na || 0; }); toast('지금부터 늘어나는 글자는 다 세요. 내일은 자동으로 원래대로 돌아가요.'); }
+            touch(S); redrawKeep(); return;
+        }
         if (e.target.closest('[data-wl="fix"]')) {
             const k = wlDay || todayKey(), cur = sessOfDay(k).reduce((a, x) => a + Math.max(0, x.c || 0), 0) || stats().days[k] || 0;
             ask(`${k} 실제로 늘어난 글자 수 (공포) — 지금 ${fmt(cur)}자로 잡혀 있어요. 1분에 ${SESS_SPIKE}자 넘게 튄 때(붙여 넣기)부터 빼요. 세션 하나만 고치려면 세션 목록의 숫자를 누르세요.`, String(cur), 'number').then(v => {

@@ -3526,13 +3526,18 @@ function sessCutExcess(list, ex) {
     return ex0 - ex;
 }
 // 하루 기록 바로잡기: 그날 세션 글자 합을 v 로, 하루 글자도 v 로
+// 오늘 숫자를 직접 고쳤으면 '오늘 최고점'을 지금 상태로 맞춤 — 플롯을 쓰고 지운 뒤 새 본문을 쓰면 바로 늘어나게 (그렇지 않으면 지운 만큼을 다시 채워야 숫자가 오름)
+function netRebase(k) {
+    const S = stats(); if (k !== todayKey() || !S.net || S.net.day !== k) return;
+    Object.values(S.net.w).forEach(o => { o.p = o.n || 0; o.pa = o.na || 0; }); touch(S);
+}
 function sessFixDay(k, v) {
     const host = sessHost(k, false), list = host ? host.list : [];
     const tot = list.reduce((a, x) => a + Math.max(0, x.c || 0), 0);
     if (tot > v) sessCutExcess(list, tot - v);
     else if (v > tot && tot > 0) { list.forEach(x => sessScaleUp(x, v / tot)); const big = list.reduce((m, x) => x.c > m.c ? x : m, list[0]); const d = v - list.reduce((a, x) => a + x.c, 0); if (d) { big.c += d; const W = Object.values(big.w || {})[0]; if (W) W.c += d; } }
     if (host) touch(host);
-    const S = stats(); S.days[k] = v; touch(S); renderToday();
+    const S = stats(); S.days[k] = v; touch(S); netRebase(k); renderToday();
 }
 // 세션 하나만 고치기 — 하루 글자도 그만큼 같이 바뀜
 function sessFixOne(k, idx, n) {
@@ -3541,7 +3546,7 @@ function sessFixOne(k, idx, n) {
     if (n < old) sessCutExcess([x], old - n);
     else if (n > old) { if (old > 0) sessScaleUp(x, n / old); x.c = n; const W = Object.values(x.w || {}).sort((a, b) => b.c - a.c)[0]; if (W) W.c += n - Object.values(x.w).reduce((a, w) => a + w.c, 0); }
     touch(host);
-    const S = stats(); S.days[k] = Math.max(0, (S.days[k] || 0) + (x.c - old)); touch(S); renderToday();
+    const S = stats(); S.days[k] = Math.max(0, (S.days[k] || 0) + (x.c - old)); touch(S); netRebase(k); renderToday();
 }
 function wlGrass(weeks) {
     const today = wdNow(); today.setHours(0, 0, 0, 0);

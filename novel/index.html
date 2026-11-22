@@ -1593,7 +1593,8 @@ body .home .wgrid .wcard.icard:not(.pol):not([style*="--gc:#"]) { --lb: #f5f4f1;
 .wl-nv { width: 28px; height: 28px; border-radius: 50%; background: var(--panel2); font-size: 17px; line-height: 1; }
 html body .wl-card .btn.wl-fix.on { background: #d7efdc !important; border: 1.5px solid #2f8a54 !important; color: #1f6b3f !important; font-weight: 700; } /* 테마의 .btn 흰 배경에 눌려 글자가 안 보이던 것 */
 .wl-fix { font-size: 12px; padding: 4px 10px; white-space: nowrap; }
-.wl-ep .wl-ep-tot { background: color-mix(in srgb, var(--accent) 14%, var(--panel2)); border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--line)); font-weight: 700; }
+.wl-ep .wl-ep-miss { color: #a1581f; }
+.wl-ep-tot { background: color-mix(in srgb, var(--accent) 14%, var(--panel2)); border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--line)); font-weight: 700; }
 button.wl-sc { background: none; border: 1px dashed transparent; border-radius: 8px; padding: 2px 6px; cursor: pointer; font-family: inherit; font-size: inherit; } button.wl-sc:hover { border-color: var(--line); background: var(--panel2); } button.wl-sc small { opacity: .45; font-weight: 400; } .wl-nv:disabled { opacity: .35; }
 .wl-sub { color: var(--muted); font-size: 12px; margin: 6px 0 4px; }
 .wl-empty { color: var(--muted); font-size: 13px; padding: 12px 2px; }
@@ -3489,7 +3490,7 @@ function wlDayCard(k) {
     // 작품별 합계
     const byW = {}; list.forEach(x => Object.entries(x.w).forEach(([wk, W]) => { const o = (byW[wk] ??= { c: 0, n: 0 }); o.c += W.c; o.n++; }));
     const byWTot = Object.values(byW).reduce((a, o) => a + o.c, 0);
-    h += `<div class="wl-sub" style="margin-top:14px">작품별로 쓴 글자</div><div class="wl-ep">${Object.entries(byW).sort((a, b) => b[1].c - a[1].c).map(([wk, o]) => `<span>${wkTitle(wk)} <small>세션 ${o.n}번</small> <b>+${fmt(o.c)}자</b></span>`).join('')}<span class="wl-ep-tot">합계 <b>+${fmt(byWTot)}자</b></span></div>`;
+    h += `<div class="wl-sub" style="margin-top:14px">작품별로 쓴 글자</div><div class="wl-ep">${Object.entries(byW).sort((a, b) => b[1].c - a[1].c).map(([wk, o]) => `<span>${wkTitle(wk)} <small>세션 ${o.n}번</small> <b>+${fmt(o.c)}자</b></span>`).join('')}${(() => { const gap = (stats().days[k] || 0) - byWTot; return gap ? `<span class="wl-ep-miss" title="위쪽 '오늘 N자'에는 잡혔지만 시간 기록(세션)에는 안 들어간 글자예요. 숫자 바로잡기나 지금부터 더하고 빼기로 지운 글자, 기록을 켜기 전에 쓴 글자 등이 여기에 나와요.">시간 기록에 안 잡힌 글자 <b>${gap > 0 ? '+' : ''}${fmt(gap)}자</b></span>` : ''; })()}<span class="wl-ep-tot">합계 <b>+${fmt(byWTot)}자</b></span>${stats().days[k] != null && (stats().days[k] || 0) !== byWTot ? `<span class="wl-ep-tot">오늘 전체 <b>${fmt(stats().days[k] || 0)}자</b></span>` : ''}</div>`;
     return h + '</div>';
 }
 /* 기록 바로잡기 (붙여 넣기 등으로 부풀려진 숫자)

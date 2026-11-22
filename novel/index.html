@@ -1552,7 +1552,8 @@ body .home .wgrid .wcard.icard:not(.pol):not([style*="--gc:#"]) { --lb: #f5f4f1;
 .wl-top > div, .wl-kr > div { flex: 1; min-width: 0; background: var(--panel2); border: 1px dashed var(--line); border-radius: 12px; padding: 8px 12px; }
 .wl-top small, .wl-kr small { color: var(--muted); font-size: 11px; display: block; }
 .wl-top b { font-size: 15px; } .wl-kr b { font-size: 15px; display: block; margin-top: 2px; }
-.wl-tabs { display: flex; gap: 6px; margin: 0 0 12px; border-bottom: 1.5px dashed var(--line); padding-bottom: 8px; }
+.wl-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.wl-wkn { display: flex; align-items: center; gap: 8px; justify-content: center; margin-bottom: 10px; }
 .wl-tabs button { padding: 6px 14px; border-radius: 999px; background: var(--panel2); border: 1px solid var(--line); font-size: 13px; color: var(--muted); }
 .wl-tabs button.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
 .wl-card { border: 1.5px dashed var(--line); border-radius: 16px; padding: 14px 16px; margin-bottom: 14px; background: var(--panel); }
@@ -3448,7 +3449,7 @@ function sessAddHours(x, add) {
     if (x.m) { Object.entries(x.m).forEach(([k, c]) => { const ms = x.s + Number(k) * 6e4 + 3e4; add(new Date(ms), sessDevAt(x, ms), c); }); return; }
     x.segs.forEach(g => { const a = msHour(g.a), b = Math.max(msHour(g.b), a + 0.0001), span = b - a; for (let hr = Math.floor(a); hr <= Math.min(23, Math.floor(b)); hr++) { const ov = Math.max(0, Math.min(b, hr + 1) - Math.max(a, hr)); const D = new Date(g.a); D.setHours(hr, 30, 0, 0); add(D, g.d, g.c * (ov / span)); } });
 }
-let wlDay = null, wlTab = 'day';
+let wlDay = null, wlTab = 'day', wlWkM = null;
 function wlDayCard(k) {
     const list = sessOfDay(k), D = new Date(k + 'T00:00:00'), WD = ['일', '월', '화', '수', '목', '금', '토'];
     const isToday = k === todayKey();
@@ -3926,7 +3927,7 @@ function wkTips(D, P) {
     T.push(`이번 주 목표: 매일 ${fmt(G.goal)}자 — ${G.txt} (${G.hrs}시간) 동안 1시간에 ${fmt(Math.ceil(G.goal / G.hrs / 10) * 10)}자씩`);
     return T;
 }
-function wkHTML(mon, back) {
+function wkParts(mon) {
     const D = wkData(mon), pm = new Date(mon); pm.setDate(pm.getDate() - 7);
     const P = wkData(pm), cur = wkMonday(wdNow()), last = new Date(cur); last.setDate(last.getDate() - 7);
     const end = new Date(mon); end.setDate(end.getDate() + 6);
@@ -3941,14 +3942,19 @@ function wkHTML(mon, back) {
     const lo = hs.length ? Math.min(...hs.map(x => x[0])) : 9, hi = hs.length ? Math.max(...hs.map(x => x[0])) : 18;
     const hourBars = Array.from({ length: hi - lo + 1 }, (_, i) => lo + i).map(h => `<div class="wl-hbc"><div class="wl-hbv" style="height:${D.hours[h] / hmx * 100}%;background:var(--accent)"></div><span>${(h - lo) % 2 === 0 ? h : ''}</span></div>`).join('');
     const devT = D.dev.ph + D.dev.pc;
-    return `<div class="modal wl-modal wk-modal"><div class="wl-head"><h3 style="margin:0;flex:1"><i class="ic ic-history"></i> 주간 요약</h3>${back ? '<button class="btn" data-wk="back">← 집필 기록</button>' : ''}<button class="wl-nv" data-wk="prev">‹</button><span class="wl-tag">${name} · ${md(mon)}~${md(end)}</span><button class="wl-nv" data-wk="next" ${+mon >= +cur ? 'disabled' : ''}>›</button><button class="btn" data-wk="close">닫기</button></div>
-        <div class="wl-card"><div class="wk-hero"><small>쓴 글자 (공포)</small><b>${fmt(D.total)}자</b>${diff == null ? '' : `<span class="wk-diff ${diff > 0 ? 'up' : diff < 0 ? 'down' : ''}">${diff > 0 ? '▲' : diff < 0 ? '▼' : '='} ${Math.abs(diff)}% <small>(그 전 주 ${fmt(P.total)}자)</small></span>`}</div>
+    const nav = `<button class="wl-nv" data-wk="prev">‹</button><span class="wl-tag">${name} · ${md(mon)}~${md(end)}</span><button class="wl-nv" data-wk="next" ${+mon >= +cur ? 'disabled' : ''}>›</button>`;
+    const body = `<div class="wl-card"><div class="wk-hero"><small>쓴 글자 (공포)</small><b>${fmt(D.total)}자</b>${diff == null ? '' : `<span class="wk-diff ${diff > 0 ? 'up' : diff < 0 ? 'down' : ''}">${diff > 0 ? '▲' : diff < 0 ? '▼' : '='} ${Math.abs(diff)}% <small>(그 전 주 ${fmt(P.total)}자)</small></span>`}</div>
         <div class="wl-kr"><div><small>쓴 날</small><b>${D.wrote} / 7일</b></div><div><small>실제로 쓴 시간</small><b>${D.act ? minTxt(D.act) : '—'}</b></div><div><small>목표 ${fmt(G.goal)}자 달성</small><b>${D.Q.hit} / 7일</b></div>${D.Q.inShare != null ? `<div><small>지향 시간 안 글자</small><b>${Math.round(D.Q.inShare * 100)}%</b></div>` : ''}${D.Q.avgFirst != null ? `<div><small>첫 글자 평균</small><b>${rpHM(Math.round(D.Q.avgFirst))}</b></div>` : ''}<div><small>세션</small><b>${D.sess.length}번</b></div><div><small>가장 많이 쓴 날</small><b>${D.best && D.best.c ? `${RP_WD[D.best.D.getDay()]}요일 ${fmt(D.best.c)}자` : '—'}</b></div></div>
         <div class="wl-sub" style="margin-top:12px">요일별</div><div class="wk-bars">${bars}</div></div>
         ${ws.length ? `<div class="wl-card"><h3>작품별로 쓴 글자</h3><div class="rp-works">${ws.map(([id, c]) => `<div><b>${wkTitle(id)}</b><span></span><i>+${fmt(c)}자</i></div>`).join('')}</div></div>` : ''}
         ${hs.length ? `<div class="wl-card"><h3>시간대별 <small style="font-weight:400;color:var(--muted);font-size:12px">· 진한 칸 = 지향 시간 ${G.txt}</small></h3>${rpBandBars(D.Q)}${devT ? `<div class="wl-sub">📱 폰 ${Math.round(D.dev.ph / devT * 100)}% · 🖥 PC ${Math.round(D.dev.pc / devT * 100)}%</div>` : ''}</div>` : ''}
         <div class="wl-card"><h3>한마디</h3><ul class="rp-tips">${wkTips(D, P).map(t => `<li>${esc(t)}</li>`).join('')}</ul></div>
-        <p class="modal-note" style="margin:0">한 주를 처음 열 때 지난주 요약이 자동으로 떠요. 설정 › 기타에서 끌 수 있어요.</p></div>`;
+        <p class="modal-note" style="margin:0">한 주를 처음 열 때 지난주 요약이 자동으로 떠요. 설정 › 기타에서 끌 수 있어요.</p>`;
+    return { nav, body };
+}
+function wkHTML(mon, back) {
+    const P = wkParts(mon);
+    return `<div class="modal wl-modal wk-modal"><div class="wl-head"><h3 style="margin:0;flex:1"><i class="ic ic-history"></i> 주간 요약</h3>${back ? '<button class="btn" data-wk="back">← 집필 기록</button>' : ''}${P.nav}<button class="btn" data-wk="close">닫기</button></div>${P.body}</div>`;
 }
 function openWeekSummary(mon, back) {   // back: 집필 기록 창에서 왔으면 '← 집필 기록' 버튼
     let m = mon || (() => { const x = wkMonday(wdNow()); x.setDate(x.getDate() - 7); return x; })();
@@ -3975,36 +3981,34 @@ function weekSummaryMaybe() {
     if (!D.total && !D.sess.length) return;   // 지난주 기록이 없으면 조용히 넘어감
     openWeekSummary(prev);
 }
-function openWriteLog(k) {
-    wlDay = k || todayKey(); wlTab = 'day';
+function openWriteLog(k, tab) {
+    wlDay = k || todayKey(); wlTab = tab || 'day';
+    { const x = wkMonday(wdNow()); x.setDate(x.getDate() - 7); wlWkM = x; } // 주간 요약은 지난주부터
     let bg = $('.wl-bg'); if (bg) bg.remove();
     bg = document.createElement('div'); bg.className = 'modal-bg wl-bg';
-    let mode = 'log';   // 'log' = 집필 기록, 'an' = 나의 집필 분석
     const draw = () => {
-        if (mode === 'an') {
-            bg.innerHTML = `<div class="modal wl-modal"><div class="wl-head"><h3 style="margin:0;flex:1"><i class="ic ic-history"></i> 나의 집필 분석</h3><button class="btn" data-wl="back">← 집필 기록</button><button class="btn" data-wl="antxt">텍스트로 저장</button><button class="btn" data-wl="close">닫기</button></div>${rpAnalysisHTML()}</div>`;
-            return;
-        }
-        const tabs = [['day', '하루 · 잔디'], ['when', '언제 쓰나요?'], ['week', '최근 7일']];
-        const body = wlTab === 'when' ? `<div class="wl-card"><h3>언제 쓰나요? 시간대 분포</h3><div class="wl-sub">요일 × 시간별로 쓴 글자 수 (최근 90일)</div>${wlHeat(90)}</div>`
-            : wlTab === 'week' ? `<div class="wl-card"><h3>최근 7일 세션 타임라인</h3><div class="wl-sub">막대 하나 = 세션 하나 · 5분 안에 기기를 바꿔 이어 쓰면 한 막대 안에 보라와 연두로 이어져요 · 날짜를 누르면 그날 상세</div>${wlWeek()}</div>`
-            : `${wlDayCard(wlDay)}
+        // 맨 윗줄 하나에 탭·기록 다운·닫기를 다 모음 (스크롤해도 고정)
+        const tabs = [['day', '하루 · 잔디'], ['when', '언제 쓰나요?'], ['week', '최근 7일'], ['wk', '주간 요약'], ['an', '나의 집필 분석']];
+        const head = `<div class="wl-head"><h3 style="margin:0"><i class="ic ic-history"></i> 집필 기록</h3><div class="wl-tabs">${tabs.map(([k, l]) => `<button class="${wlTab === k ? 'on' : ''}" data-wltab="${k}">${l}</button>`).join('')}</div><span style="flex:1"></span><button class="btn" data-wl="txt" title="작품·하루 글자·세션 기록 전체를 텍스트 파일로 저장">기록 다운 (txt)</button><button class="btn" data-wl="close">닫기</button></div>`;
+        let body;
+        if (wlTab === 'an') body = `<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn" data-wl="antxt">분석 텍스트로 저장</button></div>${rpAnalysisHTML()}`;
+        else if (wlTab === 'wk') { const P = wkParts(wlWkM); body = `<div class="wl-wkn">${P.nav}</div>${P.body}`; }
+        else {
+            const inner = wlTab === 'when' ? `<div class="wl-card"><h3>언제 쓰나요? 시간대 분포</h3><div class="wl-sub">요일 × 시간별로 쓴 글자 수 (최근 90일)</div>${wlHeat(90)}</div>`
+                : wlTab === 'week' ? `<div class="wl-card"><h3>최근 7일 세션 타임라인</h3><div class="wl-sub">막대 하나 = 세션 하나 · 5분 안에 기기를 바꿔 이어 쓰면 한 막대 안에 보라와 연두로 이어져요 · 날짜를 누르면 그날 상세</div>${wlWeek()}</div>`
+                : `${wlDayCard(wlDay)}
         <div class="wl-card"><h3>집필 잔디</h3><div class="wl-sub">하루에 쓴 글자 수 (최근 13주) · 진할수록 많이 쓴 날 · 칸을 누르면 그날 상세</div>${wlGrass(13)}</div>
         <div class="wl-card"><h3>하루에 몇 세션으로 일하나요?</h3><div class="wl-sub">최근 13주 · 하루 세션 수별 날짜</div>${wlDist(91)}</div>`;
-        bg.innerHTML = `<div class="modal wl-modal"><div class="wl-head"><h3 style="margin:0;flex:1"><i class="ic ic-history"></i> 집필 기록</h3><button class="btn" data-wl="wk" title="한 주(월~일)를 한 장으로 요약">주간 요약</button><button class="btn" data-wl="an" title="내 집필 습관을 숫자로 분석하고 유형·조언을 보여 줘요">나의 집필 분석</button><button class="btn" data-wl="txt" title="작품·하루 글자·세션 기록 전체를 텍스트 파일로 저장">기록 전체 (txt)</button><button class="btn" data-wl="close">닫기</button></div>
-        ${wlTop()}
-        <div class="wl-tabs">${tabs.map(([k, l]) => `<button class="${wlTab === k ? 'on' : ''}" data-wltab="${k}">${l}</button>`).join('')}</div>
-        <div class="wl-leg"><span><i style="background:${SESS_PC}"></i>PC</span><span><i style="background:${SESS_PH}"></i>폰</span><span><i style="background:linear-gradient(135deg,${SESS_PH} 50%,${SESS_PC} 50%)"></i>둘 다 (같은 세션으로 이어 씀)</span></div>
-        ${body}</div>`;
+            body = `${wlTop()}
+        <div class="wl-leg"><span><i style="background:${SESS_PC}"></i>PC</span><span><i style="background:${SESS_PH}"></i>폰</span><span><i style="background:linear-gradient(135deg,${SESS_PH} 50%,${SESS_PC} 50%)"></i>둘 다 (같은 세션으로 이어 씀)</span></div>${inner}`;
+        }
+        bg.innerHTML = `<div class="modal wl-modal">${head}${body}</div>`;
     };
     draw();
     bg.addEventListener('click', e => {
         if (e.target === bg || e.target.closest('[data-wl="close"]')) { bg.remove(); return; }
         if (e.target.closest('[data-wl="txt"]')) { rpExportAll(); return; }
-        if (e.target.closest('[data-wl="wk"]')) { bg.remove(); openWeekSummary(null, true); return; }
         if (e.target.closest('[data-wl="antxt"]')) { rpAnalysisText(); return; }
-        if (e.target.closest('[data-wl="an"]')) { mode = 'an'; draw(); $('.wl-modal', bg).scrollTop = 0; return; }
-        if (e.target.closest('[data-wl="back"]')) { mode = 'log'; draw(); $('.wl-modal', bg).scrollTop = 0; return; }
         // 숫자를 고친 뒤 다시 그릴 때 보고 있던 자리 그대로 (맨 위로 튀지 않게)
         const redrawKeep = () => { const st = $('.wl-modal', bg)?.scrollTop || 0; draw(); const m = $('.wl-modal', bg); if (m) m.scrollTop = st; };
         if (e.target.closest('[data-wl="fix"]')) {
@@ -4030,6 +4034,8 @@ function openWriteLog(k) {
         }
         const nv = e.target.closest('[data-wl="prev"],[data-wl="next"]');
         if (nv && !nv.disabled) { const D = new Date(wlDay + 'T00:00:00'); D.setDate(D.getDate() + (nv.dataset.wl === 'prev' ? -1 : 1)); wlDay = dayKeyOfMs(D.getTime()); draw(); $('.wl-modal', bg).scrollTop = 0; return; }
+        const wn = e.target.closest('[data-wk="prev"],[data-wk="next"]');
+        if (wn) { if (wn.disabled) return; wlWkM = new Date(wlWkM); wlWkM.setDate(wlWkM.getDate() + (wn.dataset.wk === 'prev' ? -7 : 7)); draw(); return; }
         const tb = e.target.closest('[data-wltab]'); if (tb) { wlTab = tb.dataset.wltab; draw(); $('.wl-modal', bg).scrollTop = 0; return; }
         const dd = e.target.closest('[data-wlday]'); if (dd) { wlDay = dd.dataset.wlday; wlTab = 'day'; draw(); $('.wl-modal', bg).scrollTop = 0; }
     });

@@ -2305,7 +2305,7 @@ nav.mtabs { display: none; }
 <header>
     <button class="brand" id="btn-home" title="작품 목록 (메인 화면)"><i class="ic ic-feather"></i> 루시의 작업실</button>
     <select class="work-select" id="work-select" title="작품 선택"></select>
-    <span class="today-chip" id="today-chip" title="오늘 늘어난 원고 글자 수 (공포 = 공백 포함) · 이 작품 = 지금 연 작품이 오늘 늘어난 글자 · 눌러서 집필 기록 보기" style="cursor:pointer">오늘 공포 <b>0</b><span class="tc-ja">자</span></span>
+    <span class="today-chip" id="today-chip" title="오늘 늘어난 원고 글자 수 (공포 = 공백 포함) · 이 작품 = 지금 연 작품이 오늘 늘어난 글자 · 눌러서 집필 기록 보기" style="cursor:pointer">오늘 전체 <b>0</b><span class="tc-ja">자</span></span>
     <span class="cur-chip hidden" id="cur-chip" title="지금 쓰는 회차의 글자 수 (공포 = 공백 포함, 공미 = 공백 제외)"></span>
     <span class="sel-chip hidden" id="sel-chip" title="드래그해서 고른 부분의 글자 수"></span>
     <span class="spacer"></span>
@@ -2875,11 +2875,20 @@ function renderHeader() {
 }
 // 위쪽 '오늘 N자' + 지금 연 작품이 오늘 늘어난 글자 (세션 기록의 작품별 글자)
 function renderToday() {
-    const chip = $('#today-chip'); chip.querySelector('b').textContent = fmt(stats().days[todayKey()] || 0);
+    const k = todayKey(), chip = $('#today-chip'), total = stats().days[k] || 0; chip.querySelector('b').textContent = fmt(total);
     const wid = $('.home') ? null : curWorkId();
-    let wc = 0; if (wid) sessOfDay(todayKey()).forEach(x => { wc += Math.max(0, (x.w && x.w[wid] && x.w[wid].c) || 0); });
+    const per = {}; let tot = 0; sessOfDay(k).forEach(x => Object.entries(x.w || {}).forEach(([w, o]) => { const c = Math.max(0, o.c || 0); per[w] = (per[w] || 0) + c; tot += c; }));
+    const wc = wid ? (per[wid] || 0) : 0;
     let el = chip.querySelector('.tc-w'); if (!el) { el = document.createElement('span'); el.className = 'tc-w'; chip.appendChild(el); }
-    el.hidden = !wid; el.innerHTML = wid ? `<i>·</i> <span class="tc-i">이 </span>작품 <b>+${fmt(wc)}</b>` : '';
+    el.hidden = !wid; el.innerHTML = wid ? `<i>·</i> <span class="tc-i">이 </span>작품 <b>${fmt(wc)}</b><span class="tc-ja">자</span>` : '';
+    // 마우스를 올리면: 다른 작품에 쓴 글자도 보여 줌
+    const others = Object.entries(per).filter(([w, c]) => w !== wid && c > 0).sort((a, b) => b[1] - a[1]), gap = total - tot;
+    const L = [`오늘 전체 ${fmt(total)}자 (공포 = 공백 포함)`];
+    if (wid) L.push(`이 작품 ${fmt(wc)}자`);
+    if (others.length) { L.push('— 다른 작품 —'); others.forEach(([w, c]) => L.push(`${get(w)?.title || '작품'} ${fmt(c)}자`)); }
+    if (gap) L.push(`시간 기록에 안 잡힌 글자 ${gap > 0 ? '+' : ''}${fmt(gap)}자`);
+    L.push('눌러서 집필 기록 보기');
+    chip.title = L.join('\n');
 }
 
 function openDocIds() {

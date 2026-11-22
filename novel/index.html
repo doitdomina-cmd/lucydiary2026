@@ -3449,7 +3449,7 @@ function sessAddHours(x, add) {
     if (x.m) { Object.entries(x.m).forEach(([k, c]) => { const ms = x.s + Number(k) * 6e4 + 3e4; add(new Date(ms), sessDevAt(x, ms), c); }); return; }
     x.segs.forEach(g => { const a = msHour(g.a), b = Math.max(msHour(g.b), a + 0.0001), span = b - a; for (let hr = Math.floor(a); hr <= Math.min(23, Math.floor(b)); hr++) { const ov = Math.max(0, Math.min(b, hr + 1) - Math.max(a, hr)); const D = new Date(g.a); D.setHours(hr, 30, 0, 0); add(D, g.d, g.c * (ov / span)); } });
 }
-let wlDay = null, wlTab = 'day', wlWkM = null;
+let wlDay = null, wlTab = 'day', wlWkM = null, wlWOff = 0;
 function wlDayCard(k) {
     const list = sessOfDay(k), D = new Date(k + 'T00:00:00'), WD = ['일', '월', '화', '수', '목', '금', '토'];
     const isToday = k === todayKey();
@@ -3573,9 +3573,9 @@ function wlHeat(days) {
     const hrs = Array.from({ length: 24 - lo }, (_, i) => lo + i);
     return `<div class="wl-hm"><div class="wl-hl">${WD.map(n => `<span>${n}</span>`).join('')}</div><div><div class="wl-hh">${hrs.map(h => `<span>${h % 3 === 0 ? h + '시' : ''}</span>`).join('')}</div>${ORD.map(i => cell[i]).map(r => `<div class="wl-hr">${hrs.map(h => { const c = r[h]; return `<i style="background:${sessCell(lv(c.ph + c.pc), c.ph >= 1, c.pc >= 1)}"></i>`; }).join('')}</div>`).join('')}</div></div>`;
 }
-function wlWeek() {
+function wlWeek(off = 0) {
     const today = wdNow(), WD = ['일', '월', '화', '수', '목', '금', '토'], RH = 34; let cols = '', days = [], lo = 8, hi = 24; // RH = 한 시간의 높이(px)
-    for (let i = 6; i >= 0; i--) { const D = new Date(today); D.setDate(D.getDate() - i); const k = dayKeyOfMs(D.getTime()), list = sessOfDay(k); days.push({ D, k, list }); list.forEach(x => { lo = Math.min(lo, Math.floor(wdHour(x.s, k))); hi = Math.max(hi, Math.min(26, Math.ceil(wdHour(x.e, k)))); }); } // 새벽(0~8시)은 쓴 날만 펼침, 자정 넘어 쓴 날은 새벽 2시까지
+    for (let i = 6; i >= 0; i--) { const D = new Date(today); D.setDate(D.getDate() - i - off * 7); const k = dayKeyOfMs(D.getTime()), list = sessOfDay(k); days.push({ D, k, list }); list.forEach(x => { lo = Math.min(lo, Math.floor(wdHour(x.s, k))); hi = Math.max(hi, Math.min(26, Math.ceil(wdHour(x.e, k)))); }); } // 새벽(0~8시)은 쓴 날만 펼침, 자정 넘어 쓴 날은 새벽 2시까지
     const H = hi - lo;
     days.forEach(({ D, k, list }) => {
         cols += `<div class="wl-wc" data-wlday="${k}"><b>${D.getMonth() + 1}/${D.getDate()} (${WD[D.getDay()]})</b><div class="wl-wcb" style="height:${H * RH}px">${Array.from({ length: H }, (_, j) => j).map(j => `<u style="top:${j * RH}px"></u>`).join('')}${list.map(x => { const a = wdHour(x.s, k) - lo, b = Math.max(wdHour(x.e, k) - lo, a + 0.15); if (!x.m) return `<em style="top:${a * RH}px;height:${Math.max(4, (b - a) * RH)}px;background:${sessBg(x.segs).replace('90deg', '180deg')}"></em>`; return `<em class="wl-emm" style="top:${a * RH}px;height:${Math.max(4, (b - a) * RH)}px">${sessRuns(x).map(([ra, rb, d]) => `<i style="top:${(ra - x.s) / 36e5 * RH}px;height:${Math.max(1, (rb - ra) / 36e5 * RH)}px;background:${d === 'ph' ? SESS_PH : SESS_PC}"></i>`).join('')}</em>`; }).join('')}</div><span>${list.length ? `${list.length}세션<br>+${fmt(list.reduce((a, x) => a + x.c, 0))}자` : (stats().days[k] ? `+${fmt(stats().days[k])}자` : '쉼')}</span></div>`;
@@ -3982,7 +3982,7 @@ function weekSummaryMaybe() {
     openWeekSummary(prev);
 }
 function openWriteLog(k, tab) {
-    wlDay = k || todayKey(); wlTab = tab || 'day';
+    wlDay = k || todayKey(); wlTab = tab || 'day'; wlWOff = 0;
     { const x = wkMonday(wdNow()); x.setDate(x.getDate() - 7); wlWkM = x; } // 주간 요약은 지난주부터
     let bg = $('.wl-bg'); if (bg) bg.remove();
     bg = document.createElement('div'); bg.className = 'modal-bg wl-bg';
@@ -3995,7 +3995,7 @@ function openWriteLog(k, tab) {
         else if (wlTab === 'wk') { const P = wkParts(wlWkM); body = `<div class="wl-wkn">${P.nav}</div>${P.body}`; }
         else {
             const inner = wlTab === 'when' ? `<div class="wl-card"><h3>언제 쓰나요? 시간대 분포</h3><div class="wl-sub">요일 × 시간별로 쓴 글자 수 (최근 90일)</div>${wlHeat(90)}</div>`
-                : wlTab === 'week' ? `<div class="wl-card"><h3>최근 7일 세션 타임라인</h3><div class="wl-sub">막대 하나 = 세션 하나 · 5분 안에 기기를 바꿔 이어 쓰면 한 막대 안에 보라와 연두로 이어져요 · 날짜를 누르면 그날 상세</div>${wlWeek()}</div>`
+                : wlTab === 'week' ? `<div class="wl-card"><div class="wl-dh"><h3>${wlWOff ? wlWOff + '주 전 7일' : '최근 7일'} 세션 타임라인</h3><span class="wl-tag">${(() => { const e = wdNow(); e.setDate(e.getDate() - wlWOff * 7); const b = new Date(e); b.setDate(b.getDate() - 6); return `${b.getMonth() + 1}/${b.getDate()} ~ ${e.getMonth() + 1}/${e.getDate()}`; })()}</span><span style="flex:1"></span><button class="wl-nv" data-ww="prev" title="7일 전">‹</button><button class="wl-nv" data-ww="next" title="7일 뒤" ${wlWOff ? '' : 'disabled'}>›</button></div><div class="wl-sub">막대 하나 = 세션 하나 · 5분 안에 기기를 바꿔 이어 쓰면 한 막대 안에 보라와 연두로 이어져요 · 날짜를 누르면 그날 상세</div>${wlWeek(wlWOff)}</div>`
                 : `${wlDayCard(wlDay)}
         <div class="wl-card"><h3>집필 잔디</h3><div class="wl-sub">하루에 쓴 글자 수 (최근 13주) · 진할수록 많이 쓴 날 · 칸을 누르면 그날 상세</div>${wlGrass(13)}</div>
         <div class="wl-card"><h3>하루에 몇 세션으로 일하나요?</h3><div class="wl-sub">최근 13주 · 하루 세션 수별 날짜</div>${wlDist(91)}</div>`;
@@ -4034,6 +4034,8 @@ function openWriteLog(k, tab) {
         }
         const nv = e.target.closest('[data-wl="prev"],[data-wl="next"]');
         if (nv && !nv.disabled) { const D = new Date(wlDay + 'T00:00:00'); D.setDate(D.getDate() + (nv.dataset.wl === 'prev' ? -1 : 1)); wlDay = dayKeyOfMs(D.getTime()); draw(); $('.wl-modal', bg).scrollTop = 0; return; }
+        const ww = e.target.closest('[data-ww]');
+        if (ww) { if (ww.disabled) return; wlWOff = Math.max(0, wlWOff + (ww.dataset.ww === 'prev' ? 1 : -1)); draw(); return; }
         const wn = e.target.closest('[data-wk="prev"],[data-wk="next"]');
         if (wn) { if (wn.disabled) return; wlWkM = new Date(wlWkM); wlWkM.setDate(wlWkM.getDate() + (wn.dataset.wk === 'prev' ? -7 : 7)); draw(); return; }
         const tb = e.target.closest('[data-wltab]'); if (tb) { wlTab = tb.dataset.wltab; draw(); $('.wl-modal', bg).scrollTop = 0; return; }

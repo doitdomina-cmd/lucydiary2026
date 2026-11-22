@@ -16601,6 +16601,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
         function viewWork(id) {
             const w = masterWorks.find(x => x.id === id);
             if (!w) return;
+            const prevViewId = currentViewWorkId;
             currentViewWorkId = id;
             workFormMode = 'view';
 
@@ -16610,7 +16611,21 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
 
             _fillWorkForm(w);
             showWorkForm();
-            renderMasterWorksList();
+            // 카드 하나 눌렀다고 목록 전체(수십~백 장)를 다시 그리면 버벅여서, 선택이 바뀐 카드 두 장만 갈아 끼움 (2026-11-22)
+            {
+                const cont = document.getElementById('master-works-by-genre-container');
+                const q = k => cont && cont.querySelector(`:scope > [data-wid="${CSS.escape(k)}"]`);
+                const oldEl = prevViewId && prevViewId !== id ? q(prevViewId) : null, newEl = q(id);
+                if (window._wkCardHtml && newEl && (oldEl || !prevViewId || prevViewId === id)) {
+                    const swap = (el, wk) => { if (!el || !wk) return; const t = document.createElement('template'); t.innerHTML = window._wkCardHtml(wk).trim(); const n = t.content.firstElementChild;
+                        /* 카드 통째로 바꾸면 순서 규칙(nth-child) 때문에 목록 전체를 다시 계산해서(120ms) 같은 카드 안만 바꿈 */
+                        el.className = n.className; el.setAttribute('style', n.getAttribute('style') || ''); el.innerHTML = n.innerHTML; };
+                    if (oldEl) swap(oldEl, masterWorks.find(x => x.id === prevViewId));
+                    swap(newEl, w);
+                    requestAnimationFrame(fitWorksPanelsHeight);
+                    cont.dispatchEvent(new Event('wkfit'));
+                } else renderMasterWorksList();
+            }
 
             if (listScroller) {
                 listScroller.scrollTop = savedScroll;
@@ -17075,7 +17090,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             if(worksToShow.length === 0) { container.innerHTML = `<div class="col-span-full text-center py-20 text-slate-400">작품 없음</div>`; return; }
             const editingId = document.getElementById('work-editing-id')?.value || '';
             const cardsHtml = [];   // 카드마다 innerHTML += 하면 작품이 많을 때 매번 목록 전체를 다시 만들어 느려져서 한 번에 넣음 (2026-11-22)
-            worksToShow.forEach(w => {
+            const wkCardHtml = w => {
                 const genreColor = getGenreColor(w.genre), badgeBg = hexToRgba(genreColor, genreBadgeOpacity);
                 const isEditing = editingId === w.id;
                 const isSelected = currentViewWorkId === w.id;
@@ -17111,7 +17126,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                     : '';
                 const extrasRow = `<div class="text-[12px] font-normal text-slate-500 truncate min-h-[16px]" title="${extrasNames}">${extrasNames}</div>`;
                 const editingBorder = cardClass;
-                cardsHtml.push(`<div class="rounded-xl p-3.5 transition-all group flex flex-col gap-2 relative overflow-hidden cursor-pointer ${cardClass}" title="${w.genre}" data-tp="${ddayTp(w.id)}" data-gi="${Math.max(0, genreList.findIndex(g => g.name === w.genre))}" data-gv="${gvKey(w.genre)}" ${cardBgStyle} onclick="viewWork('${w.id}')">
+                return (`<div class="rounded-xl p-3.5 transition-all group flex flex-col gap-2 relative overflow-hidden cursor-pointer ${cardClass}" data-wid="${w.id}" title="${w.genre}" data-tp="${ddayTp(w.id)}" data-gi="${Math.max(0, genreList.findIndex(g => g.name === w.genre))}" data-gv="${gvKey(w.genre)}" ${cardBgStyle} onclick="viewWork('${w.id}')">
                     ${isSelected ? '<div class="absolute top-0 left-0 w-full h-0.5" style="background:var(--primary)"></div>' : ''}
                     <div class="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2 bg-white/90 backdrop-blur-sm rounded-bl-xl z-10">
                         <button onclick="event.stopPropagation();copyWork('${w.id}')" class="text-slate-400 hover:text-emerald-600 text-xs" title="복사 (작품명 뒤에 번호)"><i class="fa-regular fa-copy"></i></button>
@@ -17129,10 +17144,11 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                         </div>${studioRow}
                     </div>
                 </div>`);
-            });
+            };
+            window._wkCardHtml = wkCardHtml;
+            worksToShow.forEach(w => cardsHtml.push(wkCardHtml(w)));
             container.innerHTML = cardsHtml.join('');
-            requestAnimationFrame(fitWorksPanelsHeight);
-            requestAnimationFrame(fitWorkListCards);
+            requestAnimationFrame(fitWorksPanelsHeight);   // 제목 글자 맞춤은 아래 MutationObserver 가 목록이 바뀔 때 한 번만 실행 (여기서 또 부르면 두 번 돎)
         }
         // 작품 등록 목록 카드: 장르 칸은 한 줄로, 제목은 '...' 없이 글자를 줄여서 다 보이게 (아이패드처럼 칸이 좁을 때)
         function fitWorkListCards() {
@@ -17145,14 +17161,16 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             const m = hs.map(h => ({ h, sw: h.scrollWidth, cw: h.clientWidth, fs: parseFloat(getComputedStyle(h).fontSize) || 14 }));
             const over = m.filter(x => x.sw > x.cw + 0.5);
             over.forEach(x => { x.nf = Math.max(7, Math.floor(x.fs * (x.cw - 1) / x.sw * 2) / 2); P(x.h, 'font-size', x.nf + 'px'); });
-            over.filter(x => x.nf <= 7).forEach(x => { if (x.h.scrollWidth > x.h.clientWidth + 0.5) P(x.h, 'text-overflow', 'ellipsis'); });
+            // 읽기와 쓰기를 섞으면 카드마다 화면을 다시 계산해서(150장에 200ms) 먼저 다 읽고 나중에 한꺼번에 씀 (2026-11-22)
+            const tiny = over.filter(x => x.nf <= 7).filter(x => x.h.scrollWidth > x.h.clientWidth + 0.5);
+            tiny.forEach(x => P(x.h, 'text-overflow', 'ellipsis'));
         }
         (function () {
             let raf = 0; const run = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(fitWorkListCards); };
             window.addEventListener('resize', run); window.addEventListener('load', run);
             if (document.fonts && document.fonts.ready) document.fonts.ready.then(run);
             if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', run);
-            /* fitobs */ const obs = () => { const c = document.getElementById('master-works-by-genre-container'); if (c) new MutationObserver(run).observe(c, { childList: true }); document.addEventListener('transitionend', e => { if (e.target && e.target.closest && e.target.closest('#master-works-by-genre-container')) run(); }, true); };
+            /* fitobs */ const obs = () => { const c = document.getElementById('master-works-by-genre-container'); if (c) new MutationObserver(run).observe(c, { childList: true }); if (c) c.addEventListener('wkfit', run); document.addEventListener('transitionend', e => { /* 마우스를 올릴 때 그림자·이동·투명도 전환이 끝날 때마다 전체 카드를 다시 재면 버벅여서, 글자 크기·폭이 바뀔 때만 (2026-11-22) */ if (!/font|width|letter|padding/.test(e.propertyName || '')) return; if (e.target && e.target.closest && e.target.closest('#master-works-by-genre-container')) run(); }, true); };
             if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', obs); else obs();
         })();
         // 작품 등록 탭: 왼쪽 폼 카드 / 오른쪽 목록 카드의 높이를 실제 남은 뷰포트 공간에 맞춰
@@ -17169,12 +17187,11 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             if (!tab || !tab.classList.contains('active')) return;
             const listScroller = document.querySelector('#master-works-by-genre-container')?.parentElement;
             const savedScroll = listScroller ? listScroller.scrollTop : 0;
-            leftCard.style.height = 'auto';
-            rightPanel.style.height = 'auto';
-            if (rightCard) rightCard.style.height = 'auto';
             // 카드 위쪽(뷰포트 기준)부터 화면 맨 아래까지 남는 공간에서 살짝 여유(20px)만 빼서 높이 확정
+            // 예전엔 높이를 auto 로 풀었다가 다시 지정해서 목록 전체를 두 번 다시 계산(작품 150장에 185ms) → 위치는 높이와 무관하니 그대로 재고, 같으면 건너뜀 (2026-11-22)
             const top = leftCard.getBoundingClientRect().top;
             const h = Math.max(Math.floor(window.innerHeight - top - 20), 300);
+            if (leftCard.style.height === h + 'px' && rightPanel.style.height === h + 'px' && (!rightCard || rightCard.style.height === h + 'px')) return;
             leftCard.style.height = h + 'px';
             rightPanel.style.height = h + 'px';
             if (rightCard) rightCard.style.height = h + 'px';
@@ -32419,4 +32436,4 @@ updateEps(); render(); renderWorks();
 } catch (e) {} })();
 </script>
 </body>
-</html>
+</html>

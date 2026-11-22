@@ -1624,10 +1624,10 @@ button.wl-sc { background: none; border: 1px dashed transparent; border-radius: 
 .wl-sc { font-weight: 700; color: #2f8a54; white-space: nowrap; }
 .wl-ep { display: flex; gap: 8px; flex-wrap: wrap; } .wl-ep span { background: var(--panel2); border-radius: 10px; padding: 6px 12px; font-size: 13px; } .wl-ep b { color: #2f8a54; margin-left: 4px; } .wl-ep small { color: var(--muted); }
 .wl-leg { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin: 0 0 12px; } .wl-leg i { display: inline-block; width: 14px; height: 14px; border-radius: 4px; vertical-align: -3px; margin-right: 5px; }
-.wl-gr { display: flex; gap: 6px; } .wl-gr > div:last-child { flex: 1; min-width: 0; } .wl-gl { display: flex; flex-direction: column; gap: 3px; padding-top: 16px; font-size: 10px; color: var(--muted); } .wl-gl span { flex: 1; display: flex; align-items: center; }
+.wl-gr { display: flex; gap: 6px; } .wl-gr > div:last-child { flex: 1; min-width: 0; } .wl-gl { display: flex; flex-direction: column; gap: 3px; padding-top: 17px; font-size: 10px; color: var(--muted); } .wl-gl span { flex: 1; display: flex; align-items: center; }
 .wl-gm { display: flex; gap: 3px; height: 14px; font-size: 10px; color: var(--muted); } .wl-gm span { flex: 1; white-space: nowrap; }
 .wl-gg { display: flex; gap: 3px; } .wl-gg > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; } .wl-gg i { width: 100%; max-width: 26px; aspect-ratio: 1; border-radius: 5px; display: block; cursor: pointer; margin: 0 auto; }
-.wl-hm { display: flex; gap: 6px; } .wl-hm > div:last-child { flex: 1; min-width: 0; } .wl-hl { display: flex; flex-direction: column; gap: 2px; padding-top: 16px; font-size: 10px; color: var(--muted); } .wl-hl span { height: 18px; line-height: 18px; }
+.wl-hm { display: flex; gap: 6px; } .wl-hm > div:last-child { flex: 1; min-width: 0; } .wl-hl { display: flex; flex-direction: column; gap: 2px; padding-top: 14px; font-size: 10px; color: var(--muted); } .wl-hl span { height: 22px; line-height: 22px; }
 .wl-hh { display: flex; gap: 2px; height: 14px; font-size: 10px; color: var(--muted); } .wl-hh span { flex: 1; white-space: nowrap; }
 .wl-hr { display: flex; gap: 2px; margin-bottom: 2px; } .wl-hr i { flex: 1; height: 22px; border-radius: 4px; display: block; min-width: 9px; }
 .wl-ta { position: relative; height: 14px; margin: 0 88px 0 80px; font-size: 10px; color: var(--muted); } .wl-ta span { position: absolute; transform: translateX(-50%); }
@@ -3545,7 +3545,7 @@ function sessFixOne(k, idx, n) {
 }
 function wlGrass(weeks) {
     const today = wdNow(); today.setHours(0, 0, 0, 0);
-    const start = new Date(today); start.setDate(start.getDate() - today.getDay() - (weeks - 1) * 7);
+    const start = new Date(today); start.setDate(start.getDate() - ((today.getDay() + 6) % 7) - (weeks - 1) * 7); // 한 주는 월요일부터
     const cols = []; let mon = '';
     for (let w = 0; w < weeks; w++) {
         const col = [];
@@ -3559,7 +3559,7 @@ function wlGrass(weeks) {
         const m = (f.getDate() <= 7) ? `${f.getMonth() + 1}월` : ''; mon += `<span>${m}</span>`;
         cols.push(`<div>${col.join('')}</div>`);
     }
-    return `<div class="wl-gr"><div class="wl-gl"><span>일</span><span></span><span>화</span><span></span><span>목</span><span></span><span>토</span></div><div><div class="wl-gm">${mon}</div><div class="wl-gg">${cols.join('')}</div></div></div>`;
+    return `<div class="wl-gr"><div class="wl-gl"><span>월</span><span></span><span>수</span><span></span><span>금</span><span></span><span>일</span></div><div><div class="wl-gm">${mon}</div><div class="wl-gg">${cols.join('')}</div></div></div>`;
 }
 function wlHeat(days) {
     const cell = Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => ({ ph: 0, pc: 0 })));
@@ -3568,10 +3568,10 @@ function wlHeat(days) {
         const D = new Date(today); D.setDate(D.getDate() - i);
         sessOfDay(dayKeyOfMs(D.getTime())).forEach(x => sessAddHours(x, (T, d, c) => { cell[T.getDay()][T.getHours()][d] += c; }));
     }
-    const WD = ['일', '월', '화', '수', '목', '금', '토'], lv = v => v <= 0 ? 0 : v < 400 ? 1 : v < 1200 ? 2 : v < 2400 ? 3 : 4;
+    const WD = ['월', '화', '수', '목', '금', '토', '일'], ORD = [1, 2, 3, 4, 5, 6, 0], lv = v => v <= 0 ? 0 : v < 400 ? 1 : v < 1200 ? 2 : v < 2400 ? 3 : 4;
     let lo = 8; cell.forEach(r => r.forEach((c, h) => { if (c.ph + c.pc > 0) lo = Math.min(lo, h); })); // 새벽(0~8시)은 쓴 기록이 있을 때만 보임
     const hrs = Array.from({ length: 24 - lo }, (_, i) => lo + i);
-    return `<div class="wl-hm"><div class="wl-hl">${WD.map(n => `<span>${n}</span>`).join('')}</div><div><div class="wl-hh">${hrs.map(h => `<span>${h % 3 === 0 ? h + '시' : ''}</span>`).join('')}</div>${cell.map(r => `<div class="wl-hr">${hrs.map(h => { const c = r[h]; return `<i style="background:${sessCell(lv(c.ph + c.pc), c.ph >= 1, c.pc >= 1)}"></i>`; }).join('')}</div>`).join('')}</div></div>`;
+    return `<div class="wl-hm"><div class="wl-hl">${WD.map(n => `<span>${n}</span>`).join('')}</div><div><div class="wl-hh">${hrs.map(h => `<span>${h % 3 === 0 ? h + '시' : ''}</span>`).join('')}</div>${ORD.map(i => cell[i]).map(r => `<div class="wl-hr">${hrs.map(h => { const c = r[h]; return `<i style="background:${sessCell(lv(c.ph + c.pc), c.ph >= 1, c.pc >= 1)}"></i>`; }).join('')}</div>`).join('')}</div></div>`;
 }
 function wlWeek() {
     const today = wdNow(), WD = ['일', '월', '화', '수', '목', '금', '토'], RH = 20; let cols = '', days = [], lo = 8, hi = 24;

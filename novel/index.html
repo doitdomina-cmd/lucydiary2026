@@ -2875,9 +2875,12 @@ function renderHeader() {
 }
 // 위쪽 '오늘 N자' + 지금 연 작품이 오늘 늘어난 글자 (세션 기록의 작품별 글자)
 function renderToday() {
-    const k = todayKey(), chip = $('#today-chip'), total = stats().days[k] || 0; chip.querySelector('b').textContent = fmt(total);
+    const k = todayKey(), chip = $('#today-chip'); let total = stats().days[k] || 0;
     const wid = $('.home') ? null : curWorkId();
     const per = {}; let tot = 0; sessOfDay(k).forEach(x => Object.entries(x.w || {}).forEach(([w, o]) => { const c = Math.max(0, o.c || 0); per[w] = (per[w] || 0) + c; tot += c; }));
+    // 오늘 합계는 항상 세션 합 이상이어야 함. 다른 기기(PC)의 옛 합계가 폰에서 쓴 숫자를 덮어써 0으로 돌아간 경우 세션 기록으로 바로잡음
+    if (tot > total) { const S = stats(); S.days[k] = total = tot; touch(S); }
+    chip.querySelector('b').textContent = fmt(total);
     const wc = wid ? (per[wid] || 0) : 0;
     let el = chip.querySelector('.tc-w'); if (!el) { el = document.createElement('span'); el.className = 'tc-w'; chip.appendChild(el); }
     el.hidden = !wid; el.innerHTML = wid ? `<i>·</i> <span class="tc-i">이 </span>작품 <b>${fmt(wc)}</b><span class="tc-ja">자</span>` : '';

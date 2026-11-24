@@ -48,6 +48,7 @@ header .spacer { flex: 1; }
 .today-chip { font-size: 12px; color: var(--muted); white-space: nowrap; height: 28px; display: inline-flex; align-items: center; gap: 3px; padding: 0 10px; border-radius: 8px; background: var(--panel2); border: 1px solid var(--line); }
 .today-chip b { color: var(--accent); }
 .today-chip .tc-w { margin-left: 3px; } .today-chip .tc-w i { font-style: normal; opacity: .5; margin-right: 3px; } .today-chip .tc-w[hidden] { display: none; }
+.cur-chip .cc-w { color: var(--muted); font-size: 12px; margin-left: 2px; } .cur-chip .cc-w b { color: var(--text); font-size: 13px; }
 .cur-chip { font-size: 13px; color: var(--text); white-space: nowrap; height: 28px; display: inline-flex; align-items: center; gap: 5px; padding: 0 12px; border-radius: 8px; background: var(--panel2); border: 1px solid var(--line); font-variant-numeric: tabular-nums; max-width: 46vw; overflow: hidden; }
 .cur-chip.hidden { display: none; }
 .sel-chip { font-size: 13px; color: var(--text); white-space: nowrap; height: 28px; display: inline-flex; align-items: center; gap: 5px; padding: 0 12px; border-radius: 8px; background: color-mix(in srgb, #8fb8e8 30%, var(--panel)); border: 1px solid color-mix(in srgb, #8fb8e8 55%, var(--line)); font-variant-numeric: tabular-nums; }
@@ -3163,7 +3164,7 @@ function renderFoot(it) {
         const goal = it.goal || 0;
         const pct = goal ? Math.min(100, Math.round(c.all / goal * 100)) : 0;   // 목표는 공포(공백 포함) 기준
         { const W = WL(), act = W.panes[W.activeEditor] && W.panes[W.activeEditor].active, chip = $('#cur-chip');   // 위쪽 바에 지금 회차 글자 수를 크게
-          if (chip && (it.id === act || !act)) { if (isRefDoc(it)) chip.classList.add('hidden'); else { chip.classList.remove('hidden'); chip.innerHTML = `<span class="cc-t">${esc(it.title || '이 회차')}</span>공포 <b>${fmt(c.all)}</b>자 <small>공미 ${fmt(c.noSpace)}</small>`; } } }
+          if (chip && (it.id === act || !act)) { if (isRefDoc(it)) chip.classList.add('hidden'); else { chip.classList.remove('hidden'); const wt = flatDocs().filter(d => !isRefDoc(d)).reduce((n, d) => n + (d.id === it.id ? c.all : docCount(d).all), 0); chip.innerHTML = `<span class="cc-t">${esc(it.title || '이 회차')}</span>공포 <b>${fmt(c.all)}</b>자 <small>공미 ${fmt(c.noSpace)}</small><span class="cc-w" title="이 작품 원고 전체 글자 수 (공포, 자료 폴더 제외)"> / 작품 전체 <b>${fmt(wt)}</b>자</span>`; } } }
         el.innerHTML = `<span>공백 포함 <b>${fmt(c.all)}</b></span><span>공백 제외 <b>${fmt(c.noSpace)}</b></span><span class="sel-foot hidden" data-selfoot></span><span class="fz-ph"><select data-fzph title="집필모드 글자 크기">${[120, 130, 140, 150, 160, 170, 180, 190, 200].map(v => `<option value="${v}" ${v === fzPhVal() ? 'selected' : ''}>${v}%</option>`).join('')}</select></span>
             <span style="flex:1"></span>
             <span title="목표는 공백 포함(공포) 기준">목표(공포)</span><input class="goal-input" type="number" min="0" step="500" data-goal="${it.id}" value="${goal || ''}" placeholder="글자">

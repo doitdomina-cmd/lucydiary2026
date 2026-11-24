@@ -162,6 +162,7 @@ main { height: calc(100% - 82px); display: flex; }
 .row:hover { background: var(--panel2); }
 .row.open { background: var(--accent-soft); }
 .row.open .r-title { color: var(--accent); font-weight: 600; }
+.row.open2 .r-title { color: var(--accent); font-weight: 600; } .row.open2 .ico .ic { color: var(--accent); }
 .row + .row { margin-top: 2px; }   /* 연달아 선택된 줄의 배경이 서로 붙어 겹쳐 보이지 않게 */
 body.cozy .row { border-radius: 10px; padding: 5px 6px; }
 body.cozy .row.open { background: color-mix(in srgb, var(--accent-soft) 85%, var(--panel)); }
@@ -2903,6 +2904,9 @@ function openDocIds() {
 function renderTree() {
     const W = WL();
     const open = openDocIds();
+    // 지금 쓰고 있는(활성) 칸의 문서만 진하게, 옆 분할 칸에 열어 둔 다른 문서는 글자 색만 살짝 (두 개가 선택된 것처럼 보이지 않게)
+    const ap = W.panes[W.activeEditor], actSet = new Set(); if (ap) { if (ap.active) actSet.add(ap.active); if (ap.ref) actSet.add(ap.ref); }
+    const oc = id => actSet.has(id) ? 'open' : open.has(id) ? 'open2' : '';
     let rows = [];
     // 맨 위에서는 원고와 설정·자료(자료 폴더·자료 문서)를 나눠서 보여 줌
     const isRefTop = it => it.kind === 'folder' ? !!it.ref : isRefDoc(it);
@@ -2911,14 +2915,14 @@ function renderTree() {
             const pad = 4 + depth * 14;
             if (it.kind === 'folder') {
                 const col = !!W.collapsed[it.id];
- rows.push(`<div class="row folder ${it.ref ? 'ref-folder' : ''} ${open.has(it.id) ? 'open' : ''} ${treeSel === it.id ? 'sel' : ''}" draggable="true" data-id="${it.id}" style="padding-left:${pad}px">
+ rows.push(`<div class="row folder ${it.ref ? 'ref-folder' : ''} ${oc(it.id)} ${treeSel === it.id ? 'sel' : ''}" draggable="true" data-id="${it.id}" style="padding-left:${pad}px">
                     <span class="caret" data-a="fold">${col ? '▸' : '▾'}</span><span class="ico">${it.icon ? `<span class="emo">${esc(it.icon)}</span>` : it.ref ? '<i class="ic ic-library"></i>' : '<i class="ic ic-folder"></i>'}</span>
                     <span class="r-title">${esc(it.title || '폴더')}</span>${folderGoalTag(it)}
                     <button class="r-more" data-a="more" title="메뉴">⋯</button></div>`);
                 if (!col) walk(it.id, depth + 1);
             } else {
                 const ref = isRefDoc(it);
-                rows.push(`<div class="row doc ${open.has(it.id) ? 'open' : ''} ${treeSel === it.id ? 'sel' : ''} ${msel.has(it.id) ? 'msel' : ''}" draggable="true" data-id="${it.id}" style="padding-left:${pad}px">
+                rows.push(`<div class="row doc ${oc(it.id)} ${treeSel === it.id ? 'sel' : ''} ${msel.has(it.id) ? 'msel' : ''}" draggable="true" data-id="${it.id}" style="padding-left:${pad}px">
                     <span class="caret"></span><span class="ico">${it.locked ? '<i class="ic ic-lock"></i>' : it.icon ? `<span class="emo">${esc(it.icon)}</span>` : (ref ? '<i class="ic ic-file-pen-line"></i>' : '<i class="ic ic-file-text"></i>')}</span>
                     <span class="r-title">${esc(it.title || '제목 없음')}</span>${goalRing(it)}
                     <button class="r-more" data-a="more" title="메뉴">⋯</button></div>`);
@@ -2934,7 +2938,7 @@ function renderTree() {
     const syn = ofWork('synop');
     const openSy = new Set(W.synopPanes.slice(0, W.synopN));
     $('#tree').innerHTML = `
-        <div class="row plan-row ${open.has(planId()) ? 'open' : ''}" data-plan="1" style="padding-left:4px"><span class="caret"></span><span class="ico"><i class="ic ic-book-open"></i></span><span class="r-title">작품 기획</span></div>
+        <div class="row plan-row ${oc(planId())}" data-plan="1" style="padding-left:4px"><span class="caret"></span><span class="ico"><i class="ic ic-book-open"></i></span><span class="r-title">작품 기획</span></div>
         <div class="tree-sec sep">원고<span class="spacer"></span>${manuscriptTotalTag()}</div>
         ${mainRows.join('') || '<div class="pane-empty">＋문서 로 첫 회차를 만들어 보세요</div>'}
         <div class="tree-sec sep">설정 · 자료<span class="spacer"></span><button data-a="new-ref" title="새 자료 폴더">＋</button></div>

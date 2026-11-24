@@ -1641,6 +1641,13 @@ button.wl-sc { background: none; border: 1px dashed transparent; border-radius: 
 .pomo-dock, .pomo-top, .pomo-ask { display: none !important; } /* 뽀모는 집필 기록(자동)으로 대체 */
 .wcard.wdone { opacity: .8; }
 .wcard.wdone:hover { opacity: 1; }
+.goal-pick { padding: 6px 4px; min-width: 210px; } .goal-pick .gp-h { font-size: 12px; font-weight: 700; padding: 2px 6px 6px; } .goal-pick .gp-h small { font-weight: 400; color: var(--muted); }
+.goal-pick .gp-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 3px 4px; } .goal-pick .gp-row:last-of-type { grid-template-columns: 1fr auto; }
+.goal-pick .gp-row button { padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel2); font-size: 13px; }
+.goal-pick .gp-row button.on, .goal-pick .gp-row button:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 700; }
+.goal-pick input { flex: 1 1 90px; min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-size: 13px; }
+.goal-pick .gp-ok { flex: 0 0 auto !important; }
+.goal-pick .gp-clear { display: block; width: calc(100% - 8px); margin: 4px; padding: 5px; font-size: 12px; color: var(--muted); }
 .wcard.drag-src { opacity: .35; }
 .wcard.drop-before { box-shadow: -5px 0 0 var(--accent), 0 8px 20px rgba(0,0,0,.08) !important; }
 .wcard.drop-after { box-shadow: 5px 0 0 var(--accent), 0 8px 20px rgba(0,0,0,.08) !important; }
@@ -4739,6 +4746,22 @@ async function renumberFrom(it) {
     todo.forEach(([d, t]) => { d.title = t; touch(d); });
     renderAll(); toast(`${todo.length}개 문서 이름을 바꿨어요.`);
 }
+// 목표 글자 수: 자주 쓰는 값을 눌러서 고르거나, 직접 입력 (공백 포함 = 공포 기준)
+function pickGoal(anchor, it, at) {
+    const presets = [4000, 5000, 15000, 20000], lab = v => v >= 10000 ? fmtMan(v) + '자' : fmt(v) + '자';
+    const pop = showPop(anchor, `<div class="goal-pick"><div class="gp-h">목표 글자 수 <small>(공백 포함)</small></div>
+        <div class="gp-row">${presets.map(v => `<button data-g="${v}" class="${it.goal === v ? 'on' : ''}">${lab(v)}</button>`).join('')}</div>
+        <div class="gp-row"><input type="number" min="0" step="500" inputmode="numeric" placeholder="직접 입력" data-gi value="${presets.includes(it.goal) ? '' : (it.goal || '')}"><button data-g="custom" class="gp-ok">정하기</button></div>
+        ${it.goal ? '<button data-g="0" class="gp-clear">목표 없애기</button>' : ''}</div>`, at);
+    const apply = v => { it.goal = Math.max(0, Math.round(Number(v)) || 0); touch(it); closePop(); renderAll(); };
+    const inp = $('[data-gi]', pop);
+    pop.addEventListener('click', e => {
+        const b = e.target.closest('[data-g]'); if (!b) return;
+        if (b.dataset.g === 'custom') { if (inp.value === '') { inp.focus(); return; } apply(inp.value); } else apply(b.dataset.g);
+    });
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); if (inp.value !== '') apply(inp.value); } });
+    setTimeout(() => inp.focus({ preventScroll: true }), 0);
+}
 function rowMenu(anchor, it, at) {
     const W = WL();
     let html = '';
@@ -4764,7 +4787,7 @@ function rowMenu(anchor, it, at) {
         if (m === 'open-synop') openSynop(it.id);
         if (m === 'rename') { const t = await ask('이름 바꾸기', it.title); if (t != null) { it.title = t.trim() || '제목 없음'; touch(it); renderAll(); } }
         if (m === 'renum') renumberFrom(it);
-        if (m === 'goal') { const t = await ask('목표 글자 수 (공백 포함, 공포)', it.goal || 5000, 'number'); if (t != null) { it.goal = Math.max(0, parseInt(t, 10) || 0); touch(it); renderAll(); } }
+        if (m === 'goal') pickGoal(anchor, it, at);
         if (m === 'history') openHistory(it.id);
         if (m === 'icon') pickIcon(anchor, it, at);
         if (m === 'lock') { it.locked = !it.locked; touch(it); renderAll(); }

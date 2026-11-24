@@ -30611,7 +30611,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
         }
 
         // 상세 기록 입력(집필량 실제 기록)에 글자수를 채우면, 그날의 '집필 목표' 카드도
-        // 자동으로 완료 처리한다. (반대로 지운다고 완료가 풀리진 않음 — 실수로 지웠다고
+        // 자동으로 완료 처리한다 — 단, 카드의 목표 글자수를 다 채웠을 때만. (반대로 지운다고 완료가 풀리진 않음 — 실수로 지웠다고
         // 이미 완료로 표시해둔 걸 되돌리면 곤란하므로)
         function syncWriteCompletionFromDaily(ds, storageKey) {
             const wd = writerDailyData[ds]?.works?.[storageKey];
@@ -30621,8 +30621,12 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             const list = writeSchedules[ds];
             if (!list) return 0;
             let count = 0;
+            // 목표 글자수를 다 채운 카드만 완료로 (여러 장이면 앞 카드부터 채운 만큼 나눠 씀). 목표가 없는 카드는 글자수가 있으면 완료.
+            let left = total;
             list.forEach(s => {
                 if (s.workId === storageKey && !s.category && !s.isCompleted) {
+                    const g = Number(s.goal) || 0;
+                    if (g > 0) { if (left < g) return; left -= g; }
                     s.isCompleted = true;
                     count++;
                 }

@@ -1278,12 +1278,17 @@ kbd { font: 12px/1.4 ui-monospace, monospace; background: var(--panel2); border:
 /* 회차 개요 칸 */
 .ed-main { flex: 1; min-height: 0; display: flex; }
 .ed-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.outline { width: 230px; flex: none; display: flex; flex-direction: column; border-left: 1px solid var(--line); border-top: 1px solid var(--line); background: var(--panel2); }
+.outline { position: relative; width: 230px; flex: none; display: flex; flex-direction: column; border-left: 1px solid var(--line); border-top: 1px solid var(--line); background: var(--panel2); }
 .ol-head { display: flex; align-items: center; gap: 4px; padding: 6px 8px 6px 10px; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--muted); }
 .ol-head b { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 120px; }
 .outline textarea { flex: 1; border: 0; outline: none; resize: none; background: transparent; padding: 4px 12px; font-size: 13px; line-height: 1.7; min-height: 120px; }
 .ol-note { font-size: 10px; color: var(--muted); padding: 4px 10px 8px; opacity: .8; }
 .editor-grid.n3 .outline, .editor-grid.n4 .outline { width: 170px; }
+.ol-grip { position: absolute; left: -4px; top: 0; bottom: 0; width: 9px; cursor: col-resize; z-index: 5; touch-action: none; }
+.ol-grip::after { content: ''; position: absolute; left: 3px; top: 50%; width: 3px; height: 38px; margin-top: -19px; border-radius: 3px; background: var(--line); opacity: 0; transition: opacity .12s; }
+.ol-grip:hover::after, .outline.ol-drag .ol-grip::after { opacity: 1; background: var(--accent); }
+.outline.ol-drag { user-select: none; }
+@media (max-width: 760px) { .ol-grip { display: none; } }
 @media (max-width: 760px) { .ed-main { flex-direction: column; } .outline { width: auto !important; border-left: 0; border-top: 0; border-bottom: 1px solid var(--line); order: -1; max-height: 34vh; } .outline textarea { min-height: 70px; } }
 /* 아이콘: Lucide (ISC License, lucide.dev) — 글자색(테마)을 따라감 */
 .ic { display: inline-block; width: 1.15em; height: 1.15em; vertical-align: -0.2em; flex: none; background-color: currentColor; -webkit-mask: var(--i) center / contain no-repeat; mask: var(--i) center / contain no-repeat; }
@@ -10189,9 +10194,29 @@ function planMd(pl) {
         + sec('세계관 · 설정 메모', pl.world);
 }
 
+// 트릿 칸(원고 오른쪽) 너비 조절: 왼쪽 가장자리를 끌기 · 두 번 누르면 원래 너비. 이 기기에 기억
+(function () {
+    let op = null;
+    document.addEventListener('pointerdown', e => {
+        const g = e.target.closest && e.target.closest('.ol-grip'); if (!g) return;
+        const ol = g.closest('.outline'); e.preventDefault();
+        op = { x: e.clientX, w: ol.offsetWidth, ol }; ol.classList.add('ol-drag');
+        try { g.setPointerCapture(e.pointerId); } catch (_) {}
+    });
+    document.addEventListener('pointermove', e => {
+        if (!op) return;
+        const w = Math.max(150, Math.min(620, Math.round(op.w - (e.clientX - op.x))));
+        $$('.outline').forEach(o => { o.style.width = w + 'px'; }); op.cur = w;
+    });
+    const end = () => { if (!op) return; op.ol.classList.remove('ol-drag'); if (op.cur) { pref.olW = op.cur; savePref(); } op = null; };
+    document.addEventListener('pointerup', end); document.addEventListener('pointercancel', end);
+    document.addEventListener('dblclick', e => {
+        if (e.target.closest && e.target.closest('.ol-grip')) { pref.olW = 0; savePref(); $$('.outline').forEach(o => { o.style.width = ''; }); }
+    });
+})();
 /* 회차 개요: 원고 오른쪽에 붙는 칸. 본문에는 안 들어감 (= 타임라인 카드·시놉 창 '지금 회차 시놉시스'와 같은 내용) */
 function outlineHtml(it) {
-    return `<aside class="outline"><div class="ol-head"><i class="ic ic-notebook-text"></i> <b>${esc(it.title || '이 회차')}</b> 트릿<span style="flex:1"></span><button class="mini" data-a="outline" title="트릿 칸 닫기">✕</button></div>
+    return `<aside class="outline"${pref.olW ? ` style="width:${pref.olW}px"` : ''}><div class="ol-grip" title="끌어서 트릿 칸 너비 조절 (두 번 누르면 원래대로)"></div><div class="ol-head"><i class="ic ic-notebook-text"></i> <b>${esc(it.title || '이 회차')}</b> 트릿<span style="flex:1"></span><button class="mini" data-a="outline" title="트릿 칸 닫기">✕</button></div>
         <textarea data-id="${it.id}" data-field="summary" placeholder="이 회차에서 쓸 내용을 적어 두세요.">${esc(it.summary || '')}</textarea>
         <div class="ol-note">본문에는 안 들어가요 · 타임라인 카드와 같은 내용</div></aside>`;
 }

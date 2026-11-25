@@ -16764,7 +16764,9 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                     const cancelBtn = document.getElementById('work-form-cancel-btn');
                     if (cancelBtn && !cancelBtn.classList.contains('hidden')) {
                         // 작품 카드 클릭은 제외 (viewWork 실행되는 곳)
-                        if (!e.target.closest('[onclick*="viewWork"]') && !e.target.closest('[onclick*="startEditWork"]')) {
+                        // 카드 클릭이 카드 안쪽을 갈아 끼우면 e.target 이 화면에서 떨어져 closest 가 못 찾으므로, 클릭 당시의 경로(composedPath)로 본다
+                        const hitCard = (e.composedPath ? e.composedPath() : []).some(n => n && n.nodeType === 1 && n.hasAttribute && (n.hasAttribute('data-wid') || /viewWork|startEditWork/.test(n.getAttribute('onclick') || '')));
+                        if (!hitCard && !e.target.closest('[onclick*="viewWork"]') && !e.target.closest('[onclick*="startEditWork"]')) {
                             cancelEditWork();
                         }
                     }

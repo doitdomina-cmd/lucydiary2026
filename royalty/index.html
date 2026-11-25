@@ -3308,6 +3308,10 @@ body.menu-font-on #settings-panel-modal .settings-tabbtn, body.menu-font-on #the
         html body #dash-memo-board .dmb-note[data-fs] .dmb-ckt { font-size: var(--fs) !important; }
         html body #dash-memo-board .dmb-ck.done .dmb-ckt { text-decoration: line-through; color: rgba(74,63,51,.45) !important; }
         #dash-memo-board .dmb-ckt:empty::before { content: attr(data-ph); color: rgba(74,63,51,.4); }
+        #dash-memo-board .dmb-ckx { flex: none; border: 0; background: transparent; color: rgba(74,63,51,.45); font-size: 13px; line-height: 1; width: 18px; height: 18px; margin-top: 2px; padding: 0; cursor: pointer; opacity: 0; transition: opacity .12s; }
+        #dash-memo-board .dmb-ck:hover .dmb-ckx, #dash-memo-board .dmb-ck:focus-within .dmb-ckx { opacity: 1; }
+        #dash-memo-board .dmb-ckx:hover { color: #c0392b; }
+        @media (hover: none) { #dash-memo-board .dmb-ckx { opacity: .55; } }
         #dash-memo-board .dmb-ckadd { align-self: flex-start; border: 0; background: transparent; color: rgba(74,63,51,.55); font-size: 12px; cursor: pointer; padding: 2px 0; }
         #dash-memo-board .dmb-ckadd:hover { color: #2B2118; }
         @media (max-width: 767px) { html body #dash-memo-board .dmb-note .dmb-ckt { font-size: 13px; } }
@@ -22860,6 +22864,11 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             btn.closest('.dmb-ck').classList.toggle('done', !!m.items[k].d);
             save(true);
         }
+        function dmbCkNoBox(id, k) {
+            const m = dashMemos.find(x => x.id === id); if (!m || !m.items || !m.items[k]) return;
+            if (m.items[k].n) delete m.items[k].n; else { m.items[k].n = 1; m.items[k].d = 0; }
+            m.ts = Date.now(); save(true); _dmbSig = ''; renderDashMemoBoard(true);
+        }
         function dmbCkInput(id, k, el) {
             const m = dashMemos.find(x => x.id === id); if (!m || !m.items || !m.items[k]) return;
             m.items[k].t = el.innerText.replace(/ /g, ' ').replace(/\n/g, ' ');
@@ -22868,7 +22877,10 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
         }
         function dmbCkKey(e, id, k) {
             const m = dashMemos.find(x => x.id === id); if (!m || !m.items) return;
-            if (e.key === 'Enter') { e.preventDefault(); m.items.splice(k + 1, 0, { t: '', d: 0 }); dmbCkSync(m); save(true); _dmbSig = ''; renderDashMemoBoard(true); dmbCkFocus(id, k + 1); }
+            if (e.key === 'Backspace' && k > 0 && m.items[k].t && !m.items[k].n) {
+                const s = getSelection(); if (s && s.isCollapsed && s.anchorOffset === 0 && e.currentTarget && e.currentTarget.contains(s.anchorNode) && (e.currentTarget.innerText || '').length) { e.preventDefault(); dmbCkNoBox(id, k); dmbCkFocus(id, k, false); return; }
+            }
+            if (e.key === 'Enter') { e.preventDefault(); m.items.splice(k + 1, 0, m.items[k] && m.items[k].n && k > 0 ? { t: '', d: 0, n: 1 } : { t: '', d: 0 }); dmbCkSync(m); save(true); _dmbSig = ''; renderDashMemoBoard(true); dmbCkFocus(id, k + 1); }
             else if (e.key === 'Backspace' && k > 0 && !m.items[k].t) { e.preventDefault(); m.items.splice(k, 1); dmbCkSync(m); save(true); _dmbSig = ''; renderDashMemoBoard(true); dmbCkFocus(id, Math.max(0, k - 1)); }
         }
         function dmbCkAdd(id) {
@@ -22897,7 +22909,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                 <div class="dmb-grip" title="끌어서 옮기기" onpointerdown="dmbGripDown(event, '${m.id}')" onpointermove="dmbGripMove(event)" onpointerup="dmbGripUp(event)" onpointercancel="dmbGripUp(event)"></div>
                 <div class="dmb-rz" title="끌어서 너비 조절" onpointerdown="dmbRzDown(event, '${m.id}')" onpointermove="dmbRzMove(event)" onpointerup="dmbRzUp(event)" onpointercancel="dmbRzUp(event)"></div>
                 ${m.fold ? '' : `<button type="button" class="dmb-foldic" onclick="dmbFold('${m.id}')" title="접어서 제목만 보기"><i class="fa-solid fa-chevron-up"></i></button>`}
-                ${m.fold ? `<div class="dmb-ftitle" onclick="dmbFold('${m.id}')" title="눌러서 펴기">${escapeHtml(String(m.text || '').split('\n')[0].trim() || '(제목 없음)')}</div><div class="dmb-fh" onclick="dmbFold('${m.id}')" title="펴기"></div>` : (m.check ? `<div class="dmb-checks">${m.items.map((it, k) => `<div class="dmb-ck${k === 0 ? ' dmb-cktitle' : (it.d ? ' done' : '')}">${k === 0 ? '' : `<button type="button" class="dmb-ckb" onclick="dmbCkToggle('${m.id}',${k},this)" title="했으면 체크"><i class="fa-solid fa-check"></i></button>`}<span class="dmb-ckt" contenteditable="${DMB_CE}" spellcheck="false" data-ph="${k === 0 ? '제목' : '할 일'}" oninput="dmbCkInput('${m.id}',${k},this)" onkeydown="dmbCkKey(event,'${m.id}',${k})" onpaste="dmbCkPaste(event)">${escapeHtml(it.t || '')}</span></div>`).join('')}<button type="button" class="dmb-ckadd" onclick="dmbCkAdd('${m.id}')">+ 할 일 추가</button></div>` : `${m.cols > 1 && m.manual && Array.isArray(m.cc) ? dmbManualHtml(m) : m.blocks ? dmbBlocksHtml(m) : m.cols > 1 ? dmbAutoHtml(m) : `<div class="dmb-text" contenteditable="true" spellcheck="false" data-ph="메모를 적어요" oninput="dmbInput('${m.id}', this)" onpaste="dmbPaste(event)">${m.h ? dmbClean(m.h) : escapeHtml(m.text || '')}</div>`}`)}
+                ${m.fold ? `<div class="dmb-ftitle" onclick="dmbFold('${m.id}')" title="눌러서 펴기">${escapeHtml(String(m.text || '').split('\n')[0].trim() || '(제목 없음)')}</div><div class="dmb-fh" onclick="dmbFold('${m.id}')" title="펴기"></div>` : (m.check ? `<div class="dmb-checks">${m.items.map((it, k) => `<div class="dmb-ck${k === 0 ? ' dmb-cktitle' : (it.n ? ' dmb-ckn' : (it.d ? ' done' : ''))}">${k === 0 || it.n ? '' : `<button type="button" class="dmb-ckb" onclick="dmbCkToggle('${m.id}',${k},this)" title="했으면 체크"><i class="fa-solid fa-check"></i></button>`}<span class="dmb-ckt" contenteditable="${DMB_CE}" spellcheck="false" data-ph="${k === 0 ? '제목' : '할 일'}" oninput="dmbCkInput('${m.id}',${k},this)" onkeydown="dmbCkKey(event,'${m.id}',${k})" onpaste="dmbCkPaste(event)">${escapeHtml(it.t || '')}</span>${k === 0 ? '' : `<button type="button" class="dmb-ckx" onclick="dmbCkNoBox('${m.id}',${k})" title="${it.n ? '체크박스 다시 넣기' : '체크박스 없애기 (일반 줄로)'}">${it.n ? '☐' : '×'}</button>`}</div>`).join('')}<button type="button" class="dmb-ckadd" onclick="dmbCkAdd('${m.id}')">+ 할 일 추가</button></div>` : `${m.cols > 1 && m.manual && Array.isArray(m.cc) ? dmbManualHtml(m) : m.blocks ? dmbBlocksHtml(m) : m.cols > 1 ? dmbAutoHtml(m) : `<div class="dmb-text" contenteditable="true" spellcheck="false" data-ph="메모를 적어요" oninput="dmbInput('${m.id}', this)" onpaste="dmbPaste(event)">${m.h ? dmbClean(m.h) : escapeHtml(m.text || '')}</div>`}`)}
                 <span class="dmb-date">${dmbFmt(m.ts)}</span>
                 <div class="dmb-tools">
                     <button type="button" class="dmb-tool colorc" onclick="dmbPal(this)" title="설정 (색·모양·장식)"><i class="fa-solid fa-gear"></i></button>

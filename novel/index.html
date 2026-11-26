@@ -2516,6 +2516,22 @@ function isRefDoc(it) {
     return false;
 }
 const openable = it => it && live(it) && it.workId === curWorkId() && (((it.kind === 'episode' || it.kind === 'folder') && !inTrash(it)) || it.kind === 'plan' || it.kind === 'sbview' || it.kind === 'plview' || it.kind === 'msel');
+// 초단 작품(장르가 '… 초단'): 원고를 폴더 없이 1권 · 2권 …으로 바로 늘어놓음. 장편은 1부 폴더 안에 1화 · 2화 …
+function isShortWork(wid = curWorkId()) { return /초단$/.test(get('plan_' + wid)?.genre || ''); }
+function epUnit(wid = curWorkId()) { return isShortWork(wid) ? '권' : '화'; }
+// 초단 작품에 남아 있는 원고 폴더(1부 등)를 한 번만 풂: 안의 권들을 폴더가 있던 자리에 그대로 꺼내 놓고, 빈 폴더는 휴지통으로
+function flattenShortWork() {
+    const w = get(curWorkId()); if (!w || w.flatDone || !isShortWork(w.id)) return;
+    const top = children(null), folders = top.filter(x => x.kind === 'folder' && !x.ref);
+    if (folders.length) {
+        const list = [];
+        top.forEach(x => { if (x.kind === 'folder' && !x.ref) flatDocs(x.id).forEach(d => list.push(d)); else list.push(x); });
+        list.forEach((x, i) => { if ((x.parentId || null) !== null || x.order !== i + 1) { x.parentId = null; x.order = i + 1; touch(x); } });
+        folders.forEach(f => { f.trashed = true; f.trashedAt = Date.now(); touch(f); });
+        setTimeout(() => toast(`초단이라 '${folders.map(f => f.title).join(', ')}' 폴더를 풀어서 권만 바로 보이게 했어요. 폴더는 휴지통에 있어요.`), 300);
+    }
+    w.flatDone = true; touch(w);
+}
 function flatDocs(parentId = null, out = []) {
     children(parentId).forEach(c => { if (c.kind === 'folder') flatDocs(c.id, out); else out.push(c); });
     return out;
@@ -2691,6 +2707,7 @@ function openDocIds() {
     return s;
 }
 function renderTree() {
+    flattenShortWork();
     const W = WL();
     const open = openDocIds();
     // 지금 쓰고 있는(활성) 칸의 문서만 칠함 — 옆 분할 칸에 열어 둔 다른 문서는 표시하지 않음 (두 개가 선택된 것처럼 보이지 않게)
@@ -2728,7 +2745,7 @@ function renderTree() {
     $('#tree').innerHTML = `
         <div class="row plan-row ${oc(planId())}" data-plan="1" style="padding-left:4px"><span class="caret"></span><span class="ico"><i class="ic ic-book-open"></i></span><span class="r-title">작품 기획</span></div>
         <div class="tree-sec sep">원고<span class="spacer"></span>${manuscriptTotalTag()}</div>
-        ${mainRows.join('') || '<div class="pane-empty">＋문서 로 첫 회차를 만들어 보세요</div>'}
+        ${mainRows.join('') || `<div class="pane-empty">＋문서 로 첫 ${isShortWork() ? '권을' : '회차를'} 만들어 보세요</div>`}
         <div class="tree-sec sep">설정 · 자료<span class="spacer"></span><button data-a="new-ref" title="새 자료 폴더">＋</button></div>
         ${sbTreeRows(open)}
         ${refRows.join('')}
@@ -2744,7 +2761,7 @@ function renderTree() {
     const gAll = num(pl && pl.goalAll), gNo = num(pl && pl.goalNo);
     const pct = (a, g) => g ? Math.min(100, Math.floor(a / g * 1000) / 10) : 0;
     const main = gAll ? pct(sum.all, gAll) : pct(sum.no, gNo);
-    $('#tree-foot').innerHTML = mselCardHtml() + `<div class="tf-row">원고 ${docs.length}편 · 회당 평균 ${docs.length ? fmt(Math.round(sum.all / docs.length)) : 0}자</div>
+    $('#tree-foot').innerHTML = mselCardHtml() + `<div class="tf-row">원고 ${docs.length}${isShortWork() ? '권' : '편'} · ${isShortWork() ? '권당' : '회당'} 평균 ${docs.length ? fmt(Math.round(sum.all / docs.length)) : 0}자</div>
         <div class="tf-row">현재 <b>${fmt(sum.all)}</b>자 <span>(공미 ${fmt(sum.no)}자)</span></div>
         ${gAll || gNo ? `<div class="tf-row">목표 <b>${gAll ? fmt(gAll) + '자' : '—'}</b> <span>(공미 ${gNo ? fmt(gNo) + '자' : '—'})</span></div>
             <div class="tf-bar" title="${main}%"><i style="width:${main}%"></i></div>
@@ -4292,23 +4309,23 @@ function newDocTarget() {
 }
 function nextEpisodeNo() {
     let max = 0;
-    flatDocs().filter(d => !isRefDoc(d)).forEach(d => { const m = /(\d+)\s*화/.exec(d.title || ''); if (m) max = Math.max(max, +m[1]); });
+    const re = new RegExp('(\\d+)\\s*' + epUnit()); flatDocs().filter(d => !isRefDoc(d)).forEach(d => { const m = re.exec(d.title || ''); if (m) max = Math.max(max, +m[1]); });
     return max ? max + 1 : flatDocs().filter(d => !isRefDoc(d)).length + 1;
 }
 // 새 문서 창: 하나만 / 여러 개 한 번에 (예: 1화부터 6화까지)
 function newDocsModal(parentId) {
     return new Promise(resolve => {
         const folder = get(parentId), isRef = !!(folder && folder.ref);
-        const n0 = nextEpisodeNo();
+        const n0 = nextEpisodeNo(), u = epUnit();
         let mode = 'one';
         const bg = document.createElement('div'); bg.className = 'modal-bg';
         bg.innerHTML = `<div class="modal nd-modal"><h3>새 문서</h3>
             <div class="nd-where"><i class="ic ic-folder"></i> 넣을 곳: <b>${esc(folder ? folder.title : '맨 위 (폴더 밖)')}</b></div>
             <div class="seg nd-seg"><button class="on" data-mode="one">하나만</button><button data-mode="many">여러 개 한 번에</button></div>
-            <div data-one><label>제목</label><input type="text" data-t value="${isRef ? '' : esc(n0 + '화')}" placeholder="제목"></div>
+            <div data-one><label>제목</label><input type="text" data-t value="${isRef ? '' : esc(n0 + u)}" placeholder="제목"></div>
             <div data-many class="hidden">
-                <div class="nd-range"><input type="number" data-from min="0" value="${n0}"><span>화부터</span><input type="number" data-to min="0" value="${n0 + 5}"><span>화까지</span></div>
-                <label>이름 모양 <small>({n} 자리에 숫자가 들어가요)</small></label><input type="text" data-pat value="{n}화">
+                <div class="nd-range"><input type="number" data-from min="0" value="${n0}"><span>${u}부터</span><input type="number" data-to min="0" value="${n0 + 5}"><span>${u}까지</span></div>
+                <label>이름 모양 <small>({n} 자리에 숫자가 들어가요)</small></label><input type="text" data-pat value="{n}${u}">
                 <div class="nd-preview modal-note"></div>
             </div>
             <div class="row2"><button class="btn" data-x="0">취소</button><button class="btn primary" data-x="1">만들기</button></div></div>`;
@@ -4538,14 +4555,14 @@ function goalRing(it) {
 }
 // 이 문서부터 뒤의 문서를 순서대로 'N화'로 다시 매김 (중간에 끼워 넣었을 때). 제목의 'N화' 숫자만 바꾸고 뒤의 말은 그대로
 async function renumberFrom(it) {
-    const re = /^(\s*)(\d+)(\s*화)/;
+    const u = epUnit(), re = new RegExp('^(\\s*)(\\d+)(\\s*' + u + ')');
     const docs = flatDocs().filter(d => !isRefDoc(d) && !inTrash(d));
     const k = docs.findIndex(d => d.id === it.id), m0 = re.exec(it.title || '');
-    if (k < 0 || !m0) { toast('이 문서 제목이 \'6화\'처럼 시작해야 거기서부터 다시 매길 수 있어요.'); return; }
+    if (k < 0 || !m0) { toast(`이 문서 제목이 '6${u}'처럼 시작해야 거기서부터 다시 매길 수 있어요.`); return; }
     let n = +m0[2]; const todo = [];
     docs.slice(k).forEach(d => { const m = re.exec(d.title || ''); if (!m) return; const t = d.title.replace(re, (_, a, _n, c) => a + n + c); if (t !== d.title) todo.push([d, t]); n++; });
     if (!todo.length) { toast('이미 순서대로예요.'); return; }
-    if (!await confirmBox(`'${it.title}'부터 뒤 ${todo.length}개 문서의 화수를 순서대로 바꿀까요? 예) ${todo[0][0].title} → ${todo[0][1]}`, '바꾸기')) return;
+    if (!await confirmBox(`'${it.title}'부터 뒤 ${todo.length}개 문서의 ${u === '권' ? '권수' : '화수'}를 순서대로 바꿀까요? 예) ${todo[0][0].title} → ${todo[0][1]}`, '바꾸기')) return;
     todo.forEach(([d, t]) => { d.title = t; touch(d); });
     renderAll(); toast(`${todo.length}개 문서 이름을 바꿨어요.`);
 }
@@ -4988,9 +5005,11 @@ $('#file-restore').addEventListener('change', async e => {
 async function newWork() {
     const r = await newWorkModal(); if (!r) { renderHeader(); return; }
     const t = r.title;
-    const w = create('work', { title: t || '새 작품', order: Date.now(), needSynop: true }); // 시놉 보드에도 같은 이름으로 만들기
-    const f1 = create('folder', { workId: w.id, title: '1부', order: 1 });
-    const e1 = create('episode', { workId: w.id, parentId: f1.id, title: '1화', order: 1, goal: 5000 });
+    const short = /초단$/.test(r.genre || '');
+    const w = create('work', { title: t || '새 작품', order: Date.now(), needSynop: true, flatDone: short }); // 시놉 보드에도 같은 이름으로 만들기
+    // 초단: 폴더 없이 1권부터 / 장편: 1부 폴더 안에 1화부터
+    const f1 = short ? null : create('folder', { workId: w.id, title: '1부', order: 1 });
+    const e1 = create('episode', { workId: w.id, parentId: f1 ? f1.id : null, title: short ? '1권' : '1화', order: 1, goal: short ? 15000 : 5000 });
     const s1 = create('synop', { workId: w.id, title: '전체 시놉시스', order: 1, cards: [newCard('로그라인')] });
     layout().workId = w.id;
     const pl = ensurePlan(w.id);
@@ -9413,7 +9432,7 @@ document.addEventListener('click', e => {
     const pl = planOf(b); if (!pl) return;
     if (b.dataset.pgen !== undefined) {
         const pop = showPop(b, `<div class="genre-pick ph-pop">${WORK_GENRES.map(g => `<button class="gp ${pl.genre === g ? 'on' : ''}" data-pg="${g}" style="${genreVars(g)}">${g}</button>`).join('')}</div>`);
-        pop.addEventListener('click', ev => { const g = ev.target.closest('[data-pg]')?.dataset.pg; if (!g) return; pl.genre = g; touch(pl); closePop(); renderPlanViews(); });
+        pop.addEventListener('click', ev => { const g = ev.target.closest('[data-pg]')?.dataset.pg; if (!g) return; pl.genre = g; touch(pl); closePop(); renderPlanViews(); scheduleTreeRefresh(); });
         return;
     }
     if (b.dataset.pform) { pl.form = b.dataset.pform; planRecalc(pl); touch(pl); renderPlanViews(); scheduleTreeRefresh(); return; }
@@ -9446,7 +9465,7 @@ function planHtml(pl) {
     const field = (f, label, ph, rows) => `<label class="pl-label">${label}</label>${rows
         ? `<textarea class="pl-input" data-id="${pl.id}" data-field="${f}" rows="${rows}" placeholder="${esc(ph)}">${esc(pl[f] || '')}</textarea>`
         : `<input class="pl-input" data-id="${pl.id}" data-field="${f}" value="${esc(pl[f] || '')}" placeholder="${esc(ph)}">`}`;
-    const chars = pl.chars || [], form = pl.form || 'serial', bl = (pl.genre || '').startsWith('BL');
+    const chars = pl.chars || [], form = pl.form || 'serial', bl = (pl.genre || '').startsWith('BL'), sh = /초단$/.test(pl.genre || '');
     // 주인공 칸: 앞에 주인공 정보(내 시놉 보드)의 이름(나이) - 가 저절로, 뒤는 직접
     const leadField = (f, tab, label) => `<label class="pl-label">${label}</label><div class="pl-lead"><span class="pl-lead-pre" data-lead="${tab}">${esc(leadPrefix(tab))}</span><textarea class="pl-input" data-id="${pl.id}" data-field="${f}" rows="1">${esc(pl[f] || '')}</textarea></div>`;
     return `<div class="plan">
@@ -9459,8 +9478,8 @@ function planHtml(pl) {
                 <label class="pl-label">연재 형태</label>
                 <div class="seg pl-form"><button class="${form === 'serial' ? 'on' : ''}" data-pform="serial">연재</button><button class="${form === 'book' ? 'on' : ''}" data-pform="book">단행</button></div>
                 ${form === 'serial' ? `<label class="pl-label">분량</label>
-                <div class="pl-calc"><span>회당</span><input class="pl-input pl-num" inputmode="numeric" data-id="${pl.id}" data-field="perEp" style="width:${numW(pl.perEp, 4)}" value="${esc(pl.perEp || '')}" placeholder="4000"><span>자 ×</span>
-                    <input class="pl-input pl-num" inputmode="numeric" data-id="${pl.id}" data-field="eps" style="width:${numW(pl.eps, 3)}" value="${esc(pl.eps || '')}" placeholder="150"><span>화</span><span class="pl-total" data-pcalc="${pl.id}">${planTotalHtml(pl)}</span></div>`
+                <div class="pl-calc"><span>${sh ? '권당' : '회당'}</span><input class="pl-input pl-num" inputmode="numeric" data-id="${pl.id}" data-field="perEp" style="width:${numW(pl.perEp, 4)}" value="${esc(pl.perEp || '')}" placeholder="${sh ? '15000' : '4000'}"><span>자 ×</span>
+                    <input class="pl-input pl-num" inputmode="numeric" data-id="${pl.id}" data-field="eps" style="width:${numW(pl.eps, 3)}" value="${esc(pl.eps || '')}" placeholder="${sh ? '4' : '150'}"><span>${sh ? '권' : '화'}</span><span class="pl-total" data-pcalc="${pl.id}">${planTotalHtml(pl)}</span></div>`
                 : `<label class="pl-label">완결 분량</label>
                 <div class="pl-calc"><span>총</span><input class="pl-input pl-num pl-wide" inputmode="numeric" data-id="${pl.id}" data-field="goalAll" style="width:${numW(pl.goalAll, 6)}" value="${esc(pl.goalAll || '')}" placeholder="300000"><span>자 (공포)</span><span class="pl-gap"></span><input class="pl-input pl-num" inputmode="numeric" data-id="${pl.id}" data-field="vols" style="width:${numW(pl.vols, 1)}" value="${esc(pl.vols || '')}" placeholder="3"><span>권짜리</span><span class="pl-total" data-pcalc="${pl.id}">${planTotalHtml(pl)}</span></div>`}
                 <label class="pl-label">연재처</label>

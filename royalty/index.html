@@ -31187,25 +31187,42 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                 const entries = [...buckets.entries()].filter(([, w]) => w > 0);
                 const totalW = entries.reduce((x, [, w]) => x + w, 0);
                 if (totalW <= 0) return;
+                // '날짜|시' 칸에 글자 넣기 — 새벽 0~1시 → 전날 '0시'·'1시' 칸 (집필 하루는 새벽 2시에 넘어감), 새벽 2~5시 → 그날 첫 칸(6시)
+                const put = (k, wid, n) => {
+                    if (n <= 0) return;
+                    const [cd, hh] = k.split('|'); const h = Number(hh);
+                    const ds = h >= 2 ? cd : novelShiftDay(cd, -1);
+                    const slot = h >= 6 || h < 2 ? h : 6;
+                    const o = ((out[ds] ??= {})[wid] ??= {});
+                    o[slot] = (o[slot] || 0) + n;
+                };
                 Object.entries(ss.w || {}).forEach(([wid0, W]) => {
                     // 정산 기록은 공백 포함(원고 위치)이라 공백 포함 글자(a)를 쓴다. a 가 없는 예전 기록은 공백 제외(c)를 0.765 로 나눠 어림
                     const cNo = Number(W && W.c) || 0, cAll = Number(W && W.a);
-                    const c0 = Math.round(cAll >= cNo && cAll > 0 ? cAll : cNo / NOSPACE_TO_WITHSPACE_RATIO);
+                    let c0 = Math.round(cAll >= cNo && cAll > 0 ? cAll : cNo / NOSPACE_TO_WITHSPACE_RATIO);
                     if (!wid0 || wid0 === '_' || c0 <= 0) return;
+                    // 작업실이 회차(권)마다 1분 단위 글자(dm: {회차id: {몇 분째: 글자}})를 남겼으면 그 권·그 시간 칸에 그대로
+                    if (W.dm) {
+                        const names = W.n || {};
+                        // 작업실에서 세션 글자를 손으로 줄였으면 분 기록도 같은 비율로 줄여서 씀
+                        const dmSum = Object.values(W.dm).reduce((a, mm) => a + Object.values(mm || {}).reduce((b, n) => b + (Number(n) || 0), 0), 0);
+                        const f = dmSum > c0 ? c0 / dmSum : 1;
+                        Object.entries(W.dm).forEach(([id, mm]) => {
+                            const v = novelVolNo(id in names ? names[id] : (docTitles || {})[id]), key = v ? wid0 + '#' + v : wid0;
+                            Object.entries(mm || {}).forEach(([k, n]) => {
+                                n = Math.min(Math.round((Number(n) || 0) * f), c0); if (n <= 0) return;
+                                const d = new Date(Number(ss.s) + Number(k) * 6e4 + 3e4);
+                                put(novelDayKey(d) + '|' + d.getHours(), key, n); c0 -= n;
+                            });
+                        });
+                        if (c0 <= 0) return;   // 남은 글자(이 기록 방식 전에 쓴 부분)만 아래처럼 나눔
+                    }
                     novelSplitByVol(wid0, W, c0, docTitles).forEach(([wid, c]) => {
                     const raw = entries.map(([k, w]) => [k, c * w / totalW]);
                     const parts = raw.map(([k, v]) => [k, Math.floor(v)]);
                     let rest = c - parts.reduce((x, [, v]) => x + v, 0);
                     raw.map(([, v], i) => [i, v - Math.floor(v)]).sort((x, y) => y[1] - x[1]).forEach(([i]) => { if (rest > 0) { parts[i][1]++; rest--; } });
-                    parts.forEach(([k, n]) => {
-                        if (n <= 0) return;
-                        const [cd, hh] = k.split('|'); const h = Number(hh);
-                        // 새벽 0~1시 → 전날 '0시'·'1시' 칸 (집필 하루는 새벽 2시에 넘어감), 새벽 2~5시 → 그날 첫 칸(6시)
-                        const ds = h >= 2 ? cd : novelShiftDay(cd, -1);
-                        const slot = h >= 6 || h < 2 ? h : 6;
-                        const o = ((out[ds] ??= {})[wid] ??= {});
-                        o[slot] = (o[slot] || 0) + n;
-                    });
+                    parts.forEach(([k, n]) => put(k, wid, n));
                     });
                 });
             }));

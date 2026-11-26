@@ -3152,8 +3152,9 @@ function docCountBefore(it, fallback, field) { const c = countCache.get(it.id); 
 
 /* =====================================================================
    집필 기록 (자동): 원고를 쓰면 '세션'이 알아서 기록됨. 5분 동안 안 쓰면 세션 끝. (2026-11-21 15분 → 5분)
-   - 하루 하나의 항목 'sess_YYYY-MM-DD' = { list: [세션…] }, 세션 = { s, e, c, segs:[{a,b,d,c}], w:{작품id:{c, e:{회차id:c}, n:{회차id:제목}}}, m:{분:글자} }
+   - 하루 하나의 항목 'sess_YYYY-MM-DD' = { list: [세션…] }, 세션 = { s, e, c, segs:[{a,b,d,c}], w:{작품id:{c, e:{회차id:c}, n:{회차id:제목}, dm:{회차id:{분:글자}}}}, m:{분:글자} }
    - n = 그 회차(권)의 제목. 정산 앱이 초단 작품의 '3권' 같은 권 칸으로 나눠 넣을 때 씀 (2026-11-26)
+   - dm = 회차마다 몇 분째에 몇 자 ({회차id: {분: 글자}}). 한 세션에서 2권·3권을 오가도 정산 앱이 시간 칸을 권별로 정확히 나눔
    - d = 'ph'(폰) / 'pc'(PC). 기기를 바꿔 5분 안에 이어 쓰면 같은 세션, 구간(segs)만 나뉨
    - m = 세션 시작부터 몇 분째에 몇 자를 썼는지 (1분 단위). 실제로 쓴 시간·시간표 진하기에 씀. 예전 기록엔 없음
    - 글자는 공포(공백 포함). c 와 a 가 같음 (a 는 정산 앱이 읽는 칸). 예전 공백 제외 기록은 sessUnitFix 가 한 번 공포로 바꾸고 u:1 표시 (2026-11-21)
@@ -3228,7 +3229,7 @@ function sessRecord(doc, delta) {   // delta = 늘어난 공포(공백 포함) �
     ss.c += delta; ss.a = (ss.a || 0) + deltaA;
     const mi = Math.floor((t - ss.s) / 6e4); if (delta > 0) (ss.m ??= {})[mi] = (ss.m[mi] || 0) + delta;   // 1분 단위로 쓴 글자
     const wk = doc.workId || '_', W = (ss.w[wk] ??= { c: 0, e: {} });
-    W.c += delta; W.a = (W.a || 0) + deltaA; if (delta > 0) { W.e[doc.id] = (W.e[doc.id] || 0) + delta; (W.n ??= {})[doc.id] = doc.title || ''; }
+    W.c += delta; W.a = (W.a || 0) + deltaA; if (delta > 0) { W.e[doc.id] = (W.e[doc.id] || 0) + delta; (W.n ??= {})[doc.id] = doc.title || ''; const dm = ((W.dm ??= {})[doc.id] ??= {}); dm[mi] = (dm[mi] || 0) + delta; }
     touch(host);
     try { sessBreakCheck(ss); } catch (e) { console.error(e); }
 }
@@ -3345,7 +3346,7 @@ function sessScaleUp(x, r) {
     const sc = c => Math.round((Number(c) || 0) * r);
     x.c = sc(x.c); if (x.a != null) x.a = sc(x.a); (x.segs || []).forEach(g => { g.c = sc(g.c); });
     if (x.m) Object.keys(x.m).forEach(i => { x.m[i] = sc(x.m[i]); });
-    Object.values(x.w || {}).forEach(W => { W.c = sc(W.c); if (W.a != null) W.a = sc(W.a); Object.keys(W.e || {}).forEach(e => { W.e[e] = sc(W.e[e]); }); });
+    Object.values(x.w || {}).forEach(W => { W.c = sc(W.c); if (W.a != null) W.a = sc(W.a); Object.keys(W.e || {}).forEach(e => { W.e[e] = sc(W.e[e]); }); Object.values(W.dm || {}).forEach(mm => Object.keys(mm).forEach(i => { mm[i] = sc(mm[i]); })); });
 }
 // 세션들(list)에서 ex 자를 뺌: 튀는 분부터, 그다음 비율대로. 실제로 뺀 글자 수를 돌려줌
 function sessCutExcess(list, ex) {

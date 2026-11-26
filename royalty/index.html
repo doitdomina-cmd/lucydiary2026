@@ -31120,14 +31120,45 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             const works = {};
             const docs = await Promise.all([...wids].map(id => col.doc(id).get().catch(() => null)));
             docs.forEach(d => { if (!d || !d.exists) return; try { const r = JSON.parse(d.data().json); works[d.id] = (r && r.title) || ''; } catch (e) {} });
+            // 회차(권) 제목: 요즘 세션엔 n 에 같이 적혀 있고, 예전 세션만 문서를 읽어서 알아낸다 (초단 '3권' 칸 나누기용)
+            const need = new Set();
+            days.forEach(day => (day.list || []).forEach(x => Object.values(x.w || {}).forEach(W => Object.keys((W && W.e) || {}).forEach(e => { if (!(W.n && e in W.n)) need.add(e); }))));
+            const docTitles = {};
+            const eds = await Promise.all([...need].slice(0, 80).map(id => col.doc(id).get().catch(() => null)));
+            eds.forEach(d => { if (!d || !d.exists) return; try { const r = JSON.parse(d.data().json); docTitles[d.id] = (r && r.title) || ''; } catch (e) {} });
             // 작업실 설정의 '정산 앱으로 자동 넘기기' 켜짐 여부
             let sync = false;
             try { const sd = await col.doc('settings').get(); if (sd.exists) { const r = JSON.parse(sd.data().json); sync = !!(r && r.royaltySync); } } catch (e) {}
-            return { ok: true, days, works, sync };
+            return { ok: true, days, works, sync, docTitles };
         }
 
-        // 세션들 → { 정산 날짜: { 작업실 작품id: { 칸(시): 글자수 } } }
-        function novelSessionsToSlots(days) {
+        // 초단 작품은 작업실에서 '1권'·'2권'처럼 권마다 문서를 따로 쓴다 → 그 권의 글자는 '작품id#권번호' 로 따로 모은다
+        const NOVEL_VOL_RE = /(\d+)\s*권/;
+        function novelVolNo(t) { const m = NOVEL_VOL_RE.exec(String(t || '')); return m ? Number(m[1]) : 0; }
+        // 작업실 기록 열쇠의 이름 ('작품' 또는 '작품 · 3권')
+        function novelKeyTitle(wk, works) {
+            const [wid, vol] = String(wk).split('#');
+            const t = (works || {})[wid] || '';
+            return vol ? `${t || '(이름 없는 작품)'} · ${vol}권` : t;
+        }
+        // 세션 하나의 작품 글자 c 를 권별로 나눔 → [[열쇠, 글자]]. 권 이름이 없는 회차의 글자는 작품 열쇠로
+        function novelSplitByVol(wid, W, c, docTitles) {
+            const e = (W && W.e) || {}, names = (W && W.n) || {};
+            const byVol = {}; let volSum = 0, all = 0;
+            Object.entries(e).forEach(([id, n]) => {
+                n = Number(n) || 0; if (n <= 0) return; all += n;
+                const v = novelVolNo(id in names ? names[id] : (docTitles || {})[id]);
+                if (v) { byVol[v] = (byVol[v] || 0) + n; volSum += n; }
+            });
+            if (!volSum || all <= 0) return [[wid, c]];
+            const out = []; let used = 0;
+            Object.entries(byVol).forEach(([v, n]) => { const k = Math.round(c * n / all); if (k > 0) { out.push([wid + '#' + v, k]); used += k; } });
+            if (c - used > 0) out.push([wid, c - used]);
+            return out;
+        }
+
+        // 세션들 → { 정산 날짜: { 작업실 작품id(초단은 '작품id#권'): { 칸(시): 글자수 } } }
+        function novelSessionsToSlots(days, docTitles) {
             const out = {};
             days.forEach(day => (day.list || []).forEach(ss => {
                 const segs = (ss.segs && ss.segs.length) ? ss.segs : [{ a: ss.s, b: ss.e, c: ss.c }];
@@ -31156,11 +31187,12 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                 const entries = [...buckets.entries()].filter(([, w]) => w > 0);
                 const totalW = entries.reduce((x, [, w]) => x + w, 0);
                 if (totalW <= 0) return;
-                Object.entries(ss.w || {}).forEach(([wid, W]) => {
+                Object.entries(ss.w || {}).forEach(([wid0, W]) => {
                     // 정산 기록은 공백 포함(원고 위치)이라 공백 포함 글자(a)를 쓴다. a 가 없는 예전 기록은 공백 제외(c)를 0.765 로 나눠 어림
                     const cNo = Number(W && W.c) || 0, cAll = Number(W && W.a);
-                    const c = Math.round(cAll >= cNo && cAll > 0 ? cAll : cNo / NOSPACE_TO_WITHSPACE_RATIO);
-                    if (!wid || wid === '_' || c <= 0) return;
+                    const c0 = Math.round(cAll >= cNo && cAll > 0 ? cAll : cNo / NOSPACE_TO_WITHSPACE_RATIO);
+                    if (!wid0 || wid0 === '_' || c0 <= 0) return;
+                    novelSplitByVol(wid0, W, c0, docTitles).forEach(([wid, c]) => {
                     const raw = entries.map(([k, w]) => [k, c * w / totalW]);
                     const parts = raw.map(([k, v]) => [k, Math.floor(v)]);
                     let rest = c - parts.reduce((x, [, v]) => x + v, 0);
@@ -31173,6 +31205,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                         const slot = h >= 6 || h < 2 ? h : 6;
                         const o = ((out[ds] ??= {})[wid] ??= {});
                         o[slot] = (o[slot] || 0) + n;
+                    });
                     });
                 });
             }));
@@ -31190,6 +31223,24 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                 || items.find(it => novelNormTitle((masterWorks.find(w => w.id === it.id) || {}).title) === n);
             return hit ? hit.id : '';
         }
+
+        // 작업실 기록 열쇠 → 자동으로 고를 정산 작품 (고른 연결이 없을 때)
+        // '작품#3' 은 그 작품을 잇는 정산 작품(고른 연결 또는 같은 제목)에서 이름이 '3권'인 칸으로. 그 칸이 없으면 1권만 본 작품으로
+        function novelSavedKey(wk, items) {
+            if (!Object.prototype.hasOwnProperty.call(novelWorkMap, wk)) return null;
+            const v = novelWorkMap[wk];
+            return (v === '' || (v && items.some(it => it.id === v))) ? v : null;
+        }
+        function novelAutoFor(wk, works, items) {
+            const [wid, vol] = String(wk).split('#');
+            const base = novelSavedKey(wid, items) ?? novelAutoKey((works || {})[wid] || '', items);
+            if (!vol || !base) return base || '';
+            const mw = masterWorks.find(w => w.id === base.split('::')[0]); if (!mw) return '';
+            const ex = (mw.extras || []).find(x => novelVolNo(x.name) === Number(vol));
+            if (ex && items.some(it => it.id === mw.id + '::' + ex.id)) return mw.id + '::' + ex.id;
+            return Number(vol) === 1 && items.some(it => it.id === mw.id) ? mw.id : '';
+        }
+        function novelResolveKey(wk, works, items) { return novelSavedKey(wk, items) ?? novelAutoFor(wk, works, items); }
 
         function openNovelImportModal() {
             const ow = document.getElementById('novel-import-overwrite'); if (ow) ow.checked = true;
@@ -31244,7 +31295,7 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                 body.innerHTML = `<div class="py-5 text-center text-rose-500 text-xs">작업실 기록을 못 불러왔어요.<br><span class="text-slate-400">${novelEsc(res && res.error || '알 수 없는 오류')}</span></div>`;
                 return;
             }
-            const all = novelSessionsToSlots(res.days || []);
+            const all = novelSessionsToSlots(res.days || [], res.docTitles);
             const slots = {};
             Object.keys(all).forEach(ds => { if (ds >= from && ds <= to) slots[ds] = all[ds]; });
             const totals = {};
@@ -31260,10 +31311,10 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
             const sum = wids.reduce((a, w) => a + totals[w], 0);
             const nDays = Object.keys(slots).length;
             const rows = wids.map(wid => {
-                const title = (res.works || {})[wid] || '(이름 없는 작품)';
-                const auto = novelAutoKey(title, items);
-                const saved = Object.prototype.hasOwnProperty.call(novelWorkMap, wid) ? novelWorkMap[wid] : null;
-                const cur = (saved === '' || (saved && items.some(it => it.id === saved))) ? saved : auto;
+                const title = novelKeyTitle(wid, res.works) || '(이름 없는 작품)';
+                const auto = novelAutoFor(wid, res.works, items);
+                const saved = novelSavedKey(wid, items);
+                const cur = saved !== null ? saved : auto;
                 const opts = `<option value="">가져오지 않음</option>` + items.map(it => `<option value="${novelEsc(it.id)}" ${it.id === cur ? 'selected' : ''}>[${novelEsc(it.genre)}] ${novelEsc(it.displayTitle)}</option>`).join('');
                 return `<div class="novel-map-row flex items-center gap-2 py-2 border-b border-slate-100">
                     <div class="min-w-0 flex-1"><div class="font-bold text-slate-700 truncate" title="${novelEsc(title)}">${novelEsc(title)}</div><div class="text-[11px] text-slate-400">${totals[wid].toLocaleString()}자${!cur ? ' · <span style="color:#e11d48">연결할 작품을 골라 주세요</span>' : ''}</div></div>
@@ -31317,14 +31368,14 @@ html body.theme-gaming #write-calendar-body .cal-selectable.cal-selectable[data-
                 // 입력하는 중이면 표를 다시 그리지 않게 다음 기회로
                 const ae = document.activeElement;
                 if (ae && (ae.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName))) { _novelAutoAt = Date.now() - minGap + 20000; return; }
-                const all = novelSessionsToSlots(res.days || []), slots = {};
+                const all = novelSessionsToSlots(res.days || [], res.docTitles), slots = {};
                 Object.keys(all).forEach(ds => { if (ds >= from && ds <= to) slots[ds] = all[ds]; });
                 const items = novelTargetItems(), map = {}, missing = [];
                 const wids = new Set(); Object.values(slots).forEach(byW => Object.keys(byW).forEach(w => wids.add(w)));
                 wids.forEach(wid => {
-                    const title = (res.works || {})[wid] || '';
-                    const has = Object.prototype.hasOwnProperty.call(novelWorkMap, wid), saved = has ? novelWorkMap[wid] : null;
-                    const key = (saved === '' || (saved && items.some(it => it.id === saved))) ? saved : novelAutoKey(title, items);
+                    const title = novelKeyTitle(wid, res.works);
+                    const saved = novelSavedKey(wid, items);
+                    const key = novelResolveKey(wid, res.works, items);
                     map[wid] = key;
                     if (!key && saved !== '') missing.push(title || '이름 없는 작품');
                 });

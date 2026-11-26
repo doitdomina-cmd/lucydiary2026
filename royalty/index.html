@@ -9785,7 +9785,7 @@ html body.theme-candy #write-calendar-body .wc-finished-tag .wcf-ico { color:#ff
         <div class="modal-content w-full" style="max-width:960px;">
             <div class="flex justify-between items-center mb-4">
                 <div class="flex items-center gap-3 min-w-0 flex-1 flex-wrap">
-                    <h3 class="text-lg font-bold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-layer-group text-yellow-500"></i> <input type="text" id="wmm-modal-title" placeholder="작품 제목" title="클릭해서 제목 수정" class="flex-1 min-w-0 bg-transparent border-b border-dashed border-transparent hover:border-slate-300 focus:border-emerald-400 outline-none font-bold text-lg text-slate-700" style="background:transparent !important; box-shadow:none !important; padding:2px 4px !important; border-radius:0 !important; field-sizing:content; min-width:6ch; max-width:min(520px, 60vw);"></h3>
+                    <h3 class="text-lg font-bold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-layer-group text-yellow-500"></i> <input type="text" id="wmm-modal-title" oninput="wmmFitTitle()" placeholder="작품 제목" title="클릭해서 제목 수정" class="flex-1 min-w-0 bg-transparent border-b border-dashed border-transparent hover:border-slate-300 focus:border-emerald-400 outline-none font-bold text-lg text-slate-700" style="background:transparent !important; box-shadow:none !important; padding:2px 4px !important; border-radius:0 !important; field-sizing:content; min-width:6ch; max-width:min(520px, 60vw);"></h3>
                     <label id="wmm-finished-pill" class="wmm-finished-pill shrink-0 flex items-center gap-1.5 cursor-pointer select-none rounded-full border px-3 py-1 text-sm font-bold" title="목표 글자수가 다 안 됐어도 완고를 보냈으면 체크 — 집필 관리 카드가 다 채워지고 '완결'이 붙어요">
                         <input type="checkbox" id="wmm-finished" class="rounded" onchange="wmmPaintFinishedPill()"> 본편 완결
                     </label>
@@ -18676,6 +18676,7 @@ html body.theme-candy #write-calendar-body .wc-finished-tag .wcf-ico { color:#ff
             document.getElementById('wmm-manuscript-date').value = w.manuscriptDate || '';
             document.getElementById('wmm-finished').checked = !!w.isFinished;
             wmmPaintFinishedPill();
+            setTimeout(wmmFitTitle, 0);
             wmmExtrasDraft = (w.extras || []).map(e => ({ ...e }));
             renderWmmExtrasList();
             loadAdvDraft('wmm', w);
@@ -18856,6 +18857,13 @@ html body.theme-candy #write-calendar-body .wc-finished-tag .wcf-ico { color:#ff
             if (!dateInput || !monthInput) return;
             if (checked) { dateInput.classList.add('hidden'); monthInput.classList.remove('hidden'); }
             else { dateInput.classList.remove('hidden'); monthInput.classList.add('hidden'); monthInput.value = ''; }
+        }
+        // 제목 칸을 글자 길이에 맞춰서 '본편 완결'이 제목 바로 옆에 붙게 (PC 앱 크롬엔 field-sizing 이 없어서 직접 잰다)
+        function wmmFitTitle() {
+            const el = document.getElementById('wmm-modal-title');
+            if (!el || !el.offsetParent) return;
+            el.style.width = '0px';
+            el.style.width = Math.min(Math.max(el.scrollWidth + 8, 60), 520) + 'px';
         }
         // 제목 옆 '본편 완결' 알약: 체크하면 테마 색으로 채워서 눈에 띄게
         function wmmPaintFinishedPill() {

@@ -2532,6 +2532,17 @@ function flattenShortWork() {
     }
     w.flatDone = true; touch(w);
 }
+// 초단 작품에 남은 'N화' 이름(장편처럼 만들어진 기본 문서)을 한 번만 'N권'으로. 기본 목표 5,000자였던 건 권 기본 15,000자로
+function volNameFix() {
+    const w = get(curWorkId()); if (!w || w.volFix || !isShortWork(w.id)) return;
+    const fixed = [];
+    flatDocs().filter(d => !isRefDoc(d)).forEach(d => {
+        const m = /^\s*(\d+)\s*화\s*$/.exec(d.title || ''); if (!m) return;
+        const old = d.title; d.title = m[1] + '권'; if (d.goal === 5000) d.goal = 15000; touch(d); fixed.push(old);
+    });
+    w.volFix = true; touch(w);
+    if (fixed.length) setTimeout(() => toast(`초단이라 ${fixed.length > 2 ? fixed.slice(0, 2).join(', ') + ' 외 ' + (fixed.length - 2) + '개' : fixed.join(', ')}를 '권'으로 바꿨어요.`), 600);
+}
 function flatDocs(parentId = null, out = []) {
     children(parentId).forEach(c => { if (c.kind === 'folder') flatDocs(c.id, out); else out.push(c); });
     return out;
@@ -2707,7 +2718,7 @@ function openDocIds() {
     return s;
 }
 function renderTree() {
-    flattenShortWork();
+    flattenShortWork(); volNameFix();
     const W = WL();
     const open = openDocIds();
     // 지금 쓰고 있는(활성) 칸의 문서만 칠함 — 옆 분할 칸에 열어 둔 다른 문서는 표시하지 않음 (두 개가 선택된 것처럼 보이지 않게)
@@ -5008,7 +5019,7 @@ async function newWork() {
     const r = await newWorkModal(); if (!r) { renderHeader(); return; }
     const t = r.title;
     const short = /초단$/.test(r.genre || '');
-    const w = create('work', { title: t || '새 작품', order: Date.now(), needSynop: true, flatDone: short }); // 시놉 보드에도 같은 이름으로 만들기
+    const w = create('work', { title: t || '새 작품', order: Date.now(), needSynop: true, flatDone: short, volFix: short }); // 시놉 보드에도 같은 이름으로 만들기
     // 초단: 폴더 없이 1권부터 / 장편: 1부 폴더 안에 1화부터
     const f1 = short ? null : create('folder', { workId: w.id, title: '1부', order: 1 });
     const e1 = create('episode', { workId: w.id, parentId: f1 ? f1.id : null, title: short ? '1권' : '1화', order: 1, goal: short ? 15000 : 5000 });

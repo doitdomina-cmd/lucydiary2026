@@ -11244,18 +11244,9 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
                 </div>
             </div>
 
-            <div class="overflow-y-auto flex-1 custom-scrollbar border border-slate-100 rounded-xl">
-                <table class="w-full text-sm text-left">
-                    <thead class="bg-slate-50 text-slate-500 font-bold text-xs sticky top-0">
-                        <tr>
-                            <th class="px-4 py-2 w-10 text-center">이동</th>
-                            <th class="px-4 py-2">이름</th>
-                            <th class="px-2 py-2 text-center w-16">색상</th>
-                            <th class="px-4 py-2 w-20 text-center">관리</th>
-                        </tr>
-                    </thead>
-                    <tbody id="genre-manager-list" class="divide-y divide-slate-50"></tbody>
-                </table>
+            <!-- 장르 목록: 장르마다 직사각형 상자 하나씩 (끌어서 순서 바꾸기) -->
+            <div class="overflow-y-auto flex-1 custom-scrollbar" style="padding:2px 4px 4px 2px;">
+                <div id="genre-manager-list" class="grid gap-2.5" style="grid-template-columns:repeat(auto-fill, minmax(230px, 1fr));"></div>
             </div>
 
             <div class="mt-6 pt-4 border-t border-slate-100">
@@ -17426,7 +17417,22 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
         function openGenreManager() { renderGenreManagerList(); try { fillCalDesignInline('works'); } catch (e) {} document.getElementById('genre-manager-modal').classList.add('open'); }
         function closeGenreManager() { document.getElementById('genre-manager-modal').classList.remove('open'); editingGenreIndex = null; document.getElementById('new-genre-input').value = ''; document.getElementById('new-genre-color').value = '#cbd5e1'; document.getElementById('btn-add-update-genre').innerText = '추가'; document.getElementById('btn-add-update-genre').onclick = addNewGenre; }
         function updateBadgeOpacity(val) { genreBadgeOpacity = val / 100; document.getElementById('badge-opacity-value').innerText = val + '%'; save(true); renderMasterWorksList(); }
-        function renderGenreManagerList() { const list = document.getElementById('genre-manager-list'); if(!list) return; list.innerHTML = genreList.map((g, idx) => `<tr class="draggable-genre cursor-move hover:bg-slate-50" draggable="true" data-index="${idx}"><td class="px-4 py-3 text-center text-slate-300"><i class="fa-solid fa-grip-vertical"></i></td><td class="px-4 py-3 font-medium">${g.name}</td><td class="px-2 py-3 text-center"><div class="w-6 h-6 rounded-full mx-auto" style="background-color: ${g.color}"></div></td><td class="px-4 py-3 text-center flex justify-center gap-2"><button onclick="editGenre(${idx})" class="text-slate-400 hover:text-blue-500 text-xs"><i class="fa-solid fa-pen"></i></button><button onclick="removeGenre(${idx})" class="text-slate-400 hover:text-red-500 text-xs"><i class="fa-solid fa-trash"></i></button></td></tr>`).join(''); addGenreDragEvents(); }
+        function renderGenreManagerList() {
+            const list = document.getElementById('genre-manager-list'); if (!list) return;
+            if (!genreList.length) { list.innerHTML = '<p class="text-xs text-slate-400 text-center py-4" style="grid-column:1/-1">등록된 장르가 없습니다.</p>'; return; }
+            list.innerHTML = genreList.map((g, idx) => {
+                const c = g.color || '#cbd5e1';
+                return `<div class="draggable-genre genre-box cursor-move flex items-center gap-2.5 px-3" draggable="true" data-index="${idx}" title="끌어서 순서 바꾸기"
+                    style="height:52px; border-radius:6px !important; background:color-mix(in srgb, ${c} 22%, #fffdf9) !important; border:1.5px solid color-mix(in srgb, ${c} 70%, #ffffff) !important; border-left:6px solid ${c} !important; box-shadow:0 1px 2px rgba(60,45,25,.08) !important;">
+                    <i class="fa-solid fa-grip-vertical text-xs" style="color:color-mix(in srgb, ${c} 55%, #8a7a66)"></i>
+                    <span class="flex-1 min-w-0 truncate text-sm font-bold" style="color:color-mix(in srgb, ${c} 35%, #3b3128)">${escapeHtml(g.name)}</span>
+                    <span class="shrink-0 w-5 h-5 rounded-full" style="background:${c}; box-shadow:0 0 0 2px #fff, 0 0 0 3px color-mix(in srgb, ${c} 60%, transparent);"></span>
+                    <button onclick="editGenre(${idx})" class="shrink-0 text-slate-400 hover:text-blue-500 text-xs px-0.5" title="수정"><i class="fa-solid fa-pen"></i></button>
+                    <button onclick="removeGenre(${idx})" class="shrink-0 text-slate-400 hover:text-red-500 text-xs px-0.5" title="삭제"><i class="fa-solid fa-trash"></i></button>
+                </div>`;
+            }).join('');
+            addGenreDragEvents();
+        }
         function addGenreDragEvents() { let dragSrcGenre = null; document.querySelectorAll('.draggable-genre').forEach(row => { row.addEventListener('dragstart', e => { dragSrcGenre = row; row.classList.add('opacity-50'); }); row.addEventListener('dragover', e => e.preventDefault()); row.addEventListener('drop', e => { e.preventDefault(); if (dragSrcGenre !== row) { const allRows = [...document.querySelectorAll('.draggable-genre')]; const srcIdx = allRows.indexOf(dragSrcGenre), dstIdx = allRows.indexOf(row); const movedItem = genreList.splice(srcIdx, 1)[0]; genreList.splice(dstIdx, 0, movedItem); save(); renderGenreManagerList(); updateUI(); } }); row.addEventListener('dragend', () => row.classList.remove('opacity-50')); }); }
         function editGenre(idx) { editingGenreIndex = idx; const g = genreList[idx]; document.getElementById('new-genre-input').value = g.name; document.getElementById('new-genre-color').value = g.color; const btn = document.getElementById('btn-add-update-genre'); btn.innerText = '수정'; btn.onclick = updateGenre; }
         function updateGenre() { 

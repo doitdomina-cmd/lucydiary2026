@@ -7576,7 +7576,7 @@ body.theme-candy .tab-content :is(.lb-c1, .lb-c3, .lb-c5):is(.stat-card, .glass-
 body.theme-candy .tab-content :is(.lb-c3, .lb-c5):is(.stat-card, .glass-card):not(.glass-card .glass-card)::before { transform: rotate(2.5deg); }
 body.theme-candy #tab-dashboard .stat-card::before { top: -2px; }
 body.theme-candy #tab-dashboard .stat-card:is(.lb-c1, .lb-c3)::before { top: -13px; }
-body.theme-candy .tab-content :is(.stat-card, .glass-card):hover { transform: none !important; filter: brightness(1.03); }
+body.theme-candy .tab-content :is(.stat-card, .glass-card):hover { transform: none !important; filter: none; }   /* 마우스 올리면 판 전체가 밝아지던 것 끔 (2026-11-26) */
 
 /* ── 풍선 제목: 위 분홍 아래 보라로 나뉘는 통통한 글씨 (부풀리기 4px) ── */
 body.theme-candy :is(.cozy-hero .title, .cozy-pubhero .mname, .cozy-pubhero .yr, aside h1) {
@@ -12557,10 +12557,24 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
         }
 
         // 저장된 객체로 전역 상태 채우기 (로컬 파일/클라우드 공용)
+        // 출간일이 지난 작품(본편·외전/후속권)은 '완결' 체크를 한 번 켜 둔다 (2026-11-26 사용자 요청).
+        // 작품마다 _finMig 표시를 남겨서 한 번만 한다 — 나중에 사용자가 체크를 풀면 다시 켜지 않는다.
+        // (나중에 새로 등록한 작품도 처음 불러올 때 한 번 검사: 이미 출간된 작품을 등록하면 완결로 켜짐)
+        function autoFinishPublished() {
+            const d = new Date(), today = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+            let changed = false;
+            (masterWorks || []).forEach(w => {
+                if (!w) return;
+                if (!w._finMig) { if (!w.isPending && w.publishDate && w.publishDate <= today && !w.isFinished) w.isFinished = true; w._finMig = 1; changed = true; }
+                (w.extras || []).forEach(ex => { if (ex && !ex._finMig) { if (ex.publishDate && ex.publishDate <= today && !ex.isFinished) ex.isFinished = true; ex._finMig = 1; changed = true; } });
+            });
+            return changed;
+        }
         function hydrateFromParsed(parsed) {
             if (!parsed) return;
             masterWorks = parsed.masterWorks || [];
             try { fixWebtoonRates(); } catch(e) {}   // 웹툰 내 비율 7 → 70% (다른 기기에서 불러온 자료도)
+            try { if (autoFinishPublished()) setTimeout(() => { try { save(true); } catch (e) {} }, 0); } catch (e) {}   // 출간일 지난 작품은 한 번 '완결' 체크
             try { assetHydrateWorks(masterWorks); } catch (e) { console.error('[Asset] 불러오기 변환 실패', e); }
             monthlyData = parsed.monthlyData || {};
             years = parsed.years || [2024, 2025, 2026];
@@ -29008,7 +29022,7 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
                         let gray = false;
                         if (cm) { const v = [0, 2, 4].map(o => parseInt(cm[1].slice(o, o + 2), 16) / 255); gray = Math.max(...v) - Math.min(...v) < 0.07; }
                         const pt = gray ? '#ECE7DB' : `color-mix(in srgb, ${spanColorVivid(s.color)} 20%, #FFFFFF)`;
-                        const pf = gray ? '#D8D8DC' : `${spanColorVivid(s.color)}`;
+                        const pf = gray ? '#D8D8DC' : `color-mix(in srgb, ${spanColorVivid(s.color)} 60%, #FFFFFF)`;   // 차오르는 색은 조금 연한 파스텔로 (2026-11-26)
                         // 스킨이 막대 배경을 덮어써도 바탕·채움 색은 그대로 보이게 인라인으로 고정
                         bar.style.setProperty('background', pt, 'important');
                         bar.style.setProperty('background-image', 'none', 'important');

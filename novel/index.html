@@ -4048,6 +4048,29 @@ function weekSummaryMaybe() {
     if (!D.total && !D.sess.length) return;   // 지난주 기록이 없으면 조용히 넘어감
     openWeekSummary(prev);
 }
+// 오늘 집필 기록만 글로 복사 (세션 · 시간 · 작품 · 글자)
+function wlTodayText() {
+    const k = todayKey(), list = sessOfDay(k), D = new Date(k + 'T00:00:00'), WD = ['일', '월', '화', '수', '목', '금', '토'];
+    const L = [`■ 루시의 작업실 — 오늘의 집필 기록`, `${k} (${WD[D.getDay()]})`, ''];
+    const total = stats().days[k] || 0, sc = list.reduce((a, x) => a + Math.max(0, x.c || 0), 0), act = list.reduce((a, x) => a + sessActMin(x), 0);
+    L.push(`오늘 전체: ${fmt(total)}자 (공백 포함)`);
+    if (!list.length) { L.push('세션 기록 없음'); return L.join('\n'); }
+    L.push(`세션 ${list.length}번 · 실제로 쓴 시간 ${minTxt(act)} · 시간당 ${act ? fmt(Math.round(sc / (act / 60))) : 0}자`);
+    L.push('');
+    list.forEach((x, i) => {
+        L.push(`${i + 1}. ${hm(x.s)}~${hm(x.e)} (${minTxt(sessSpanMin(x))}${sessActMin(x) !== sessSpanMin(x) ? ` 중 실제 ${minTxt(sessActMin(x))}` : ''}) ${devTxt(x.segs).replace(/📱 |🖥 /g, '')} +${fmt(x.c)}자`);
+        Object.entries(x.w || {}).forEach(([wk, W]) => { const eps = Object.keys(W.e || {}).map(e => get(e)?.title).filter(Boolean).join(', '); L.push(`   - ${get(wk)?.title || '작품'}${eps ? ' · ' + eps : ''} +${fmt(W.c)}자`); });
+    });
+    const byW = {}; list.forEach(x => Object.entries(x.w || {}).forEach(([wk, W]) => { byW[wk] = (byW[wk] || 0) + W.c; }));
+    L.push(''); L.push('작품별:'); Object.entries(byW).sort((a, b) => b[1] - a[1]).forEach(([wk, c]) => L.push(`- ${get(wk)?.title || '작품'} +${fmt(c)}자`));
+    if (total !== sc) L.push(`(시간 기록에 안 잡힌 글자 ${total - sc > 0 ? '+' : ''}${fmt(total - sc)}자)`);
+    return L.join('\n');
+}
+function wlCopyToday() {
+    const t = wlTodayText(), ok = () => toast('오늘 집필 기록을 복사했어요.');
+    const fb = () => { const ta = document.createElement('textarea'); ta.value = t; ta.style.cssText = 'position:fixed;left:-9999px'; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); ok(); } catch (_) { toast('복사하지 못했어요.'); } ta.remove(); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(ok, fb); else fb();
+}
 function openWriteLog(k, tab) {
     wlDay = k || todayKey(); wlTab = tab || 'day'; wlWOff = 0;
     { const x = wkMonday(wdNow()); x.setDate(x.getDate() - 7); wlWkM = x; } // 주간 요약은 지난주부터
@@ -4056,7 +4079,7 @@ function openWriteLog(k, tab) {
     const draw = () => {
         // 맨 윗줄 하나에 탭·기록 다운·닫기를 다 모음 (스크롤해도 고정)
         const tabs = [['day', '하루 · 잔디'], ['when', '언제 쓰나요?'], ['week', '최근 7일'], ['wk', '주간 요약'], ['an', '나의 집필 분석']];
-        const head = `<div class="wl-head"><h3 style="margin:0"><i class="ic ic-history"></i> 집필 기록</h3><div class="wl-tabs">${tabs.map(([k, l]) => `<button class="${wlTab === k ? 'on' : ''}" data-wltab="${k}">${l}</button>`).join('')}</div><span style="flex:1"></span><button class="btn" data-wl="txt" title="작품·하루 글자·세션 기록 전체를 텍스트 파일로 저장">기록 다운 (txt)</button><button class="btn" data-wl="close">닫기</button></div>`;
+        const head = `<div class="wl-head"><h3 style="margin:0"><i class="ic ic-history"></i> 집필 기록</h3><div class="wl-tabs">${tabs.map(([k, l]) => `<button class="${wlTab === k ? 'on' : ''}" data-wltab="${k}">${l}</button>`).join('')}</div><span style="flex:1"></span><button class="btn" data-wl="today" title="오늘 집필 기록(세션·시간·작품·글자)만 바로 복사해요">오늘만 복사</button><button class="btn" data-wl="txt" title="작품·하루 글자·세션 기록 전체를 텍스트 파일로 저장">기록 다운 (txt)</button><button class="btn" data-wl="close">닫기</button></div>`;
         let body;
         if (wlTab === 'an') body = `<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn" data-wl="antxt">분석 텍스트로 저장</button></div>${rpAnalysisHTML()}`;
         else if (wlTab === 'wk') { const P = wkParts(wlWkM); body = `<div class="wl-wkn">${P.nav}</div>${P.body}`; }
@@ -4075,6 +4098,7 @@ function openWriteLog(k, tab) {
     bg.addEventListener('click', e => {
         if (e.target === bg || e.target.closest('[data-wl="close"]')) { bg.remove(); return; }
         if (e.target.closest('[data-wl="txt"]')) { rpExportAll(); return; }
+        if (e.target.closest('[data-wl="today"]')) { wlCopyToday(); return; }
         if (e.target.closest('[data-wl="antxt"]')) { rpAnalysisText(); return; }
         // 숫자를 고친 뒤 다시 그릴 때 보고 있던 자리 그대로 (맨 위로 튀지 않게)
         const redrawKeep = () => { const st = $('.wl-modal', bg)?.scrollTop || 0; draw(); const m = $('.wl-modal', bg); if (m) m.scrollTop = st; };

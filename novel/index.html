@@ -4427,7 +4427,10 @@ async function newDoc(parentId = null, open = true) {
     const docs = flatDocs().filter(d => !isRefDoc(d));
     const last = docs[docs.length - 1];
     const base = nextOrder(parentId);
-    const made = list.map((t, i) => create('episode', { workId: curWorkId(), parentId, title: t, order: base + i, goal: last?.goal || 5000 }));
+    // 제목이 'N권'인 새 문서는 맨 윗줄에 <작품제목 N권>을 미리 넣어 줌
+    const wt = (get(curWorkId())?.title || '').trim(), parentRef = !!(get(parentId) && get(parentId).ref);
+    const volHead = t => { const m = /^\s*(\d+)\s*권\s*$/.exec(t); return m && wt && !parentRef ? `<p>&lt;${esc(wt)} ${m[1]}권&gt;</p><p><br></p>` : ''; };
+    const made = list.map((t, i) => create('episode', { workId: curWorkId(), parentId, title: t, order: base + i, goal: last?.goal || 5000, body: volHead(t) }));
     if (parentId) setWL(W => { delete W.collapsed[parentId]; });
     treeSel = made[made.length - 1].id;
     if (!open) { renderTree(); return made[0]; }

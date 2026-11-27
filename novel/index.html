@@ -9653,7 +9653,7 @@ function outlineHtml(it, showOl = true, showPh = true) {
 
 /* =====================================================================
    자주 쓰는 표현 칸 (트릿 칸 위, 원고 오른쪽)
-   - 공통: 모든 작품 (settings.phCommon) · 이 작품: 작품 기획 항목에 (plan.phWork)
+   - 이 작품: 작품 기획 항목에 (plan.phWork). 예전 '공통' 탭(settings.phCommon)은 2026-11-27에 뺌 (장면 문장이 공통 역할)
    - 장면 문장: 장면(키스·애무 시작…)마다 예전 원고에서 담아 둔 문장. 'scenelib' 항목 하나에 모아 기기끼리 같이 씀
      · 인물 이름은 {남주}·{여주} 자리로 바꿔 저장 → 넣을 때 지금 작품 이름으로, 조사(은/는·이/가…)도 이름에 맞춰 채움
      · 담는 법: 원고에서 문장을 골라 '장면 문장으로' · 'AI로 뽑기'(예전 작품을 골라 장면별 후보를 받고 고른 것만 저장)
@@ -9665,7 +9665,6 @@ function sceneLib() {
     const L = items.scenelib; L.tags ??= PH_TAGS_DEF.slice(); L.lines ??= [];
     return L;
 }
-const phCommon = () => (settings().phCommon ||= []);
 const phWorkList = (wid = curWorkId()) => { const pl = ensurePlan(wid); return (pl.phWork ||= []); };
 // 지금 작품의 주인공 이름: 직접 적은 것 > 내 시놉 보드 캐릭터 설정
 function phNames(wid = curWorkId()) {
@@ -9686,14 +9685,14 @@ function phFill(text, names = phNames()) {
     return t;
 }
 function phInner() {
-    const tab = pref.phTab || 'work', edit = !!pref.phEdit, L = sceneLib();
-    const tabs = [['common', '공통'], ['work', '이 작품'], ['scene', '장면 문장']].map(([k, n]) => `<button class="${tab === k ? 'on' : ''}" data-pht="${k}">${n}</button>`).join('');
+    const tab = pref.phTab === 'scene' ? 'scene' : 'work', edit = !!pref.phEdit, L = sceneLib();
+    const tabs = [['work', '이 작품'], ['scene', '장면 문장']].map(([k, n]) => `<button class="${tab === k ? 'on' : ''}" data-pht="${k}">${n}</button>`).join('');
     let body = '';
     if (tab !== 'scene') {
-        const list = tab === 'common' ? phCommon() : phWorkList();
+        const list = phWorkList();
         body = `<div class="ph-chips">${list.map((w, i) => `<span style="display:inline-flex;align-items:center;max-width:100%"><button class="ph-chip" data-phi="${i}" title="${esc(w)}">${esc(w)}</button>${edit ? `<button class="ph-x" data-phdel="${i}" title="빼기">✕</button>` : ''}</span>`).join('')}
-            <button class="ph-chip add" data-phadd title="${tab === 'common' ? '모든 작품에서 쓰는 표현' : '이 작품에서만 쓰는 표현'} 더하기">＋ 더하기</button></div>
-            ${list.length ? '' : `<div class="ph-empty">${tab === 'common' ? '모든 작품에서 자주 쓰는 말(예: ……, 하아, 흐읏)을 더해 두세요.' : '이 작품에서만 자주 쓰는 말(인물 이름·호칭·말버릇)을 더해 두세요.'} 누르면 커서 자리에 바로 들어가요.</div>`}`;
+            <button class="ph-chip add" data-phadd title="이 작품에서만 쓰는 표현 더하기">＋ 더하기</button></div>
+            ${list.length ? '' : `<div class="ph-empty">이 작품에서 자주 쓰는 말(인물 이름·호칭·말버릇)을 더해 두세요. 원고에서 드래그해 '이 작품 표현'을 눌러도 돼요. 누르면 커서 자리에 바로 들어가요.</div>`}`;
     } else {
         const cur = L.tags.includes(pref.phTag) ? pref.phTag : L.tags[0], n = phNames();
         const lines = L.lines.filter(x => x.tag === cur);
@@ -9746,11 +9745,10 @@ document.addEventListener('click', async e => {
     if (d.pht) { pref.phTab = d.pht; savePref(); phRender(); return; }
     if (d.phedit != null) { pref.phEdit = !pref.phEdit; savePref(); phRender(); return; }
     if (d.phtag) { pref.phTag = d.phtag; savePref(); phRender(); return; }
-    const tab = pref.phTab || 'work';
-    const list = tab === 'common' ? phCommon() : phWorkList(), host = tab === 'common' ? settings() : ensurePlan();
+    const list = phWorkList(), host = ensurePlan();
     if (d.phi != null) { const w = list[+d.phi]; if (w != null) phInsert(w, pane); return; }
     if (d.phadd != null) {
-        const t = await ask(tab === 'common' ? '공통 표현 더하기 (모든 작품) — 여러 개는 쉼표로' : '이 작품 표현 더하기 — 여러 개는 쉼표로', ''); if (!t) return;
+        const t = await ask('이 작품 표현 더하기 — 여러 개는 쉼표로', ''); if (!t) return;
         t.split(/[,，]/).map(x => x.trim()).filter(Boolean).forEach(x => { if (!list.includes(x)) list.push(x); }); touch(host); phRender(); return;
     }
     if (d.phdel != null) { list.splice(+d.phdel, 1); touch(host); phRender(); return; }
@@ -9784,10 +9782,10 @@ function phSelText() {
 // 선택 막대 '이 작품 표현': 고른 말을 바로 담음 (여러 줄은 한 줄로)
 function phSaveTo(k, got = phSelText()) {
     if (!got) { toast('담을 말을 원고에서 먼저 골라 주세요.'); return; }
-    const w = got.text.replace(/\s*\n\s*/g, ' ').trim(), list = k === 'common' ? phCommon() : phWorkList();
+    const w = got.text.replace(/\s*\n\s*/g, ' ').trim(), list = phWorkList();
     if (list.includes(w)) toast('이미 들어 있어요.');
-    else { list.push(w); touch(k === 'common' ? settings() : ensurePlan()); toast(`${k === 'common' ? '공통' : '이 작품'} 표현에 담았어요: ${w.length > 20 ? w.slice(0, 20) + '…' : w}`); }
-    pref.phTab = k; savePref(); phRender();
+    else { list.push(w); touch(ensurePlan()); toast(`이 작품 표현에 담았어요: ${w.length > 20 ? w.slice(0, 20) + '…' : w}`); }
+    pref.phTab = 'work'; savePref(); phRender();
 }
 // 원고에서 고른 문장 → 장면 문장 담기 창 (이름은 {남주}·{여주}로 바꿔서 보여 줌)
 function phCaptureFromSelection(got = phSelText()) {

@@ -754,7 +754,7 @@ body.th-spiral .fullboard .wb-chips .chip.on[style*="--tc"] { color: #fff !impor
 .wb-fonts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; }
 .pop .wb-fonts button { text-align: center; padding: 7px 6px; border: 1px solid var(--line); border-radius: 8px; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pop .wb-fonts button.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
-.wb-style .seg { display: flex; flex-wrap: wrap; gap: 4px; }
+.wb-style .seg, body:is(.th-label, .th-polaroid, .th-spiral) .wb-style .seg { display: flex; flex-wrap: wrap; gap: 4px; border: 0 !important; border-radius: 0 !important; background: none !important; box-shadow: none !important; overflow: visible; }
 .pop .wb-style .seg button { width: auto; flex: 1; text-align: center; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; font-size: 12px; }
 .pop .wb-style .seg button.on { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); font-weight: 700; }
 .fullboard { position: fixed; inset: 0; z-index: 95; background: var(--bg); display: flex; flex-direction: column; padding-top: env(safe-area-inset-top, 0px); }
@@ -5363,11 +5363,11 @@ const WB_TAG_COLORS = ['#8a5a9e', '#c0603d', '#9a7a1f', '#5b8a3a', '#b04a6a', '#
 const WB_COLORS = ['#fbf0c8', '#fadfc8', '#f6d6d0', '#f6d9e2', '#eadbee', '#e0dcf0', '#d9e4f1', '#d5e9ee', '#d4eadf', '#e3eed3', '#f0ece2', '#ffffff'];
 // 예전 형광 느낌 팔레트 → 파스텔 (저장된 포스트잇 색 변환용)
 const WB_OLD_PALETTE = { '#fff1a8': '#fbf0c8', '#ffe0b8': '#fadfc8', '#ffd3c4': '#f6d6d0', '#ffd6e4': '#f6d9e2', '#f3d7f5': '#eadbee', '#e2d8fb': '#e0dcf0', '#d5e4fb': '#d9e4f1', '#cdeef7': '#d5e9ee', '#c9f0e1': '#d4eadf', '#dcf3c6': '#e3eed3', '#fff3a8': '#fbf0c8', '#ffc8dd': '#f6d9e2', '#b9fbc0': '#d4eadf', '#a3c4f3': '#d9e4f1', '#cfbaf0': '#e0dcf0' };
-const WB_FONTS = [['', '메모 글꼴 따라가기', 'var(--note-font)'], ['gaegu', '개구', "'Gaegu', cursive"], ['nanumpen', '나눔손글씨 펜', "'Nanum Pen Script', cursive"], ['gamja', '감자꽃', "'Gamja Flower', cursive"], ['himelody', '하이멜로디', "'Hi Melody', cursive"], ['poorstory', '푸어스토리', "'Poor Story', cursive"], ['jua', '주아', "'Jua', sans-serif"], ['gowundodum', '고운돋움', "'Gowun Dodum', sans-serif"], ['pretendard', '프리텐다드', "'Pretendard', sans-serif"], ['gowun', '고운바탕', "'Gowun Batang', serif"]];
+const WB_FONTS = [['follow', '메모 글꼴 따라가기', 'var(--note-font)'], ['gaegu', '개구', "'Gaegu', cursive"], ['nanumpen', '나눔손글씨 펜', "'Nanum Pen Script', cursive"], ['gamja', '감자꽃', "'Gamja Flower', cursive"], ['himelody', '하이멜로디', "'Hi Melody', cursive"], ['poorstory', '푸어스토리', "'Poor Story', cursive"], ['jua', '주아', "'Jua', sans-serif"], ['gowundodum', '고운돋움', "'Gowun Dodum', sans-serif"], ['pretendard', '프리텐다드', "'Pretendard', sans-serif"], ['gowun', '고운바탕', "'Gowun Batang', serif"]];
 const WB_BGS = [['dot', '점 화이트보드'], ['grid', '모눈'], ['plain', '깨끗한 흰 판'], ['cork', '코르크']];
 // 포스트잇 모양: 메모지 · 둥근 카드 · 접힌 모서리 · 줄 노트
 const WB_SHAPES = [['paper', '메모지'], ['round', '둥근 카드'], ['fold', '접힌 모서리'], ['lined', '줄 노트']];
-function wbStyle() { const W = WL(); return { font: '', size: 13, bg: 'dot', tape: true, tilt: true, shape: 'paper', ...(W.wbs || {}) }; }
+function wbStyle() { const W = WL(), S = { font: 'gowundodum', size: 13, bg: 'dot', tape: true, tilt: true, shape: 'paper', ...(W.wbs || {}) }; if (!S.font) S.font = 'gowundodum'; return S; } // 기본 글꼴은 모든 테마에서 고운돋움 (예전에 저장된 빈 값도 고운돋움으로)
 function wbTopic(t) { return WB_TOPICS.find(x => x.t === t); }
 function wbTagLabel(t) { return wbTopic(t)?.label || t; }
 // 주제 이름을 아이콘과 함께 (기본 주제 3개)
@@ -5914,7 +5914,7 @@ function wbPlaceFloat(mode) {
     const n = get(wbSel[mode]), el = n && $(`.pi[data-note="${n.id}"]`, view);
     if (!el || wbBusy) { fl.classList.add('hidden'); return; }
     const tag = (n.tag || '').trim(), al = n.al || 'left', S = wbStyle();
-    const ff = wbFontOf(n) || WB_FONTS.find(f => f[0] === S.font) || WB_FONTS[0];
+    const ff = wbFontOf(n) || WB_FONTS.find(f => f[0] === S.font) || WB_FONTS[7];
     const fmt = `<div class="wf-row wf-fmt">
         <button data-t="font" class="wb-fontbtn" title="이 포스트잇 글꼴" style="font-family:${ff[2]}">${esc(ff[0] ? ff[1] : '기본 글꼴')} ▾</button>
         <i class="sep"></i><button data-t="fs-" title="글자 작게">－</button><span class="wb-fsz">${n.fs || S.size}</span><button data-t="fs+" title="글자 크게">＋</button>
@@ -5951,7 +5951,7 @@ function wbFloatClick(e, mode) {
     wbUpdate(n, x => { x.tag = (x.tag || '').trim() === t ? '' : t; }, true);
 }
 function wbFontPop(anchor, n) {
-    const S = wbStyle(), def = WB_FONTS.find(f => f[0] === S.font) || WB_FONTS[0];
+    const S = wbStyle(), def = WB_FONTS.find(f => f[0] === S.font) || WB_FONTS[7];
     const pop = showPop(anchor, `<div class="wb-style" style="width:280px"><div class="wb-fonts">
         <button class="${!n.ff ? 'on' : ''}" data-ff="" style="font-family:${def[2]}">기본 (${esc(def[0] ? def[1] : '메모 글꼴')})</button>
         ${WB_FONTS.filter(f => f[0]).map(([k, nm, fam]) => `<button class="${n.ff === k ? 'on' : ''}" data-ff="${k}" style="font-family:${fam}">${esc(nm)}</button>`).join('')}</div>
@@ -6183,7 +6183,7 @@ function wbStylePop(anchor) {
     });
 }
 function wbApplyStyle() {
-    const S = wbStyle(), fam = (WB_FONTS.find(f => f[0] === S.font) || WB_FONTS[0])[2];
+    const S = wbStyle(), fam = (WB_FONTS.find(f => f[0] === S.font) || WB_FONTS[7])[2];
     ['col', 'full'].forEach(m => {
         const v = wbView(m); if (!v) return;
         v.style.setProperty('--wb-font', fam); v.style.setProperty('--wb-fs', S.size + 'px');

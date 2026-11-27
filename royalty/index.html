@@ -7916,6 +7916,8 @@ html body.theme-candy.theme-cozy .cozy-pubhero .eyebrow { margin-top: 16px !impo
 html body :is(#publish-dday-list, #task-dday-list) .dd-title { zoom: var(--ddfs, 1); }
 html body :is(#publish-dday-list, #task-dday-list) .dd-meta { zoom: var(--ddfs, 1); }
 html body #publish-dday-list .dd-meta-pub.dd-meta-pub { font-size: 12px !important; line-height: 1.35 !important; margin-top: 3px; }
+/* 업커밍 카드 글자 굵기 — 설정의 '굵기'(data-fw + --ddfw). 디자인 규칙보다 이기게 우선순위를 높게 */
+html body :is(#publish-dday-list, #task-dday-list)[data-fw][data-fw][data-fw] > div[data-tp][data-tp] :is(.dd-title, .dd-title *, .dd-meta) { font-weight: var(--ddfw) !important; }
 </style>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/galmuri@2.40.3/dist/galmuri.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/neodgm/neodgm-webfont@latest/neodgm/style.css">
@@ -24621,8 +24623,8 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
             hiddenDesignFix();
             try { applyCalCardDesign(); } catch (e) {}
             const a = document.getElementById('publish-dday-list'), b = document.getElementById('task-dday-list');
-            if (a) { a.setAttribute('data-design', ddayCardDesigns.pub || 'heart'); a.setAttribute('data-font', ddayCardFonts.pub || 'auto'); a.style.setProperty('--ddfs', String(ddayCardFonts.pubSize || 1)); }
-            if (b) { b.setAttribute('data-design', ddayCardDesigns.task || 'heart'); b.setAttribute('data-font', ddayCardFonts.task || 'auto'); b.style.setProperty('--ddfs', String(ddayCardFonts.taskSize || 1)); }
+            if (a) { a.setAttribute('data-design', ddayCardDesigns.pub || 'heart'); a.setAttribute('data-font', ddayCardFonts.pub || 'auto'); a.style.setProperty('--ddfs', String(ddayCardFonts.pubSize || 1)); ddaySetWeight(a, ddayCardFonts.pubWeight); }
+            if (b) { b.setAttribute('data-design', ddayCardDesigns.task || 'heart'); b.setAttribute('data-font', ddayCardFonts.task || 'auto'); b.style.setProperty('--ddfs', String(ddayCardFonts.taskSize || 1)); ddaySetWeight(b, ddayCardFonts.taskWeight); }
         }
         function closeDdayDesignMenu() { const o = document.getElementById('dday-design-overlay'); if (o) o.remove(); }
         function fillDdayDesignMenu(m, which) {
@@ -24635,13 +24637,22 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
                 '<label class="' + lb + ' mt-5">카드 글씨체</label>' +
                 '<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(92px,1fr)); gap:8px;">' + DDAY_FONTS.filter(o => !o.hide || o.k === curF).map(o =>
                     fontTileHtml("setDdayFont('" + which + "', '" + o.k + "')", o.k === 'auto' ? '' : o.f, o.n, o.k === curF)).join('') + '</div>' +
-                '<label class="' + lb + ' mt-5">글자 크기 <span style="text-transform:none; font-weight:600;">(작품명·출판사·장르)</span></label>' +
-                '<div style="display:flex; align-items:center; gap:10px;">' +
+                '<label class="' + lb + ' mt-5">글자 크기 · 굵기 <span style="text-transform:none; font-weight:600;">(작품명·출판사·장르)</span></label>' +
+                '<div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px;">' +
                 '<button type="button" onclick="changeDdaySize(\'' + which + '\', -1)" style="width:30px; height:30px; border-radius:999px; background:#F4EEE2; font-weight:700; color:#7A6A52;">−</button>' +
                 '<span style="min-width:56px; text-align:center; font-weight:700; font-size:13px; color:#3F3A33;">' + Math.round((ddayCardFonts[which + 'Size'] || 1) * 100) + '%</span>' +
                 '<button type="button" onclick="changeDdaySize(\'' + which + '\', 1)" style="width:30px; height:30px; border-radius:999px; background:#F4EEE2; font-weight:700; color:#7A6A52;">+</button>' +
-                '<button type="button" onclick="changeDdaySize(\'' + which + '\', 0)" style="padding:4px 11px; border-radius:999px; font-size:12px; border:1px solid #EBE2D1; background:#FFFEFC; color:#7A6A52;">기본</button></div>';
+                '<button type="button" onclick="changeDdaySize(\'' + which + '\', 0)" style="padding:4px 11px; border-radius:999px; font-size:12px; border:1px solid #EBE2D1; background:#FFFEFC; color:#7A6A52;">기본</button>' +
+                // 글자 굵기 (크기 옆) — 2026-11-27
+                '<span style="flex-basis:100%; height:0;"></span>' +
+                '<span style="min-width:30px; font-size:12px; font-weight:700; color:#A39A8C;">굵기</span>' +
+                DDAY_WEIGHTS.map(([w, n]) => { const on = String(ddayCardFonts[which + 'Weight'] || '') === String(w);
+                    return '<button type="button" onclick="setDdayWeight(\'' + which + '\', \'' + w + '\')" style="padding:4px 10px; border-radius:999px; font-size:12px; font-weight:' + (w || 600) + '; border:1px solid ' + (on ? '#C9AE7C' : '#EBE2D1') + '; background:' + (on ? '#F6F0E3' : '#FFFEFC') + '; color:#3F3A33;">' + n + '</button>'; }).join('') +
+                '</div>';
         }
+        const DDAY_WEIGHTS = [['', '기본'], [300, '얇게'], [400, '보통'], [700, '굵게'], [900, '아주 굵게']];
+        function ddaySetWeight(el, w) { if (w) { el.setAttribute('data-fw', String(w)); el.style.setProperty('--ddfw', String(w)); } else { el.removeAttribute('data-fw'); el.style.removeProperty('--ddfw'); } }
+        function setDdayWeight(which, w) { ddayCardFonts[which + 'Weight'] = w ? Number(w) : ''; applyDdayDesign(); save(true); const m = document.getElementById('dday-design-menu'); if (m) fillDdayDesignMenu(m, which); }
         function changeDdaySize(which, d) {   // 업커밍 카드 글자 크기: 80%~150%, 10%씩 (d=0 → 기본 100%)
             const key = which + 'Size';
             ddayCardFonts[key] = d === 0 ? 1 : Math.round(Math.max(0.8, Math.min(1.5, (ddayCardFonts[key] || 1) + d * 0.1)) * 10) / 10;

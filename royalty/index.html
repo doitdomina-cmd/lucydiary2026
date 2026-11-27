@@ -7932,7 +7932,7 @@ html body #publish-dday-list .dd-meta-pub.dd-meta-pub { font-size: 12px !importa
   #theme-card-grid .theme-card .tc-prev { width: 100% !important; max-width: 64px; }
   .modal-content:has(#settings-presets-box) .grid.grid-cols-2 { grid-template-columns: minmax(0, 1fr) !important; row-gap: 14px; }
   :is(#app-font-picker, #menu-font-picker) { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
-  :is(#app-font-picker, #menu-font-picker) > button { white-space: nowrap; word-break: keep-all; overflow: hidden; text-overflow: ellipsis; }
+  :is(#app-font-picker, #menu-font-picker) > button { word-break: keep-all; overflow: hidden; }
 }
 </style>
 <style id="polaroid-settle-planner">/* ═══ POLAROID SETTLE START (make_polaroid_settle.py) ═══ */
@@ -10412,12 +10412,12 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
                         <div class="grid grid-cols-2 gap-x-6 items-start">
                             <div>
                                 <p class="text-xs font-bold text-slate-400 uppercase mb-1.5">본문 글꼴 <span class="font-normal normal-case text-slate-300">· 화면 전체 글씨체</span></p>
-                                <div id="app-font-picker" class="grid grid-cols-4 gap-1"></div>
+                                <div id="app-font-picker" class="grid grid-cols-4 gap-1.5"></div>
                                 <div class="flex items-center gap-2 mt-2"><span class="text-xs font-bold text-slate-400 shrink-0">글자 크기</span><input id="app-fs-range" type="range" min="70" max="150" step="5" value="100" oninput="setFontScale('app_fs_v1', this.value)" class="flex-1"><span id="app-fs-label" class="text-xs font-bold text-slate-500 w-10 text-right">100%</span><button type="button" onclick="setFontScale('app_fs_v1', 100)" class="text-xs text-slate-400 underline">기본</button></div>
                             </div>
                             <div>
                                 <p class="text-xs font-bold text-slate-400 uppercase mb-1.5">메뉴 글꼴 <span class="font-normal normal-case text-slate-300">· 왼쪽 메뉴만 따로</span></p>
-                                <div id="menu-font-picker" class="grid grid-cols-4 gap-1"></div>
+                                <div id="menu-font-picker" class="grid grid-cols-4 gap-1.5"></div>
                                 <div class="flex items-center gap-2 mt-2"><span class="text-xs font-bold text-slate-400 shrink-0">글자 크기</span><input id="menu-fs-range" type="range" min="70" max="150" step="5" value="100" oninput="setFontScale('menu_fs_v1', this.value)" class="flex-1"><span id="menu-fs-label" class="text-xs font-bold text-slate-500 w-10 text-right">100%</span><button type="button" onclick="setFontScale('menu_fs_v1', 100)" class="text-xs text-slate-400 underline">기본</button></div>
                             </div>
                         </div>
@@ -10471,7 +10471,7 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
                                 <div><!-- 위젯 글꼴 -->
                     <div>
                         <p class="text-xs font-bold text-slate-400 uppercase mb-1">위젯 글꼴 <span class="font-normal normal-case text-slate-300">(위젯 · 미니창 · 목표 · 뽀모도로 · 계산기 한꺼번에)</span></p>
-                        <div id="widget-font-picker" class="flex flex-wrap gap-1.5"></div>
+                        <div id="widget-font-picker" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(84px,1fr)); gap:6px;"></div>
                                 <div class="flex items-center gap-2 mt-2"><span class="text-xs font-bold text-slate-400 shrink-0">글자 크기</span><input id="widget-fs-range" type="range" min="80" max="140" step="5" value="100" oninput="setWidgetFontScale(this.value)" class="flex-1"><span id="widget-fs-label" class="text-xs font-bold text-slate-500 w-10 text-right">100%</span><button type="button" onclick="setWidgetFontScale(100)" class="text-xs text-slate-400 underline">기본</button></div>
                     </div></div>
                                 <div style="display:none"><!-- 배경/글자 색상 (화면에서 숨김: 다른 코드가 입력칸을 참조) -->
@@ -14166,6 +14166,12 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
                     pairs.forEach(p => { if (gAssign[p.gi] === undefined && !used.has(p.ei)) { gAssign[p.gi] = p.ei; used.add(p.ei); } });
                     pairs.forEach(p => { if (gAssign[p.gi] === undefined) gAssign[p.gi] = p.ei; });   // 색이 모자라면 가장 가까운 색을 같이 쓴다
                     gl.forEach((g, gi) => { const e = ents[gAssign[gi]]; if (e) out.push(prefix + '[data-gi="' + gi + '"] { ' + _wkCss(gl, gAssign, ents, gi, e.css) + ' }'); });
+                    if (prefix.indexOf('#task-calendar-body') >= 0) TASK_CT_TONES.forEach(k => {   // 스케줄 관리 달력: 분류 색(data-ct)이 장르 색보다 우선 — 2026-11-27
+                        const th = _hueOf(DDAY_TONES[k].lc); let best = null, bd = 999;
+                        ents.forEach(e => { const d = (th === null || e.hue === null) ? 999 : _hueDist(th, e.hue); if (d < bd) { bd = d; best = e; } });
+                        if (!best) return;
+                        out.push(prefix + '[data-ct="' + k + '"][data-ct] { ' + (bd > 28 ? _recolorCss(best.css, th, 0) : best.css) + ' }');
+                    });
                 });
                 // 게이밍: 집필 달력 카드 맨 위 '창 제목줄'도 작품 장르 색으로
                 if (document.body.classList.contains('theme-gaming')) {
@@ -14284,10 +14290,7 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
         function _fontCss(id) { const f = APP_FONTS.find(x => x[0] === id); return f && f[0] ? f[2] : ''; }
         function _fontPicker(boxId, cur, fn, defLabel) {
             const box = document.getElementById(boxId); if (!box) return;
-            box.innerHTML = APP_FONTS.map(x => {
-                const on = x[0] === cur, label = x[0] ? x[1] : defLabel;
-                return `<button type="button" onclick="${fn}('${x[0]}')" class="px-1 py-0.5 rounded-md border text-[11px] leading-tight ${on ? 'border-2 bg-slate-50 font-bold' : 'border-slate-200 text-slate-600'}" style="${x[0] ? 'font-family:' + x[2] + ';' : ''}${on ? 'border-color:var(--primary);' : ''}">${label}</button>`;
-            }).join('');
+            box.innerHTML = APP_FONTS.map(x => fontTileHtml(fn + "('" + x[0] + "')", x[0] ? x[2] : '', x[0] ? x[1] : defLabel, x[0] === cur, true)).join('');
         }
         function _fsGet(k) { const v = parseFloat(_fontGet(k)); return (v >= 0.7 && v <= 1.5) ? v : 1; }
         function setFontScale(key, pct) {
@@ -15975,10 +15978,7 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
             const box = document.getElementById('widget-font-picker'); if (!box) return;
             const cur = (widgetSettingsData && widgetSettingsData.widgetFont) || '';
             { const fv = (widgetSettingsData && widgetSettingsData.widgetFontScale) || 1; const r = document.getElementById('widget-fs-range'), l = document.getElementById('widget-fs-label'); if (r && document.activeElement !== r) r.value = Math.round(fv * 100); if (l) l.textContent = Math.round(fv * 100) + '%'; }
-            box.innerHTML = WIDGET_FONTS.map(([id, name, css]) => {
-                const on = id === cur;
-                return `<button type="button" onclick="setWidgetFont('${id}')" class="px-3 py-1.5 rounded-lg border text-[13px] ${on ? 'font-bold' : 'text-slate-600'}" style="${css ? 'font-family:' + css + ';' : ''}${on ? 'border-color:#10b981; box-shadow:0 0 0 2px rgba(16,185,129,.25); background:#ecfdf5;' : 'border-color:#e2e8f0; background:#fff;'}">${name}</button>`;
-            }).join('');
+            box.innerHTML = WIDGET_FONTS.map(([id, name, css]) => fontTileHtml("setWidgetFont('" + id + "')", css || '', name, id === cur, true)).join('');
         }
         function setWidgetFont(id) {
             const f = WIDGET_FONTS.find(x => x[0] === id) || WIDGET_FONTS[0];
@@ -24376,7 +24376,7 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
 
                 const taskCardStyle = `font-family:'Pretendard','Apple SD Gothic Neo',sans-serif; font-size:${taskCardSettings.fontSize}px; background:${t.isCompleted ? '#f1f5f9' : taskCardSettings.colorDefault};`;
 
-                return `<div class="cal-selectable border border-slate-200 border-l-4 p-1 rounded-lg relative group/block shadow-sm hover:shadow-md transition-all cursor-move" data-cal="task" data-gi="${work ? Math.max(0, genreList.findIndex(g => g.name === work.genre)) : 0}" data-done="${t.isCompleted ? 1 : 0}" data-block-id="${t.id}" data-block-date="${t.date}" style="border-left-color: ${catColor}; ${taskCardStyle}" draggable="true" ondragstart="handleTaskDragStart(event, '${t.id}', '${t.date}')" ondragover="handleCardDragOver(event, this)" ondragleave="handleCardDragLeave(event, this)" ondrop="handleTaskCardDrop(event, this, '${t.id}', '${t.date}')" onclick="event.stopPropagation(); openTaskEditModal('${t.id}', '${t.date}')" oncontextmenu="duplicateTaskSchedule(event, '${t.id}', '${t.date}')">
+                return `<div class="cal-selectable border border-slate-200 border-l-4 p-1 rounded-lg relative group/block shadow-sm hover:shadow-md transition-all cursor-move" data-cal="task" data-gi="${work ? Math.max(0, genreList.findIndex(g => g.name === work.genre)) : 0}" data-ct="${taskCatTone(t.category)}" data-done="${t.isCompleted ? 1 : 0}" data-block-id="${t.id}" data-block-date="${t.date}" style="border-left-color: ${DDAY_TONES[taskCatTone(t.category)].lc}; ${taskCardStyle}" draggable="true" ondragstart="handleTaskDragStart(event, '${t.id}', '${t.date}')" ondragover="handleCardDragOver(event, this)" ondragleave="handleCardDragLeave(event, this)" ondrop="handleTaskCardDrop(event, this, '${t.id}', '${t.date}')" onclick="event.stopPropagation(); openTaskEditModal('${t.id}', '${t.date}')" oncontextmenu="duplicateTaskSchedule(event, '${t.id}', '${t.date}')">
                     <div class="flex items-start">
                         ${completeIcon}
                         <div class="flex-1 min-w-0 ml-0.5">
@@ -24402,6 +24402,16 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
             { k: 'cozy', n: '코지', d: '크림 종이 카드' },
         ].concat(themeDesigns('dday'));
         // hide: 고르는 칸에선 뺀 글씨체 (예전에 골라 둔 화면은 그대로 보이게 규칙은 남김, 2026-11-22 사용자 요청)
+        // 글씨체 고르기 네모 칸(카드 디자인 칸처럼): 위엔 그 글씨체로 쓴 '가나다', 아래엔 이름 — 2026-11-27
+        // fam 이 비면 '기본'(✨ 아이콘). compact = 좁은 곳(설정 본문·메뉴 글꼴, 달력 카드 메뉴)용 작은 칸
+        function fontTileHtml(onclick, fam, name, on, compact) {
+            const z = compact ? { h: 56, fs: 15, nfs: 10.5, pad: '6px 3px', r: 12, gap: 3 } : { h: 72, fs: 19, nfs: 11.5, pad: '9px 4px', r: 14, gap: 5 };
+            const sample = fam
+                ? '<span style="font-size:' + z.fs + 'px; line-height:1.15; font-family:' + fam + '; color:#3F3A33; white-space:nowrap;">가나다</span>'
+                : '<i class="fa-solid fa-wand-magic-sparkles" style="font-size:' + (z.fs - 3) + 'px; color:#B09A78;"></i>';
+            return '<button type="button" class="font-tile" onclick="' + onclick + '" title="' + name + '" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:' + z.gap + 'px; min-width:0; min-height:' + z.h + 'px; padding:' + z.pad + '; border-radius:' + z.r + 'px; color:#3F3A33; border:1px solid ' + (on ? '#C9AE7C' : '#EBE2D1') + '; background:' + (on ? '#F6F0E3' : '#FFFEFC') + ';' + (on ? ' box-shadow:0 0 0 1px #C9AE7C inset;' : '') + '">' + sample +
+                '<span style="font-size:' + z.nfs + 'px; font-weight:700; line-height:1.2; text-align:center; word-break:keep-all; max-width:100%; color:#3F3A33;">' + name + '</span></button>';
+        }
         const DDAY_FONTS = [
             { k: 'auto', n: '디자인 기본', f: 'inherit' },
             { k: 'sans', n: '고딕', hide: 1, f: "'Pretendard','Apple SD Gothic Neo',sans-serif" },
@@ -24545,7 +24555,8 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
                 // 두 장르가 같은 톤이면(예: 로판 금색·현로 초단 연노랑) 톤에서 더 먼 장르는 톤 색을 자기 장르 색 쪽으로 돌린 새 톤으로
                 const _tk = Object.keys(DDAY_TONES), _tEnts = _tk.map(k => ({ hue: _hueOf(DDAY_TONES[k].lc) })), _tAsg = {};
                 genreList.forEach((g, i) => { _tAsg[i] = _tk.indexOf(ddayLabelTone(g.color)); });
-                const t = genreList.map((g, i) => `:is(#write-calendar-body, #task-calendar-body) .cal-selectable[data-gi="${i}"], #publish-cal-body [draggable="true"][data-gi="${i}"]{${_wkCss(genreList, _tAsg, _tEnts, i, ddayToneVars(g.color))}}`).join(' ');
+                const t = genreList.map((g, i) => `:is(#write-calendar-body, #task-calendar-body) .cal-selectable[data-gi="${i}"], #publish-cal-body [draggable="true"][data-gi="${i}"]{${_wkCss(genreList, _tAsg, _tEnts, i, ddayToneVars(g.color))}}`).join(' ')
+                    + ' ' + TASK_CT_TONES.map(k => `#task-calendar-body .cal-selectable[data-ct="${k}"][data-ct]{${ddayToneVarsByName(k)}}`).join(' ');   // 스케줄 카드는 분류 색이 장르 색보다 우선
                 if (st.textContent !== t) st.textContent = t;
             } catch (e) {}
             Object.keys(CAL_CARD_IDS).forEach(k => {
@@ -24566,8 +24577,8 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
                     `<button type="button" onclick="setCalCardDesign('${which}', '${o.k}')" style="display:flex; flex-direction:column; align-items:center; gap:4px; padding:7px 2px; border-radius:12px; font-size:11.5px; font-weight:700; color:#3F3A33; border:1px solid ${o.k === cur ? '#C9AE7C' : '#EBE2D1'}; background:${o.k === cur ? '#F6F0E3' : '#FFFEFC'};"><span class="dday-swatch dday-swatch-${o.sw}"></span>${o.n}</button>`).join('') + '</div>'
                 : CAL_CARD_DESIGNS.map(o =>
                     `<button type="button" onclick="setCalCardDesign('${which}', '${o.k}')" style="display:flex; align-items:center; gap:10px; width:100%; text-align:left; padding:7px 8px; border-radius:12px; border:1px solid ${o.k === cur ? '#C9AE7C' : 'transparent'}; background:${o.k === cur ? '#F6F0E3' : 'transparent'};"><span class="dday-swatch dday-swatch-${o.sw}"></span><span><b style="display:block; font-size:12.5px; color:#3F3A33;">${o.n}</b><span style="font-size:10.5px; color:#A39A8C;">${o.d}</span></span></button>`).join('');
-            const fonts = '<div style="display:flex; flex-wrap:wrap; gap:6px; ' + (inline ? '' : 'padding:0 6px 6px;') + '">' + DDAY_FONTS.filter(o => !o.hide || o.k === curF).map(o =>
-                `<button type="button" onclick="setCalCardFont('${which}', '${o.k}')" style="padding:4px 11px; border-radius:999px; font-size:13px; font-family:${o.f}; border:1px solid ${o.k === curF ? '#C9AE7C' : '#EBE2D1'}; background:${o.k === curF ? '#F6F0E3' : '#FFFEFC'}; color:#3F3A33;">${o.n}</button>`).join('') + '</div>';
+            const fonts = '<div style="display:grid; grid-template-columns:' + (inline ? 'repeat(auto-fill,minmax(84px,1fr))' : 'repeat(3,minmax(0,1fr))') + '; gap:6px; ' + (inline ? '' : 'padding:0 6px 6px;') + '">' + DDAY_FONTS.filter(o => !o.hide || o.k === curF).map(o =>
+                fontTileHtml("setCalCardFont('" + which + "', '" + o.k + "')", o.k === 'auto' ? '' : o.f, o.n, o.k === curF, true)).join('') + '</div>';
             const sizeRow = which === 'pub'
                 ? '<div style="font-size:11px; font-weight:700; color:#B09A78; padding:10px 8px 6px; border-top:1px dashed #E3D7BC; margin-top:6px;">글자 크기</div>' +
                   '<div style="display:flex; align-items:center; gap:8px; padding:0 6px 6px;">' +
@@ -24622,11 +24633,8 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
                 '<label class="' + lb + '">카드 디자인</label><div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(92px,1fr)); gap:8px;">' + DDAY_DESIGNS.map(o =>
                 '<button type="button" onclick="setDdayDesign(\'' + which + '\', \'' + o.k + '\')" title="' + o.d + '" style="display:flex; flex-direction:column; align-items:center; gap:5px; padding:9px 4px; border-radius:14px; font-size:12px; font-weight:700; color:#3F3A33; border:1px solid ' + (o.k === cur ? '#C9AE7C' : '#EBE2D1') + '; background:' + (o.k === cur ? '#F6F0E3' : '#FFFEFC') + ';"><span class="dday-swatch dday-swatch-' + o.k + '"></span>' + o.n + '</button>').join('') + '</div>' +
                 '<label class="' + lb + ' mt-5">카드 글씨체</label>' +
-                // 글씨체도 카드 디자인처럼 네모 칸: 위엔 그 글씨체로 쓴 '가나다', 아래엔 이름(기본 글씨) — 2026-11-27
                 '<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(92px,1fr)); gap:8px;">' + DDAY_FONTS.filter(o => !o.hide || o.k === curF).map(o =>
-                    '<button type="button" onclick="setDdayFont(\'' + which + '\', \'' + o.k + '\')" title="' + o.n + '" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; min-height:72px; padding:9px 4px; border-radius:14px; color:#3F3A33; border:1px solid ' + (o.k === curF ? '#C9AE7C' : '#EBE2D1') + '; background:' + (o.k === curF ? '#F6F0E3' : '#FFFEFC') + ';">' +
-                    '<span style="font-size:19px; line-height:1.15; font-family:' + (o.k === 'auto' ? 'inherit' : o.f) + '; color:#3F3A33;">' + (o.k === 'auto' ? '<i class="fa-solid fa-wand-magic-sparkles" style="font-size:16px; color:#B09A78;"></i>' : '가나다') + '</span>' +
-                    '<span style="font-size:11.5px; font-weight:700; line-height:1.2; text-align:center; word-break:keep-all;">' + o.n + '</span></button>').join('') + '</div>' +
+                    fontTileHtml("setDdayFont('" + which + "', '" + o.k + "')", o.k === 'auto' ? '' : o.f, o.n, o.k === curF)).join('') + '</div>' +
                 '<label class="' + lb + ' mt-5">글자 크기 <span style="text-transform:none; font-weight:600;">(작품명·출판사·장르)</span></label>' +
                 '<div style="display:flex; align-items:center; gap:10px;">' +
                 '<button type="button" onclick="changeDdaySize(\'' + which + '\', -1)" style="width:30px; height:30px; border-radius:999px; background:#F4EEE2; font-weight:700; color:#7A6A52;">−</button>' +
@@ -24675,6 +24683,17 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
             if (h < 175) return 'mint';
             return (h >= 235) ? 'lilac' : 'sky';
         }
+        // 스케줄 달력 카드 색은 분류(일정 내용)로: 완고 입고=분홍, 작교본=보라, 시놉시스=민트, 표지 제안서=파랑, 그 외=노랑 (2026-11-27 사용자 요청)
+        function taskCatTone(cat) {
+            const c = String(cat || '').replace(/\s+/g, '');
+            if (c.includes('완고')) return 'pink';
+            if (c.includes('작교')) return 'lilac';
+            if (c.includes('시놉')) return 'mint';
+            if (c.includes('표지')) return 'sky';
+            return 'butter';
+        }
+        const TASK_CT_TONES = ['pink', 'lilac', 'mint', 'sky', 'butter'];
+        function ddayToneVarsByName(k) { const t = DDAY_TONES[k] || DDAY_TONES.butter; return `--lb:${t.lb}; --lc:${t.lc}; --lbd:${t.lbd}; --lband:${t.lband}; --ldash:${t.ldash}; --lv:${t.lv}; --ls1:${t.ls1}; --ls2:${t.ls2}; --lk:${t.lk}`; }
         function ddayToneVars(hex) { const t = DDAY_TONES[ddayLabelTone(hex)]; return `--lb:${t.lb}; --lc:${t.lc}; --lbd:${t.lbd}; --lband:${t.lband}; --ldash:${t.ldash}; --lv:${t.lv}; --ls1:${t.ls1}; --ls2:${t.ls2}; --lk:${t.lk}`; }
         function ddayRawGenre(name, fb) { try { const g = genreList.find(x => x.name === name); return (g && g.color) || fb; } catch (e) { return fb; } }   // 코지가 흐리게 만든 색이 아닌 원래 장르 색
         function ddayTp(str) { let h = 2166136261; String(str || '').split('').forEach(c => { h = Math.imul(h ^ c.charCodeAt(0), 16777619); }); h ^= h >>> 15; h = Math.imul(h, 2246822519); h ^= h >>> 13; return (h >>> 0) % 5; }

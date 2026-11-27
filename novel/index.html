@@ -5367,7 +5367,7 @@ const WB_FONTS = [['follow', '메모 글꼴 따라가기', 'var(--note-font)'], 
 const WB_BGS = [['dot', '점 화이트보드'], ['grid', '모눈'], ['plain', '깨끗한 흰 판'], ['cork', '코르크']];
 // 포스트잇 모양: 메모지 · 둥근 카드 · 접힌 모서리 · 줄 노트
 const WB_SHAPES = [['paper', '메모지'], ['round', '둥근 카드'], ['fold', '접힌 모서리'], ['lined', '줄 노트']];
-function wbStyle() { const W = WL(), S = { font: 'gowundodum', size: 13, bg: 'dot', tape: true, tilt: true, shape: 'paper', ...(W.wbs || {}) }; if (!S.font) S.font = 'gowundodum'; return S; } // 기본 글꼴은 모든 테마에서 고운돋움 (예전에 저장된 빈 값도 고운돋움으로)
+function wbStyle() { const W = WL(), S = { font: 'gowundodum', size: 13, bg: 'dot', shape: 'paper', ...(W.wbs || {}) }; if (!S.font) S.font = 'gowundodum'; S.tape = !!S.tapeOn; S.tilt = !!S.tiltOn; return S; } // 테이프·기울이기는 기본 꺼짐 (켠 것만 tapeOn/tiltOn에 저장) // 기본 글꼴은 모든 테마에서 고운돋움 (예전에 저장된 빈 값도 고운돋움으로)
 function wbTopic(t) { return WB_TOPICS.find(x => x.t === t); }
 function wbTagLabel(t) { return wbTopic(t)?.label || t; }
 // 주제 이름을 아이콘과 함께 (기본 주제 3개)
@@ -6177,7 +6177,7 @@ function wbStylePop(anchor) {
     pop.addEventListener('click', e => {
         const v = e.target.closest('[data-ws]')?.dataset.ws; if (!v) return;
         const [k, val] = v.split(':');
-        setWL(W => { const S = { ...wbStyle() }; if (k === 'size') S.size = +val; else if (k === 'tape' || k === 'tilt') S[k] = !S[k]; else S[k] = val; W.wbs = S; });
+        setWL(W => { const S = { ...wbStyle() }; if (k === 'size') S.size = +val; else if (k === 'tape' || k === 'tilt') S[k + 'On'] = !S[k]; else S[k] = val; W.wbs = S; });
         pop.innerHTML = draw();
         wbApplyStyle(); ['col', 'full'].forEach(m => { const w = wbWorld(m); if (w) { $$('textarea', w).forEach(autoGrow); wbDrawLines(m); wbPlaceBar(m); } });
     });

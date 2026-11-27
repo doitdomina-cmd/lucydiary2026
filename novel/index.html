@@ -4197,7 +4197,7 @@ function buildSelbar() {
         <div class="sb-c"><button class="tb small" data-fold title="고른 단락 접기"><i class="ic ic-fold-vertical"></i> 접기</button>
         <button class="tb small" data-polish title="고른 문장을 퇴고해서 두 가지 안으로 다듬기 (AI)"><i class="ic ic-sparkles"></i> 다듬기</button>
         <button class="tb small" data-syn title="비슷한 표현 추천"><i class="ic ic-sparkles"></i> 비슷한 표현</button>
-        <button class="tb small" data-scene title="고른 문장을 장면 문장 보관함에 담기 (인물 이름은 {남주}·{여주} 자리로)"><i class="ic ic-type"></i> 장면 문장으로</button>
+        <button class="tb small" data-scene title="고른 말을 자주 쓰는 표현(이 작품 · 공통)이나 장면 문장에 담기"><i class="ic ic-type"></i> 표현으로 담기</button>
         <button class="tb small" data-hwpx title="고른 부분을 색·서식 그대로 한글 파일(.hwpx)로 저장 → 한글에서 열어 복사하면 색이 살아요"><i class="ic ic-file-down"></i> 한글로</button></div>`;
 }
 
@@ -4209,7 +4209,7 @@ $('#selbar').addEventListener('click', e => {
     if (b.hasAttribute('data-fold')) foldSelection();
     if (b.hasAttribute('data-syn')) synFromSelection();
     if (b.hasAttribute('data-polish')) polishFromSelection();
-    if (b.hasAttribute('data-scene')) phCaptureFromSelection();
+    if (b.hasAttribute('data-scene')) phSavePick(b);
     if (b.hasAttribute('data-hwpx')) hwpxFromSelection();
 });
 function updateSelbar() {
@@ -9770,15 +9770,35 @@ document.addEventListener('click', async e => {
     if (d.phnew != null) { phCaptureModal({ text: '', tag: L.tags.includes(pref.phTag) ? pref.phTag : L.tags[0], src: '' }); return; }
     if (d.phai != null) { phExtractModal(); return; }
 });
-// 원고에서 고른 문장 → 장면 문장 담기 창 (이름은 {남주}·{여주}로 바꿔서 보여 줌)
-function phCaptureFromSelection() {
-    const sel = getSelection(); if (!sel.rangeCount || sel.isCollapsed) { toast('담을 문장을 원고에서 먼저 골라 주세요.'); return; }
+// 원고에서 고른 글 (문단은 줄바꿈으로)
+function phSelText() {
+    const sel = getSelection(); if (!sel.rangeCount || sel.isCollapsed) return null;
     const div = document.createElement('div'); div.appendChild(sel.getRangeAt(0).cloneContents());
     $$('p, div, br', div).forEach(n => n.insertAdjacentText(n.tagName === 'BR' ? 'beforebegin' : 'afterend', '\n'));
-    const text = div.textContent.replace(/\n{2,}/g, '\n').trim(); if (!text) return;
-    const an = sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement), doc = get(an?.closest('.manuscript')?.dataset.id);
+    const text = div.textContent.replace(/\n{2,}/g, '\n').trim(); if (!text) return null;
+    const an = sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
+    return { text, doc: get(an?.closest('.manuscript')?.dataset.id) };
+}
+// 선택 막대 '표현으로 담기' → 이 작품 표현 / 공통 표현 / 장면 문장 중 고르기
+function phSavePick(anchor) {
+    const got = phSelText(); if (!got) { toast('담을 말을 원고에서 먼저 골라 주세요.'); return; }
+    const pop = showPop(anchor, `<button data-ps="work"><i class="ic ic-type"></i> 이 작품 표현으로</button><button data-ps="common"><i class="ic ic-type"></i> 공통 표현으로 (모든 작품)</button><button data-ps="scene"><i class="ic ic-book-open-text"></i> 장면 문장으로…</button>`);
+    pop.addEventListener('mousedown', e => e.preventDefault());
+    pop.addEventListener('click', e => {
+        const k = e.target.closest('[data-ps]')?.dataset.ps; if (!k) return;
+        closePop();
+        if (k === 'scene') { phCaptureFromSelection(got); return; }
+        const w = got.text.replace(/\s*\n\s*/g, ' ').trim(), list = k === 'common' ? phCommon() : phWorkList();
+        if (list.includes(w)) toast('이미 들어 있어요.');
+        else { list.push(w); touch(k === 'common' ? settings() : ensurePlan()); toast(`${k === 'common' ? '공통' : '이 작품'} 표현에 담았어요: ${w.length > 20 ? w.slice(0, 20) + '…' : w}`); }
+        pref.phTab = k; savePref(); phRender();
+    });
+}
+// 원고에서 고른 문장 → 장면 문장 담기 창 (이름은 {남주}·{여주}로 바꿔서 보여 줌)
+function phCaptureFromSelection(got = phSelText()) {
+    if (!got) { toast('담을 문장을 원고에서 먼저 골라 주세요.'); return; }
     const L = sceneLib();
-    phCaptureModal({ text: phToSlots(text, phNames()), tag: L.tags.includes(pref.phTag) ? pref.phTag : L.tags[0], src: [get(curWorkId())?.title, doc?.title].filter(Boolean).join(' · ') });
+    phCaptureModal({ text: phToSlots(got.text, phNames()), tag: L.tags.includes(pref.phTag) ? pref.phTag : L.tags[0], src: [get(curWorkId())?.title, got.doc?.title].filter(Boolean).join(' · ') });
 }
 function phCaptureModal({ text, tag, src, id }) {
     const L = sceneLib(); let cur = tag || L.tags[0];

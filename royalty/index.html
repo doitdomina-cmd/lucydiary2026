@@ -2591,7 +2591,7 @@ body.theme-cozy #year-timeline-content[data-card="retro"] #timeline-export-btn {
         @container (max-width: 700px) { body.theme-cozy #daily-nav-row { position: static; margin: -4px 0 6px; justify-content: center; } }
         /* 스케줄·집필 달력: 이전/다음 달 칸을 출간 일정처럼 흐릿하게 (테두리·진한 배경 없이) */
         body.theme-cozy :is(:is(#task-calendar-body, #rs-vcal-body), #write-calendar-body) > div[class~="bg-slate-50/50"] { opacity: .4; background-color: #FFFEFC; border-color: #F2ECE1; box-shadow: none !important; }
-        body.theme-cozy :is(:is(#task-calendar-body, #rs-vcal-body), #write-calendar-body) > div[class~="bg-slate-50/50"]:hover { opacity: .65; }
+        /* 이번 달이 아닌 칸에 마우스를 올리면 .4 → .65 로 밝아져 카드·막대가 반짝이던 규칙은 뺐다 (2026-11-27 사용자 신고) */
         body.theme-cozy :is(:is(#task-calendar-body, #rs-vcal-body), #write-calendar-body) > div[class~="bg-slate-50/50"] .text-slate-300 { color: #8A8F9C; }
         /* 웹툰 투고 관리 왼쪽 목록: 장르는 큰 견출지, 작품은 작은 견출지 스티커 (살짝 기울여서) */
 body.theme-cozy .wsub-left { padding: 8px 10px 16px; }
@@ -7918,6 +7918,8 @@ html body :is(#publish-dday-list, #task-dday-list) .dd-meta { zoom: var(--ddfs, 
 html body #publish-dday-list .dd-meta-pub.dd-meta-pub { font-size: 12px !important; line-height: 1.35 !important; margin-top: 3px; }
 /* 업커밍 카드 글자 굵기 — 설정의 '굵기'(data-fw + --ddfw). 디자인 규칙보다 이기게 우선순위를 높게 */
 html body :is(#publish-dday-list, #task-dday-list)[data-fw][data-fw][data-fw] > div[data-tp][data-tp] :is(.dd-title, .dd-title *, .dd-meta) { font-weight: var(--ddfw) !important; }
+/* 집필 달력 진행 색: 레트로는 팔레트가 진해서 쓴 부분에도 흰빛을 조금 얹는다(--wveil) */
+#write-calendar-body[data-card="retro"], body.theme-retro #write-calendar-body { --wveil: .32; }
 </style>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/galmuri@2.40.3/dist/galmuri.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/neodgm/neodgm-webfont@latest/neodgm/style.css">
@@ -24080,7 +24082,7 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
                 
                 if (s.category) {
                     const prefix = `[${s.category}]`;
-                    let opacity = s.isCompleted ? 'opacity-70' : '';
+                    let opacity = '';   // 완료 표시는 하트가 맡는다 — 글자를 흐리게(opacity-70) 하지 않음 (2026-11-27 사용자 요청)
                     if (s.category === WRITE_MEMO_CATEGORY) {
                         // 메모 카드는 한 줄: 제목 왼쪽, 체크 진행(완료/전체) 오른쪽
                         const cl = s.checklist || [];
@@ -24102,7 +24104,7 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
                                    ${s.memo ? `<div class="text-[10px] text-slate-500 ${opacity}" style="white-space:normal; word-break:break-word;">${s.memo}</div>` : ''}`;
                     }
                 } else {
-                    let opacity = s.isCompleted ? 'opacity-70' : '';
+                    let opacity = '';   // 완료해도 글자를 흐리게 하지 않음 (하트로 구분)
                     let goalData = cumulativeGoalMap[s.id];
                     let blockStart = 0, blockEnd = (s.goal || 0), rawStart = 0;
                     
@@ -24176,8 +24178,8 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
                     cardBg = `background: ${WRITE_COLORS[s.category] || '#94a3b8'};`;
                 } else if (_pastelFill) {
                     const fp = s.isCompleted ? 100 : Math.max(0, Math.min(100, fillPct));
-                    cardBg = fp >= 100 ? `background: ${wcs.colorDefault};`
-                        : `background: linear-gradient(to right, transparent ${fp}%, rgba(255,255,255,.58) ${fp}%) ${wcs.colorDefault};`;
+                    // --wveil: 쓴 부분에도 얹는 흰빛(기본 0). 바탕색이 진한 디자인(레트로)은 CSS 에서 값을 줘서 지난 날이 주황빛으로 튀지 않게
+                    cardBg = `background: linear-gradient(to right, rgba(255,255,255,var(--wveil,0)) ${fp}%, rgba(255,255,255,.58) ${fp}%) ${wcs.colorDefault};`;
                 } else if (fillPct > 0) {
                     cardBg = `background: linear-gradient(to right, ${hexToRgba(fillColor, wcs.fillOpacity)} ${fillPct}%, ${wcs.colorDefault} ${fillPct}%);`;
                 } else {

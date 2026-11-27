@@ -24169,8 +24169,15 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
 
                 // 분류가 있으면 해당 분류의 설정 색상으로 전체 채움 (분류별 색상은 WRITE_COLORS에서 관리)
                 let cardBg = '';
+                // 카드 바탕이 파스텔 톤인 디자인(견출지 등·스킨 테마)에선 진행 막대를 회색빛으로 덧칠하면 다 쓴 지난 날이 탁해진다 →
+                // 쓴 부분 = 원래 톤 그대로, 아직 안 쓴 부분 = 흰빛을 얹어 더 연하게 (완료 카드는 끝까지 원래 톤) — 2026-11-27 사용자 요청
+                const _pastelFill = ['label', 'spiral', 'polaroid', 'postcard', 'retro', 'gaming', 'galaxy', 'candy'].some(k => document.body.classList.contains('theme-' + k)) || (calCardDesigns.write || 'cozy') !== 'cozy';
                 if (s.category) {
                     cardBg = `background: ${WRITE_COLORS[s.category] || '#94a3b8'};`;
+                } else if (_pastelFill) {
+                    const fp = s.isCompleted ? 100 : Math.max(0, Math.min(100, fillPct));
+                    cardBg = fp >= 100 ? `background: ${wcs.colorDefault};`
+                        : `background: linear-gradient(to right, transparent ${fp}%, rgba(255,255,255,.58) ${fp}%) ${wcs.colorDefault};`;
                 } else if (fillPct > 0) {
                     cardBg = `background: linear-gradient(to right, ${hexToRgba(fillColor, wcs.fillOpacity)} ${fillPct}%, ${wcs.colorDefault} ${fillPct}%);`;
                 } else {
@@ -24681,7 +24688,8 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
             butter: { lb: '#FCEFC4', lc: '#D9A441', lbd: '#E8CB7E', lband: '#F6E09A', ldash: '#A8832E', lv: '#F7D154', ls1: '#D9A441', ls2: '#9FB7CC', lk: '#8A6A1E' },
             mint: { lb: '#D6EBDD', lc: '#5FAA84', lbd: '#9ACBB0', lband: '#BFE0CB', ldash: '#4E8C6B', lv: '#7ED3A6', ls1: '#5FAA84', ls2: '#E3A5A0', lk: '#2F7A55' },
             sky: { lb: '#D3E6F3', lc: '#5E94C2', lbd: '#9CC1DE', lband: '#BCD8EC', ldash: '#4A7BA3', lv: '#7DB8F0', ls1: '#5E94C2', ls2: '#E3A5A0', lk: '#2B5F8F' },
-            lilac: { lb: '#E9E0F7', lc: '#9B7FD1', lbd: '#C3B0E6', lband: '#D9CCF1', ldash: '#7C62B0', lv: '#B79CF0', ls1: '#9B7FD1', ls2: '#E3A5A0', lk: '#5E4596' }   // 보라 장르(웹툰 등)용 — 2026-11-26
+            lilac: { lb: '#E9E0F7', lc: '#9B7FD1', lbd: '#C3B0E6', lband: '#D9CCF1', ldash: '#7C62B0', lv: '#B79CF0', ls1: '#9B7FD1', ls2: '#E3A5A0', lk: '#5E4596' },   // 보라 장르(웹툰 등)용 — 2026-11-26
+            peach: { lb: '#FDE2CF', lc: '#E0936A', lbd: '#F0BC9C', lband: '#F8CDB0', ldash: '#B6704A', lv: '#F7A77C', ls1: '#E0936A', ls2: '#9FB7CC', lk: '#A0552E' }   // 살구 장르(로판 등)용 — 노랑으로 가던 것 (2026-11-27)
         };
         function ddayLabelTone(hex) {
             const m = /^#?([0-9a-f]{6})$/i.exec(hex || ''); if (!m) return 'butter';
@@ -24689,7 +24697,8 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
             const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; let h = 0;
             if (d) { h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h *= 60; if (h < 0) h += 360; }
             if (d < 0.06) return 'butter';
-            if (h >= 300 || h < 22) return 'pink';
+            if (h >= 300 || h < 14) return 'pink';
+            if (h < 42) return 'peach';   // 살구·코랄 (예전엔 노랑으로 묶였음)
             if (h < 70) return 'butter';
             if (h < 175) return 'mint';
             return (h >= 235) ? 'lilac' : 'sky';
@@ -24734,10 +24743,10 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
                 const diff = Math.round((new Date(t.date) - new Date(today)) / 86400000);
                 const dLabel = diff === 0 ? 'D-Day' : `D-${diff}`;
                 const dColor = diff === 0 ? '#ef4444' : diff <= 7 ? '#f97316' : diff <= 30 ? 'var(--primary)' : '#94a3b8';
-                const catColor = (t.resolved.work && t.resolved.work.genre && getGenreColor(t.resolved.work.genre)) || TASK_COLORS[t.category] || '#64748b';   // 출간 업커밍 카드처럼 장르 색 (작품이 없으면 분류 색)
+                const _tk = taskCatTone(t.category), catColor = DDAY_TONES[_tk].lc;   // 스케줄 달력 카드처럼 분류 색 (완고 입고=분홍·작교본=보라·시놉시스=민트·표지=파랑·그 외=노랑) — 2026-11-27
                 const titlePart = t.resolved.work ? ` ${t.resolved.displayTitle}` : '';
                 const volMemo = /^\s*\[[^\]]*권\]\s*$/.test(t.memo || '');   // '[2권]' 같은 권수 메모는 제목 뒤에 같은 글씨로 붙인다 (출간 카드처럼)
-                return `<div class="flex items-start gap-2 p-2.5 bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-all group cursor-pointer" style="--c:${ddayMute(catColor)}; --g:${ddayRawGenre(t.resolved.work && t.resolved.work.genre, catColor)}; ${ddayToneVars(ddayRawGenre(t.resolved.work && t.resolved.work.genre, catColor))}; --dd:${diff}" data-tp="${ddayTp(t.id + t.date)}" onclick="openTaskEditModal('${t.id}', '${t.date}')">
+                return `<div class="flex items-start gap-2 p-2.5 bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-all group cursor-pointer" style="--c:${ddayMute(catColor)}; --g:${catColor}; ${ddayToneVarsByName(_tk)}; --dd:${diff}" data-tp="${ddayTp(t.id + t.date)}" onclick="openTaskEditModal('${t.id}', '${t.date}')">
                     <div class="shrink-0 w-1 self-stretch rounded-full" style="background:${catColor}"></div>
                     <div class="flex-1 min-w-0">
                         <div class="flex items-center justify-between gap-1 mb-0.5">

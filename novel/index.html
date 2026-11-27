@@ -3147,7 +3147,8 @@ function onEditorInput(ed) {
 }
 /* 오늘 늘어난 글자 = 작품마다 오늘 글자 변화(늘면 +, 지우면 −)를 더한 값이 '오늘 최고점'을 넘은 만큼만.
    예전엔 늘어난 것만 더해서, 지웠다가 다시 붙여 넣거나 잘라서 다른 회차로 옮기면 그만큼이 또 '쓴 글자'로 잡혔음 (2026-11-21) */
-const liveCountOn = () => { const S = stats(); return !!(S.net && S.net.day === todayKey() && S.net.live); };
+// 기본: 쓴 만큼 더하고 지운 만큼 뺌 (2026-11-27). 설정 countPeak = 예전 규칙(오늘 최고점을 넘은 만큼만, 지워도 안 줄어듦)
+const liveCountOn = () => settings().countPeak !== true;
 function netGain(doc, d, all) {   // all = 공백 포함 쪽을 따로 셈
     const S = stats(), k = todayKey();
     if (!S.net || S.net.day !== k) S.net = { day: k, w: {} };
@@ -3300,7 +3301,7 @@ function wlDayCard(k) {
     const list = sessOfDay(k), D = new Date(k + 'T00:00:00'), WD = ['일', '월', '화', '수', '목', '금', '토'];
     const isToday = k === todayKey();
     const tot = list.reduce((a, x) => a + x.c, 0), mins = list.reduce((a, x) => a + sessActMin(x), 0), spanMins = list.reduce((a, x) => a + sessSpanMin(x), 0);
-    let h = `<div class="wl-card"><div class="wl-dh"><h3>${isToday ? '오늘의 하루' : '하루 보기'}</h3><span class="wl-tag">${D.getMonth() + 1}월 ${D.getDate()}일 (${WD[D.getDay()]})</span><span style="flex:1"></span>${isToday ? `<button class="btn wl-fix${liveCountOn() ? ' on' : ''}" data-wl="free" title="지금부터 0으로 다시 시작해요. 쓴 만큼 오르고, 지우면 내려가요. 내일은 저절로 원래대로 돌아가요.">${liveCountOn() ? '✓ 지금부터 더하고 빼는 중' : '지금부터 더하고 빼기'}</button>` : ''}<button class="btn wl-fix" data-wl="fix" title="붙여 넣기 등으로 부풀려진 이 날의 글자 수를 실제 숫자로 고쳐요">숫자 바로잡기</button><button class="wl-nv" data-wl="prev">‹</button><button class="wl-nv" data-wl="next" ${isToday ? 'disabled' : ''}>›</button></div>`;
+    let h = `<div class="wl-card"><div class="wl-dh"><h3>${isToday ? '오늘의 하루' : '하루 보기'}</h3><span class="wl-tag">${D.getMonth() + 1}월 ${D.getDate()}일 (${WD[D.getDay()]})</span><span style="flex:1"></span>${isToday ? `<button class="btn wl-fix${liveCountOn() ? ' on' : ''}" data-wl="free" title="${liveCountOn() ? '지금: 쓴 만큼 오르고 지우면 내려가요. 누르면 지워도 안 줄어드는 규칙(오늘 가장 많이 쓴 때 기준)으로 바꿔요.' : '지금: 지워도 숫자가 안 줄어요. 누르면 쓴 만큼 오르고 지우면 내려가는 규칙으로 바꿔요.'}">${liveCountOn() ? '✓ 지우면 빼는 중' : '지워도 안 빼는 중'}</button>` : ''}<button class="btn wl-fix" data-wl="fix" title="붙여 넣기 등으로 부풀려진 이 날의 글자 수를 실제 숫자로 고쳐요">숫자 바로잡기</button><button class="wl-nv" data-wl="prev">‹</button><button class="wl-nv" data-wl="next" ${isToday ? 'disabled' : ''}>›</button></div>`;
     const dayTot = stats().days[k] || 0;
     if (!list.length) return h + `<div class="wl-empty">${dayTot ? `이 날은 ${fmt(dayTot)}자를 썼어요. (시간 기록은 이 기능을 켠 뒤부터 남아요)` : '이 날은 쓴 기록이 없어요.'}</div></div>`;
     h += `<div class="wl-kr"><div><small>세션</small><b>${list.length}번</b></div><div><small>실제로 쓴 시간</small><b>${minTxt(mins)}</b>${spanMins > mins ? `<small>세션 ${minTxt(spanMins)} 중</small>` : ''}</div><div><small>늘어난 글자 (공포)</small><b>+${fmt(tot)}자</b></div><div><small>시간당</small><b>${mins ? fmt(Math.round(tot / (mins / 60))) : 0}자</b></div><div><small>첫 시작~마지막</small><b>${hm(list[0].s)}~${hm(list[list.length - 1].e)}</b></div></div>`;
@@ -3884,12 +3885,15 @@ function openWriteLog(k, tab) {
         // 숫자를 고친 뒤 다시 그릴 때 보고 있던 자리 그대로 (맨 위로 튀지 않게)
         const redrawKeep = () => { const st = $('.wl-modal', bg)?.scrollTop || 0; draw(); const m = $('.wl-modal', bg); if (m) m.scrollTop = st; };
         if (e.target.closest('[data-wl="free"]')) {
-            const S = stats(), k = todayKey();
-            if (liveCountOn()) { delete S.net.live; touch(S); toast('원래 규칙으로 돌아갔어요. (지금 숫자는 그대로)'); redrawKeep(); return; }
-            // 오늘 쌓인 숫자는 그대로 두고, 지금 글자 수를 기준으로 이 뒤로 쓴 만큼 더하고 지운 만큼 뺌
-            if (!S.net || S.net.day !== k) S.net = { day: k, w: {} };
-            S.net.live = true; Object.values(S.net.w).forEach(o => { o.p = o.n || 0; o.pa = o.na || 0; }); touch(S);
-            toast(`지금부터 쓴 만큼 더하고 지운 만큼 빼요. (지금 ${fmt(S.days[k] || 0)}자에서 시작)`); redrawKeep();
+            const S = stats(), k = todayKey(), set = settings();
+            if (liveCountOn()) {
+                // 지워도 안 줄어드는 규칙으로: 지금 숫자에서 시작해서, 이 뒤로 지운 만큼은 다시 써도 안 더함
+                set.countPeak = true; touch(set);
+                S.net = { day: k, w: {} }; touch(S);
+                toast('이제 지워도 숫자가 안 줄어요. (지금 숫자는 그대로)'); redrawKeep(); return;
+            }
+            delete set.countPeak; touch(set);
+            toast(`이제 쓴 만큼 더하고 지운 만큼 빼요. (지금 ${fmt(S.days[k] || 0)}자에서 시작)`); redrawKeep();
             return;
         }
         if (e.target.closest('[data-wl="fix"]')) {

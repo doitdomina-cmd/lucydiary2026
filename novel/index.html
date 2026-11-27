@@ -11277,7 +11277,18 @@ function homeHero(list) {
     const h = new Date().getHours(), hi = h < 5 ? '아직 깨어 있네요' : h < 12 ? '좋은 아침이에요' : h < 18 ? '좋은 오후예요' : '오늘도 수고했어요';
     // 이어서 쓰기: 홈 카드 끌어서 정한 순서와 상관없이, 가장 최근에 원고를 고친 (완고 아닌) 작품
     const lastEp = wid => Object.values(items).reduce((m, it) => (it.kind === 'episode' && it.workId === wid && live(it) && !inTrash(it) && !isRefDoc(it) && it.rev > m) ? it.rev : m, 0);
-    const pool = list.filter(x => !x.w.done), last = (pool.length ? pool : list).map(x => [x, lastEp(x.w.id)]).sort((a, b) => b[1] - a[1])[0]?.[0] || list[0];
+    // 가장 최근 '글자를 쓴 기록'(집필 기록)의 작품이 먼저. 기록이 없으면 원고를 마지막으로 고친 작품
+    const pool = list.filter(x => !x.w.done), cand = pool.length ? pool : list;
+    const sessLast = (() => {
+        const ss = []; Object.values(items).forEach(h => { if (h.kind === 'sessday' && !h.deleted) (h.list || []).forEach(x => { if (x && x.w) ss.push(x); }); });
+        ss.sort((p, q) => q.e - p.e);
+        for (const x of ss) {
+            const ws = Object.entries(x.w).filter(([id, v]) => v && v.c > 0 && cand.some(c => c.w.id === id)).sort((p, q) => q[1].c - p[1].c);
+            if (ws.length) return cand.find(c => c.w.id === ws[0][0]);
+        }
+        return null;
+    })();
+    const last = sessLast || cand.map(x => [x, lastEp(x.w.id)]).sort((a, b) => b[1] - a[1])[0]?.[0] || list[0];
     const total = list.reduce((a, x) => a + x.s.chars, 0);
     const line = today > 0 ? `오늘 <b>${fmt(today)}자</b> 썼어요 ♡` : last ? '오늘의 첫 줄을 써 볼까요 ♡' : '첫 작품을 만들어 볼까요 ♡';
     const ph = hhPhoto(h), mode = pref.homeCover || 'photo';

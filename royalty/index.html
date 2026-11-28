@@ -4397,7 +4397,6 @@ html body.theme-gaming #dash-goal-board .dgb-addc:hover { background: #FFF1BF; }
         html body.theme-gaming #tab-works #works-right-panel#works-right-panel #library-tabs#library-tabs#library-tabs button.lib-tab.lib-tab.lib-tab::after { content: none !important; }
         html body.theme-gaming #tab-works #works-right-panel#works-right-panel #library-tabs#library-tabs#library-tabs button.lib-tab.lib-tab.lib-tab.lib-on { background: #FFB9CB !important; border-color: #2F3A5C !important; }
         html body.theme-gaming #tab-works #works-right-panel#works-right-panel #library-tabs#library-tabs#library-tabs button.lib-tab.lib-tab.lib-tab.lib-on::before { content: '▶' !important; display: inline-block !important; margin-right: 3px; font-size: 9px; color: #D93D72; }
-        @media (min-width: 1025px) { html body.theme-gaming #tab-works #works-right-panel#works-right-panel { position: relative; height: auto !important; } html body.theme-gaming #tab-works #works-right-panel#works-right-panel > .glass-card.glass-card.glass-card { position: absolute !important; inset: 0; height: auto !important; min-height: 0 !important; margin: 0 !important; } }
         html body.theme-gaming #tab-works #works-right-panel#works-right-panel > .glass-card.glass-card.glass-card::before { box-sizing: border-box !important; height: 40px !important; display: flex !important; align-items: center; padding-top: 0 !important; padding-bottom: 0 !important; border-radius: 13px 13px 0 0 !important; }
         html body.theme-gaming #tab-works #works-right-panel#works-right-panel > .glass-card.glass-card.glass-card { padding-top: 46px !important; }
         /* GAMING FORMDAILY END */
@@ -10887,8 +10886,10 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
                         <input type="date" id="extra-manuscript-date" class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100">
                     </div>
                     <div>
-                        <label class="text-sm font-bold text-slate-600 ml-1 mb-1 block">출간 예정일</label>
+                        <label class="text-sm font-bold text-slate-600 ml-1 mb-1 flex items-center justify-between"><span>출간 예정일</span>
+                            <span class="flex items-center gap-1.5 text-[11px] font-normal text-slate-400" title="날짜가 안 정해졌으면 체크하고 월만 고르기"><input type="checkbox" id="extra-pending" class="rounded" onchange="toggleExtraPending(this.checked)"> 예정</span></label>
                         <input type="date" id="extra-publish-date" class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100">
+                        <input type="month" id="extra-pending-month" class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-100 hidden">
                     </div>
                 </div>
                 <div class="flex gap-3 pt-2">
@@ -13778,10 +13779,11 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
             masterWorks.forEach(w => {
                 if (!w.genre || !w.genre.includes('장편')) return;
                 (w.extras || []).forEach(ex => {
-                    const has = ex.publishDate && ex.publishDate.startsWith(y + '-');
-                    if (ex.publishDate && !has) return;
-                    const sp = span[w.id + '::' + ex.id], mo = has ? +ex.publishDate.slice(5, 7) : 0;
-                    out.push({ id: pcUid(), ref: w.id + '::' + ex.id, half: 1, when: mo ? mo + '월' + (has ? dayOf(ex.publishDate) : '') : '미정', title: `${w.title} [${ex.name}]`, sub: (w.publisher && w.publisher !== '-') ? w.publisher : '', tag: sp ? '확정' : '희망', range: sp ? `${md(sp.a)} ~ ${md(sp.b)}` : '', _k: mo ? String(mo).padStart(2, '0') : '99' });
+                    const exYm = ex.publishDate || (ex.isPending ? ex.pendingMonth || '' : '');
+                    const has = exYm.startsWith(y + '-');
+                    if (exYm && !has) return;
+                    const sp = span[w.id + '::' + ex.id], mo = has ? +exYm.slice(5, 7) : 0;
+                    out.push({ id: pcUid(), ref: w.id + '::' + ex.id, half: 1, when: mo ? mo + '월' + (ex.publishDate ? dayOf(ex.publishDate) : '') : '미정', title: `${w.title} [${ex.name}]`, sub: (w.publisher && w.publisher !== '-') ? w.publisher : '', tag: sp ? '확정' : '희망', range: sp ? `${md(sp.a)} ~ ${md(sp.b)}` : '', _k: mo ? String(mo).padStart(2, '0') : '99' });
                 });
             });
             out.sort((a, b) => a._k.localeCompare(b._k) || a.title.localeCompare(b.title)); out.forEach(r => delete r._k);
@@ -14079,17 +14081,19 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
                     allItems.push(item);
                 }
                 (w.extras || []).forEach(ex => {
-                    if (ex.publishDate) {
+                    const exDate = ex.publishDate || (ex.isPending && /^\d{4}-\d{2}$/.test(ex.pendingMonth || '') ? ex.pendingMonth + '-01' : '');
+                    if (exDate) {
                         const exItem = {
                             id: w.id + '::' + ex.id,
                             _refId: w.id + '::' + ex.id,
+                            _pendingMonthOnly: !ex.publishDate,
                             _displayTitle: `${w.title} [${ex.name}]`,
                             title: w.title,
                             genre: w.genre, publisher: w.publisher, studio: w.studio,
-                            publishDate: ex.publishDate, isPending: false,
+                            publishDate: exDate, isPending: !ex.publishDate,
                             _isExtra: true, _extraName: ex.name, _parentWorkId: w.id, _extraId: ex.id
                         };
-                        publishMap[ex.publishDate] = (publishMap[ex.publishDate] || []).concat(exItem);
+                        publishMap[exDate] = (publishMap[exDate] || []).concat(exItem);
                         allItems.push(exItem);
                     }
                 });
@@ -14199,7 +14203,7 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
                         const [wId, exId] = dragId.split('::');
                         const w = masterWorks.find(x => x.id === wId);
                         const ex = w?.extras?.find(e => e.id === exId);
-                        if (ex) { ex.publishDate = ds; save(); renderPublishCal(); }   // 대시보드 등은 그 탭을 열 때 updateUI 가 다시 계산한다
+                        if (ex) { ex.publishDate = ds; ex.isPending = false; ex.pendingMonth = ''; save(); renderPublishCal(); }   // 대시보드 등은 그 탭을 열 때 updateUI 가 다시 계산한다
                     } else {
                         const w = masterWorks.find(x => x.id === dragId); if (!w) return;
                         w.publishDate = ds;
@@ -17144,6 +17148,9 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
                     document.getElementById('extra-goal-withspace').value = ex.goalWithSpace || '';
                     document.getElementById('extra-manuscript-date').value = ex.manuscriptDate || '';
                     document.getElementById('extra-publish-date').value = ex.publishDate || '';
+                    document.getElementById('extra-pending').checked = !!ex.isPending;
+                    document.getElementById('extra-pending-month').value = ex.pendingMonth || '';
+                    toggleExtraPending(!!ex.isPending);
                 }
             } else {
                 document.getElementById('extra-modal-title').textContent = '외전 / 후속권 추가';
@@ -17152,6 +17159,9 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
                 document.getElementById('extra-goal-withspace').value = '';
                 document.getElementById('extra-manuscript-date').value = '';
                 document.getElementById('extra-publish-date').value = '';
+                document.getElementById('extra-pending').checked = false;
+                document.getElementById('extra-pending-month').value = '';
+                toggleExtraPending(false);
                 // 자동 이름 제안
                 const w = masterWorks.find(x => x.id === workId);
                 const lastEx = (w?.extras || []).slice(-1)[0];
@@ -17173,6 +17183,11 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
             nameEl.value = kind === 'sequel' ? `${same + 2}권` : `외전 ${same + 1}`;
         }
 
+        function toggleExtraPending(checked) {
+            document.getElementById('extra-publish-date').classList.toggle('hidden', checked);
+            document.getElementById('extra-pending-month').classList.toggle('hidden', !checked);
+        }
+
         function closeExtraModal() {
             document.getElementById('extra-modal').classList.remove('open');
         }
@@ -17192,7 +17207,9 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
                 goalNoSpace: parseInt(document.getElementById('extra-goal-nospace').value) || 0,
                 goalWithSpace: parseInt(document.getElementById('extra-goal-withspace').value) || 0,
                 manuscriptDate: document.getElementById('extra-manuscript-date').value || '',
-                publishDate: document.getElementById('extra-publish-date').value || ''
+                isPending: document.getElementById('extra-pending').checked,
+                pendingMonth: document.getElementById('extra-pending').checked ? (document.getElementById('extra-pending-month').value || '') : '',
+                publishDate: document.getElementById('extra-pending').checked ? '' : (document.getElementById('extra-publish-date').value || '')
             };
 
             if (editId) {
@@ -17255,7 +17272,7 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
             cont.innerHTML = extras.map(ex => {
                 const isPast = ex.publishDate && ex.publishDate < today;
                 const opacity = isPast ? 'opacity-50' : '';
-                const dateInfo = ex.publishDate ? `${ex.publishDate}` : (ex.manuscriptDate ? `완고 ${ex.manuscriptDate}` : '날짜 미정');
+                const dateInfo = ex.isPending ? getPendingLabel(ex) : ex.publishDate ? `${ex.publishDate}` : (ex.manuscriptDate ? `완고 ${ex.manuscriptDate}` : '날짜 미정');
                 const goalInfo = ex.goalWithSpace ? `${ex.goalWithSpace.toLocaleString()}자` : '';
                 return `<div class="flex items-center gap-2 p-2.5 rounded-xl ${opacity}" style="background: var(--primary-light); border: 1px solid var(--primary);">
                     <div class="flex-1 min-w-0">
@@ -19224,6 +19241,8 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
                 const today = new Date().toISOString().slice(0, 10);
                 const nx = (w.extras || []).filter(e => e.publishDate && e.publishDate > today).sort((a, b) => a.publishDate.localeCompare(b.publishDate))[0];
                 if (nx) return `<span style="color:#ec4899;font-weight:500;">${escapeHtml(nx.name || '외전')} ${nx.publishDate}</span>`;
+                const pd = (w.extras || []).filter(e => e.isPending && !e.isFinished).sort((a, b) => (a.pendingMonth || '9999').localeCompare(b.pendingMonth || '9999'))[0];
+                if (pd) return `<span style="color:#ec4899;font-weight:500;">${escapeHtml(pd.name || '외전')} ${getPendingLabel(pd)}</span>`;
             }
             if (isWebtoonPublished(w)) {
                 return `<span style="color:#475569;font-weight:500;">${w.publishDate} 출간</span>`;
@@ -19315,6 +19334,7 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
             const days = target ? Math.round((Date.parse(target) - Date.parse(today)) / 86400000) : null;
             const dday = days !== null && days >= 0
                 ? `<span class="gq-dday">${published ? esc(next.name || '외전') + ' ' : ''}${days ? 'D-' + days : 'D-DAY'}</span>`
+                : (published && (w.extras || []).some(e => e.isPending && !e.isFinished)) ? '<span class="gq-dday">출간 예정</span>'
                 : `<span class="gq-dday${published ? ' clear' : ''}">${published ? 'CLEAR ★' : '출간 예정'}</span>`;
             const count = (a, b) => (!a && !b) ? '' : `${Number(a || 0).toLocaleString()} / ${Number(b || 0).toLocaleString()}자`;
             // 아래 부분 = 아이템 칸 (웹툰 카드와 같은 모양): 출판사 / 비율 / 글자수 / 선인세 / 프로모션 / 외전·후속권
@@ -19324,7 +19344,7 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
             const extras = w.extras || [];
             const exTitle = extras.some(e => extraKind(e) === 'sequel') ? (extras.some(e => extraKind(e) === 'extra') ? '외전 / 후속권' : '후속권') : '외전';
             const exHTML = !extras.length ? '' : `<div class="gq-item wide gq-exbox"><small>${exTitle}</small>` + extras.map(e =>
-                `<div class="gq-ex"><i>${esc(e.name)}</i><b>${short(e.publishDate) || '<em>–</em>'}${e.isFinished ? ' ✓' : ''}</b><span>${count(e.goalNoSpace, e.goalWithSpace)}</span></div>`).join('') + '</div>';
+                `<div class="gq-ex"><i>${esc(e.name)}</i><b>${e.isPending ? (e.pendingMonth ? e.pendingMonth.slice(2) + ' 예정' : '예정') : (short(e.publishDate) || '<em>–</em>')}${e.isFinished ? ' ✓' : ''}</b><span>${count(e.goalNoSpace, e.goalWithSpace)}</span></div>`).join('') + '</div>';
             const items = [
                 item('출판사', (w.publisher && w.publisher !== '-') ? esc(w.publisher) : ''),
                 item('비율', w.rate ? esc(w.rate) + '%' + (w.direct ? ' <em>직계</em>' : '') : ''),
@@ -19357,7 +19377,7 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
             if (mainCC) charCountText = `${parseInt(w.volumes) || 1}권 ${mainCC}`;
             const extraRowsHTML = (w.extras || []).map(ex => {
                 const cc = formatCharCount(ex.goalNoSpace, ex.goalWithSpace);
-                const rightParts = [ex.publishDate, cc].filter(Boolean).join(' ');
+                const rightParts = [ex.isPending ? getPendingLabel(ex) : ex.publishDate, cc].filter(Boolean).join(' ');
                 return `<div class="wm-fit flex pl-3"><span class="shrink-0 mr-3" style="color:${workManageCardSettings.labelColor2}">${ex.name}</span><span style="color:${workManageCardSettings.valueColors.ep1conti}">${rightParts}</span></div>`;
             }).join('');
             const launchHref = info.launchUrl ? (info.launchUrl.startsWith('http') ? info.launchUrl : 'https://' + info.launchUrl) : '';
@@ -19474,7 +19494,7 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
             else if (workManageViewFilter === 'upcoming') {
                 // 본편이 이미 나왔어도 외전·후속권 출간일이 아직 안 왔으면 '출간 예정'에 같이 보여준다
                 const today = new Date().toISOString().slice(0, 10);
-                filtered = allWorks.filter(w => !isWebtoonPublished(w) || (w.extras || []).some(e => e.publishDate && e.publishDate > today));
+                filtered = allWorks.filter(w => !isWebtoonPublished(w) || (w.extras || []).some(e => (e.publishDate && e.publishDate > today) || (e.isPending && !e.isFinished)));
             }
             filtered = sortWorkManageWorks(filtered);
             if (workManageViewFilter === 'upcoming' && workManageSortMode !== 'genre') {
@@ -19482,7 +19502,7 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
                 const today = new Date().toISOString().slice(0, 10);
                 const key = w => {
                     if (!isWebtoonPublished(w)) return sortKeyDate(w);
-                    const next = (w.extras || []).map(e => e.publishDate).filter(d => d && d > today).sort()[0];
+                    const next = (w.extras || []).map(e => e.publishDate && e.publishDate > today ? e.publishDate : (e.isPending && !e.isFinished && e.pendingMonth ? e.pendingMonth + '-01' : '')).filter(Boolean).sort()[0];
                     return next ? '1_' + next : sortKeyDate(w);
                 };
                 filtered = [...filtered].sort((a, b) => key(a).localeCompare(key(b)));
@@ -19579,8 +19599,8 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
                         <input type="number" id="wmm-ex-ws-${i}" value="${ex.goalWithSpace || ''}" placeholder="0" onchange="updateWmmExtraGoal(${i}, 'goalWithSpace', this.value)" class="${inputCls} w-full"></label>
                     <label class="flex flex-col" style="flex:1 1 118px; min-width:118px; max-width:150px"><span class="text-[10px] font-bold text-slate-400 ml-1">완고일</span>
                         <input type="date" value="${ex.manuscriptDate || ''}" onchange="updateWmmExtraField(${i}, 'manuscriptDate', this.value)" class="${inputCls} w-full"></label>
-                    <label class="flex flex-col" style="flex:1 1 118px; min-width:118px; max-width:150px"><span class="text-[10px] font-bold text-slate-400 ml-1">출간일</span>
-                        <input type="date" value="${ex.publishDate || ''}" onchange="updateWmmExtraField(${i}, 'publishDate', this.value)" class="${inputCls} w-full"></label>
+                    <div class="flex flex-col" style="flex:1 1 118px; min-width:118px; max-width:150px"><span class="flex items-center justify-between text-[10px] font-bold text-slate-400 ml-1">출간일<label class="flex items-center gap-1 cursor-pointer font-normal" title="날짜가 안 정해졌으면 체크하고 월만 고르기"><input type="checkbox" ${ex.isPending ? 'checked' : ''} onchange="updateWmmExtraPending(${i}, this.checked)" style="width:11px; height:11px;">예정</label></span>
+                        ${ex.isPending ? `<input type="month" value="${ex.pendingMonth || ''}" onchange="updateWmmExtraField(${i}, 'pendingMonth', this.value)" class="${inputCls} w-full">` : `<input type="date" value="${ex.publishDate || ''}" onchange="updateWmmExtraField(${i}, 'publishDate', this.value)" class="${inputCls} w-full">`}</div>
                     <label class="flex flex-col items-center shrink-0 cursor-pointer" style="width:34px" title="목표 글자수가 다 안 됐어도 완고를 보냈으면 체크"><span class="text-[10px] font-bold text-slate-400">완결</span>
                         <input type="checkbox" ${ex.isFinished ? 'checked' : ''} onchange="wmmExtrasDraft[${i}].isFinished = this.checked" class="rounded" style="width:16px; height:16px; margin:9px 0 11px;"></label>
                     <button type="button" onclick="removeWmmExtraRow(${i})" class="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-rose-50 hover:text-rose-500 text-slate-400" style="margin-bottom:3px"><i class="fa-solid fa-xmark text-xs"></i></button>
@@ -19631,6 +19651,13 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
         }
         function updateWmmExtraField(idx, field, value) {
             if (wmmExtrasDraft[idx]) wmmExtrasDraft[idx][field] = value || '';
+        }
+        function updateWmmExtraPending(idx, checked) {
+            const ex = wmmExtrasDraft[idx];
+            if (!ex) return;
+            ex.isPending = checked;
+            if (checked) ex.publishDate = ''; else ex.pendingMonth = '';
+            renderWmmExtrasList();
         }
         function removeWmmExtraRow(idx) {
             const ex = wmmExtrasDraft[idx];
@@ -25892,7 +25919,7 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
                 const w = masterWorks.find(x => x.id === wid);
                 const ex = w && (w.extras || []).find(e => e.id === eid);
                 if (!w || !ex) return null;
-                return { w, ex, rec: ex, view: { id: workId, title: `${w.title} [${ex.name}]`, genre: w.genre, publisher: w.publisher, manuscriptDate: ex.manuscriptDate || '', goalWithSpace: ex.goalWithSpace || '', goalNoSpace: ex.goalNoSpace || '', isPending: false, pendingMonth: '', publishDate: ex.publishDate || '' } };
+                return { w, ex, rec: ex, view: { id: workId, title: `${w.title} [${ex.name}]`, genre: w.genre, publisher: w.publisher, manuscriptDate: ex.manuscriptDate || '', goalWithSpace: ex.goalWithSpace || '', goalNoSpace: ex.goalNoSpace || '', isPending: !!ex.isPending, pendingMonth: ex.pendingMonth || '', publishDate: ex.publishDate || '' } };
             }
             const w = masterWorks.find(x => x.id === workId);
             return w ? { w, ex: null, rec: w, view: w } : null;
@@ -25904,8 +25931,6 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
             const wt = wwiTarget(workId);
             if (!wt) { panel.style.visibility = 'hidden'; return; }
             const w = wt.view;
-            const pendLbl = document.getElementById('wwi-pending') && document.getElementById('wwi-pending').closest('label');
-            if (pendLbl) pendLbl.style.display = wt.ex ? 'none' : '';
             panel.style.visibility = 'visible';
 
             document.getElementById('wwi-title').textContent = w.title || '(제목 없음)';
@@ -26025,7 +26050,6 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
             const workId = document.getElementById('write-work-select').value;
             const wt = wwiTarget(workId); if (!wt) return;
             const w = wt.rec;
-            if (wt.ex) { w.publishDate = document.getElementById('wwi-publish-date').value || ''; save(); updateUI(); return; }
             const isPending = document.getElementById('wwi-pending').checked;
             w.isPending = isPending;
             w.pendingMonth = isPending ? (document.getElementById('wwi-pending-month').value || '') : '';
@@ -29254,21 +29278,14 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
             const dateInput = document.getElementById('swi-publish-date');
             const monthInput = document.getElementById('swi-pending-month');
             const pendLabel = pendingBox.closest('label');
-            if (ex) {
-                // 외전은 출간 예정(날짜 미정) 표시가 없다
-                pendingBox.checked = false; if (pendLabel) pendLabel.style.display = 'none';
-                dateInput.classList.remove('hidden'); dateInput.value = ex.publishDate || '';
-                monthInput.classList.add('hidden'); monthInput.value = '';
+            if (pendLabel) pendLabel.style.display = '';
+            pendingBox.checked = !!tgt.isPending;
+            if (tgt.isPending) {
+                dateInput.classList.add('hidden'); dateInput.value = '';
+                monthInput.classList.remove('hidden'); monthInput.value = tgt.pendingMonth || '';
             } else {
-                if (pendLabel) pendLabel.style.display = '';
-                pendingBox.checked = !!w.isPending;
-                if (w.isPending) {
-                    dateInput.classList.add('hidden'); dateInput.value = '';
-                    monthInput.classList.remove('hidden'); monthInput.value = w.pendingMonth || '';
-                } else {
-                    dateInput.classList.remove('hidden'); dateInput.value = w.publishDate || '';
-                    monthInput.classList.add('hidden'); monthInput.value = '';
-                }
+                dateInput.classList.remove('hidden'); dateInput.value = tgt.publishDate || '';
+                monthInput.classList.add('hidden'); monthInput.value = '';
             }
         }
 
@@ -29313,12 +29330,7 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
             const workId = document.getElementById('span-work-select').value;
             const r = workId ? resolveWorkItem(workId) : null;
             if (!r || !r.work) return;
-            if (r.extra) {
-                r.extra.publishDate = document.getElementById('swi-publish-date').value || '';
-                save(); updateUI();
-                return;
-            }
-            const w = r.work;
+            const w = r.extra || r.work;
             const isPending = document.getElementById('swi-pending').checked;
             w.isPending = isPending;
             w.pendingMonth = isPending ? (document.getElementById('swi-pending-month').value || '') : '';

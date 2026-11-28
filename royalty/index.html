@@ -6319,8 +6319,8 @@ body.theme-gaming #genre-sheets-container .sheet-footer-inner td.grand-total-cel
 body.theme-gaming #genre-sheets-container .sheet-footer-inner td.sticky-col { background: #FFC2D4 !important; background-image: none !important; font-family: 'Galmuri11', 'Jua', sans-serif !important; }
 body.theme-gaming #genre-sheets-container .sheet-footer-inner td.sticky-col::before { content: '★ '; color: #FFE36E; text-shadow: 1px 1px 0 #2F3A5C, -1px -1px 0 #2F3A5C, 1px -1px 0 #2F3A5C, -1px 1px 0 #2F3A5C; }
 body.theme-gaming #genre-sheets-container .sheet-footer-inner td.grand-total-cell { font-size: clamp(11.5px, calc(.9vw - 3.2px), 13px) !important; padding-left: 2px !important; padding-right: 5px !important; letter-spacing: -.03em !important; }
-/* 게이밍 달력 기간 막대 색: 지정한 색의 색상(hue)은 그대로, 달 이름 글자(분홍·하늘)처럼 선명한 채도 + 조금 연한 밝기로 */
-body.theme-cozy #write-calendar-body[data-card="gaming"] .write-span-bar { background: color-mix(in srgb, var(--sc) 65%, #FFFFFF) !important; background: hsl(from var(--sc) h 74% 80%) !important; }
+/* 게이밍 달력 기간 막대 색: 지정한 색의 계열을 월 탭 색으로 (make_gaming_spancolor.py) */
+body.theme-cozy #write-calendar-body[data-card="gaming"] .write-span-bar { background: var(--gms, var(--sc)) !important; }
 body.theme-cozy #year-timeline-content[data-card="gaming"] #year-timeline-body [title][style*="--spc"] { background-color: color-mix(in srgb, var(--vc, var(--spc)) 84%, #FFFFFF) !important; }
 body.theme-cozy #year-timeline-content[data-card="gaming"][data-card][data-card][data-card] #year-timeline-body [title][style*="--spc"] { background-color: #FFF3B8 !important; }
 body.theme-cozy #year-timeline-content[data-card="gaming"][data-card][data-card][data-card] #year-timeline-body [title][style*="border-left:4px solid"]:not([style*="--spc"]) { background-color: #EAF6FF !important; }
@@ -29467,6 +29467,14 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
             if (d < 0.07) return '#EFE6D2';
             return 'hsl(' + Math.round(h) + ', 62%, 87%)';
         }
+        // 게이밍 기간 막대: 고른 색의 색상 계열을 월 탭 색(분홍·노랑·민트·하늘·보라, 회색은 연남색)으로
+        function gamingSpanColor(color) {
+            const m = String(color || '').match(/#([0-9a-fA-F]{6})/); if (!m) return '#E6E9F5';
+            const n = parseInt(m[1], 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255, max = Math.max(r, g, b), d = max - Math.min(r, g, b);
+            if (d < 10) return '#E6E9F5';
+            const hue = ((max === r ? (g - b) / d : max === g ? (b - r) / d + 2 : (r - g) / d + 4) * 60 + 360) % 360;
+            return hue >= 300 || hue < 18 ? '#FFC2D4' : hue < 70 ? '#FFEEA8' : hue < 175 ? '#C4EFDC' : hue < 245 ? '#C4E5FC' : '#E2D4FF';
+        }
         function spanColorSolid(color) {
             if (typeof color === 'string' && color.indexOf('gradient') > -1) {
                 const m = color.match(/#[0-9a-fA-F]{6}/);
@@ -29898,6 +29906,7 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
                         letter-spacing:0.4px; word-spacing:1px;
                         box-shadow:0 1px 2px rgba(0,0,0,0.06);`;
                     bar.style.setProperty('--lbs', labelSpanPastel(spanColorSolid(s.color)));
+                    bar.style.setProperty('--gms', gamingSpanColor(spanColorSolid(s.color)));
                     bar.title = label + (s.memo ? `\n${s.memo}` : '');
                     if (typeof s.color === 'string' && s.color.indexOf('gradient') > -1) { bar.dataset.pat = '1'; bar.style.setProperty('--bgo', s.color); }   // 무늬 색은 테마가 단색으로 덮지 않게 표시
                     // 첫 조각에만 전체 정보를 쓰고, 이어지는 조각은 제목만 간단히

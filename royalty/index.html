@@ -11793,7 +11793,7 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
 
                 <div id="span-passive-daily" style="display:none;">
                     <div id="span-passive-total-wrap" class="flex items-center justify-between mb-3">
-                        <label class="text-sm font-bold text-slate-600">총 글자수 <span class="text-xs font-normal text-slate-400">(작품 연결 안 했을 때)</span></label>
+                        <label class="text-sm font-bold text-slate-600">총 글자수 <span class="text-xs font-normal text-slate-400">(비우면 하루 글자수 × 집필일)</span></label>
                         <div class="flex items-center gap-1.5">
                             <span id="span-passive-total-ns" class="text-xs text-slate-400 mr-1 whitespace-nowrap"></span>
                             <input type="number" id="span-passive-total-input" min="0" step="1000" placeholder="14000" oninput="onSpanPassiveTotalInput()" class="w-28 p-2 bg-slate-50 rounded-lg border border-slate-200 text-sm text-right outline-none focus:border-amber-400">
@@ -11801,14 +11801,14 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
                         </div>
                     </div>
                     <div id="span-passive-part-wrap" class="flex items-center justify-between mb-3">
-                        <label class="text-sm font-bold text-slate-600">패시브로 쓸 분량 <span class="text-xs font-normal text-slate-400">(비우면 확정 카드를 뺀 나머지 전부)</span></label>
+                        <label class="text-sm font-bold text-slate-600">패시브로 쓸 분량 <span class="text-xs font-normal text-slate-400">(비우면 하루 글자수 × 집필일)</span></label>
                         <div class="flex items-center gap-1.5">
                             <input type="number" id="span-passive-part-input" min="0" step="1000" placeholder="나머지 전부" oninput="updateSpanPreview()" class="w-28 p-2 bg-slate-50 rounded-lg border border-slate-200 text-sm text-right outline-none focus:border-amber-400">
                             <span class="text-sm text-slate-500">자</span>
                         </div>
                     </div>
                     <div class="flex items-center justify-between mb-1.5">
-                        <label class="text-sm font-bold text-slate-600">하루에 쓸 글자수로 종료일 맞추기</label>
+                        <label class="text-sm font-bold text-slate-600">하루에 쓸 글자수 <span class="text-xs font-normal text-slate-400">(분량을 적었으면 종료일 자동)</span></label>
                         <div class="flex items-center gap-1.5">
                             <input type="number" id="span-passive-daily-input" min="0" step="500" placeholder="예) 2000" oninput="onSpanPassiveDailyInput()" class="w-28 p-2 bg-slate-50 rounded-lg border border-slate-200 text-sm text-right outline-none focus:border-amber-400">
                             <span class="text-sm text-slate-500">자</span>
@@ -28479,9 +28479,16 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
         const PASSIVE_DEFAULT_CHARS = 14000;
         // 작품을 연결한 패시브가 맡는 글자수. 분량을 적었으면 그만큼, 비웠으면 '목표 − 확정 카드 − 분량을 적은 다른 패시브'.
         // (분량을 비운 패시브가 같은 작품에 여러 개면 기간 길이대로 나눈다)
+        // 분량이 정해진 패시브의 글자수: 적은 분량, 없으면 하루 글자수 × 집필일. 둘 다 없으면 null
+        function passiveFixedAmount(span) {
+            const amt = Math.max(0, Number(span.workId ? span.passivePart : span.passiveTotal) || 0);
+            if (amt) return amt;
+            const daily = Math.max(0, Number(span.passiveDaily) || 0);
+            return daily ? daily * spanWorkDaysInRange(span, span.startDate, span.endDate) : null;
+        }
         function passiveLinkedAmount(span) {
-            const part = Math.max(0, Number(span.passivePart) || 0);
-            if (part) return part;
+            const fixed = passiveFixedAmount(span);
+            if (fixed !== null) return fixed;
             const goal = resolveWorkItem(span.workId).goalWithSpace || 0;
             if (!goal) return 0;
             const reset = writeCounterResetDate[span.workId] || '';
@@ -28493,9 +28500,9 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
             // 가정표에서는 확정 카드가 '기간 집필' 블록으로 바뀌어 있으므로 그 분량을 뺀다
             if (typeof timelineWhatIf !== 'undefined' && timelineWhatIf.on) others.filter(s => (s.type || 'write') === 'write').forEach(s => { planned += Number(calcSpanStats(s).totalChars) || 0; });
             const passives = others.filter(s => s.type === 'passive');
-            passives.forEach(s => { planned += Math.max(0, Number(s.passivePart) || 0); });
+            passives.forEach(s => { planned += passiveFixedAmount(s) || 0; });
             const len = s => Math.max(1, spanDayDiff(s.startDate, s.endDate) + 1);
-            const autoDays = passives.filter(s => !(Number(s.passivePart) > 0)).reduce((n, s) => n + len(s), len(span));
+            const autoDays = passives.filter(s => passiveFixedAmount(s) === null).reduce((n, s) => n + len(s), len(span));
             return Math.round(Math.max(0, goal - planned) * len(span) / autoDays);
         }
         function passiveStats(span) {
@@ -28514,7 +28521,7 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
                 if (!rest) work++;
             }
             // 작품을 연결하지 않으면(초단 미리 잡아두기 등) 기본 14,000자로 계산한다
-            const total = span.workId ? passiveLinkedAmount(span) : (Number(span.passiveTotal) > 0 ? Number(span.passiveTotal) : PASSIVE_DEFAULT_CHARS);
+            const total = span.workId ? passiveLinkedAmount(span) : (passiveFixedAmount(span) ?? PASSIVE_DEFAULT_CHARS);
             return { totalDays, workDays: work, restDays: totalDays - work, flags, workIdx, total, daily: work ? total / work : 0 };
         }
 
@@ -28584,7 +28591,7 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
             rest:     { label: '휴식',      icon: '☁︎', hint: '쉬는 기간으로만 표시합니다.', rest: false, chars: false },
             trip:     { label: '여행',      icon: '✿︎', hint: '기간만 표시합니다.', rest: false, chars: false },
             synopsis: { label: '시놉/기획', icon: '✧︎', hint: '기간만 표시합니다. (시놉시스·기획 작업 등)', rest: false, chars: false },
-            passive:  { label: '패시브',    icon: '✎︎', hint: '카드 없이 낮은 막대 하나만 둡니다. 맡은 분량(적지 않으면 작품 목표에서 확정 카드를 뺀 나머지)을 기간(쉬는 날 뺀 일수)으로 나누고, 확정 카드 누적 글자수는 이 분량에 이어서 셉니다. 시작일부터 쓴 글자수(미리 쓴 것 포함)만큼 앞에서부터 색이 차올라요.', rest: true, chars: false, passive: true,
+            passive:  { label: '패시브',    icon: '✎︎', hint: '카드 없이 낮은 막대 하나만 둡니다. 분량과 하루 글자수를 적으면 종료일이 맞춰지고, 하루 글자수만 적으면 종료일까지 매일 그만큼, 둘 다 비우면 남은 분량(연결 안 하면 14,000자)을 기간으로 나눠요. 확정 카드 누적 글자수는 이 분량에 이어서 셉니다. 시작일부터 쓴 글자수(미리 쓴 것 포함)만큼 앞에서부터 색이 차올라요.', rest: true, chars: false, passive: true,
                       iconHtml: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-0.12em;"><path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 013 3L8 19z"/><path d="M14.5 6.5l3 3"/></svg>' },   // iconHtml: 글꼴에 따라 컬러 이모지로 바뀌지 않게 선으로 그린 연필
             etc:      { label: '기타',      icon: '♪︎', hint: '기간만 표시합니다. (자료조사·미팅 등)', rest: false, chars: false, hidden: true }
 
@@ -28612,9 +28619,14 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
                 document.getElementById('span-rest-input').value = 0;
                 setSpanRestMode('count');
             }
+            // 새 패시브는 기본 '14일 동안 매일 1,000자'
+            const fresh = type === 'passive' && !currentEditSpanId && !(parseInt(document.getElementById('span-passive-daily-input').value) > 0);
+            if (fresh && !spanPassiveEndTouched) {
+                const st = document.getElementById('span-start-input').value;
+                if (st) document.getElementById('span-end-input').value = spanDateAdd(st, 13);
+            }
             setSpanType(type);
-            // 새 패시브는 기본 '매일 1,000자' (작품 안 고르면 14,000자 → 14일)
-            if (type === 'passive' && !currentEditSpanId && !(parseInt(document.getElementById('span-passive-daily-input').value) > 0)) setSpanPassiveDaily(1000);
+            if (fresh) setSpanPassiveDaily(1000);
         }
 
         function setSpanType(type) {
@@ -28824,7 +28836,7 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
 
         function openWriteSpanModal(id, dateStr, jumpToMonth) {
             // 이전에 열었을 때 고른 '하루 글자수'가 남아 종료일을 다시 맞춰버리지 않게 비운다
-            spanPassiveAuto = false;
+            spanPassiveAuto = false; spanPassiveBaseEnd = ''; spanPassiveEndTouched = false;
             { const pi = document.getElementById('span-passive-daily-input'); if (pi) pi.value = ''; }
             { const pp = document.getElementById('span-passive-part-input'); if (pp) pp.value = ''; }
             closeWriteModal();
@@ -28878,6 +28890,7 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
                 document.getElementById('span-memo-input').value = span.memo || '';
                 { const ti = document.getElementById('span-passive-total-input'); if (ti) ti.value = span.passiveTotal > 0 ? span.passiveTotal : ''; spanPassiveNsLabel(); }
                 { const pp = document.getElementById('span-passive-part-input'); if (pp) pp.value = span.passivePart > 0 ? span.passivePart : ''; }
+                if (span.passiveDaily > 0) { document.getElementById('span-passive-daily-input').value = span.passiveDaily; spanPassiveAuto = true; }
                 currentSpanRestWeekdays = Array.isArray(span.restWeekdays) ? [...span.restWeekdays] : [];
                 currentSpanMidBreaks = Array.isArray(span.midBreaks) ? span.midBreaks.map(b => ({ ...b })) : [];
                 currentSpanDailyRanges = spanDailyRanges(span).map(r => ({ ...r }));
@@ -29088,25 +29101,37 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
             if (currentEditSpanId) return;
             const st = document.getElementById('span-start-input'), en = document.getElementById('span-end-input');
             if (!st || !en || !st.value) return;
-            en.value = spanDateAdd(st.value, 7);
+            en.value = spanDateAdd(st.value, currentSpanType === 'passive' ? 13 : 7);   // 패시브 기본은 14일
+            spanPassiveBaseEnd = '';
         }
         // 패시브: 하루에 쓸 글자수를 고르면 (목표 글자수 ÷ 하루 글자수)만큼의 집필일이 차는 날을 종료일로 자동 설정
         let spanPassiveAuto = false;
+        let spanPassiveBaseEnd = '';        // 분량에 맞춰 종료일을 옮기기 전의 날짜
+        let spanPassiveEndTouched = false;  // 새 일정에서 종료일을 직접 골랐는지
         function spanPassiveFitEnd() {
             const start = document.getElementById('span-start-input').value;
+            const endEl = document.getElementById('span-end-input');
             const wsel = document.getElementById('span-work-select').value;
-            const n = parseInt(document.getElementById('span-passive-daily-input').value) || 0;
+            const n = spanPassiveDailyVal(), amount = spanPassiveAmountVal();
+            if (!amount) {   // 분량을 지우면 직접 정했던 종료일로 되돌린다
+                if (spanPassiveBaseEnd) endEl.value = spanPassiveBaseEnd;
+                spanPassiveBaseEnd = '';
+                return;
+            }
             if (!start || n <= 0) return;
-            const total = wsel ? passiveLinkedAmount({ id: currentEditSpanId || '__new', workId: wsel, passivePart: spanPassivePartVal(), startDate: start, endDate: document.getElementById('span-end-input').value || start }) : spanPassiveTotalVal();
-            if (!total) return;
-            const need = Math.ceil(total / n);
-            const ps = passiveStats({ id: currentEditSpanId || '__new', passivePart: spanPassivePartVal(), passiveTotal: spanPassiveTotalVal(), startDate: start, endDate: spanDateAdd(start, 3650), workId: wsel, restMode: currentSpanRestMode, restWeekdays: currentSpanRestWeekdays, restPerWeek: document.getElementById('span-rest-input').value, midBreaks: currentSpanMidBreaks });
+            if (!spanPassiveBaseEnd) spanPassiveBaseEnd = endEl.value;
+            const need = Math.ceil(amount / n);
+            const ps = passiveStats({ startDate: start, endDate: spanDateAdd(start, 3650), workId: wsel, passivePart: amount, passiveTotal: amount, restMode: currentSpanRestMode, restWeekdays: currentSpanRestWeekdays, restPerWeek: document.getElementById('span-rest-input').value, midBreaks: currentSpanMidBreaks });
             for (let i = 0; i < ps.totalDays; i++) {
-                if (!ps.flags[i] && ps.workIdx[i] === need - 1) { document.getElementById('span-end-input').value = spanDateAdd(start, i); return; }
+                if (!ps.flags[i] && ps.workIdx[i] === need - 1) { endEl.value = spanDateAdd(start, i); return; }
             }
         }
-        function spanPassiveTotalVal() { const el = document.getElementById('span-passive-total-input'); const n = el ? parseInt(el.value) || 0 : 0; return n > 0 ? n : PASSIVE_DEFAULT_CHARS; }
-        function spanPassivePartVal() { const el = document.getElementById('span-passive-part-input'); return Math.max(0, el ? parseInt(el.value) || 0 : 0); }
+        function spanPassiveNum(id) { const el = document.getElementById(id); return Math.max(0, el ? parseInt(el.value) || 0 : 0); }
+        function spanPassiveTotalVal() { return spanPassiveNum('span-passive-total-input'); }
+        function spanPassivePartVal() { return spanPassiveNum('span-passive-part-input'); }
+        function spanPassiveDailyVal() { return spanPassiveNum('span-passive-daily-input'); }
+        // 위 칸에 적은 분량 (작품을 연결했으면 '패시브로 쓸 분량', 아니면 '총 글자수')
+        function spanPassiveAmountVal() { return document.getElementById('span-work-select').value ? spanPassivePartVal() : spanPassiveTotalVal(); }
         function spanPassiveNsLabel() {
             const el = document.getElementById('span-passive-total-ns'), ti = document.getElementById('span-passive-total-input'); if (!el || !ti) return;
             const n = parseInt(ti.value) || 0;
@@ -29121,9 +29146,13 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
             document.getElementById('span-passive-daily-input').value = n;
             onSpanPassiveDailyInput();
         }
-        function onSpanEndManual() {   // 종료일을 직접 고치면 자동 맞춤을 끈다
-            spanPassiveAuto = false;
-            const pi = document.getElementById('span-passive-daily-input'); if (pi) pi.value = '';
+        function onSpanEndManual() {   // 분량을 적어둔 채 종료일을 직접 고치면 자동 맞춤을 끈다 (분량이 없으면 그날까지 매일 하루 글자수)
+            spanPassiveEndTouched = true;
+            spanPassiveBaseEnd = '';
+            if (currentSpanType === 'passive' && spanPassiveAmountVal()) {
+                spanPassiveAuto = false;
+                document.getElementById('span-passive-daily-input').value = '';
+            }
             updateSpanPreview();
         }
         function updateSpanPreview() {
@@ -29154,13 +29183,18 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
 
             if (t.passive) {
                 const wsel = document.getElementById('span-work-select').value;
-                const ps = passiveStats({ id: currentEditSpanId || '__new', passivePart: spanPassivePartVal(), passiveTotal: spanPassiveTotalVal(), startDate: start, endDate: end, workId: wsel, restMode: currentSpanRestMode, restWeekdays: currentSpanRestWeekdays, restPerWeek: document.getElementById('span-rest-input').value, midBreaks: currentSpanMidBreaks });
+                const ps = passiveStats({ id: currentEditSpanId || '__new', passivePart: spanPassivePartVal(), passiveTotal: spanPassiveTotalVal(), passiveDaily: spanPassiveDailyVal(), startDate: start, endDate: end, workId: wsel, restMode: currentSpanRestMode, restWeekdays: currentSpanRestWeekdays, restPerWeek: document.getElementById('span-rest-input').value, midBreaks: currentSpanMidBreaks });
                 const pinfo = document.getElementById('span-passive-info');
+                {   // 분량 칸이 비었고 하루 글자수가 있으면, 계산된 글자수를 흐리게 보여준다
+                    const byDaily = !spanPassiveAmountVal() && spanPassiveDailyVal();
+                    document.getElementById('span-passive-total-input').placeholder = byDaily ? ps.total : PASSIVE_DEFAULT_CHARS;
+                    document.getElementById('span-passive-part-input').placeholder = byDaily ? ps.total : '나머지 전부';
+                }
                 { const tw = document.getElementById('span-passive-total-wrap'); if (tw) tw.style.display = wsel ? 'none' : 'flex'; }
                 { const pw = document.getElementById('span-passive-part-wrap'); if (pw) pw.style.display = wsel ? 'flex' : 'none'; }
                 if (pinfo) {
                     pinfo.innerHTML = (ps.total
-                            ? `${!wsel ? '<span class="text-slate-400 text-xs">작품을 연결하지 않아 위에 적은 총 글자수(비우면 14,000자)로 계산해요.</span><br>' : ''}총 <b class="text-slate-700">${ps.total.toLocaleString()}자</b> · <b class="text-slate-700">${ps.workDays}일</b> 동안<br><span class="text-base font-bold text-amber-600">하루 약 ${Math.ceil(ps.daily).toLocaleString()}자씩</span> 쓰면 돼요`
+                            ? `${!wsel ? '<span class="text-slate-400 text-xs">작품을 연결하지 않은 일정이에요.</span><br>' : ''}총 <b class="text-slate-700">${ps.total.toLocaleString()}자</b> · <b class="text-slate-700">${ps.workDays}일</b> 동안<br><span class="text-base font-bold text-amber-600">하루 약 ${Math.ceil(ps.daily).toLocaleString()}자씩</span> 쓰면 돼요`
                             : (wsel && resolveWorkItem(wsel).goalWithSpace
                                 ? '<span class="text-rose-500 font-bold">확정 카드가 목표를 다 채워서 남은 분량이 없어요.</span> 패시브로 쓸 분량을 직접 적어주세요.'
                                 : '<span class="text-rose-500 font-bold">연결한 작품에 목표 글자수가 없어요.</span> 작품 정보에서 목표 글자수를 먼저 넣어주세요.'));
@@ -29229,6 +29263,7 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
                 color: currentSpanColor,
                 passiveTotal: Math.max(0, parseInt((document.getElementById('span-passive-total-input') || {}).value) || 0),
                 passivePart: spanPassivePartVal(),
+                passiveDaily: currentSpanType === 'passive' && !spanPassiveAmountVal() ? spanPassiveDailyVal() : 0,
                 memo: document.getElementById('span-memo-input').value
             };
 

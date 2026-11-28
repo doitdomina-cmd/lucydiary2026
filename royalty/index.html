@@ -2432,7 +2432,13 @@ body.theme-cozy #year-timeline-content h3 > i { color: var(--primary) !important
 body.theme-cozy #year-timeline-content .bg-slate-100.rounded-lg { background: #F4EEE2; border-radius: 999px; padding: 3px; }
 body.theme-cozy #year-timeline-content .bg-slate-100.rounded-lg button { border-radius: 999px; }
 body.theme-cozy #year-timeline-content #timeline-year-label { font-family: var(--cozy-serif); color: #BF7B74; }
-body.theme-cozy #year-timeline-content #timeline-summary { color: #A39A8C; }
+/* 연간 일정 요약 3줄 상자 */
+@media (max-width: 767px) { #year-timeline-content > div:first-child { flex-wrap: wrap; gap: 6px; } #year-timeline-content > div:first-child > div:last-child { width: 100%; } #year-timeline-content #timeline-summary { flex: 1; font-size: 11px !important; line-height: 1.5; } #year-timeline-content #timeline-summary:not(:empty) { padding: 6px 10px; } }
+#timeline-summary:not(:empty) { background: #FFFFFF; border: 1.8px solid #CDBFA6; border-radius: 12px; padding: 8px 16px; box-shadow: 0 2px 6px rgba(60,45,25,.12); }
+body.theme-gaming #timeline-summary:not(:empty) { border: 2.5px solid #2F3A5C; box-shadow: 3px 3px 0 #FF9DB8; }
+#timeline-summary > div + div { border-top: 1px dashed rgba(120,100,70,.3); padding-top: 2px; }
+#timeline-summary .tl-sum-name { display: inline-block; min-width: 7.2em; font-weight: 700; }
+body.theme-cozy #year-timeline-content #timeline-summary { color: #7D7366; }
 body.theme-cozy #year-timeline-content #timeline-summary b.text-slate-700 { color: #3F3A33; font-family: var(--cozy-serif); }
 body.theme-cozy #year-timeline-content #timeline-summary b.text-emerald-600 { color: #8A7050; font-family: var(--cozy-serif); }
 body.theme-cozy #year-timeline-content #timeline-summary b.text-amber-700 { color: #B9746E; font-family: var(--cozy-serif); }
@@ -12188,7 +12194,7 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
                     <button type="button" class="cal-design-btn" onclick="toggleCalDesignMenu(this, event, 'tl')" title="연간 집필 일정 테마"><i class="fa-solid fa-palette"></i></button>
                 </div>
                 <div class="flex items-center gap-2">
-                    <div id="timeline-summary" class="text-sm text-slate-500 mr-2"></div>
+                    <div id="timeline-summary" class="text-sm text-slate-500 mr-2 min-w-0"></div>
                     <button type="button" onclick="pcOpen(timelineYear, timelineWhatIf.on ? timelineWhatIf.id : null)" class="cal-design-btn" title="출간 일정 카드 만들기 (가정표를 열어 두면 그 가정표 기준)" style="display:inline-flex !important;"><i class="fa-solid fa-heart" style="color:#E8707E;"></i></button>
                     <button onclick="closeYearTimeline()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-times text-xl"></i></button>
                 </div>
@@ -12201,7 +12207,7 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
                 <span><i class="fa-solid fa-square text-emerald-300 mr-1"></i>집필 일정 (달력 카드 기준)</span>
                 <span><i class="fa-solid fa-square text-amber-300 mr-1"></i>기간 일정</span>
                 <span><i class="fa-solid fa-square text-slate-200 mr-1"></i>일정 없는 기간 (쉬는 구간)</span>
-                <span class="text-slate-300">초단편(현로 초단 · BL 초단)은 제외</span>
+                <span class="text-slate-300">초단편(현로 초단 · BL 초단)은 막대에서 제외</span>
                 <button onclick="printYearTimeline()" id="timeline-print-btn" title="이 일정표만 인쇄"
                         class="ml-auto flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-200 transition-colors">
                     <i class="fa-solid fa-print"></i> 인쇄
@@ -27244,61 +27250,16 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
             const dedicatedRestDays = items.filter(it => it.group === 'spanRest').reduce((n, it) => n + (Number(it.days) || 0), 0);
             const totalRestDays = (daysInYear - busyDays) + internalRestDays + dedicatedRestDays;
 
-            // 아직 카드로 안 만들어진(확정 안 된) 집필형 기간 일정 — 작품 연결 여부로 계약작/자유작을 가른다
-            const confirmedSpanIds = new Set();
-            Object.values(tlSched()).forEach(list => (list || []).forEach(s => { if (s.spanId) confirmedSpanIds.add(s.spanId); }));
-            const pendingWriteSpans = spans.filter(sp => (sp.span.type || 'write') === 'write' && !confirmedSpanIds.has(sp.span.id));
-            const contractSpans = pendingWriteSpans.filter(sp => sp.span.workId && !confirmedWorkIds.has(sp.span.workId));
-            const freeSpans = pendingWriteSpans.filter(sp => !sp.span.workId);
-            // 이미 확정된(카드 있는) 작품에 연결된 미확정 기간 일정: 작품 수는 이미 확정에 셌으니 글자·집필일만 계약작 쪽에 더한다 (월별 표와 같은 합계가 되게)
-            const confirmedLinkedSpans = pendingWriteSpans.filter(sp => sp.span.workId && confirmedWorkIds.has(sp.span.workId));
-            // 패시브 기간 일정과 초단편에 연결된 집필 기간 일정은 위 막대·표에는 안 그리지만, 계약작/자유작 목표에는 포함한다
-            const exContractIds = new Set(), exFreeCount = { n: 0 };
-            let exContractChars = 0, exContractDays = 0, exFreeChars = 0, exFreeDays = 0;
-            {
-                const yS = `${y}-01-01`, yE = `${y}-12-31`;
-                tlSpans().filter(sp => sp.startDate <= yE && sp.endDate >= yS).forEach(sp => {
-                    const t = sp.type || 'write';
-                    const cs = sp.startDate < yS ? yS : sp.startDate, ce = sp.endDate > yE ? yE : sp.endDate;
-                    if (t === 'passive') {
-                        const ps = passiveStats(sp);
-                        if (!ps.total || !ps.workDays) return;
-                        let n = 0;
-                        for (let i = 0; i < ps.totalDays; i++) { const d = spanDateAdd(sp.startDate, i); if (d >= cs && d <= ce && !ps.flags[i]) n++; }
-                        const chars = Math.round(ps.total * n / ps.workDays);
-                        if (sp.workId) { exContractChars += chars; exContractDays += n; if (!confirmedWorkIds.has(sp.workId) && !contractSpans.some(c => c.span.workId === sp.workId)) exContractIds.add(sp.workId); }
-                        else { exFreeChars += chars; exFreeDays += n; exFreeCount.n++; }
-                    } else if (t === 'write' && sp.workId && tlIsExcludedWork(sp.workId) && !confirmedSpanIds.has(sp.id)) {
-                        const st = calcSpanStats({ ...sp, startDate: cs, endDate: ce });
-                        exContractChars += st.totalChars; exContractDays += Number(st.workDays) || 0;
-                        exContractIds.add(sp.workId);
-                    }
-                });
-            }
-            const contractWorkCount = new Set(contractSpans.map(sp => sp.span.workId)).size + exContractIds.size;
-            const freeWorkCount = freeSpans.length + exFreeCount.n;   // 자유작은 연결된 작품이 없어 하나로 묶을 수 없으니, 기간 일정 하나당 1개로 센다
-
-            const contractChars = contractSpans.concat(confirmedLinkedSpans).reduce((n, sp) => n + sp.stats.totalChars, 0) + exContractChars;
-            const contractWriteDays = contractSpans.concat(confirmedLinkedSpans).reduce((n, sp) => n + (Number(sp.stats.workDays) || 0), 0) + exContractDays;
-            const freeChars = freeSpans.reduce((n, sp) => n + sp.stats.totalChars, 0) + exFreeChars;
-            const freeWriteDays = freeSpans.reduce((n, sp) => n + (Number(sp.stats.workDays) || 0), 0) + exFreeDays;
-
-            // 집필일 = 실제로 쓴(카드 있는) 날 + 아직 카드는 없지만 집필형 기간 일정에서 쉬는 날 빼고 남는 날
-            const confirmedWriteDays = items.filter(it => it.kind === 'work').reduce((n, it) => n + (Number(it.days) || 0), 0);
-
-            // 2번째 줄: 확정 + 계약작까지 확정된다고 가정
-            const withContractWorks = confirmedWorkIds.size + contractWorkCount;
-            const withContractWriteDays = confirmedWriteDays + contractWriteDays;
-            const withContractChars = totalChars + contractChars;
-            // 3번째 줄: 거기에 자유작까지 전부 확정된다고 가정 (전체 총합)
-            const withFreeWorks = withContractWorks + freeWorkCount;
-            const withFreeWriteDays = withContractWriteDays + freeWriteDays;
-            const withFreeChars = withContractChars + freeChars;
-
-            document.getElementById('timeline-summary').innerHTML =
-                `<div>확정 <b class="text-slate-700">${confirmedWorkIds.size}작품</b> · 계약작 <b class="text-slate-700">${contractWorkCount}작품</b> · 자유작 <b class="text-slate-700">${freeWorkCount}작품</b> · 집필일 <b class="text-slate-700">${confirmedWriteDays}일</b> · 총 <b class="text-amber-700">${totalRestDays}일</b> 휴식 · 확정 목표 <b class="text-emerald-600">${totalChars.toLocaleString()}자</b></div>
-                 <div class="mt-0.5">(계약작까지 확정 시 <b class="text-slate-700">${withContractWorks}작품</b> · 집필일 <b class="text-slate-700">${withContractWriteDays}일</b> · 총 <b class="text-amber-700">${totalRestDays}일</b> 휴식 · 목표 <b class="text-emerald-600">${withContractChars.toLocaleString()}자</b>)</div>
-                 <div class="mt-0.5">(자유작까지 확정 시 <b class="text-slate-700">${withFreeWorks}작품</b> · 집필일 <b class="text-slate-700">${withFreeWriteDays}일</b> · 총 <b class="text-amber-700">${totalRestDays}일</b> 휴식 · 목표 <b class="text-emerald-600">${withFreeChars.toLocaleString()}자</b>)</div>`;
+            // 위쪽 요약 3줄: ① 확정 카드 ② + 집필 기간 일정(제목 연동 여부 상관없이 전부) ③ + 패시브·초단. 초단편은 패시브와 함께 ③ 에서만 더한다 (아래 합친 표와 같은 자료)
+            const all = tlAllWriteItems(y);
+            const sumRows = [['확정 카드', ['card']], ['+ 기간 집필', ['card', 'span']], ['+ 패시브·초단', null]].map(([name, types]) => {
+                const list = types ? all.filter(it => !it.short && types.includes(it.type)) : all;
+                const ids = new Set(list.filter(it => it.workId).map(it => it.workId));
+                return [name, ids.size + list.filter(it => !it.workId).length,   // 작품 연결이 없는 일정은 하나당 1작품
+                    list.reduce((n, it) => n + it.days, 0), list.reduce((n, it) => n + it.chars, 0)];
+            });
+            document.getElementById('timeline-summary').innerHTML = sumRows.map((r, i) =>
+                `<div${i ? ' class="mt-0.5"' : ''}><span class="tl-sum-name">${r[0]}</span> <b class="text-slate-700">${r[1]}작품</b> · 집필일 <b class="text-slate-700">${r[2]}일</b> · 총 <b class="text-amber-700">${totalRestDays}일</b> 휴식 · 목표 <b class="text-emerald-600">${r[3].toLocaleString()}자</b></div>`).join('');
             // ── 6) 막대가 좁으면 글씨를 막대 오른쪽 바깥에 내놓는다. 그 폭까지 감안해서 줄(lane)을 배치
             // ── 6) 네모(막대) 안에 글씨를 넣는다.
             //      폭이 모자라면 글씨를 조금씩 줄여서라도 안에 넣고(최대 60%까지),
@@ -27645,17 +27606,46 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
                 </div>`;
         }
 
-        // 확정 일정(달력 카드) + 기간 일정(집필)을 날짜순으로 한 표에 합친 줄들 (화면 표·이미지 저장 공용)
+        // 그 해 집필량 전부: 확정 카드(초단 포함) + 아직 카드로 안 만든 집필 기간 일정(작품 연결 여부 상관없이) + 패시브. 위 요약 3줄과 합친 표가 같이 쓴다
+        function tlAllWriteItems(y) {
+            const yS = `${y}-01-01`, yE = `${y}-12-31`;
+            const cards = {}, confirmedSpanIds = new Set(), items = [];
+            Object.entries(tlSched()).forEach(([d, list]) => (list || []).forEach(s => {
+                if (s.spanId) confirmedSpanIds.add(s.spanId);
+                if (!d.startsWith(`${y}-`) || s.category || !isScheduleWorkValid(s.workId)) return;
+                const c = cards[s.workId] || (cards[s.workId] = { days: new Set(), chars: 0 });
+                c.days.add(d); c.chars += Number(s.goal) || 0;
+            }));
+            Object.entries(cards).forEach(([workId, c]) => {
+                const ds = Array.from(c.days).sort(), a = ds[0], z = ds[ds.length - 1];
+                items.push({ type: 'card', workId, short: tlIsExcludedWork(workId), start: a, name: resolveWorkItem(workId).displayTitle || '(삭제된 작품)', period: `${a} ~ ${z}`, days: ds.length, chars: c.chars });
+            });
+            tlSpans().filter(sp => sp.startDate <= yE && sp.endDate >= yS).forEach(sp => {
+                const t = sp.type || 'write';
+                const cs = sp.startDate < yS ? yS : sp.startDate, ce = sp.endDate > yE ? yE : sp.endDate;
+                let days = 0, chars = 0;
+                if (t === 'passive') {
+                    const ps = passiveStats(sp);
+                    if (!ps.total || !ps.workDays) return;
+                    for (let i = 0; i < ps.totalDays; i++) { const d = spanDateAdd(sp.startDate, i); if (d >= cs && d <= ce && !ps.flags[i]) days++; }
+                    chars = Math.round(ps.total * days / ps.workDays);
+                } else if (t === 'write' && !confirmedSpanIds.has(sp.id)) {   // 카드로 확정한 일정은 카드 줄에 이미 들어 있다
+                    const st = calcSpanStats((cs !== sp.startDate || ce !== sp.endDate) ? { ...sp, startDate: cs, endDate: ce } : sp);
+                    days = Number(st.workDays) || 0; chars = Number(st.totalChars) || 0;
+                } else return;
+                const wt = sp.workId ? (resolveWorkItem(sp.workId).displayTitle || '') : '';
+                const title = (sp.title && sp.title !== '(제목 없음)') ? sp.title : '';
+                items.push({ type: t === 'passive' ? 'passive' : 'span', workId: sp.workId || '', short: tlIsExcludedWork(sp.workId), start: cs, name: title && wt ? `${title} (${wt})` : (title || wt || '(제목 없음)'), period: `${cs} ~ ${ce}`, days, chars });
+            });
+            return items.sort((a, b) => String(a.start).localeCompare(String(b.start)));
+        }
+
+        // 확정 일정 + 기간 일정(집필) + 패시브를 날짜순으로 한 표에 합친 줄들 (화면 표·이미지 저장 공용)
         function tlCombinedRows(data) {
             const num = n => (Number(n) || 0).toLocaleString();
-            const items = [];
-            (data.works || []).forEach(w => items.push({ k: '확정', start: w.firstDate, name: w.title, period: `${w.firstDate} ~ ${w.lastDate}`, days: Number(w.workDays) || 0, chars: Number(w.totalChars) || 0 }));
-            (data.spans || []).filter(sp => (sp.span.type || 'write') === 'write').forEach(({ span: s, stats: st }) => {
-                const wt = s.workId ? (resolveWorkItem(s.workId).displayTitle || '') : '';
-                items.push({ k: '기간', start: s.startDate, name: wt ? `${s.title} (${wt})` : s.title, period: `${s.startDate} ~ ${s.endDate}`, days: Number(st.workDays) || 0, chars: Number(st.totalChars) || 0 });
-            });
-            items.sort((a, b) => String(a.start).localeCompare(String(b.start)));
-            const rows = items.map(it => [it.k, it.name, it.period, `${it.days}일`, `${num(it.chars)}자`, it.days ? `${num(Math.round(it.chars / it.days))}자/일` : '-']);
+            const items = tlAllWriteItems(data.y);
+            const kind = it => it.type === 'passive' ? '패시브' : (it.type === 'card' ? '확정' : '기간') + (it.short ? '·초단' : '');   // 초단은 패시브와 같은 묶음 (위 요약 ③ 에서만 더한다)
+            const rows = items.map(it => [kind(it), it.name, it.period, `${it.days}일`, `${num(it.chars)}자`, it.days ? `${num(Math.round(it.chars / it.days))}자/일` : '-']);
             if (rows.length) {
                 const dd = items.reduce((n, it) => n + it.days, 0), cc = items.reduce((n, it) => n + it.chars, 0);
                 rows.push(['합계', `${items.length}건`, '', `${dd}일`, `${num(cc)}자`, dd ? `${num(Math.round(cc / dd))}자/일` : '-']);
@@ -27741,7 +27731,7 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
                      psWorkDays ? `${num(Math.round(psChars / psWorkDays))}자/일` : '-', '']));
 
             // 확정 일정 + 기간 일정(집필) 합친 표
-            const combinedHtml = wrap('■ 확정 일정 + 기간 일정 (집필) 합친 표', '#0e7490',
+            const combinedHtml = wrap('■ 확정 일정 + 기간 일정 (집필·패시브) 합친 표', '#0e7490',
                 tableHtml(['구분', '작품 / 일정', '기간', '일수', '글자수', '평균'], tlCombinedRows(data), '#0e7490'));
 
             // 기간 일정 · 휴식 등 (휴식/교정/여행/시놉기획)
@@ -28785,7 +28775,7 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
             drawTable('■ 기간 일정 · 집필', ['일정 제목','연결 작품','기간','총일수','집필일','쉬는 날','예상 글자수','하루 집필량','메모'],
                       [200, 230, 300, 100, 100, 150, 230, 160, 154], writeSpanRows, '#b45309');
 
-            drawTable('■ 확정 일정 + 기간 일정 (집필) 합친 표', ['구분','작품 / 일정','기간','일수','글자수','평균'],
+            drawTable('■ 확정 일정 + 기간 일정 (집필·패시브) 합친 표', ['구분','작품 / 일정','기간','일수','글자수','평균'],
                       [120, 560, 380, 160, 220, 184], combinedRows, '#0e7490');
 
             drawTable('■ 기간 일정 · 휴식 등 (휴식·교정·여행·시놉기획)', ['종류','일정 제목','연결 작품','기간','총일수','메모'],
@@ -28797,7 +28787,7 @@ html body.theme-candy #publisher-status-list .pub-direct-tag .wcf-ico { color:#f
             drawTable('■ 일정이 비어 있는 구간 (2일 이상)', ['기간','일수'], [420, 140], restRows, '#64748b');
 
             // ── 푸터
-            text('※ 글자수는 공백 포함 목표치입니다. 기간 일정의 예상 글자수 = (총일수 − 쉬는 날) × 하루 집필량으로 계산했습니다. 초단편(현로 초단 · BL 초단)은 이 표에서 제외되어 있습니다.',
+            text('※ 글자수는 공백 포함 목표치입니다. 기간 일정의 예상 글자수 = (총일수 − 쉬는 날) × 하루 집필량으로 계산했습니다. 초단편(현로 초단 · BL 초단)은 합친 표에만 들어 있고 다른 표에서는 제외됩니다.',
                  PAD, H - 34, { size: 13, color: '#94a3b8' });
 
             // ── 내려받기
